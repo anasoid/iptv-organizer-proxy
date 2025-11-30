@@ -487,15 +487,16 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 **live_streams**
 ```sql
 - id (PRIMARY KEY)
-- source_id (FOREIGN KEY)
+- source_id (FOREIGN KEY) - references sources.id
 - stream_id (INT) - original stream ID from source
 - num (INT) - sequence number from source
 - name (VARCHAR)
 - stream_type (VARCHAR)
 - stream_icon (VARCHAR)
 - epg_channel_id (VARCHAR)
-- category_id (INT) - primary category
-- category_ids (TEXT) - JSON array of all category IDs: [1363,1364]
+- category_id (INT) - primary category (functional ID from API, with source_id references categories)
+- category_ids (TEXT) - JSON array of all category functional IDs: [1363,1364]
+- FOREIGN KEY (source_id, category_id) REFERENCES categories(source_id, category_id)
 - added (INT) - Unix timestamp when added to source
 - is_adult (BOOLEAN) - adult content flag
 - custom_sid (VARCHAR)
@@ -512,14 +513,15 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 **vod_streams**
 ```sql
 - id (PRIMARY KEY)
-- source_id (FOREIGN KEY)
+- source_id (FOREIGN KEY) - references sources.id
 - stream_id (INT)
 - num (INT) - sequence number from source
 - name (VARCHAR)
 - stream_type (VARCHAR) - typically "movie"
 - stream_icon (VARCHAR)
-- category_id (INT) - primary category
-- category_ids (TEXT) - JSON array of all category IDs
+- category_id (INT) - primary category (functional ID from API, with source_id references categories)
+- category_ids (TEXT) - JSON array of all category functional IDs
+- FOREIGN KEY (source_id, category_id) REFERENCES categories(source_id, category_id)
 - added (INT) - Unix timestamp when added to source
 - is_adult (BOOLEAN) - adult content flag
 - container_extension (VARCHAR) - mp4, mkv, avi, etc.
@@ -550,7 +552,7 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 **series**
 ```sql
 - id (PRIMARY KEY)
-- source_id (FOREIGN KEY)
+- source_id (FOREIGN KEY) - references sources.id
 - series_id (INT)
 - num (INT) - sequence number from source
 - name (VARCHAR)
@@ -564,8 +566,9 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 - rating (DECIMAL)
 - rating_5based (DECIMAL)
 - tmdb (VARCHAR) - TMDB ID for external reference
-- category_id (INT) - primary category
-- category_ids (TEXT) - JSON array of all category IDs
+- category_id (INT) - primary category (functional ID from API, with source_id references categories)
+- category_ids (TEXT) - JSON array of all category functional IDs
+- FOREIGN KEY (source_id, category_id) REFERENCES categories(source_id, category_id)
 - backdrop_path (TEXT) - JSON array of backdrop images
 - youtube_trailer (VARCHAR)
 - episode_run_time (INT) - minutes
@@ -579,15 +582,18 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 
 **categories**
 ```sql
-- id (PRIMARY KEY)
-- source_id (FOREIGN KEY)
-- category_id (INT)
+- id (PRIMARY KEY) - technical ID for internal use only
+- source_id (FOREIGN KEY) - references sources.id
+- category_id (INT) - functional ID from Xtream API
+- UNIQUE KEY (source_id, category_id) - composite functional identifier
 - category_name (VARCHAR)
 - category_type (ENUM: live, vod, series)
-- parent_id (INT)
+- parent_id (INT) - references category_id within same source (not technical id)
 - labels (TEXT) - extracted labels (comma-separated: "Sports,HD,live")
 - created_at (DATETIME)
 ```
+
+**Note:** Stream-to-category relationships use the functional ID (source_id, category_id) instead of technical ID. This ensures proper foreign key relationships across sources with potentially overlapping category IDs.
 
 **sync_logs**
 ```sql
@@ -1201,88 +1207,6 @@ GET /api/sync/logs - Sync history
 75. Release automation
 76. Per-task sync status dashboard
 
-## Risks and Mitigations
-
-### Technical Challenges
-
-**Risk:** Upstream Xtream API may be slow or unreliable
-- **Mitigation:** Implement timeout handling, async sync jobs, health monitoring per source, error logging
-
-**Risk:** Large catalogs (50,000+ streams) may cause slow sync
-- **Mitigation:** Incremental sync, pagination, batch inserts, database indexing, progress tracking
-
-**Risk:** Filter logic may become complex and slow with large datasets
-- **Mitigation:** Database-level filtering using SQL WHERE clauses, proper indexes, caching, query optimization
-
-**Risk:** React build size may be too large
-- **Mitigation:** Code splitting, lazy loading routes, tree shaking, production optimizations, Vite/Webpack optimization
-
-**Risk:** Docker images may be too large
-- **Mitigation:** Multi-stage builds, Alpine base images, minimize layers, .dockerignore, production dependencies only
-
-**Risk:** Database incompatibility between MySQL and SQLite
-- **Mitigation:** Use standard SQL, PDO abstraction, test both databases, avoid DB-specific features
-
-**Risk:** One-source-per-client limitation may not suit all users
-- **Mitigation:** Document architecture clearly, ensure filters provide enough flexibility, consider future enhancement if demand exists
-
-### MVP Definition & Scope
-
-**Minimum Viable Product Must Include:**
-- Single source synchronization (live streams only)
-- Basic client authentication with source assignment
-- Xtream API for live streams (categories + streams)
-- Stream URL proxying to client's assigned source
-- React admin panel for source and client management
-- Manual sync trigger
-- Basic category-based filters
-- Docker Compose deployment
-- SQLite support for easy installation
-
-**Can Be Deferred to Post-MVP:**
-- VOD and series support
-- Advanced filter rules (AND/OR combinations)
-- Automatic scheduled sync (PHP daemon worker)
-- External webhook triggers for sync
-- Email/webhook notifications
-- Connection logging
-- Multi-platform Docker builds
-- CI/CD pipeline (can be added after core works)
-
-**MVP Success Criteria:**
-- Admin can deploy with `docker-compose up`
-- Admin can add Xtream source and sync data
-- Admin can create client and assign to source
-- Client can connect with IPTV player
-- Client can see filtered channel list from assigned source
-- Client can play channels
-- Admin can apply basic filters
-- React UI is functional and professional
-
-**Fast Path to Working Product:**
-1. Backend: Database + Source sync (CLI works)
-2. Backend: Client API (IPTV player works)
-3. React: Login + Source management (can add sources)
-4. React: Client management (can create clients)
-5. **At this point have working end-to-end system**
-6. Add filters for content control
-7. Add VOD/series support
-8. Add automation and polish
-
-### Deployment & Operations
-
-**Risk:** Docker deployment complexity for non-technical users
-- **Mitigation:** Clear documentation, docker-compose.yml with comments, .env templates, video tutorials, one-command setup
-
-**Risk:** Database migrations may fail during updates
-- **Mitigation:** Backup automation, migration rollback support, pre-migration validation, testing in CI
-
-**Risk:** GitHub Actions may consume too many minutes
-- **Mitigation:** Optimize build steps, cache dependencies, conditional workflows, use self-hosted runners if needed
-
-**Risk:** Multi-platform builds take too long
-- **Mitigation:** Parallel build jobs, Docker Buildx caching, build only on releases not every commit
-
 ## Appendix
 
 ### Technical Specifications
@@ -1607,13 +1531,21 @@ jobs:
 
 ### Database Indexes for Performance
 ```sql
+-- Composite index for category lookups (functional ID relationship)
+CREATE INDEX idx_live_source_category ON live_streams(source_id, category_id);
+CREATE INDEX idx_vod_source_category ON vod_streams(source_id, category_id);
+CREATE INDEX idx_series_source_category ON series(source_id, category_id);
+
+-- Other performance indexes
 CREATE INDEX idx_live_source ON live_streams(source_id);
-CREATE INDEX idx_live_category ON live_streams(category_id);
 CREATE INDEX idx_live_active ON live_streams(is_active);
 CREATE INDEX idx_client_username ON clients(username);
 CREATE INDEX idx_client_source ON clients(source_id);
 CREATE INDEX idx_client_active ON clients(is_active);
 CREATE INDEX idx_filter_client ON client_filters(client_id);
+
+-- Unique constraint on categories to ensure functional ID integrity
+CREATE UNIQUE INDEX idx_category_functional ON categories(source_id, category_id, category_type);
 
 -- Note: For label filtering, use LIKE queries with comma delimiters
 -- Example: WHERE labels LIKE '%,HD,%' OR labels LIKE 'HD,%' OR labels LIKE '%,HD'
