@@ -490,114 +490,141 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 
 **live_streams**
 ```sql
+-- Essential fields (indexed/filterable)
 - id (PRIMARY KEY)
 - source_id (FOREIGN KEY) - references sources.id
-- stream_id (INT) - original stream ID from source
-- num (INT) - sequence number from source
-- name (VARCHAR)
-- stream_type (VARCHAR)
-- stream_icon (VARCHAR)
-- epg_channel_id (VARCHAR)
+- stream_id (INT) - original stream ID from source (needed for stream URL construction)
+- name (VARCHAR) - stream name (needed for filter matching by name)
 - category_id (INT) - primary category (functional ID from API, with source_id references categories)
 - category_ids (TEXT) - JSON array of all category functional IDs: [1363,1364]
 - FOREIGN KEY (source_id, category_id) REFERENCES categories(source_id, category_id)
-- added (INT) - Unix timestamp when added to source
-- is_adult (BOOLEAN) - adult content flag
-- custom_sid (VARCHAR)
-- tv_archive (BOOLEAN) - catchup/timeshift available
-- tv_archive_duration (INT) - catchup duration in days
-- direct_source (VARCHAR)
-- stream_url (TEXT) - constructed URL template
-- labels (TEXT) - extracted labels (comma-separated: "ESPN,HD,Sports,USA,live")
+- is_adult (BOOLEAN) - adult content flag (needed for adult content filtering)
+- labels (TEXT) - extracted labels (comma-separated: "ESPN,HD,Sports,USA,live") (needed for filter matching)
 - is_active (BOOLEAN)
 - created_at (DATETIME)
 - updated_at (DATETIME)
+
+-- All other fields stored as JSON
+- data (JSON) - complete stream data from API including:
+  {
+    "num": 1,
+    "stream_type": "live",
+    "stream_icon": "http://...",
+    "epg_channel_id": "",
+    "added": 1675464765,
+    "custom_sid": null,
+    "tv_archive": 0,
+    "tv_archive_duration": 0,
+    "direct_source": "",
+    ... (any other fields from API)
+  }
 ```
+
+**Note:** The `data` JSON field stores the complete API response, allowing the proxy to return all original fields without needing schema changes when the API adds new fields.
 
 **vod_streams**
 ```sql
+-- Essential fields (indexed/filterable)
 - id (PRIMARY KEY)
 - source_id (FOREIGN KEY) - references sources.id
-- stream_id (INT)
-- num (INT) - sequence number from source
-- name (VARCHAR)
-- stream_type (VARCHAR) - typically "movie"
-- stream_icon (VARCHAR)
+- stream_id (INT) - original stream ID from source (needed for stream URL construction)
+- name (VARCHAR) - movie/VOD name (needed for filter matching by name)
 - category_id (INT) - primary category (functional ID from API, with source_id references categories)
 - category_ids (TEXT) - JSON array of all category functional IDs
 - FOREIGN KEY (source_id, category_id) REFERENCES categories(source_id, category_id)
-- added (INT) - Unix timestamp when added to source
-- is_adult (BOOLEAN) - adult content flag
-- container_extension (VARCHAR) - mp4, mkv, avi, etc.
-- custom_sid (VARCHAR)
-- direct_source (VARCHAR)
-- stream_url (TEXT)
-- plot (TEXT)
-- cast (TEXT)
-- director (VARCHAR)
-- genre (VARCHAR)
-- release_date (VARCHAR)
-- rating (DECIMAL)
-- rating_5based (DECIMAL)
-- tmdb (VARCHAR) - TMDB ID for external reference
-- trailer (VARCHAR) - trailer URL or ID
-- year (INT)
-- duration_secs (INT)
-- duration (VARCHAR) - formatted duration
-- video (TEXT) - JSON with video codec info
-- audio (TEXT) - JSON with audio codec info
-- bitrate (INT)
-- labels (TEXT) - extracted labels (comma-separated: "Action,English,movie")
+- is_adult (BOOLEAN) - adult content flag (needed for adult content filtering)
+- labels (TEXT) - extracted labels (comma-separated: "Action,English,movie") (needed for filter matching)
 - is_active (BOOLEAN)
 - created_at (DATETIME)
 - updated_at (DATETIME)
+
+-- All other fields stored as JSON
+- data (JSON) - complete VOD data from API including:
+  {
+    "num": 1,
+    "stream_type": "movie",
+    "stream_icon": "https://...",
+    "added": 1764452400,
+    "container_extension": "mp4",
+    "custom_sid": null,
+    "direct_source": "",
+    "plot": "...",
+    "cast": "...",
+    "director": "...",
+    "genre": "...",
+    "release_date": "...",
+    "rating": 5.857,
+    "rating_5based": 2.9,
+    "tmdb": "1211776",
+    "trailer": "...",
+    "year": 2025,
+    "duration_secs": 5400,
+    "duration": "1:30:00",
+    "video": {...},
+    "audio": {...},
+    "bitrate": 8000,
+    ... (any other fields from API)
+  }
 ```
 
 **series**
 ```sql
+-- Essential fields (indexed/filterable)
 - id (PRIMARY KEY)
 - source_id (FOREIGN KEY) - references sources.id
-- series_id (INT)
-- num (INT) - sequence number from source
-- name (VARCHAR)
-- cover (VARCHAR)
-- plot (TEXT)
-- cast (TEXT)
-- director (VARCHAR)
-- genre (VARCHAR)
-- release_date (VARCHAR)
-- last_modified (INT) - Unix timestamp
-- rating (DECIMAL)
-- rating_5based (DECIMAL)
-- tmdb (VARCHAR) - TMDB ID for external reference
+- series_id (INT) - original series ID from source (needed for API lookups)
+- name (VARCHAR) - series name (needed for filter matching by name)
 - category_id (INT) - primary category (functional ID from API, with source_id references categories)
 - category_ids (TEXT) - JSON array of all category functional IDs
 - FOREIGN KEY (source_id, category_id) REFERENCES categories(source_id, category_id)
-- backdrop_path (TEXT) - JSON array of backdrop images
-- youtube_trailer (VARCHAR)
-- episode_run_time (INT) - minutes
-- seasons (TEXT) - JSON array of season data
-- episodes (TEXT) - JSON object with all episodes data
-- labels (TEXT) - extracted labels (comma-separated: "Drama,2024,series")
+- labels (TEXT) - extracted labels (comma-separated: "Drama,2024,series") (needed for filter matching)
 - is_active (BOOLEAN)
 - created_at (DATETIME)
 - updated_at (DATETIME)
+
+-- All other fields stored as JSON
+- data (JSON) - complete series data from API including:
+  {
+    "num": 1,
+    "cover": "https://...",
+    "plot": "...",
+    "cast": "...",
+    "director": "...",
+    "genre": "...",
+    "release_date": "...",
+    "last_modified": 1234567890,
+    "rating": 8.5,
+    "rating_5based": 4.25,
+    "tmdb": "246680",
+    "backdrop_path": ["https://...", ...],
+    "youtube_trailer": "LSPzvzgZ9JE",
+    "episode_run_time": 45,
+    "seasons": [...],
+    "episodes": {...},
+    ... (any other fields from API)
+  }
 ```
+
+**Note:** Series data is particularly large due to seasons/episodes information. The `is_adult` flag is not typically present in series API responses, but can be added to labels for filtering if needed.
 
 **categories**
 ```sql
+-- Essential fields (indexed/filterable)
 - id (PRIMARY KEY) - technical ID for internal use only
 - source_id (FOREIGN KEY) - references sources.id
 - category_id (INT) - functional ID from Xtream API
 - UNIQUE KEY (source_id, category_id) - composite functional identifier
-- category_name (VARCHAR)
+- category_name (VARCHAR) - category name (needed for filter matching by name)
 - category_type (ENUM: live, vod, series)
 - parent_id (INT) - references category_id within same source (not technical id)
-- labels (TEXT) - extracted labels (comma-separated: "Sports,HD,live")
+- labels (TEXT) - extracted labels (comma-separated: "Sports,HD,live") (needed for filter matching)
 - created_at (DATETIME)
 ```
 
-**Note:** Stream-to-category relationships use the functional ID (source_id, category_id) instead of technical ID. This ensures proper foreign key relationships across sources with potentially overlapping category IDs.
+**Note:**
+- Stream-to-category relationships use the functional ID (source_id, category_id) instead of technical ID
+- Categories have minimal extra data from the API, so no JSON field is needed
+- This ensures proper foreign key relationships across sources with potentially overlapping category IDs
 
 **sync_logs**
 ```sql
