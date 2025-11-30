@@ -16,7 +16,6 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 - Automatic daily synchronization with sources
 - Standard Xtream Codes API compatibility with all clients
 - Local caching reduces load on source servers
-- Modern React-based administration interface
 - Docker deployment for easy installation
 - Configurable database (MySQL or SQLite)
 
@@ -159,36 +158,10 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 **How it works:**
 - **Simple Authentication System:**
   - Username and password-based login
-  - Password hashing using bcrypt (cost factor 10-12)
-  - Session-based or JWT token authentication
-  - Secure token storage and validation
 
 - **Admin User Management:**
   - Create/edit/delete admin users
-  - Each admin has unique username
-  - Password change functionality
-  - Enable/disable admin accounts
-  - Admin activity tracking
 
-- **Default Admin Setup:**
-  - First admin user created automatically on initial setup
-  - Username from `ADMIN_USERNAME` environment variable
-  - Password from `ADMIN_PASSWORD` environment variable
-  - Created during first database migration/initialization
-
-- **Protected Endpoints:**
-  - All admin API endpoints require valid authentication
-  - Authentication middleware validates tokens/sessions
-  - Automatic session expiration (configurable)
-  - Logout functionality to invalidate sessions
-
-- **Security Features:**
-  - HTTPS enforcement in production
-  - Rate limiting on login endpoint (prevent brute force)
-  - Session cookies with HttpOnly, Secure, SameSite flags
-  - CSRF protection for session-based auth
-  - Input validation and sanitization
-  - SQL injection prevention (PDO prepared statements)
 
 ### 5. React-based Administration Web Interface
 **What it does:** Provides a modern, responsive web-based dashboard for managing sources, clients, and filters.
@@ -290,134 +263,13 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 ### 7. Docker Deployment
 **What it does:** Provides containerized deployment with Docker for easy installation and portability.
 
-**Why it's important:** Simplifies deployment, ensures consistency across environments, enables easy updates.
-
-**How it works:**
-- Multi-stage Docker build for optimized image size
-- Separate containers for PHP backend and React frontend
-- Docker Compose configuration for full stack
-- Environment variable configuration
-- Volume mounts for persistent data
-- Health checks for containers
-- Official Docker Hub image publishing
 
 ### 8. CI/CD with GitHub Actions
 **What it does:** Automated build, test, and deployment pipeline using GitHub Actions.
 
 **Why it's important:** Ensures code quality, automates releases, publishes Docker images automatically.
 
-**How it works:**
-- Automated testing on pull requests
-- Docker image build on commits to main branch
-- Multi-platform builds (amd64, arm64)
-- Automatic versioning (semantic versioning)
-- Docker image push to Docker Hub/GitHub Container Registry
-- Release artifact generation
-- Automated changelog generation
 
-## User Experience
-
-### User Personas
-
-**Persona 1: The IPTV Reseller**
-- Purchases access from wholesale provider
-- Needs to filter content for different client packages
-- Wants to hide adult content for family packages
-- Sells different tiers (basic, premium, sports)
-- Manages 100-1000 clients
-- Each client gets filtered access to the same source
-
-**Persona 2: The Service Administrator**
-- Manages technical infrastructure
-- Monitors system health and performance
-- Troubleshoots client connection issues
-- Performs maintenance and updates
-- Values Docker for easy deployment
-- Uses modern admin UI efficiently
-
-**Persona 3: The Self-Hoster**
-- Runs personal IPTV setup
-- Wants SQLite for simplicity
-- Uses Docker on home server
-- Manages family accounts with different filters
-- Values easy updates and maintenance
-
-### Key User Flows
-
-**Flow 1: Initial System Setup**
-1. Administrator pulls Docker image or clones repository
-2. Administrator configures environment (database choice, credentials)
-3. Administrator runs Docker Compose
-4. Administrator accesses React admin panel
-5. Administrator adds first Xtream Codes source
-6. System performs initial synchronization
-7. Administrator creates basic filters (YAML with two sections: rules and favoris)
-8. Administrator adds first client with source and one filter
-9. Administrator provides credentials to end client
-
-**Flow 2: Adding a New Source**
-1. Administrator navigates to Sources page in React UI
-2. Administrator clicks "Add Source" button
-3. Administrator enters source details in form
-4. Administrator tests connection (instant feedback)
-5. Administrator sets sync interval
-6. Administrator saves source
-7. System performs initial sync (progress shown)
-8. Administrator receives notification on completion
-
-**Flow 3: Creating a Client with Filter**
-1. Administrator navigates to Clients page
-2. Administrator clicks "Add Client"
-3. Administrator enters client name and details
-4. Administrator selects source from dropdown (required)
-5. System generates or administrator sets credentials
-6. Administrator selects one filter to apply (optional)
-7. Administrator sets expiration date (optional)
-8. Administrator saves client
-9. System displays client credentials and connection URL
-10. Administrator copies credentials to clipboard
-
-**Flow 4: Client Connecting to Service**
-1. End user enters credentials in IPTV player
-2. Player sends authentication request to proxy
-3. Proxy validates credentials and identifies assigned source
-4. Proxy returns user info and server details
-5. Player requests channel list
-6. Proxy applies filters and returns filtered list from client's source
-7. User selects channel to watch
-8. Proxy proxies stream URL to client's assigned source
-9. User watches content seamlessly
-
-**Flow 5: Daily Sync Operation**
-1. Sync daemon or cron job triggers at scheduled time
-2. **For each source, runs 6 separate sync tasks:**
-   - Task 1: Sync live categories
-   - Task 2: Sync live streams
-   - Task 3: Sync VOD categories
-   - Task 4: Sync VOD streams
-   - Task 5: Sync series categories
-   - Task 6: Sync series
-3. Each task fetches updated data from source
-4. Each task compares with local database
-5. Each task updates changed content
-6. Each task removes deleted content
-7. Each task adds new content
-8. System logs each task result separately in sync_logs with sync_type
-9. React dashboard shows updated sync status per task type
-
-### UI/UX Considerations
-- Modern React SPA with Material-UI or Ant Design
-- Responsive design (desktop, tablet, mobile)
-- Real-time updates using WebSockets or polling
-- Data tables with sorting, filtering, search, pagination
-- Form validation with inline error messages
-- Loading states and progress indicators
-- Toast notifications for actions
-- Confirmation modals for destructive actions
-- Dark/light theme support
-- Breadcrumb navigation
-- Clean, intuitive layout
-- Copy-to-clipboard functionality for credentials
 </context>
 
 <PRD>
@@ -436,12 +288,12 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 
 **Data Architecture:**
 - **Stored in database**: Channels, categories, VOD, series metadata
-- **Proxied on-the-fly**: EPG data, stream URLs
+- **Proxied on-the-fly**: EPG data, stream URLs,series info
 - Filters applied to database queries for cached content
 - Filters applied in real-time for proxied EPG data
 
 **2. React Frontend (Admin Panel)**
-- React 18+ with TypeScript
+- React with TypeScript
 - State management (Redux Toolkit or Zustand)
 - UI component library (Material-UI or Ant Design)
 - React Router for navigation
@@ -451,8 +303,8 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 - Build with Vite or Create React App
 
 **3. Database (Configurable)**
-- **MySQL 8.0+** (for production, multi-user deployments)
-- **SQLite 3** (for development, single-user, embedded deployments)
+- **MySQL** (for production, multi-user deployments)
+- **SQLite** (for development, single-user, embedded deployments)
 - Single configuration option determines which to use
 - Same schema supports both databases
 - Migration scripts for both database types
@@ -465,31 +317,10 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 - Error handling and logging
 - Logging to database and files
 
-**5. Web Server (Nginx)**
-- Serve React static files
-- Reverse proxy to PHP backend
-- Handle stream proxying
-- URL rewriting for Xtream API format
-- SSL/TLS termination
-- Access logging
-
-**6. Docker Infrastructure**
-- **Backend Container:** PHP-FPM with Nginx
-- **Frontend Container:** Nginx serving React build
-- **Database Container:** MySQL (optional, if not using SQLite)
-- **Sync Worker Container:** PHP CLI for background jobs
-- Docker Compose orchestration
-- Volume mounts for data persistence
-- Network isolation and security
 
 **7. CI/CD Pipeline (GitHub Actions)**
 - Automated testing (PHPUnit, Jest)
-- Code quality checks (PHPStan, ESLint)
-- Docker image builds (multi-stage)
 - Multi-platform support (linux/amd64, linux/arm64)
-- Push to Docker Hub and GitHub Container Registry
-- Semantic versioning and tagging
-- Release notes generation
 
 ### Data Models
 
@@ -798,23 +629,23 @@ GET /api/sync/logs - Sync history (protected)
 ### Technology Stack Summary
 
 **Backend:**
-- PHP 8.1+
-- Slim Framework 4 or vanilla PHP with routing
+- PHP
+- Slim Framework or vanilla PHP with routing
 - PDO for database abstraction
 - Guzzle for HTTP client
 - Monolog for logging
 
 **Frontend:**
-- React 18+
+- React
 - TypeScript
 - Material-UI or Ant Design
 - Redux Toolkit or Zustand
-- React Router 6
+- React Router
 - Axios
 - React Hook Form
 
 **Database:**
-- MySQL 8.0+ OR SQLite 3 (configurable)
+- MySQL OR SQLite (configurable)
 - Migration system (Phinx or custom)
 
 **DevOps:**
@@ -1042,19 +873,6 @@ GET /api/sync/logs - Sync history (protected)
 - Filter templates/presets (YAML files)
 - Import/export filters (YAML format)
 
-**Deliverables:**
-- Filter management components
-- Filter builder UI
-- Filter application engine (backend)
-- Preview functionality
-- Client-filter assignment UI
-
-**Success Criteria:**
-- Can create filters using YAML format
-- YAML editor validates and highlights syntax
-- Can assign filters to clients
-- Client API responses respect filters from assigned source
-- Preview shows accurate results
 
 ### Phase 7: VOD & Series Support
 **Scope:** Extend functionality to VOD movies and series
@@ -1077,19 +895,7 @@ GET /api/sync/logs - Sync history (protected)
 - VOD/series display in React admin
 - Enhanced sync worker to handle all 6 sync task types (live_categories, live_streams, vod_categories, vod_streams, series_categories, series)
 
-**Deliverables:**
-- Full Xtream API compatibility
-- VOD and series database tables
-- VOD/series sync functionality
-- VOD/series filtering
-- VOD/series UI in admin panel
 
-**Success Criteria:**
-- VOD content syncs from sources
-- Series content syncs with episodes
-- Clients can browse and play VOD
-- Clients can browse and play series
-- Filters work for all content types
 
 ### Phase 8: Automated Sync & Background Workers
 **Scope:** Background workers and scheduled synchronization (no cron required)
@@ -1176,12 +982,6 @@ GET /api/sync/logs - Sync history (protected)
 - Environment templates
 - Deployment documentation
 
-**Success Criteria:**
-- Can deploy entire stack with `docker-compose up`
-- Can choose MySQL or SQLite via environment variable
-- Data persists across container restarts
-- Health checks work correctly
-- Easy configuration via .env file
 
 ### Phase 10: CI/CD with GitHub Actions
 **Scope:** Automated build, test, and deployment pipeline
@@ -1523,8 +1323,6 @@ LOG_LEVEL=info
 
 **Docker Compose:**
 ```yaml
-version: '3.8'
-
 services:
   backend:
     image: ghcr.io/yourorg/iptv-proxy-backend:latest
@@ -1703,16 +1501,16 @@ jobs:
 ### Technology Requirements
 
 **Backend:**
-- PHP 8.1+
+- PHP (latest stable version recommended)
 - Extensions: pdo, pdo_mysql, pdo_sqlite, curl, json, mbstring, openssl
-- Composer 2.x
+- Composer (latest version)
 
 **Frontend:**
-- Node.js 18+
+- Node.js (LTS version recommended)
 - NPM or Yarn
 - Modern browser support (ES6+)
 
 **Infrastructure:**
-- Docker 20.10+
-- Docker Compose 2.x
+- Docker (latest stable version)
+- Docker Compose
 </PRD>
