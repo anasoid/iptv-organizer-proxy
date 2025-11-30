@@ -29,9 +29,17 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 
 **How it works:**
 - Connect to Xtream Codes API using credentials (username, password, URL)
-- Fetch live streams catalog (`get_live_categories`, `get_live_streams`)
-- Fetch VOD movies catalog (`get_vod_categories`, `get_vod_streams`)
-- Fetch series catalog (`get_series_categories`, `get_series`)
+- **Synchronization is separated by categories and stream types:**
+  - **Live Sync Tasks:**
+    1. Sync live categories (`get_live_categories`)
+    2. Sync live streams (`get_live_streams`)
+  - **VOD Sync Tasks:**
+    1. Sync VOD categories (`get_vod_categories`)
+    2. Sync VOD streams (`get_vod_streams`)
+  - **Series Sync Tasks:**
+    1. Sync series categories (`get_series_categories`)
+    2. Sync series (`get_series`)
+- Each task is separate and can be tracked independently
 - Store all metadata in local database (MySQL or SQLite)
 - **Extract labels** from channel names and category names:
   - Split by `-` (dash) delimiter and trim whitespace
@@ -45,7 +53,7 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
   - Store labels in database for advanced filtering, grouping, and search
 - Scheduled synchronization (daily, configurable interval)
 - Track sync status and last update time per source
-- Handle API errors and retry logic
+- Handle API errors with logging
 
 ### 2. Client Access via Xtream Codes API
 **What it does:** Provides standard Xtream Codes API endpoints for clients to access filtered content from their assigned source.
@@ -165,7 +173,6 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
   - Set expiration dates
   - Enable/disable clients
   - View client connection logs
-  - Client statistics (last connection, streams watched)
 
 - **Filter Management:**
   - Create/edit/delete filters
@@ -181,8 +188,6 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
   - System overview (total sources, clients, streams)
   - Recent activity logs
   - Sync status for all sources
-  - Storage usage
-  - Active connections
   - Quick actions
 
 ### 5. Automatic Data Refresh
@@ -215,13 +220,20 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 
 **Sync Features (all options):**
 - Configurable refresh interval per source (default: 24 hours)
+- **Separate sync tasks by type:**
+  - Live categories sync
+  - Live streams sync
+  - VOD categories sync
+  - VOD streams sync
+  - Series categories sync
+  - Series sync
+- Each task tracked independently in sync_logs
 - Incremental updates when possible
-- Full resync option
+- Full resync option per task type
 - Conflict resolution (handle deleted/updated content)
 - Notification on sync failures
-- Retry mechanism with exponential backoff
-- Sync logs and history
-- Lock mechanism to prevent duplicate syncs
+- Sync logs and history per task type
+- Lock mechanism to prevent duplicate syncs per task type
 
 ### 6. Docker Deployment
 **What it does:** Provides containerized deployment with Docker for easy installation and portability.
@@ -325,14 +337,21 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 9. User watches content seamlessly
 
 **Flow 5: Daily Sync Operation**
-1. Cron job triggers at scheduled time
-2. System fetches updated data from each source
-3. System compares with local database
-4. System updates changed content
-5. System removes deleted content
-6. System adds new content
-7. System logs sync results
-8. React dashboard shows updated sync status
+1. Sync daemon or cron job triggers at scheduled time
+2. **For each source, runs 6 separate sync tasks:**
+   - Task 1: Sync live categories
+   - Task 2: Sync live streams
+   - Task 3: Sync VOD categories
+   - Task 4: Sync VOD streams
+   - Task 5: Sync series categories
+   - Task 6: Sync series
+3. Each task fetches updated data from source
+4. Each task compares with local database
+5. Each task updates changed content
+6. Each task removes deleted content
+7. Each task adds new content
+8. System logs each task result separately in sync_logs with sync_type
+9. React dashboard shows updated sync status per task type
 
 ### UI/UX Considerations
 - Modern React SPA with Material-UI or Ant Design
@@ -391,7 +410,7 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 - Cron-triggered or continuous loop
 - Queue-based processing
 - Handles all source synchronization
-- Error handling and retries
+- Error handling and logging
 - Logging to database and files
 
 **5. Web Server (Nginx)**
@@ -570,6 +589,7 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 ```sql
 - id (PRIMARY KEY)
 - source_id (FOREIGN KEY)
+- sync_type (ENUM: live_categories, live_streams, vod_categories, vod_streams, series_categories, series)
 - started_at (DATETIME)
 - completed_at (DATETIME)
 - status (ENUM: success, failed, partial)
@@ -659,7 +679,6 @@ PUT /api/filters/{id} - Update filter
 DELETE /api/filters/{id} - Delete filter
 POST /api/filters/{id}/preview - Preview filter results
 
-GET /api/dashboard/stats - Dashboard statistics
 GET /api/dashboard/activity - Recent activity
 GET /api/sync/status - All sources sync status
 GET /api/sync/logs - Sync history
@@ -682,7 +701,6 @@ GET /api/sync/logs - Sync history
 - React Router 6
 - Axios
 - React Hook Form
-- Chart.js for analytics
 
 **Database:**
 - MySQL 8.0+ OR SQLite 3 (configurable)
@@ -715,10 +733,13 @@ GET /api/sync/logs - Sync history
 - Source model and storage
 - Xtream Codes API client (PHP)
 - Basic authentication for sources
-- Fetch live streams from one source
+- **Separate sync tasks:**
+  - Sync live categories task
+  - Sync live streams task
 - **Label extraction engine** (parse channel/category names by `-`, `|`, `[]`, add stream_type)
-- Store live streams in database with extracted labels
-- Command-line sync script (PHP CLI)
+- Store live categories and streams in database with extracted labels
+- Sync logging per task type (sync_type field in sync_logs)
+- Command-line sync script (PHP CLI) with task separation
 - Environment configuration (.env)
 
 **Deliverables:**
@@ -731,7 +752,9 @@ GET /api/sync/logs - Sync history
 
 **Success Criteria:**
 - Can connect to Xtream source
-- Can fetch and store live streams
+- Can fetch and store live categories (separate task)
+- Can fetch and store live streams (separate task)
+- Each task is logged independently in sync_logs with sync_type
 - Data persists in chosen database
 - Can switch between MySQL and SQLite via config
 - Works in Docker container
@@ -805,9 +828,9 @@ GET /api/sync/logs - Sync history
 - Edit source form/modal
 - Delete source with confirmation
 - Test source connection button (real-time feedback)
-- Manual sync trigger button
-- View sync status and progress
-- Sync logs display
+- Manual sync trigger button (trigger all tasks or individual task types)
+- View sync status and progress per task type
+- Sync logs display per task type (live_categories, live_streams, vod_categories, vod_streams, series_categories, series)
 - Form validation
 - Error handling and toast notifications
 - Loading states
@@ -822,7 +845,8 @@ GET /api/sync/logs - Sync history
 **Success Criteria:**
 - Can add/edit/delete sources via React UI
 - Can test connection with instant feedback
-- Can trigger sync and see progress
+- Can trigger sync (all tasks or individual task types) and see progress
+- Sync status shows progress per task type (live_categories, live_streams, etc.)
 - Clean, intuitive UI with proper feedback
 
 ### Phase 5: React Admin Panel - Client Management
@@ -839,7 +863,6 @@ GET /api/sync/logs - Sync history
 - Enable/disable client toggle
 - Expiry date picker
 - View client connection logs
-- Client statistics display
 - Copy credentials to clipboard
 - Display client connection URL
 - Pagination and search
@@ -849,7 +872,6 @@ GET /api/sync/logs - Sync history
 - Client API endpoints (backend)
 - Connection logging display
 - Credential generation
-- Statistics dashboard
 
 **Success Criteria:**
 - Can create clients via React UI
@@ -921,8 +943,12 @@ GET /api/sync/logs - Sync history
 **Scope:** Extend functionality to VOD movies and series
 
 **Features:**
-- Sync VOD categories and streams
-- Sync series categories and episodes
+- **Separate VOD sync tasks:**
+  - Sync VOD categories task
+  - Sync VOD streams task
+- **Separate series sync tasks:**
+  - Sync series categories task
+  - Sync series task (with episodes)
 - `get_vod_categories` API endpoint
 - `get_vod_streams` API endpoint
 - `get_series_categories` API endpoint
@@ -932,7 +958,7 @@ GET /api/sync/logs - Sync history
 - Series episode URL proxying
 - Filters for VOD and series
 - VOD/series display in React admin
-- Enhanced sync worker for all content types
+- Enhanced sync worker to handle all 6 sync task types (live_categories, live_streams, vod_categories, vod_streams, series_categories, series)
 
 **Deliverables:**
 - Full Xtream API compatibility
@@ -955,27 +981,37 @@ GET /api/sync/logs - Sync history
 - **PHP Daemon Worker** (primary method):
   - Long-running PHP process in Docker container
   - Continuous loop checking next_sync timestamps
+  - **Processes 6 separate sync tasks per source:**
+    1. Live categories sync
+    2. Live streams sync
+    3. VOD categories sync
+    4. VOD streams sync
+    5. Series categories sync
+    6. Series sync
   - Sleep between iterations (configurable, default 5 minutes)
   - Docker restart policy for reliability
 
 - **Webhook API Endpoint** (alternative method):
   - Authenticated HTTP endpoint to trigger sync
+  - Can trigger all tasks or specific task type
   - Can be called by external cron services (cron-job.org, etc.)
   - Can be triggered manually from admin panel
 
 - **On-Demand Sync with TTL** (fallback method):
-  - Check data age on API requests
+  - Check data age on API requests per task type
   - Trigger background sync if stale
   - Non-blocking for client requests
 
 - Configurable sync interval per source
+- **Task-level sync management:**
+  - Each of the 6 task types tracked separately in sync_logs
+  - Sync lock per task type (prevent duplicate syncs)
 - Incremental sync (detect changes)
-- Sync queue system (handle multiple sources)
-- Sync lock mechanism (prevent duplicate syncs)
-- Error handling and retry logic with exponential backoff
+- Sync queue system (handle multiple sources and task types)
+- Error handling and logging per task
 - Email/webhook notifications on sync failure
-- Sync history and detailed logs
-- Sync progress tracking (real-time in UI)
+- Sync history and detailed logs per task type
+- Sync progress tracking (real-time in UI) per task
 - Manual vs automatic sync tracking
 - Sync worker Docker container with restart policy
 
@@ -1063,34 +1099,6 @@ GET /api/sync/logs - Sync history
 - Semantic versioning applied automatically
 - Releases created with changelogs
 
-### Phase 11: Dashboard & Analytics
-**Scope:** Enhanced dashboard with statistics and monitoring
-
-**Features:**
-- Dashboard statistics API
-- Real-time active connections display
-- Charts for client activity (Chart.js)
-- Storage usage monitoring
-- Sync success/failure trends
-- Most popular streams/categories
-- Client growth over time
-- Source health monitoring
-- Recent activity feed
-- System information display
-- Quick action buttons
-
-**Deliverables:**
-- Dashboard components
-- Analytics API endpoints
-- Chart visualizations
-- Real-time data updates
-
-**Success Criteria:**
-- Dashboard shows comprehensive statistics
-- Charts display meaningful data
-- Real-time updates work
-- Performance remains good with large datasets
-
 ## Logical Dependency Chain
 
 **Foundation Layer (Must build first):**
@@ -1102,97 +1110,99 @@ GET /api/sync/logs - Sync history
 
 **Data Sync Layer (Core data pipeline):**
 6. Xtream API client library (HTTP requests)
-7. Live streams fetch and parse
-8. Live streams database storage
-9. Source model and CRUD operations
-10. Basic sync script (CLI)
+7. Sync task separation system (6 task types)
+8. Live categories fetch and parse (task 1)
+9. Live streams fetch and parse (task 2)
+10. Live categories and streams database storage
+11. Sync logging with sync_type tracking
+12. Source model and CRUD operations
+13. Basic sync script (CLI) with task separation
 
 **Client API Layer (External interface):**
-11. Client model with source assignment (one-to-one)
-12. Client authentication system
-13. `player_api.php` routing and handler
-14. `get_live_streams` endpoint with source-based filtering
-15. `get_live_categories` endpoint
-16. Stream URL proxy/redirect to client's source
-17. JSON response formatter
-18. Nginx configuration for Xtream URLs
+14. Client model with source assignment (one-to-one)
+15. Client authentication system
+16. `player_api.php` routing and handler
+17. `get_live_streams` endpoint with source-based filtering
+18. `get_live_categories` endpoint
+19. Stream URL proxy/redirect to client's source
+20. JSON response formatter
+21. Nginx configuration for Xtream URLs
 
 **React Foundation (Admin interface base):**
-19. React project setup (TypeScript, Vite)
-20. UI library integration (Material-UI/Ant Design)
-21. React Router setup
-22. Admin authentication UI (login page)
-23. Backend auth API (JWT/session)
-24. Protected routes
-25. Main layout with navigation
-26. Frontend Docker container
-27. Docker Compose for backend + frontend
+22. React project setup (TypeScript, Vite)
+23. UI library integration (Material-UI/Ant Design)
+24. React Router setup
+25. Admin authentication UI (login page)
+26. Backend auth API (JWT/session)
+27. Protected routes
+28. Main layout with navigation
+29. Frontend Docker container
+30. Docker Compose for backend + frontend
 
 **Source Management (First admin feature):**
-28. Sources API endpoints (backend)
-29. Sources list component
-30. Add/edit source forms
-31. Source test connection
-32. Manual sync trigger from React UI
+31. Sources API endpoints (backend)
+32. Sources list component
+33. Add/edit source forms
+34. Source test connection
+35. Manual sync trigger from React UI (per task type)
+36. Sync status display per task type
 
 **Client Management (Second admin feature):**
-33. Clients API endpoints (backend)
-34. Clients list component
-35. Add/edit client forms with source dropdown
-36. Client enable/disable toggle
-37. Connection logging
-38. Credential generation and display
+37. Clients API endpoints (backend)
+38. Clients list component
+39. Add/edit client forms with source dropdown
+40. Client enable/disable toggle
+41. Connection logging
+42. Credential generation and display
 
 **Filter System (Core business logic):**
-39. Filter database schema
-40. Filter model and storage
-41. Filter API endpoints (backend)
-42. Filter CRUD components (React)
-43. Filter rule builder UI
-44. Filter application logic (backend)
-45. Client-filter assignment
-46. Filter preview functionality
+43. Filter database schema
+44. Filter model and storage
+45. Filter API endpoints (backend)
+46. Filter CRUD components (React)
+47. Filter rule builder UI (rules and favoris sections)
+48. Filter application logic (backend)
+49. Client-filter assignment
+50. Filter preview functionality
 
-**Content Expansion (All content types):**
-47. VOD database schema
-48. VOD sync implementation
-49. VOD API endpoints
-50. Series database schema
-51. Series sync implementation
-52. Series API endpoints
+**Content Expansion (All content types with task separation):**
+51. VOD database schema
+52. VOD categories sync task implementation
+53. VOD streams sync task implementation
+54. VOD API endpoints
+55. Series database schema
+56. Series categories sync task implementation
+57. Series sync task implementation
+58. Series API endpoints
 
 **Automation & Background Jobs (no cron required):**
-53. PHP daemon worker (long-running process)
-54. Webhook API endpoint for external triggers
-55. On-demand sync middleware with TTL
-56. Sync lock mechanism
-57. Scheduled sync system (loop-based)
-58. Error notification system
-59. Sync logging and history
-60. Real-time sync progress in UI
-61. Docker restart policy for worker
+59. PHP daemon worker (long-running process)
+60. Task separation logic for 6 sync types
+61. Webhook API endpoint for external triggers (per task type)
+62. On-demand sync middleware with TTL per task
+63. Sync lock mechanism per task type
+64. Scheduled sync system (loop-based) handling all task types
+65. Error notification system per task
+66. Sync logging and history per task type
+67. Real-time sync progress in UI per task
+68. Docker restart policy for worker
 
 **Deployment & CI/CD:**
-62. Production Docker Compose
-63. Environment configuration templates
-64. GitHub Actions for testing
-65. GitHub Actions for Docker builds
-66. Multi-platform build support
-67. Docker Hub/GHCR publishing
-68. Release automation
-
-**Enhancement Layer:**
-69. Dashboard statistics API
-70. Dashboard charts and visualizations
-71. Analytics components
-72. System monitoring
+69. Production Docker Compose
+70. Environment configuration templates
+71. GitHub Actions for testing
+72. GitHub Actions for Docker builds
+73. Multi-platform build support
+74. Docker Hub/GHCR publishing
+75. Release automation
+76. Per-task sync status dashboard
 
 ## Risks and Mitigations
 
 ### Technical Challenges
 
 **Risk:** Upstream Xtream API may be slow or unreliable
-- **Mitigation:** Implement timeout handling, retry logic, async sync jobs, health monitoring per source
+- **Mitigation:** Implement timeout handling, async sync jobs, health monitoring per source, error logging
 
 **Risk:** Large catalogs (50,000+ streams) may cause slow sync
 - **Mitigation:** Incremental sync, pagination, batch inserts, database indexing, progress tracking
@@ -1231,7 +1241,6 @@ GET /api/sync/logs - Sync history
 - Automatic scheduled sync (PHP daemon worker)
 - External webhook triggers for sync
 - Email/webhook notifications
-- Advanced analytics and charts
 - Connection logging
 - Multi-platform Docker builds
 - CI/CD pipeline (can be added after core works)
