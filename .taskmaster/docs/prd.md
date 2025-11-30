@@ -521,6 +521,7 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 - category_id (INT) - primary category
 - category_ids (TEXT) - JSON array of all category IDs
 - added (INT) - Unix timestamp when added to source
+- is_adult (BOOLEAN) - adult content flag
 - container_extension (VARCHAR) - mp4, mkv, avi, etc.
 - custom_sid (VARCHAR)
 - direct_source (VARCHAR)
@@ -532,6 +533,8 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 - release_date (VARCHAR)
 - rating (DECIMAL)
 - rating_5based (DECIMAL)
+- tmdb (VARCHAR) - TMDB ID for external reference
+- trailer (VARCHAR) - trailer URL or ID
 - year (INT)
 - duration_secs (INT)
 - duration (VARCHAR) - formatted duration
@@ -560,6 +563,7 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 - last_modified (INT) - Unix timestamp
 - rating (DECIMAL)
 - rating_5based (DECIMAL)
+- tmdb (VARCHAR) - TMDB ID for external reference
 - category_id (INT) - primary category
 - category_ids (TEXT) - JSON array of all category IDs
 - backdrop_path (TEXT) - JSON array of backdrop images
@@ -1304,21 +1308,87 @@ GET /api/sync/logs - Sync history
 }
 ```
 
-**Live Streams Response:**
+**Live Streams Response Example:**
 ```json
 [
   {
     "num": 1,
-    "name": "Channel Name",
+    "name": "##### GENERAL #####",
     "stream_type": "live",
-    "stream_id": 12345,
-    "stream_icon": "http://example.com/icon.png",
-    "epg_channel_id": "channel.id",
-    "category_id": "5",
-    "category_name": "Sports"
+    "stream_id": 845453,
+    "stream_icon": "http://51.158.145.100/picons/logos/france/845453.png",
+    "epg_channel_id": "",
+    "added": "1675464765",
+    "is_adult": 0,
+    "category_id": "1363",
+    "category_ids": [1363],
+    "custom_sid": null,
+    "tv_archive": 0,
+    "direct_source": "",
+    "tv_archive_duration": 0
   }
 ]
 ```
+
+**Note:** All fields from Xtream API are stored in database. The `stream_url` field is constructed by the proxy during sync.
+
+**VOD Streams Response Example:**
+```json
+[
+  {
+    "num": 1,
+    "name": "AR - Violent Ends (2025)",
+    "stream_type": "movie",
+    "stream_id": 1328644,
+    "stream_icon": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/9BrXyyrd5amNmpbZNc4gSblt6kQ.jpg",
+    "rating": "5.857",
+    "rating_5based": 2.9,
+    "tmdb": "1211776",
+    "trailer": "",
+    "added": "1764452400",
+    "is_adult": 0,
+    "category_id": "1487",
+    "category_ids": [1487],
+    "container_extension": "mp4",
+    "custom_sid": null,
+    "direct_source": ""
+  }
+]
+```
+
+**Note:** Additional VOD metadata (plot, cast, director, genre, year, duration, video/audio codecs) may be available from `get_vod_info` API call.
+
+**Series Response Example:**
+```json
+[
+  {
+    "num": 1,
+    "name": "AR - Davey & Jonesie's Locker (2024)",
+    "series_id": 25703,
+    "cover": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/ezbU23Ayb3FVkfXCAvqpB2sfGKE.jpg",
+    "plot": "Best friends Davey and Jonesie escape their bland high school lives through their locker, which is actually a portal to other universes.",
+    "cast": "Veronika Slowikowska, Jaelynn Thora Brooks, Sydney Topliffe",
+    "director": "",
+    "genre": "Comedy / Family",
+    "releaseDate": "2024-03-22",
+    "release_date": "2024-03-22",
+    "last_modified": "1721497059",
+    "rating": "4",
+    "rating_5based": "2",
+    "backdrop_path": [
+      "https://image.tmdb.org/t/p/w1280/ohjylMcBzzPYIq16tMAga3kBvF1.jpg",
+      "https://image.tmdb.org/t/p/w1280/ftExofLUyY4SDPfGNEJGuJWLH1w.jpg"
+    ],
+    "youtube_trailer": "LSPzvzgZ9JE",
+    "tmdb": "246680",
+    "episode_run_time": "0",
+    "category_id": "956",
+    "category_ids": [956]
+  }
+]
+```
+
+**Note:** The series list from `get_series` doesn't include `seasons` and `episodes` data. To get full episode information, use `get_series_info` with the `series_id`.
 
 **Filter YAML Format Example:**
 ```yaml
