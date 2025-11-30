@@ -8,9 +8,16 @@ dev-debug.log
 
 # Dependency directories
 node_modules/
+vendor/
 
 # Environment variables
 .env
+.env.local
+.env.*.local
+
+# PHP
+composer.phar
+composer.lock
 
 # Editor directories and files
 .idea
@@ -24,5 +31,12 @@ node_modules/
 # OS specific
 .DS_Store
 
+# Data and storage
+data/
+storage/
+
+# Testing
+.phpunit.result.cache
+phpunit.xml
 
 tmp

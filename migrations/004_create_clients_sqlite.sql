@@ -1,0 +1,35 @@
+-- Clients table for SQLite
+-- Stores end-user credentials and assignments
+
+CREATE TABLE IF NOT EXISTS clients (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_id INTEGER NOT NULL,
+    filter_id INTEGER,
+    username TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    name TEXT,
+    email TEXT,
+    expiry_date TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
+    hide_adult_content INTEGER NOT NULL DEFAULT 1 CHECK(hide_adult_content IN (0, 1)),
+    max_connections INTEGER NOT NULL DEFAULT 1,
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    last_login TEXT,
+    FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
+    FOREIGN KEY (filter_id) REFERENCES filters(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_clients_username ON clients(username);
+CREATE INDEX IF NOT EXISTS idx_clients_source_id ON clients(source_id);
+CREATE INDEX IF NOT EXISTS idx_clients_filter_id ON clients(filter_id);
+CREATE INDEX IF NOT EXISTS idx_clients_is_active ON clients(is_active);
+CREATE INDEX IF NOT EXISTS idx_clients_expiry_date ON clients(expiry_date);
+
+-- Trigger to update updated_at timestamp
+CREATE TRIGGER IF NOT EXISTS trg_clients_updated_at
+AFTER UPDATE ON clients
+BEGIN
+    UPDATE clients SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
