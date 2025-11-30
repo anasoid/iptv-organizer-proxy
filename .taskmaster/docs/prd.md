@@ -2,13 +2,13 @@
 
 <context>
 ## Overview
-The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtream Codes API sources, stores it in a local database, and provides filtered access to clients through the standard Xtream Codes API protocol. It enables IPTV service providers to filter and customize content per client with granular access control. Each client is assigned to a single source with custom filters applied.
+The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtream Codes API sources, stores it in a local database, and provides filtered access through the standard Xtream Codes API protocol. It enables personal users to organize, filter, and customize IPTV content for themselves and family members with granular access control. Each user/device can be assigned to a source with custom filters applied.
 
 **Target Users:**
-- IPTV resellers managing client subscriptions
-- Service providers wanting to filter and customize content per client
-- IPTV administrators managing subscriber bases
+- Personal IPTV users managing their own content
 - Self-hosters running personal IPTV proxy services
+- Home users organizing IPTV for family members
+- Individual users wanting to filter and customize their IPTV content
 
 **Value Proposition:**
 - Simple one-source-per-client architecture
@@ -90,16 +90,56 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 **Why it's important:** Core business logic for content distribution and access control.
 
 **How it works:**
-- Define filters based on:
-  - Categories (include/exclude specific categories)
-  - Channels/streams (include/exclude specific items)
-  - Content type (live TV, VOD, series)
-  - **Labels** (filter by extracted labels: "HD", "FHD", "4K", "Sports", country codes, etc.)
-  - Keywords (filter by name matching)
-  - Language/country metadata
-- Combine multiple filter rules with AND/OR logic
-- Assign filters to clients (many-to-many relationship)
-- Priority/order of filter application
+- **Filter Structure (YAML):**
+  - Filter has two separate sections:
+    1. **rules**: list of include/exclude rules
+    2. **favoris**: list of favoris rules (separate field)
+
+  - **Each include/exclude rule has:**
+    - **name**: descriptive name for the rule
+    - **type**: include or exclude
+    - **match**: criteria for matching content
+      - **categories**: match by category name or labels
+      - **channels**: match by channel name or labels
+
+  - **Each favoris rule has:**
+    - **name**: descriptive name for the favoris
+    - **target_group**: name of the favorite group/category (virtual category)
+    - **match**: criteria for matching content
+      - **categories**: match by category name or labels
+      - **channels**: match by channel name or labels
+
+- **Rule Types:**
+  - **include**: whitelist matching categories/channels
+  - **exclude**: blacklist matching categories/channels
+  - **favoris** (separate field): add matching categories/channels to a favorite group (virtual category)
+
+- **Matching Criteria:**
+  - Match by **name**: exact or partial category/channel name matching
+  - Match by **labels**: match extracted labels (HD, FHD, 4K, country codes, etc.)
+  - Can match on categories, channels, or both
+
+- **Favorite Groups (Virtual Categories):**
+  - Create virtual categories from favoris section (separate from rules)
+  - Channels/categories appear in their target group
+  - Groups appear as categories in client API
+  - **Favoris ID Generation:**
+    - Favoris category IDs start from 100000
+    - Order respects the order of favoris in the favoris section
+    - First favoris → category_id: 100000
+    - Second favoris → category_id: 100001
+    - Third favoris → category_id: 100002, etc.
+  - **Favoris Calculation by Content Type:**
+    - Process separately for each type: live, movies, series
+    - For `get_live_categories`: check all favoris, create virtual categories for live streams, **favoris appear first**
+    - For `get_vod_categories`: check all favoris, create virtual categories for movies, **favoris appear first**
+    - For `get_series_categories`: check all favoris, create virtual categories for series, **favoris appear first**
+    - **Category Order:** Favoris categories (100000+) are listed first, then regular categories
+
+- Include/exclude rules are applied in order within the rules section
+- Favoris are processed separately from the favoris section
+- Each client has ONE filter assigned
+- Each filter contains YAML with two sections: rules (include/exclude) and favoris
 - Preview filter results before applying
 - Template filters for common configurations
 
@@ -121,7 +161,7 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
   - Add/edit/delete clients
   - Generate client credentials (username/password)
   - Assign source to client (one source per client)
-  - Assign filters to clients
+  - Assign filter to client (one filter per client, optional)
   - Set expiration dates
   - Enable/disable clients
   - View client connection logs
@@ -129,10 +169,13 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 
 - **Filter Management:**
   - Create/edit/delete filters
-  - Configure filter rules with visual interface
+  - Configure filters in YAML format with two sections:
+    - **rules**: include/exclude rules
+    - **favoris**: favoris rules (separate)
+  - YAML editor with syntax highlighting
   - Preview filtered content
   - Clone filters
-  - Import/export filter configurations
+  - Import/export filter configurations (YAML files)
 
 - **Dashboard:**
   - System overview (total sources, clients, streams)
@@ -244,8 +287,8 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 4. Administrator accesses React admin panel
 5. Administrator adds first Xtream Codes source
 6. System performs initial synchronization
-7. Administrator creates basic filters
-8. Administrator adds first client with source and filters
+7. Administrator creates basic filters (YAML with two sections: rules and favoris)
+8. Administrator adds first client with source and one filter
 9. Administrator provides credentials to end client
 
 **Flow 2: Adding a New Source**
@@ -258,13 +301,13 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 7. System performs initial sync (progress shown)
 8. Administrator receives notification on completion
 
-**Flow 3: Creating a Client with Filters**
+**Flow 3: Creating a Client with Filter**
 1. Administrator navigates to Clients page
 2. Administrator clicks "Add Client"
 3. Administrator enters client name and details
 4. Administrator selects source from dropdown (required)
 5. System generates or administrator sets credentials
-6. Administrator selects/creates filters to apply
+6. Administrator selects one filter to apply (optional)
 7. Administrator sets expiration date (optional)
 8. Administrator saves client
 9. System displays client credentials and connection URL
@@ -399,6 +442,7 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 ```sql
 - id (PRIMARY KEY)
 - source_id (FOREIGN KEY) - assigned source (required)
+- filter_id (FOREIGN KEY) - assigned filter (optional, one filter per client)
 - username (VARCHAR, UNIQUE) - client credential
 - password (VARCHAR) - client credential
 - name (VARCHAR) - friendly name
@@ -416,17 +460,9 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 - id (PRIMARY KEY)
 - name (VARCHAR)
 - description (TEXT)
-- filter_type (ENUM: category, stream, keyword, label)
-- filter_config (JSON/TEXT) - filter rules
+- filter_config (TEXT) - YAML format with two sections: "rules" (include/exclude) and "favoris" (separate)
 - created_at (DATETIME)
 - updated_at (DATETIME)
-```
-
-**client_filters** (many-to-many)
-```sql
-- client_id (FOREIGN KEY)
-- filter_id (FOREIGN KEY)
-- priority (INT) - order of application
 ```
 
 **live_streams**
@@ -798,6 +834,7 @@ GET /api/sync/logs - Sync history
 - Edit client form/modal
 - Delete client with confirmation
 - Source assignment dropdown (required field)
+- Filter assignment dropdown (optional field, one filter per client)
 - Generate random credentials button
 - Enable/disable client toggle
 - Expiry date picker
@@ -816,7 +853,8 @@ GET /api/sync/logs - Sync history
 
 **Success Criteria:**
 - Can create clients via React UI
-- Must assign source to each client
+- Must assign source to each client (required)
+- Can optionally assign one filter to each client
 - Can disable/enable clients
 - Client credentials work with IPTV players
 - Can view client activity
@@ -825,18 +863,45 @@ GET /api/sync/logs - Sync history
 **Scope:** Filter creation, management, and application
 
 **Features:**
-- Filter definition storage (database)
+- Filter definition storage (database - YAML in TEXT field)
 - Filter CRUD interface in React
-- Category-based filters (include/exclude)
-- Stream ID filters (whitelist/blacklist)
-- **Label-based filters** (filter by extracted labels: HD, FHD, 4K, country codes, etc.)
-- Keyword filters (name matching)
-- Filter rule builder UI (visual interface)
-- Filter assignment to clients (multi-select)
-- Filter application logic in API responses (SQL queries with label matching)
-- Filter preview functionality (show what client will see)
-- Filter templates/presets
-- Import/export filters (JSON)
+- **Filter structure with two sections:**
+  - **rules section:** include/exclude rules
+    - Each rule has: name, type (include/exclude), match criteria
+    - Match by categories: by_name or by_labels
+    - Match by channels: by_name or by_labels
+  - **favoris section:** favoris rules (separate field)
+    - Each favoris has: name, target_group, match criteria
+    - Match by categories: by_name or by_labels
+    - Match by channels: by_name or by_labels
+- Filter rule editor UI (YAML format with syntax highlighting and validation)
+- Filter assignment to clients (one filter per client)
+- Filter application logic in API responses:
+  - **Stream Filtering Algorithm (for each stream):**
+    1. Iterate through all rules in the **rules section** (include/exclude only)
+    2. For each rule, check if stream matches (by name or labels, for categories or channels)
+    3. **If rule type is "include" and matches:** accept stream
+    4. **If rule type is "exclude" and matches:** reject stream (skip to next stream)
+    5. Continue checking remaining rules for the stream
+    6. After processing all include/exclude rules, check **favoris section separately**
+    7. For each favoris, check if stream matches
+    8. **If favoris matches:** add stream to that favoris category (with calculated ID)
+    9. Note: A stream can appear in both its original category AND in multiple favoris categories
+
+  - **Generate virtual categories from favoris section:**
+    - Iterate through all favoris in the **favoris section** (in order)
+    - Assign category_id starting from 100000, incrementing for each favoris
+    - Create virtual category for each favoris with target_group as category_name
+    - Process separately for live/movies/series based on API endpoint
+    - When client requests `get_live_categories`, return favoris virtual categories (100000+) **first**, then regular categories
+    - When client requests `get_vod_categories`, return favoris virtual categories **first**, then regular categories
+    - When client requests `get_series_categories`, return favoris virtual categories **first**, then regular categories
+    - When client requests streams by favoris category_id (e.g., 100000), return all streams that matched that favoris
+
+  - Match on name (partial string matching) or labels (exact match)
+- Filter preview functionality (show what client will see with virtual categories)
+- Filter templates/presets (YAML files)
+- Import/export filters (YAML format)
 
 **Deliverables:**
 - Filter management components
@@ -846,7 +911,8 @@ GET /api/sync/logs - Sync history
 - Client-filter assignment UI
 
 **Success Criteria:**
-- Can create filters with visual rule builder
+- Can create filters using YAML format
+- YAML editor validates and highlights syntax
 - Can assign filters to clients
 - Client API responses respect filters from assigned source
 - Preview shows accurate results
@@ -1243,6 +1309,71 @@ GET /api/sync/logs - Sync history
     "category_name": "Sports"
   }
 ]
+```
+
+**Filter YAML Format Example:**
+```yaml
+# Filter configuration in YAML format
+# Two separate sections: rules (include/exclude) and favoris
+
+# Include/Exclude Rules Section
+rules:
+  # Rule 1: Exclude adult content
+  - name: "Block Adult Content"
+    type: exclude
+    match:
+      categories:
+        by_name: ["Adult", "XXX", "18+"]
+        by_labels: ["Adult", "18+"]
+      channels:
+        by_name: ["Playboy TV", "Adult Channel"]
+        by_labels: ["Adult", "XXX"]
+
+  # Rule 2: Include only sports channels
+  - name: "Include Sports"
+    type: include
+    match:
+      categories:
+        by_name: ["Sports", "Football", "Basketball"]
+        by_labels: ["Sports", "ESPN"]
+      channels:
+        by_labels: ["Sports", "HD"]
+
+  # Rule 3: Exclude news channels
+  - name: "Block News"
+    type: exclude
+    match:
+      categories:
+        by_name: ["News", "Politics"]
+      channels:
+        by_labels: ["News"]
+
+# Favoris Section (separate from rules)
+favoris:
+  # Favoris 1: Kids channels (will get category_id: 100000)
+  - name: "Kids Favorites"
+    target_group: "Kids Corner"
+    match:
+      categories:
+        by_name: ["Cartoons", "Kids", "Children"]
+        by_labels: ["Kids", "Cartoon"]
+      channels:
+        by_name: ["Disney", "Nickelodeon", "Cartoon Network"]
+        by_labels: ["Kids", "Family"]
+
+  # Favoris 2: HD sports (will get category_id: 100001)
+  - name: "HD Sports Favorites"
+    target_group: "My Sports HD"
+    match:
+      channels:
+        by_labels: ["Sports", "HD", "FHD"]
+
+  # Favoris 3: Movies (will get category_id: 100002)
+  - name: "My Movies"
+    target_group: "Favorite Movies"
+    match:
+      categories:
+        by_name: ["Action", "Comedy"]
 ```
 
 ### Environment Configuration
