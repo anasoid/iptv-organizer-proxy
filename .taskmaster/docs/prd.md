@@ -151,12 +151,57 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 - Preview filter results before applying
 - Template filters for common configurations
 
-### 4. React-based Administration Web Interface
+### 4. Admin Authentication & Authorization
+**What it does:** Provides secure authentication system for accessing the administration panel.
+
+**Why it's important:** Protects the system from unauthorized access and ensures only authenticated administrators can manage sources, clients, and filters.
+
+**How it works:**
+- **Simple Authentication System:**
+  - Username and password-based login
+  - Password hashing using bcrypt (cost factor 10-12)
+  - Session-based or JWT token authentication
+  - Secure token storage and validation
+
+- **Admin User Management:**
+  - Create/edit/delete admin users
+  - Each admin has unique username
+  - Password change functionality
+  - Enable/disable admin accounts
+  - Admin activity tracking
+
+- **Default Admin Setup:**
+  - First admin user created automatically on initial setup
+  - Username from `ADMIN_USERNAME` environment variable
+  - Password from `ADMIN_PASSWORD` environment variable
+  - Created during first database migration/initialization
+
+- **Protected Endpoints:**
+  - All admin API endpoints require valid authentication
+  - Authentication middleware validates tokens/sessions
+  - Automatic session expiration (configurable)
+  - Logout functionality to invalidate sessions
+
+- **Security Features:**
+  - HTTPS enforcement in production
+  - Rate limiting on login endpoint (prevent brute force)
+  - Session cookies with HttpOnly, Secure, SameSite flags
+  - CSRF protection for session-based auth
+  - Input validation and sanitization
+  - SQL injection prevention (PDO prepared statements)
+
+### 5. React-based Administration Web Interface
 **What it does:** Provides a modern, responsive web-based dashboard for managing sources, clients, and filters.
 
 **Why it's important:** Essential for day-to-day operations and configuration with excellent user experience.
 
 **How it works:**
+- **Authentication:**
+  - Login page with username/password
+  - Session/token management
+  - Logout functionality
+  - Protected routes (redirect to login if not authenticated)
+
 - **Source Management:**
   - Add/edit/delete Xtream Codes sources
   - Configure source credentials (URL, username, password)
@@ -185,13 +230,19 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
   - Clone filters
   - Import/export filter configurations (YAML files)
 
+- **Admin User Management:**
+  - List all admin users
+  - Add/edit/delete admin accounts
+  - Change passwords (own and others)
+  - Enable/disable admin users
+
 - **Dashboard:**
   - System overview (total sources, clients, streams)
   - Recent activity logs
   - Sync status for all sources
   - Quick actions
 
-### 5. Automatic Data Refresh
+### 6. Automatic Data Refresh
 **What it does:** Scheduled background jobs that synchronize data from sources at configurable intervals without requiring cron.
 
 **Why it's important:** Keeps local database up-to-date with source changes without manual intervention.
@@ -236,7 +287,7 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 - Sync logs and history per task type
 - Lock mechanism to prevent duplicate syncs per task type
 
-### 6. Docker Deployment
+### 7. Docker Deployment
 **What it does:** Provides containerized deployment with Docker for easy installation and portability.
 
 **Why it's important:** Simplifies deployment, ensures consistency across environments, enables easy updates.
@@ -250,7 +301,7 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 - Health checks for containers
 - Official Docker Hub image publishing
 
-### 7. CI/CD with GitHub Actions
+### 8. CI/CD with GitHub Actions
 **What it does:** Automated build, test, and deployment pipeline using GitHub Actions.
 
 **Why it's important:** Ensures code quality, automates releases, publishes Docker images automatically.
@@ -441,6 +492,18 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 - Release notes generation
 
 ### Data Models
+
+**admin_users**
+```sql
+- id (PRIMARY KEY)
+- username (VARCHAR, UNIQUE) - admin username
+- password_hash (VARCHAR) - bcrypt hashed password
+- email (VARCHAR)
+- is_active (BOOLEAN) - admin account enabled/disabled
+- created_at (DATETIME)
+- updated_at (DATETIME)
+- last_login (DATETIME)
+```
 
 **sources**
 ```sql
@@ -694,35 +757,42 @@ GET /series/{username}/{password}/{stream_id}.{ext} (any extension: mp4, mkv, av
 
 **Admin REST API (for React frontend):**
 ```
-POST /api/auth/login - Admin authentication
+POST /api/auth/login - Admin authentication (returns token/session)
 POST /api/auth/logout - Admin logout
-GET /api/auth/me - Get current admin user
+GET /api/auth/me - Get current authenticated admin
+POST /api/auth/change-password - Change admin password
 
-GET /api/sources - List all sources
-POST /api/sources - Add source
-GET /api/sources/{id} - Get source details
-PUT /api/sources/{id} - Update source
-DELETE /api/sources/{id} - Delete source
-POST /api/sources/{id}/sync - Trigger manual sync
-POST /api/sources/{id}/test - Test source connection
+GET /api/admin-users - List admin users (protected)
+POST /api/admin-users - Create admin user (protected)
+GET /api/admin-users/{id} - Get admin user details (protected)
+PUT /api/admin-users/{id} - Update admin user (protected)
+DELETE /api/admin-users/{id} - Delete admin user (protected)
 
-GET /api/clients - List clients (with pagination, filters)
-POST /api/clients - Add client
-GET /api/clients/{id} - Get client details
-PUT /api/clients/{id} - Update client
-DELETE /api/clients/{id} - Delete client
-GET /api/clients/{id}/logs - Get client connection logs
+GET /api/sources - List all sources (protected)
+POST /api/sources - Add source (protected)
+GET /api/sources/{id} - Get source details (protected)
+PUT /api/sources/{id} - Update source (protected)
+DELETE /api/sources/{id} - Delete source (protected)
+POST /api/sources/{id}/sync - Trigger manual sync (protected)
+POST /api/sources/{id}/test - Test source connection (protected)
 
-GET /api/filters - List filters
-POST /api/filters - Create filter
-GET /api/filters/{id} - Get filter details
-PUT /api/filters/{id} - Update filter
-DELETE /api/filters/{id} - Delete filter
-POST /api/filters/{id}/preview - Preview filter results
+GET /api/clients - List clients (protected, pagination, filters)
+POST /api/clients - Add client (protected)
+GET /api/clients/{id} - Get client details (protected)
+PUT /api/clients/{id} - Update client (protected)
+DELETE /api/clients/{id} - Delete client (protected)
+GET /api/clients/{id}/logs - Get client connection logs (protected)
 
-GET /api/dashboard/activity - Recent activity
-GET /api/sync/status - All sources sync status
-GET /api/sync/logs - Sync history
+GET /api/filters - List filters (protected)
+POST /api/filters - Create filter (protected)
+GET /api/filters/{id} - Get filter details (protected)
+PUT /api/filters/{id} - Update filter (protected)
+DELETE /api/filters/{id} - Delete filter (protected)
+POST /api/filters/{id}/preview - Preview filter results (protected)
+
+GET /api/dashboard/activity - Recent activity (protected)
+GET /api/sync/status - All sources sync status (protected)
+GET /api/sync/logs - Sync history (protected)
 ```
 
 ### Technology Stack Summary
@@ -1437,6 +1507,8 @@ APP_URL=http://localhost
 # Admin Credentials
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=changeme123
+JWT_SECRET=random_secret_key_here  # For JWT token signing (if using JWT)
+SESSION_SECRET=random_session_secret  # For session encryption (if using sessions)
 
 # Sync Configuration (no cron required)
 SYNC_ENABLED=true
@@ -1568,6 +1640,9 @@ jobs:
 
 ### Database Indexes for Performance
 ```sql
+-- Admin users
+CREATE UNIQUE INDEX idx_admin_username ON admin_users(username);
+
 -- Composite index for category lookups (functional ID relationship)
 CREATE INDEX idx_live_source_category ON live_streams(source_id, category_id);
 CREATE INDEX idx_vod_source_category ON vod_streams(source_id, category_id);
