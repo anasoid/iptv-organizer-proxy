@@ -170,6 +170,7 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
   - Generate client credentials (username/password)
   - Assign source to client (one source per client)
   - Assign filter to client (one filter per client, optional)
+  - Hide adult content toggle (automatically filters out adult streams/VOD/series)
   - Set expiration dates
   - Enable/disable clients
   - View client connection logs
@@ -468,11 +469,14 @@ The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtr
 - email (VARCHAR)
 - expiry_date (DATETIME)
 - is_active (BOOLEAN)
+- hide_adult_content (BOOLEAN, DEFAULT true) - automatically exclude adult content for this client
 - max_connections (INT)
 - created_at (DATETIME)
 - last_login (DATETIME)
 - notes (TEXT)
 ```
+
+**Note:** When `hide_adult_content` is true, all streams/VOD/series with `is_adult=1` are automatically excluded from the client's API responses, regardless of filter rules.
 
 **filters**
 ```sql
@@ -869,6 +873,7 @@ GET /api/sync/logs - Sync history
 - Delete client with confirmation
 - Source assignment dropdown (required field)
 - Filter assignment dropdown (optional field, one filter per client)
+- Hide adult content toggle (checkbox, default: enabled)
 - Generate random credentials button
 - Enable/disable client toggle
 - Expiry date picker
@@ -887,9 +892,11 @@ GET /api/sync/logs - Sync history
 - Can create clients via React UI
 - Must assign source to each client (required)
 - Can optionally assign one filter to each client
+- Can toggle adult content filtering per client (default: enabled)
 - Can disable/enable clients
 - Client credentials work with IPTV players
 - Can view client activity
+- Adult content is automatically hidden when client has hide_adult_content enabled
 
 ### Phase 6: Filter System Implementation
 **Scope:** Filter creation, management, and application
@@ -910,15 +917,18 @@ GET /api/sync/logs - Sync history
 - Filter assignment to clients (one filter per client)
 - Filter application logic in API responses:
   - **Stream Filtering Algorithm (for each stream):**
-    1. Iterate through all rules in the **rules section** (include/exclude only)
-    2. For each rule, check if stream matches (by name or labels, for categories or channels)
-    3. **If rule type is "include" and matches:** accept stream
-    4. **If rule type is "exclude" and matches:** reject stream (skip to next stream)
-    5. Continue checking remaining rules for the stream
-    6. After processing all include/exclude rules, check **favoris section separately**
-    7. For each favoris, check if stream matches
-    8. **If favoris matches:** add stream to that favoris category (with calculated ID)
-    9. Note: A stream can appear in both its original category AND in multiple favoris categories
+    1. **Adult Content Check (First Priority):**
+       - If client has `hide_adult_content=true` AND stream has `is_adult=1`: reject stream immediately
+       - This check happens before any filter rules are evaluated
+    2. Iterate through all rules in the **rules section** (include/exclude only)
+    3. For each rule, check if stream matches (by name or labels, for categories or channels)
+    4. **If rule type is "include" and matches:** accept stream
+    5. **If rule type is "exclude" and matches:** reject stream (skip to next stream)
+    6. Continue checking remaining rules for the stream
+    7. After processing all include/exclude rules, check **favoris section separately**
+    8. For each favoris, check if stream matches
+    9. **If favoris matches:** add stream to that favoris category (with calculated ID)
+    10. Note: A stream can appear in both its original category AND in multiple favoris categories
 
   - **Generate virtual categories from favoris section:**
     - Iterate through all favoris in the **favoris section** (in order)
@@ -1539,9 +1549,12 @@ CREATE INDEX idx_series_source_category ON series(source_id, category_id);
 -- Other performance indexes
 CREATE INDEX idx_live_source ON live_streams(source_id);
 CREATE INDEX idx_live_active ON live_streams(is_active);
+CREATE INDEX idx_live_adult ON live_streams(is_adult);
+CREATE INDEX idx_vod_adult ON vod_streams(is_adult);
 CREATE INDEX idx_client_username ON clients(username);
 CREATE INDEX idx_client_source ON clients(source_id);
 CREATE INDEX idx_client_active ON clients(is_active);
+CREATE INDEX idx_client_adult_filter ON clients(hide_adult_content);
 CREATE INDEX idx_filter_client ON client_filters(client_id);
 
 -- Unique constraint on categories to ensure functional ID integrity
