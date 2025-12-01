@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
-use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use App\Models\AdminUser;
 use Firebase\JWT\JWT;
@@ -15,11 +15,11 @@ class AuthController
     /**
      * Login endpoint - authenticates admin user and returns JWT token
      *
-     * @param RequestInterface $request
+     * @param ServerRequestInterface $request
      * @param ResponseInterface $response
      * @return ResponseInterface
      */
-    public function login(RequestInterface $request, ResponseInterface $response): ResponseInterface
+    public function login(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try {
             $body = json_decode($request->getBody()->getContents(), true);
@@ -55,11 +55,11 @@ class AuthController
     /**
      * Get current authenticated user
      *
-     * @param RequestInterface $request
+     * @param ServerRequestInterface $request
      * @param ResponseInterface $response
      * @return ResponseInterface
      */
-    public function getCurrentUser(RequestInterface $request, ResponseInterface $response): ResponseInterface
+    public function getCurrentUser(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try {
             // Get token from request (set by middleware)
@@ -92,11 +92,11 @@ class AuthController
     /**
      * Logout endpoint (client-side token removal)
      *
-     * @param RequestInterface $request
+     * @param ServerRequestInterface $request
      * @param ResponseInterface $response
      * @return ResponseInterface
      */
-    public function logout(RequestInterface $request, ResponseInterface $response): ResponseInterface
+    public function logout(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         return $this->jsonResponse($response, [
             'success' => true,
