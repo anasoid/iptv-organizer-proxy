@@ -13,6 +13,8 @@ use RuntimeException;
  * Base Model Class
  *
  * Provides common CRUD operations and utilities for all models
+ *
+ * @phpstan-consistent-constructor
  */
 abstract class BaseModel
 {

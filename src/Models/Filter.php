@@ -10,6 +10,13 @@ use RuntimeException;
  * Filter Model
  *
  * Handles YAML-based stream filtering configuration
+ *
+ * @property int $id
+ * @property string $name
+ * @property string|null $description
+ * @property string $filter_config
+ * @property string $created_at
+ * @property string $updated_at
  */
 class Filter extends BaseModel
 {

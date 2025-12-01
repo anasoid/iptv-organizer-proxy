@@ -10,6 +10,13 @@ use RuntimeException;
  * ConnectionLog Model
  *
  * Tracks client connection activity
+ *
+ * @property int $id
+ * @property int $client_id
+ * @property string $action
+ * @property string $ip_address
+ * @property string|null $user_agent
+ * @property string $created_at
  */
 class ConnectionLog extends BaseModel
 {

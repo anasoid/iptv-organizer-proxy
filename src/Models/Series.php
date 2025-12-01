@@ -10,6 +10,19 @@ use RuntimeException;
  * Series Model
  *
  * Represents TV series content
+ *
+ * @property int $id
+ * @property int $source_id
+ * @property string $stream_id
+ * @property string $name
+ * @property string|null $category_id
+ * @property string|null $category_ids
+ * @property int $is_adult
+ * @property string|null $labels
+ * @property int $is_active
+ * @property string|null $data
+ * @property string $created_at
+ * @property string $updated_at
  */
 class Series extends BaseModel
 {

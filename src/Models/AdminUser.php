@@ -10,6 +10,15 @@ use RuntimeException;
  * AdminUser Model
  *
  * Handles admin panel user authentication and management
+ *
+ * @property int $id
+ * @property string $username
+ * @property string $password_hash
+ * @property string|null $email
+ * @property int $is_active
+ * @property string|null $last_login
+ * @property string $created_at
+ * @property string $updated_at
  */
 class AdminUser extends BaseModel
 {

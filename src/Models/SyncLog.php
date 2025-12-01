@@ -10,6 +10,17 @@ use RuntimeException;
  * SyncLog Model
  *
  * Tracks synchronization operations with upstream sources
+ *
+ * @property int $id
+ * @property int $source_id
+ * @property string $sync_type
+ * @property string $started_at
+ * @property string|null $completed_at
+ * @property string $status
+ * @property int $items_added
+ * @property int $items_updated
+ * @property int $items_deleted
+ * @property string|null $error_message
  */
 class SyncLog extends BaseModel
 {

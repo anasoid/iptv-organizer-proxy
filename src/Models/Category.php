@@ -10,6 +10,15 @@ use RuntimeException;
  * Category Model
  *
  * Represents stream categories (live, vod, series)
+ *
+ * @property int $id
+ * @property int $source_id
+ * @property string $category_id
+ * @property string $category_name
+ * @property string $category_type
+ * @property int|null $parent_id
+ * @property string|null $labels
+ * @property string $created_at
  */
 class Category extends BaseModel
 {

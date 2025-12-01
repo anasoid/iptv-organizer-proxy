@@ -11,6 +11,21 @@ use RuntimeException;
  * Client Model
  *
  * Represents an end-user client with credentials and source assignment
+ *
+ * @property int $id
+ * @property int $source_id
+ * @property int|null $filter_id
+ * @property string $username
+ * @property string $password
+ * @property string|null $name
+ * @property string|null $email
+ * @property string|null $expiry_date
+ * @property int $is_active
+ * @property int $hide_adult_content
+ * @property int $max_connections
+ * @property string|null $notes
+ * @property string $created_at
+ * @property string $updated_at
  */
 class Client extends BaseModel
 {

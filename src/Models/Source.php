@@ -11,6 +11,19 @@ use RuntimeException;
  * Source Model
  *
  * Represents an upstream IPTV source server
+ *
+ * @property int $id
+ * @property string $name
+ * @property string $url
+ * @property string $username
+ * @property string $password
+ * @property int $sync_interval
+ * @property string|null $last_sync
+ * @property string|null $next_sync
+ * @property string $sync_status
+ * @property int $is_active
+ * @property string $created_at
+ * @property string $updated_at
  */
 class Source extends BaseModel
 {
