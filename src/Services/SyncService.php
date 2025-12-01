@@ -88,7 +88,7 @@ class SyncService
      */
     private function startSyncLog(string $syncType): SyncLog
     {
-        return SyncLog::startSync($this->source->id, $syncType);
+        return SyncLog::logSyncStart($this->source->id, $syncType);
     }
 
     /**
