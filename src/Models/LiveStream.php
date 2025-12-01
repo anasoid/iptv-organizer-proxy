@@ -13,7 +13,7 @@ use RuntimeException;
  *
  * @property int $id
  * @property int $source_id
- * @property string $stream_id
+ * @property int|string $stream_id
  * @property string $name
  * @property string|null $category_id
  * @property string|null $category_ids

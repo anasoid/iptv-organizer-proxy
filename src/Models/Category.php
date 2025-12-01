@@ -13,7 +13,7 @@ use RuntimeException;
  *
  * @property int $id
  * @property int $source_id
- * @property string $category_id
+ * @property int|string $category_id
  * @property string $category_name
  * @property string $category_type
  * @property int|null $parent_id

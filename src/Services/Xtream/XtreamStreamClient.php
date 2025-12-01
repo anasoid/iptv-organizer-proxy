@@ -142,7 +142,7 @@ class XtreamStreamClient
 
                 $logger->info('Streams fetched successfully', [
                     'action' => $params['action'] ?? 'unknown',
-                    'count' => is_array($data) ? count($data) : 0,
+                    'count' => count($data),
                 ]);
 
                 return $data;
