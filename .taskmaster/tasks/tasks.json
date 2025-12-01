@@ -107,8 +107,9 @@
         "dependencies": [
           "7"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "in-progress",
+        "subtasks": [],
+        "updatedAt": "2025-12-01T18:46:24.807Z"
       },
       {
         "id": "9",
@@ -120,8 +121,9 @@
         "dependencies": [
           "8"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "in-progress",
+        "subtasks": [],
+        "updatedAt": "2025-12-01T18:46:38.569Z"
       },
       {
         "id": "10",
@@ -307,7 +309,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2025-12-01T07:54:46.647Z",
+      "lastModified": "2025-12-01T18:46:38.571Z",
       "taskCount": 18,
       "completedCount": 5,
       "tags": [
