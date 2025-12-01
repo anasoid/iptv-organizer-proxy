@@ -90,21 +90,20 @@ class FilterController
             if (empty($body['name'])) {
                 return $this->jsonError($response, 'Filter name is required', 400);
             }
-            if (empty($body['rules'])) {
-                return $this->jsonError($response, 'Filter rules are required', 400);
+            if (empty($body['filter_config'])) {
+                return $this->jsonError($response, 'Filter configuration is required', 400);
             }
 
             // Validate YAML format (basic validation)
-            if (!is_string($body['rules'])) {
-                return $this->jsonError($response, 'Filter rules must be a valid YAML string', 400);
+            if (!is_string($body['filter_config'])) {
+                return $this->jsonError($response, 'Filter configuration must be a valid YAML string', 400);
             }
 
             // Create filter
             $filter = new Filter();
             $filter->name = $body['name'];
-            $filter->rules = $body['rules'];
+            $filter->filter_config = $body['filter_config'];
             $filter->description = $body['description'] ?? null;
-            $filter->is_active = $body['is_active'] ?? 1;
 
             if (!$filter->save()) {
                 return $this->jsonError($response, 'Failed to create filter', 500);
@@ -147,17 +146,14 @@ class FilterController
             if (isset($body['name'])) {
                 $filter->name = $body['name'];
             }
-            if (isset($body['rules'])) {
-                if (!is_string($body['rules'])) {
-                    return $this->jsonError($response, 'Filter rules must be a valid YAML string', 400);
+            if (isset($body['filter_config'])) {
+                if (!is_string($body['filter_config'])) {
+                    return $this->jsonError($response, 'Filter configuration must be a valid YAML string', 400);
                 }
-                $filter->rules = $body['rules'];
+                $filter->filter_config = $body['filter_config'];
             }
             if (isset($body['description'])) {
                 $filter->description = $body['description'];
-            }
-            if (isset($body['is_active'])) {
-                $filter->is_active = (int) $body['is_active'];
             }
 
             if (!$filter->save()) {
