@@ -42,7 +42,7 @@
         "updatedAt": "2025-11-30T21:57:49.161Z"
       },
       {
-        "id": "4",
+        "id": 4,
         "title": "Xtream Codes API Client Library",
         "description": "Implement HTTP client to fetch data from upstream Xtream Codes servers, handle authentication, and parse all API endpoints",
         "status": "in-progress",
@@ -234,7 +234,63 @@
           "17"
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Backend CI Workflow for Testing",
+            "description": "Implement GitHub Actions workflow for automated backend testing on pull requests including PHPUnit tests and PHPStan static analysis",
+            "dependencies": [],
+            "details": "Create `.github/workflows/backend-ci.yml` workflow file:\n- Trigger on: pull_request (targeting main branch)\n- Job: test-backend\n  - Checkout code using actions/checkout@v4\n  - Setup PHP 8.2 using shivammathur/setup-php@v2 with extensions: pdo, pdo_mysql, mbstring\n  - Validate composer.json and composer.lock\n  - Install Composer dependencies with: composer install --prefer-dist --no-progress --no-suggest\n  - Run PHPUnit tests: composer test (vendor/bin/phpunit)\n  - Run PHPStan static analysis: composer analyse (phpstan analyse src --level=5)\n  - Upload coverage report using codecov/codecov-action@v3 or similar\n  - Cache Composer dependencies using actions/cache@v3 with key based on composer.lock hash\n- Add matrix strategy to test on PHP 8.1 and 8.2 versions\n- Set environment variables for testing (DB_TYPE=sqlite, DB_SQLITE_PATH=:memory:)\n- Fail workflow if any test fails or PHPStan finds issues",
+            "status": "pending",
+            "testStrategy": "1. Create a test PR and verify workflow triggers\n2. Verify PHP setup installs correct version and extensions\n3. Verify Composer dependencies install successfully\n4. Verify PHPUnit tests execute (even if no tests exist yet)\n5. Verify PHPStan static analysis runs and reports issues\n6. Verify workflow fails on test failures or analysis errors\n7. Verify cache speeds up subsequent runs"
+          },
+          {
+            "id": 2,
+            "title": "Create Frontend CI Workflow for Testing",
+            "description": "Implement GitHub Actions workflow for automated frontend testing including Jest tests, ESLint, TypeScript checks, and production builds",
+            "dependencies": [],
+            "details": "Create `.github/workflows/frontend-ci.yml` workflow file:\n- Trigger on: pull_request (targeting main branch), but only when frontend files change (paths: admin-panel/**, .github/workflows/frontend-ci.yml)\n- Job: test-frontend\n  - Checkout code using actions/checkout@v4\n  - Setup Node.js 18 using actions/setup-node@v4\n  - Install npm dependencies: cd admin-panel && npm ci\n  - Run Jest tests: npm test -- --coverage\n  - Run ESLint: npm run lint\n  - Run TypeScript type check: npm run type-check or npx tsc --noEmit\n  - Build production bundle: npm run build\n  - Upload test coverage report\n  - Cache node_modules using actions/cache@v3 with key based on package-lock.json hash\n- Add matrix strategy to test on Node.js 18 and 20 versions\n- Ensure all steps fail workflow if they detect errors\n- Upload build artifacts for verification",
+            "status": "pending",
+            "testStrategy": "1. Create a test PR with frontend changes and verify workflow triggers\n2. Verify Node.js setup installs correct version\n3. Verify npm dependencies install successfully\n4. Verify Jest tests execute (create placeholder test if needed)\n5. Verify ESLint runs (create .eslintrc if needed)\n6. Verify TypeScript type check passes\n7. Verify production build completes successfully\n8. Verify workflow only runs when frontend files change"
+          },
+          {
+            "id": 3,
+            "title": "Create Multi-Platform Docker Build Workflow",
+            "description": "Implement GitHub Actions workflow for building and pushing multi-platform Docker images to Docker Hub and GHCR on main branch pushes and version tags",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create `.github/workflows/docker-build.yml` workflow file:\n- Trigger on: push to main branch, push of tags matching v* pattern\n- Jobs:\n  - build-and-push:\n    - Strategy matrix for multiple images: backend, nginx, sync-worker\n    - Set up QEMU for multi-platform builds: docker/setup-qemu-action@v3\n    - Set up Docker Buildx: docker/setup-buildx-action@v3\n    - Login to Docker Hub: docker/login-action@v3 with secrets.DOCKERHUB_USERNAME and secrets.DOCKERHUB_TOKEN\n    - Login to GHCR: docker/login-action@v3 with github.actor and secrets.GITHUB_TOKEN\n    - Extract metadata for tags and labels: docker/metadata-action@v5\n      - Tags: latest (for main), semver (for tags like v1.0.0, v1.0, v1), sha-{{sha}}\n    - Build and push: docker/build-push-action@v5\n      - Platforms: linux/amd64, linux/arm64\n      - Context and Dockerfile paths per matrix image type\n      - Push to both Docker Hub (iptv-organizer-proxy/backend:tag) and GHCR (ghcr.io/owner/iptv-organizer-proxy-backend:tag)\n      - Enable layer caching with cache-from and cache-to\n- Create Dockerfiles if they don't exist (backend, nginx, sync-worker)\n- Add .dockerignore for optimization",
+            "status": "pending",
+            "testStrategy": "1. Test workflow triggers on push to main branch\n2. Verify QEMU and Buildx setup correctly\n3. Verify Docker Hub and GHCR login succeed with secrets\n4. Verify multi-platform images build for amd64 and arm64\n5. Verify images push to both Docker Hub and GHCR with correct tags\n6. Test tag-based builds create semantic version tags (v1.0.0, v1.0, v1, latest)\n7. Verify layer caching improves build times\n8. Test pulling and running built images on different platforms"
+          },
+          {
+            "id": 4,
+            "title": "Create Release Workflow for Version Management",
+            "description": "Implement GitHub Actions workflow to automate release creation with changelog generation and artifact publishing when version tags are pushed",
+            "dependencies": [
+              3
+            ],
+            "details": "Create `.github/workflows/release.yml` workflow file:\n- Trigger on: push of tags matching v* pattern (e.g., v1.0.0, v1.2.3)\n- Job: create-release\n  - Checkout code with full history: actions/checkout@v4 with fetch-depth: 0\n  - Extract version from tag: echo \"VERSION=${GITHUB_REF#refs/tags/v}\" >> $GITHUB_ENV\n  - Generate changelog from commits since last tag using git log or actions/github-script@v7\n    - Parse conventional commits (feat:, fix:, docs:, etc.)\n    - Group by type (Features, Bug Fixes, Documentation, etc.)\n  - Create GitHub release: actions/create-release@v1 or gh release create\n    - Release title: \"Release v{version}\"\n    - Body: Generated changelog\n    - Draft: false, Prerelease: auto-detect from version (v1.0.0-beta)\n  - Upload deployment artifacts:\n    - docker-compose.yml\n    - .env.example.app (renamed to .env.example)\n    - README.md\n    - SETUP.md\n  - Add release notes template with installation instructions\n  - Link to Docker images published in previous workflow\n- Ensure workflow waits for docker-build workflow to complete",
+            "status": "pending",
+            "testStrategy": "1. Create test version tag (v0.1.0-test) and verify workflow triggers\n2. Verify version extraction from tag works correctly\n3. Verify changelog generation includes commits since last tag\n4. Verify GitHub release is created with correct title and body\n5. Verify deployment artifacts are attached to release\n6. Verify release notes include Docker image links\n7. Test with prerelease tags (v1.0.0-beta) and verify prerelease flag\n8. Verify workflow waits for Docker build completion"
+          },
+          {
+            "id": 5,
+            "title": "Add CI/CD Status Badges and Documentation",
+            "description": "Update README with CI/CD status badges, configure required repository secrets, and document the CI/CD pipeline setup",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "1. Update README.md:\n   - Add status badges section at the top after title:\n     - Backend CI badge: ![Backend CI](https://github.com/owner/repo/workflows/Backend%20CI/badge.svg)\n     - Frontend CI badge: ![Frontend CI](https://github.com/owner/repo/workflows/Frontend%20CI/badge.svg)\n     - Docker Build badge: ![Docker Build](https://github.com/owner/repo/workflows/Docker%20Build/badge.svg)\n     - Docker image version badge from Docker Hub\n   - Add CI/CD section explaining the automated workflows\n   - Document required GitHub secrets\n2. Create CONTRIBUTING.md:\n   - Explain PR workflow and CI requirements\n   - Document how to run tests locally before pushing\n   - Explain semantic versioning for releases\n3. Create .github/PULL_REQUEST_TEMPLATE.md:\n   - Checklist for CI passing\n   - Link to CI workflow runs\n4. Document required repository secrets in README:\n   - DOCKERHUB_USERNAME: Docker Hub username\n   - DOCKERHUB_TOKEN: Docker Hub access token\n   - GITHUB_TOKEN: Automatically provided by GitHub Actions\n5. Add .env.ci.example for CI-specific environment configuration\n6. Create docs/CI-CD.md with detailed pipeline documentation:\n   - Workflow triggers and purposes\n   - How to create releases\n   - Troubleshooting common CI issues",
+            "status": "pending",
+            "testStrategy": "1. Verify status badges display correctly on GitHub\n2. Verify badges update when workflows run\n3. Verify CONTRIBUTING.md renders properly\n4. Verify PR template appears when creating PRs\n5. Test that new contributors can understand setup from docs\n6. Verify all required secrets are documented\n7. Verify CI/CD documentation is complete and accurate\n8. Test following the docs to create a test release"
+          }
+        ]
       }
     ],
     "metadata": {
