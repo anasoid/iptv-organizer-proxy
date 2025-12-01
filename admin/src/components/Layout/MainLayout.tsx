@@ -187,13 +187,18 @@ export default function MainLayout({ themeMode, toggleTheme }: MainLayoutProps) 
       <Box
         component="main"
         sx={{
+          display: 'flex',
+          flexDirection: 'column',
           flexGrow: 1,
-          p: 3,
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          width: { xs: '100%', sm: `calc(100% - ${drawerWidth}px)` },
+          height: '100vh',
+          overflow: 'hidden',
         }}
       >
         <Toolbar />
-        <Outlet />
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflow: 'auto' }}>
+          <Outlet />
+        </Box>
       </Box>
     </Box>
   );

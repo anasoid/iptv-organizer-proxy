@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { Box, ThemeProvider, CssBaseline } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createAppTheme } from './utils/theme';
 import { useAuthStore } from './stores/authStore';
@@ -50,31 +50,33 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <BrowserRouter>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<Login />} />
+        <Box sx={{ width: '100%', height: '100%' }}>
+          <BrowserRouter>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<Login />} />
 
-            {/* Protected routes */}
-            <Route
-              element={
-                <ProtectedRoute>
-                  <MainLayout themeMode={themeMode} toggleTheme={toggleTheme} />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/sources" element={<Sources />} />
-              <Route path="/clients" element={<Clients />} />
-              <Route path="/filters" element={<Filters />} />
-              <Route path="/admin-users" element={<AdminUsers />} />
-            </Route>
+              {/* Protected routes */}
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <MainLayout themeMode={themeMode} toggleTheme={toggleTheme} />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/sources" element={<Sources />} />
+                <Route path="/clients" element={<Clients />} />
+                <Route path="/filters" element={<Filters />} />
+                <Route path="/admin-users" element={<AdminUsers />} />
+              </Route>
 
-            {/* 404 */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+              {/* 404 */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </Box>
       </ThemeProvider>
     </QueryClientProvider>
   );

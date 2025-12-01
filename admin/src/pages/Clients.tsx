@@ -113,30 +113,29 @@ export default function Clients() {
   }
 
   return (
-    <Box>
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>Clients</h2>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', flex: 1, p: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <h2 style={{ margin: 0 }}>Clients</h2>
         <Button variant="contained" onClick={handleAddClient}>
           Add Client
         </Button>
       </Box>
 
-      <Box sx={{ mb: 2 }}>
-        <TextField
-          placeholder="Search clients..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-          fullWidth
-          size="small"
-        />
-      </Box>
+      <TextField
+        placeholder="Search clients..."
+        value={search}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setPage(1);
+        }}
+        fullWidth
+        size="small"
+        sx={{ mb: 2 }}
+      />
 
-      {error && <Alert severity="error">Failed to load clients</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>Failed to load clients</Alert>}
 
-      <Box sx={{ height: 600, width: '100%' }}>
+      <Box sx={{ flex: 1, width: '100%', minHeight: 0 }}>
         <DataGrid
           rows={data?.data || []}
           columns={columns}
@@ -145,6 +144,7 @@ export default function Clients() {
           onPaginationModelChange={(model) => setPage(model.page + 1)}
           pageSizeOptions={[10]}
           getRowId={(row: Client) => row.id || 0}
+          sx={{ height: '100%', width: '100%' }}
         />
       </Box>
 
