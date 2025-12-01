@@ -22,6 +22,16 @@ import filtersApi from '../services/filtersApi';
 import { useAuthStore } from '../stores/authStore';
 import ClientForm from '../components/ClientForm';
 
+interface Source {
+  id: number;
+  name: string;
+}
+
+interface Filter {
+  id: number;
+  name: string;
+}
+
 export default function Clients() {
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
@@ -55,14 +65,14 @@ export default function Clients() {
 
   // Create lookup maps
   const sourcesMap = new Map(
-    (Array.isArray(sourcesData?.data) ? sourcesData.data : []).map((source: any) => [
+    (Array.isArray(sourcesData?.data) ? sourcesData.data : []).map((source: Source) => [
       source.id,
       source.name,
     ])
   );
 
   const filtersMap = new Map(
-    (Array.isArray(filtersData?.data) ? filtersData.data : []).map((filter: any) => [
+    (Array.isArray(filtersData?.data) ? filtersData.data : []).map((filter: Filter) => [
       filter.id,
       filter.name,
     ])
