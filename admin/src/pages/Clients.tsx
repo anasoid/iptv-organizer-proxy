@@ -17,6 +17,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import type { Client } from '../services/clientsApi';
 import clientsApi from '../services/clientsApi';
+import sourcesApi from '../services/sourcesApi';
+import filtersApi from '../services/filtersApi';
 import { useAuthStore } from '../stores/authStore';
 import ClientForm from '../components/ClientForm';
 
@@ -36,6 +38,35 @@ export default function Clients() {
     queryFn: () => clientsApi.getClients(page, limit, search),
     enabled: isAuthenticated,
   });
+
+  // Fetch sources for mapping
+  const { data: sourcesData } = useQuery({
+    queryKey: ['sources', 1, 100],
+    queryFn: () => sourcesApi.getSources(1, 100),
+    enabled: isAuthenticated,
+  });
+
+  // Fetch filters for mapping
+  const { data: filtersData } = useQuery({
+    queryKey: ['filters', 1, 100],
+    queryFn: () => filtersApi.getFilters(1, 100),
+    enabled: isAuthenticated,
+  });
+
+  // Create lookup maps
+  const sourcesMap = new Map(
+    (Array.isArray(sourcesData?.data) ? sourcesData.data : []).map((source: any) => [
+      source.id,
+      source.name,
+    ])
+  );
+
+  const filtersMap = new Map(
+    (Array.isArray(filtersData?.data) ? filtersData.data : []).map((filter: any) => [
+      filter.id,
+      filter.name,
+    ])
+  );
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -67,10 +98,22 @@ export default function Clients() {
   };
 
   const columns: GridColDef[] = [
-    { field: 'id', headerName: 'ID', width: 70 },
-    { field: 'username', headerName: 'Username', width: 150, flex: 1 },
-    { field: 'source_id', headerName: 'Source ID', width: 100 },
-    { field: 'email', headerName: 'Email', width: 200, flex: 1 },
+    { field: 'id', headerName: 'ID', width: 60 },
+    { field: 'username', headerName: 'Username', flex: 1, minWidth: 120 },
+    {
+      field: 'source_id',
+      headerName: 'Source',
+      flex: 1,
+      minWidth: 120,
+      renderCell: (params) => sourcesMap.get(params.value) || '-',
+    },
+    {
+      field: 'filter_id',
+      headerName: 'Filter',
+      flex: 1,
+      minWidth: 120,
+      renderCell: (params) => (params.value ? filtersMap.get(params.value) || '-' : '-'),
+    },
     {
       field: 'is_active',
       headerName: 'Active',

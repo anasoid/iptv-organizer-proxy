@@ -18,6 +18,7 @@ import { ContentCopy as CopyIcon } from '@mui/icons-material';
 import type { Client } from '../services/clientsApi';
 import clientsApi from '../services/clientsApi';
 import sourcesApi from '../services/sourcesApi';
+import filtersApi from '../services/filtersApi';
 
 interface ClientFormProps {
   client?: Client | null;
@@ -55,6 +56,12 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
   const { data: sourcesData } = useQuery({
     queryKey: ['sources'],
     queryFn: () => sourcesApi.getSources(1, 100),
+  });
+
+  // Fetch filters for dropdown
+  const { data: filtersData } = useQuery({
+    queryKey: ['filters'],
+    queryFn: () => filtersApi.getFilters(1, 100),
   });
 
   // Create mutation
@@ -136,6 +143,23 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
               </MenuItem>
             )
           )}
+        </TextField>
+
+        <TextField
+          select
+          label="Filter (Optional)"
+          fullWidth
+          {...register('filter_id')}
+        >
+          <MenuItem value="">None</MenuItem>
+          {Array.isArray(filtersData?.data) &&
+            filtersData.data.map(
+              (filter: { id: number; name: string }) => (
+                <MenuItem key={filter.id} value={filter.id}>
+                  {filter.name}
+                </MenuItem>
+              )
+            )}
         </TextField>
 
         <TextField
