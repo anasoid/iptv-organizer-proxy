@@ -40,9 +40,12 @@ class ClientController
             $total = count($allClients);
             $paginatedClients = array_slice($allClients, $offset, $limit);
 
+            // Convert models to arrays
+            $clientsData = array_map(fn($client) => $client->toArray(), $paginatedClients);
+
             return $this->jsonResponse($response, [
                 'success' => true,
-                'data' => $paginatedClients,
+                'data' => $clientsData,
                 'pagination' => [
                     'page' => $page,
                     'limit' => $limit,
@@ -78,7 +81,7 @@ class ClientController
 
             return $this->jsonResponse($response, [
                 'success' => true,
-                'data' => $client,
+                'data' => $client->toArray(),
             ]);
         } catch (\Throwable $e) {
             return $this->jsonError($response, 'Failed to get client: ' . $e->getMessage(), 500);
@@ -124,7 +127,7 @@ class ClientController
             return $this->jsonResponse($response, [
                 'success' => true,
                 'message' => 'Client created successfully',
-                'data' => $client,
+                'data' => $client->toArray(),
             ], 201);
         } catch (\Throwable $e) {
             return $this->jsonError($response, 'Failed to create client: ' . $e->getMessage(), 400);
@@ -181,7 +184,7 @@ class ClientController
             return $this->jsonResponse($response, [
                 'success' => true,
                 'message' => 'Client updated successfully',
-                'data' => $client,
+                'data' => $client->toArray(),
             ]);
         } catch (\Throwable $e) {
             return $this->jsonError($response, 'Failed to update client: ' . $e->getMessage(), 400);

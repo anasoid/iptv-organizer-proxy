@@ -18,7 +18,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: null,
   isAuthenticated: false,
-  isLoading: false,
+  isLoading: true, // Start with true so ProtectedRoute waits for auth check
   error: null,
 
   login: async (credentials: LoginRequest) => {
@@ -80,12 +80,17 @@ export const useAuthStore = create<AuthState>((set) => ({
           user,
           token,
           isAuthenticated: true,
+          isLoading: false,
         });
       } catch {
         // Invalid stored data, clear it
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
+        set({ isLoading: false });
       }
+    } else {
+      // No stored auth data
+      set({ isLoading: false });
     }
   },
 

@@ -32,9 +32,12 @@ class SourceController
             // Get paginated results
             $paginatedSources = array_slice($sources, $offset, $limit);
 
+            // Convert models to arrays
+            $sourcesData = array_map(fn($source) => $source->toArray(), $paginatedSources);
+
             return $this->jsonResponse($response, [
                 'success' => true,
-                'data' => $paginatedSources,
+                'data' => $sourcesData,
                 'pagination' => [
                     'page' => $page,
                     'limit' => $limit,
@@ -70,7 +73,7 @@ class SourceController
 
             return $this->jsonResponse($response, [
                 'success' => true,
-                'data' => $source,
+                'data' => $source->toArray(),
             ]);
         } catch (\Throwable $e) {
             return $this->jsonError($response, 'Failed to get source: ' . $e->getMessage(), 500);
@@ -120,7 +123,7 @@ class SourceController
             return $this->jsonResponse($response, [
                 'success' => true,
                 'message' => 'Source created successfully',
-                'data' => $source,
+                'data' => $source->toArray(),
             ], 201);
         } catch (\Throwable $e) {
             return $this->jsonError($response, 'Failed to create source: ' . $e->getMessage(), 400);
@@ -177,7 +180,7 @@ class SourceController
             return $this->jsonResponse($response, [
                 'success' => true,
                 'message' => 'Source updated successfully',
-                'data' => $source,
+                'data' => $source->toArray(),
             ]);
         } catch (\Throwable $e) {
             return $this->jsonError($response, 'Failed to update source: ' . $e->getMessage(), 400);

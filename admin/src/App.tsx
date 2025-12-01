@@ -25,7 +25,7 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-  const { checkAuth } = useAuthStore();
+  const checkAuth = useAuthStore((state) => state.checkAuth);
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('theme_mode');
     return (saved as 'light' | 'dark') || 'light';
@@ -36,7 +36,7 @@ function App() {
   useEffect(() => {
     // Check for existing authentication on mount
     checkAuth();
-  }, [checkAuth]);
+  }, []);
 
   const toggleTheme = () => {
     setThemeMode((prevMode) => {

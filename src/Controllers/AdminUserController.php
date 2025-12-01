@@ -29,15 +29,16 @@ class AdminUserController
             $total = count($users);
             $paginatedUsers = array_slice($users, $offset, $limit);
 
-            // Remove password hashes before returning
-            $paginatedUsers = array_map(function ($user) {
-                unset($user->password_hash);
-                return $user;
+            // Convert models to arrays and remove password hashes
+            $usersData = array_map(function ($user) {
+                $data = $user->toArray();
+                unset($data['password_hash']);
+                return $data;
             }, $paginatedUsers);
 
             return $this->jsonResponse($response, [
                 'success' => true,
-                'data' => $paginatedUsers,
+                'data' => $usersData,
                 'pagination' => [
                     'page' => $page,
                     'limit' => $limit,
@@ -71,12 +72,13 @@ class AdminUserController
                 return $this->jsonError($response, 'User not found', 404);
             }
 
-            // Remove password hash
-            unset($user->password_hash);
+            // Convert to array and remove password hash
+            $userData = $user->toArray();
+            unset($userData['password_hash']);
 
             return $this->jsonResponse($response, [
                 'success' => true,
-                'data' => $user,
+                'data' => $userData,
             ]);
         } catch (\Throwable $e) {
             return $this->jsonError($response, 'Failed to get admin user: ' . $e->getMessage(), 500);
@@ -110,13 +112,14 @@ class AdminUserController
                 $body['email'] ?? null
             );
 
-            // Remove password hash before returning
-            unset($user->password_hash);
+            // Convert to array and remove password hash
+            $userData = $user->toArray();
+            unset($userData['password_hash']);
 
             return $this->jsonResponse($response, [
                 'success' => true,
                 'message' => 'Admin user created successfully',
-                'data' => $user,
+                'data' => $userData,
             ], 201);
         } catch (\Throwable $e) {
             return $this->jsonError($response, 'Failed to create admin user: ' . $e->getMessage(), 400);
@@ -158,13 +161,14 @@ class AdminUserController
                 return $this->jsonError($response, 'Failed to update admin user', 500);
             }
 
-            // Remove password hash
-            unset($user->password_hash);
+            // Convert to array and remove password hash
+            $userData = $user->toArray();
+            unset($userData['password_hash']);
 
             return $this->jsonResponse($response, [
                 'success' => true,
                 'message' => 'Admin user updated successfully',
-                'data' => $user,
+                'data' => $userData,
             ]);
         } catch (\Throwable $e) {
             return $this->jsonError($response, 'Failed to update admin user: ' . $e->getMessage(), 400);

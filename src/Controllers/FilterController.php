@@ -29,9 +29,12 @@ class FilterController
             $total = count($filters);
             $paginatedFilters = array_slice($filters, $offset, $limit);
 
+            // Convert models to arrays
+            $filtersData = array_map(fn($filter) => $filter->toArray(), $paginatedFilters);
+
             return $this->jsonResponse($response, [
                 'success' => true,
-                'data' => $paginatedFilters,
+                'data' => $filtersData,
                 'pagination' => [
                     'page' => $page,
                     'limit' => $limit,
@@ -67,7 +70,7 @@ class FilterController
 
             return $this->jsonResponse($response, [
                 'success' => true,
-                'data' => $filter,
+                'data' => $filter->toArray(),
             ]);
         } catch (\Throwable $e) {
             return $this->jsonError($response, 'Failed to get filter: ' . $e->getMessage(), 500);
@@ -112,7 +115,7 @@ class FilterController
             return $this->jsonResponse($response, [
                 'success' => true,
                 'message' => 'Filter created successfully',
-                'data' => $filter,
+                'data' => $filter->toArray(),
             ], 201);
         } catch (\Throwable $e) {
             return $this->jsonError($response, 'Failed to create filter: ' . $e->getMessage(), 400);
@@ -163,7 +166,7 @@ class FilterController
             return $this->jsonResponse($response, [
                 'success' => true,
                 'message' => 'Filter updated successfully',
-                'data' => $filter,
+                'data' => $filter->toArray(),
             ]);
         } catch (\Throwable $e) {
             return $this->jsonError($response, 'Failed to update filter: ' . $e->getMessage(), 400);
