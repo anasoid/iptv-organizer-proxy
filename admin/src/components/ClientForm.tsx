@@ -51,6 +51,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
   });
 
   const sourceId = watch('source_id');
+  const filterId = watch('filter_id');
 
   // Fetch sources for dropdown
   const { data: sourcesData } = useQuery({
@@ -131,6 +132,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           select
           label="Source"
           fullWidth
+          value={sourceId || ''}
           {...register('source_id', { required: 'Source is required' })}
           error={!!errors.source_id}
           helperText={errors.source_id?.message}
@@ -149,6 +151,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           select
           label="Filter (Optional)"
           fullWidth
+          value={filterId || ''}
           {...register('filter_id')}
         >
           <MenuItem value="">None</MenuItem>
