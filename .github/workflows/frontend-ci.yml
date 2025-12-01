@@ -1,0 +1,56 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'admin/**'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  test-frontend:
+    name: Test Frontend (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: ['18', '20']
+      fail-fast: false
+
+    defaults:
+      run:
+        working-directory: admin
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript type check
+        run: npm run type-check
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Upload build artifacts
+        if: matrix.node-version == '20'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: admin/dist
+          retention-days: 7
