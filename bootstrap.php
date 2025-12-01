@@ -11,9 +11,9 @@ use Dotenv\Dotenv;
 // Load Composer autoloader
 require_once __DIR__ . '/vendor/autoload.php';
 
-// Load environment variables
+// Load environment variables (use safeLoad to allow missing .env in CI)
 $dotenv = Dotenv::createImmutable(__DIR__);
-$dotenv->load();
+$dotenv->safeLoad();
 
 // Set timezone
 date_default_timezone_set($_ENV['APP_TIMEZONE'] ?? 'UTC');
