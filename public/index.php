@@ -6,7 +6,9 @@ use Dotenv\Dotenv;
 use Slim\Factory\AppFactory;
 use App\Middleware\CorsMiddleware;
 use App\Middleware\ClientAuthMiddleware;
+use App\Middleware\AdminAuthMiddleware;
 use App\Controllers\XtreamController;
+use App\Controllers\AuthController;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -42,12 +44,15 @@ $app->get('/health', function ($request, $response) {
     return $response->withHeader('Content-Type', 'application/json');
 });
 
+// Admin authentication API routes
+$authController = new AuthController();
+$app->post('/api/auth/login', [$authController, 'login']);
+$app->post('/api/auth/logout', [$authController, 'logout'])->add(new AdminAuthMiddleware());
+$app->get('/api/auth/me', [$authController, 'getCurrentUser'])->add(new AdminAuthMiddleware());
+
 // Xtream Codes API routes (protected by ClientAuthMiddleware)
 $app->group('/player_api.php', function ($group) {
     $controller = new XtreamController();
-
-    // Authenticate endpoint (no action parameter)
-    $group->get('', [$controller, 'authenticate']);
 
     // Live streams endpoints
     $group->get('[/]', function ($request, $response) use ($controller) {

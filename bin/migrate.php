@@ -78,6 +78,13 @@ try {
     $files = glob($migrationDir . '/*' . $suffix);
     sort($files);
 
+    // Filter out wrong database type migrations
+    if ($dbType === 'mysql') {
+        $files = array_filter($files, function($file) {
+            return !str_ends_with($file, '_sqlite.sql');
+        });
+    }
+
     // Filter to get only pending migrations
     $pendingMigrations = [];
     foreach ($files as $file) {
@@ -119,28 +126,17 @@ try {
                 continue;
             }
 
-            // Begin transaction
-            $pdo->beginTransaction();
-
-            // Execute migration
+            // Execute migration (DDL statements auto-commit in MySQL)
             $pdo->exec($sql);
 
             // Record migration in tracking table
             $stmt = $pdo->prepare("INSERT INTO migrations (migration) VALUES (?)");
             $stmt->execute([$filename]);
 
-            // Commit transaction
-            $pdo->commit();
-
             log_success("Migration executed: {$filename}");
             $executed++;
 
         } catch (PDOException $e) {
-            // Rollback on error
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-
             log_error("Migration failed: {$filename}");
             log_error("Error: " . $e->getMessage());
             $failed++;
