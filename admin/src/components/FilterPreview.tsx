@@ -37,6 +37,18 @@ interface TabPanelProps {
   value: number;
 }
 
+interface Source {
+  id: number;
+  name: string;
+}
+
+interface PreviewSample {
+  id: string;
+  type: 'live' | 'vod' | 'series';
+  name: string;
+  matched_rules?: string[];
+}
+
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
 
@@ -71,8 +83,8 @@ export default function FilterPreview({ open, filter, onClose }: FilterPreviewPr
     enabled: open && Boolean(selectedSourceId),
   });
 
-  const handleSourceChange = (event: any) => {
-    setSelectedSourceId(event.target.value as number);
+  const handleSourceChange = (_event: unknown, value: unknown) => {
+    setSelectedSourceId(value as number);
   };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -96,7 +108,7 @@ export default function FilterPreview({ open, filter, onClose }: FilterPreviewPr
               <MenuItem value="">
                 <em>Choose a source...</em>
               </MenuItem>
-              {sourcesData?.data?.map((source: any) => (
+              {sourcesData?.data?.map((source: Source) => (
                 <MenuItem key={source.id} value={source.id}>
                   {source.name}
                 </MenuItem>
@@ -124,12 +136,12 @@ export default function FilterPreview({ open, filter, onClose }: FilterPreviewPr
                 </Tabs>
 
                 <TabPanel value={tabValue} index={0}>
-                  {preview.preview_samples?.filter((s: any) => s.type === 'live').length > 0 ? (
+                  {preview.preview_samples?.filter((s: PreviewSample) => s.type === 'live').length > 0 ? (
                     <Box>
                       {preview.preview_samples
-                        ?.filter((s: any) => s.type === 'live')
+                        ?.filter((s: PreviewSample) => s.type === 'live')
                         .slice(0, 20)
-                        .map((stream: any) => (
+                        .map((stream: PreviewSample) => (
                           <Accordion key={stream.id}>
                             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                               <Typography>{stream.name}</Typography>
@@ -139,9 +151,9 @@ export default function FilterPreview({ open, filter, onClose }: FilterPreviewPr
                                 <Typography variant="caption" display="block" sx={{ mb: 1 }}>
                                   Matched Rules:
                                 </Typography>
-                                {stream.matched_rules?.length > 0 ? (
+                                {(stream.matched_rules ?? []).length > 0 ? (
                                   <Box>
-                                    {stream.matched_rules.map((rule: string, idx: number) => (
+                                    {(stream.matched_rules ?? []).map((rule: string, idx: number) => (
                                       <Typography key={idx} variant="caption" display="block">
                                         • {rule}
                                       </Typography>
@@ -163,12 +175,12 @@ export default function FilterPreview({ open, filter, onClose }: FilterPreviewPr
                 </TabPanel>
 
                 <TabPanel value={tabValue} index={1}>
-                  {preview.preview_samples?.filter((s: any) => s.type === 'vod').length > 0 ? (
+                  {preview.preview_samples?.filter((s: PreviewSample) => s.type === 'vod').length > 0 ? (
                     <Box>
                       {preview.preview_samples
-                        ?.filter((s: any) => s.type === 'vod')
+                        ?.filter((s: PreviewSample) => s.type === 'vod')
                         .slice(0, 20)
-                        .map((stream: any) => (
+                        .map((stream: PreviewSample) => (
                           <Accordion key={stream.id}>
                             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                               <Typography>{stream.name}</Typography>
@@ -178,9 +190,9 @@ export default function FilterPreview({ open, filter, onClose }: FilterPreviewPr
                                 <Typography variant="caption" display="block" sx={{ mb: 1 }}>
                                   Matched Rules:
                                 </Typography>
-                                {stream.matched_rules?.length > 0 ? (
+                                {(stream.matched_rules ?? []).length > 0 ? (
                                   <Box>
-                                    {stream.matched_rules.map((rule: string, idx: number) => (
+                                    {(stream.matched_rules ?? []).map((rule: string, idx: number) => (
                                       <Typography key={idx} variant="caption" display="block">
                                         • {rule}
                                       </Typography>
@@ -202,12 +214,12 @@ export default function FilterPreview({ open, filter, onClose }: FilterPreviewPr
                 </TabPanel>
 
                 <TabPanel value={tabValue} index={2}>
-                  {preview.preview_samples?.filter((s: any) => s.type === 'series').length > 0 ? (
+                  {preview.preview_samples?.filter((s: PreviewSample) => s.type === 'series').length > 0 ? (
                     <Box>
                       {preview.preview_samples
-                        ?.filter((s: any) => s.type === 'series')
+                        ?.filter((s: PreviewSample) => s.type === 'series')
                         .slice(0, 20)
-                        .map((stream: any) => (
+                        .map((stream: PreviewSample) => (
                           <Accordion key={stream.id}>
                             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                               <Typography>{stream.name}</Typography>
@@ -217,9 +229,9 @@ export default function FilterPreview({ open, filter, onClose }: FilterPreviewPr
                                 <Typography variant="caption" display="block" sx={{ mb: 1 }}>
                                   Matched Rules:
                                 </Typography>
-                                {stream.matched_rules?.length > 0 ? (
+                                {(stream.matched_rules ?? []).length > 0 ? (
                                   <Box>
-                                    {stream.matched_rules.map((rule: string, idx: number) => (
+                                    {(stream.matched_rules ?? []).map((rule: string, idx: number) => (
                                       <Typography key={idx} variant="caption" display="block">
                                         • {rule}
                                       </Typography>
