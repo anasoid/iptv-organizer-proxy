@@ -10,11 +10,13 @@ use RuntimeException;
  * Filter Model
  *
  * Handles YAML-based stream filtering configuration
+ * Separates rules (filtering logic) from favoris (virtual categories)
  *
  * @property int $id
  * @property string $name
  * @property string|null $description
- * @property string $filter_config
+ * @property string $filter_config YAML rules section (include/exclude rules)
+ * @property string|null $favoris YAML favoris section (virtual category definitions)
  * @property string $created_at
  * @property string $updated_at
  */
@@ -25,14 +27,17 @@ class Filter extends BaseModel
         'name',
         'description',
         'filter_config',
+        'favoris',
     ];
 
     private ?array $parsedConfig = null;
 
     /**
-     * Parse YAML configuration
+     * Parse YAML configuration (rules and favoris)
      *
-     * @return array
+     * Returns array with both rules (from filter_config) and favoris (from separate field)
+     *
+     * @return array ['rules' => [...], 'favoris' => [...]]
      */
     public function parseYaml(): array
     {
@@ -40,18 +45,31 @@ class Filter extends BaseModel
             return $this->parsedConfig;
         }
 
-        if (empty($this->filter_config)) {
-            return ['rules' => [], 'favoris' => []];
+        $rules = [];
+        $favoris = [];
+
+        // Parse rules from filter_config
+        if (!empty($this->filter_config)) {
+            try {
+                $rulesConfig = $this->parseYamlBasic($this->filter_config);
+                $rules = $rulesConfig['rules'] ?? [];
+            } catch (\Exception $e) {
+                throw new RuntimeException("Failed to parse rules YAML: " . $e->getMessage());
+            }
         }
 
-        // Note: This will use symfony/yaml when available (Task 9)
-        // For now, we'll use a basic YAML parser
-        try {
-            $this->parsedConfig = $this->parseYamlBasic($this->filter_config);
-            return $this->parsedConfig;
-        } catch (\Exception $e) {
-            throw new RuntimeException("Failed to parse YAML: " . $e->getMessage());
+        // Parse favoris from separate favoris field
+        if (!empty($this->favoris)) {
+            try {
+                $favorisConfig = $this->parseYamlBasic($this->favoris);
+                $favoris = $favorisConfig['favoris'] ?? $favorisConfig;
+            } catch (\Exception $e) {
+                throw new RuntimeException("Failed to parse favoris YAML: " . $e->getMessage());
+            }
         }
+
+        $this->parsedConfig = ['rules' => $rules, 'favoris' => $favoris];
+        return $this->parsedConfig;
     }
 
     /**
@@ -97,9 +115,9 @@ class Filter extends BaseModel
     }
 
     /**
-     * Validate YAML configuration
+     * Validate YAML rules configuration
      *
-     * @param string $yaml
+     * @param string $yaml Rules YAML
      * @return bool
      */
     public static function validateYaml(string $yaml): bool
@@ -108,23 +126,46 @@ class Filter extends BaseModel
             return false;
         }
 
-        // Basic validation - check for required sections
+        // Validate rules YAML - must contain 'rules:' section
         if (strpos($yaml, 'rules:') === false) {
-            throw new RuntimeException("YAML must contain 'rules:' section");
-        }
-
-        if (strpos($yaml, 'favoris:') === false) {
-            throw new RuntimeException("YAML must contain 'favoris:' section");
+            throw new RuntimeException("Rules YAML must contain 'rules:' section");
         }
 
         // Try to parse it
         try {
             $instance = new static();
             $instance->filter_config = $yaml;
-            $instance->parseYaml();
+            $rulesConfig = $instance->parseYamlBasic($yaml);
+            if (!isset($rulesConfig['rules'])) {
+                throw new RuntimeException("Rules YAML must contain 'rules:' section");
+            }
             return true;
         } catch (\Exception $e) {
-            throw new RuntimeException("Invalid YAML: " . $e->getMessage());
+            throw new RuntimeException("Invalid rules YAML: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Validate YAML favoris configuration
+     *
+     * @param string $yaml Favoris YAML
+     * @return bool
+     */
+    public static function validateFavorisYaml(string $yaml): bool
+    {
+        if (empty($yaml)) {
+            return true; // Favoris is optional
+        }
+
+        // Try to parse it
+        try {
+            $instance = new static();
+            $instance->favoris = $yaml;
+            $favorisConfig = $instance->parseYamlBasic($yaml);
+            // Favoris can be a list directly or under 'favoris:' key
+            return true;
+        } catch (\Exception $e) {
+            throw new RuntimeException("Invalid favoris YAML: " . $e->getMessage());
         }
     }
 
@@ -155,13 +196,18 @@ class Filter extends BaseModel
             throw new RuntimeException("Filter name is required");
         }
 
-        // Filter config required and valid
+        // Filter config (rules) is required
         if (empty($this->attributes['filter_config'])) {
-            throw new RuntimeException("Filter configuration is required");
+            throw new RuntimeException("Filter rules configuration is required");
         }
 
-        // Validate YAML syntax
+        // Validate rules YAML syntax
         static::validateYaml($this->attributes['filter_config']);
+
+        // Validate favoris YAML if provided
+        if (!empty($this->attributes['favoris'])) {
+            static::validateFavorisYaml($this->attributes['favoris']);
+        }
 
         return true;
     }
