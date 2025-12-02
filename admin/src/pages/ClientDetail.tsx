@@ -30,8 +30,6 @@ import clientsApi from '../services/clientsApi';
 import sourcesApi from '../services/sourcesApi';
 import { useAuthStore } from '../stores/authStore';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-
 // Type definitions for category and stream data
 interface Category {
   category_id: string | number;
@@ -295,7 +293,7 @@ export default function ClientDetail() {
         type: 'success',
         message: `Downloaded ${filename}`,
       });
-    } catch (error) {
+    } catch {
       setExportMessage({
         type: 'error',
         message: 'Failed to download blocked items',

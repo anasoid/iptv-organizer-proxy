@@ -19,6 +19,15 @@ import { ArrowBack, Sync as SyncIcon, PlayArrow } from '@mui/icons-material';
 import sourcesApi, { SYNC_TASK_TYPES } from '../services/sourcesApi';
 import { useAuthStore } from '../stores/authStore';
 
+// Type definitions for error handling
+interface ApiErrorResponse {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
+
 export default function SourceDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -46,7 +55,7 @@ export default function SourceDetail() {
       });
       setSyncingTask(null);
     },
-    onError: (error: any) => {
+    onError: (error: ApiErrorResponse) => {
       setSyncMessage({
         type: 'error',
         message: error?.response?.data?.message || 'Synchronization failed',
@@ -68,7 +77,7 @@ export default function SourceDetail() {
       });
       setSyncingTask(null);
     },
-    onError: (error: any) => {
+    onError: (error: ApiErrorResponse) => {
       setSyncMessage({
         type: 'error',
         message: error?.response?.data?.message || 'Full synchronization failed',
