@@ -7,13 +7,13 @@ use Slim\Factory\AppFactory;
 use App\Middleware\CorsMiddleware;
 use App\Middleware\ClientAuthMiddleware;
 use App\Middleware\AdminAuthMiddleware;
-use App\Controllers\XtreamController;
-use App\Controllers\AuthController;
-use App\Controllers\SourceController;
-use App\Controllers\ClientController;
-use App\Controllers\FilterController;
-use App\Controllers\AdminUserController;
-use App\Controllers\DashboardController;
+use App\Controllers\Xtream\XtreamController;
+use App\Controllers\Admin\AuthController;
+use App\Controllers\Admin\SourceController;
+use App\Controllers\Admin\ClientController;
+use App\Controllers\Admin\FilterController;
+use App\Controllers\Admin\AdminUserController;
+use App\Controllers\Admin\DashboardController;
 
 require __DIR__ . '/../vendor/autoload.php';
 

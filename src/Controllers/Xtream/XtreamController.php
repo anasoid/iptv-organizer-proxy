@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Controllers;
+namespace App\Controllers\Xtream;
 
 use App\Models\Client;
 use App\Models\Source;
