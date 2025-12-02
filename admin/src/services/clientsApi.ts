@@ -73,6 +73,73 @@ class ClientsApi {
     });
     return response.data;
   }
+
+  /**
+   * Export live categories for client
+   */
+  async exportLiveCategories(id: number) {
+    const response = await api.get(`/clients/${id}/export/live-categories`);
+    return response.data;
+  }
+
+  /**
+   * Export VOD categories for client
+   */
+  async exportVodCategories(id: number) {
+    const response = await api.get(`/clients/${id}/export/vod-categories`);
+    return response.data;
+  }
+
+  /**
+   * Export series categories for client
+   */
+  async exportSeriesCategories(id: number) {
+    const response = await api.get(`/clients/${id}/export/series-categories`);
+    return response.data;
+  }
+
+  /**
+   * Export live streams for client (optionally filtered by category)
+   */
+  async exportLiveStreams(id: number, categoryId?: number) {
+    const params = categoryId ? { category_id: categoryId } : {};
+    const response = await api.get(`/clients/${id}/export/live-streams`, { params });
+    return response.data;
+  }
+
+  /**
+   * Export VOD streams for client (optionally filtered by category)
+   */
+  async exportVodStreams(id: number, categoryId?: number) {
+    const params = categoryId ? { category_id: categoryId } : {};
+    const response = await api.get(`/clients/${id}/export/vod-streams`, { params });
+    return response.data;
+  }
+
+  /**
+   * Export series for client (optionally filtered by category)
+   */
+  async exportSeries(id: number, categoryId?: number) {
+    const params = categoryId ? { category_id: categoryId } : {};
+    const response = await api.get(`/clients/${id}/export/series`, { params });
+    return response.data;
+  }
+
+  /**
+   * Get blocked categories and streams by type for client
+   */
+  async getBlockedItems(id: number) {
+    const response = await api.get(`/clients/${id}/blocked-items`);
+    return response.data;
+  }
+
+  /**
+   * Export blocked items for client
+   */
+  async exportBlockedItems(id: number) {
+    const response = await api.get(`/clients/${id}/export/blocked-items`);
+    return response.data;
+  }
 }
 
 export default new ClientsApi();

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -14,7 +15,7 @@ import {
 import { DataGrid, GridActionsCellItem } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Edit as EditIcon, Delete as DeleteIcon, Visibility as ViewIcon } from '@mui/icons-material';
 import type { Client } from '../services/clientsApi';
 import clientsApi from '../services/clientsApi';
 import sourcesApi from '../services/sourcesApi';
@@ -33,6 +34,7 @@ interface Filter {
 }
 
 export default function Clients() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
   const [open, setOpen] = useState(false);
@@ -92,6 +94,10 @@ export default function Clients() {
     setOpen(true);
   };
 
+  const handleViewClient = (client: Client) => {
+    navigate(`/clients/${client.id}`);
+  };
+
   const handleEditClient = (client: Client) => {
     setEditingClient(client);
     setOpen(true);
@@ -139,8 +145,14 @@ export default function Clients() {
     {
       field: 'actions',
       type: 'actions',
-      width: 100,
+      width: 120,
       getActions: (params) => [
+        <GridActionsCellItem
+          key="view"
+          icon={<ViewIcon />}
+          label="View"
+          onClick={() => handleViewClient(params.row as Client)}
+        />,
         <GridActionsCellItem
           key="edit"
           icon={<EditIcon />}

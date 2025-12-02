@@ -78,6 +78,14 @@ $app->group('/api', function ($group) {
     $group->put('/clients/{id}', [$clientController, 'update']);
     $group->delete('/clients/{id}', [$clientController, 'delete']);
     $group->get('/clients/{id}/logs', [$clientController, 'logs']);
+    $group->get('/clients/{id}/blocked-items', [$clientController, 'getBlockedItems']);
+    $group->get('/clients/{id}/export/blocked-items', [$clientController, 'exportBlockedItems']);
+    $group->get('/clients/{id}/export/live-categories', [$clientController, 'exportLiveCategories']);
+    $group->get('/clients/{id}/export/vod-categories', [$clientController, 'exportVodCategories']);
+    $group->get('/clients/{id}/export/series-categories', [$clientController, 'exportSeriesCategories']);
+    $group->get('/clients/{id}/export/live-streams', [$clientController, 'exportLiveStreams']);
+    $group->get('/clients/{id}/export/vod-streams', [$clientController, 'exportVodStreams']);
+    $group->get('/clients/{id}/export/series', [$clientController, 'exportSeries']);
 
     // Filter management
     $filterController = new FilterController();

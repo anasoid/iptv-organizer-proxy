@@ -7,6 +7,12 @@ namespace App\Controllers;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use App\Models\Client;
+use App\Models\Category;
+use App\Models\LiveStream;
+use App\Models\VodStream;
+use App\Models\Series;
+use App\Models\Filter;
+use App\Services\FilterService;
 
 class ClientController
 {
@@ -260,6 +266,467 @@ class ClientController
             ]);
         } catch (\Throwable $e) {
             return $this->jsonError($response, 'Failed to get client logs: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get blocked categories and streams by type for client
+     * GET /api/clients/{id}/blocked-items
+     */
+    public function getBlockedItems(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        try {
+            $id = (int) ($args['id'] ?? 0);
+            $client = Client::find($id);
+            if (!$client) {
+                return $this->jsonError($response, 'Client not found', 404);
+            }
+
+            // If no filter is assigned, return empty
+            if (!$client->filter_id) {
+                return $this->jsonResponse($response, [
+                    'success' => true,
+                    'data' => [
+                        'has_filter' => false,
+                        'blocked_categories' => [],
+                        'blocked_streams' => [],
+                    ],
+                ]);
+            }
+
+            // Get the filter
+            $filter = Filter::find($client->filter_id);
+            if (!$filter) {
+                return $this->jsonResponse($response, [
+                    'success' => true,
+                    'data' => [
+                        'has_filter' => false,
+                        'blocked_categories' => [],
+                        'blocked_streams' => [],
+                    ],
+                ]);
+            }
+
+            $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
+
+            // Get blocked categories
+            $blockedCategories = [];
+            $categoryTypes = ['live', 'vod', 'series'];
+            foreach ($categoryTypes as $type) {
+                $allCategories = Category::getBySourceAndType($client->source_id, $type);
+                // Categories don't have filtering applied in the same way, so we show all available
+                $blockedCategories[$type] = array_map(fn($c) => [
+                    'id' => $c->id,
+                    'category_id' => $c->category_id,
+                    'category_name' => $c->category_name,
+                    'parent_id' => $c->parent_id ?? 0,
+                ], $allCategories);
+            }
+
+            // Get blocked streams
+            $blockedStreams = [];
+
+            // Check live streams
+            $liveStreams = LiveStream::getBySource($client->source_id, false);
+            $filteredLive = $filterService->applyToStreams($liveStreams);
+            $blockedLive = array_values(array_filter($liveStreams, function ($stream) use ($filteredLive) {
+                return !in_array($stream->id, array_column($filteredLive, 'id'));
+            }));
+
+            // Check VOD streams
+            $vodStreams = VodStream::getBySource($client->source_id, false);
+            $filteredVod = $filterService->applyToStreams($vodStreams);
+            $blockedVod = array_values(array_filter($vodStreams, function ($stream) use ($filteredVod) {
+                return !in_array($stream->id, array_column($filteredVod, 'id'));
+            }));
+
+            // Check series
+            $seriesList = Series::getBySource($client->source_id, false);
+            $filteredSeries = $filterService->applyToStreams($seriesList);
+            $blockedSeriesItems = array_values(array_filter($seriesList, function ($series) use ($filteredSeries) {
+                return !in_array($series->id, array_column($filteredSeries, 'id'));
+            }));
+
+            // Format response
+            $blockedStreams['live'] = array_map(fn($s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'num' => $s->num ?? null,
+                'category_id' => $s->category_id,
+            ], $blockedLive);
+
+            $blockedStreams['vod'] = array_map(fn($s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'num' => $s->num ?? null,
+                'category_id' => $s->category_id,
+            ], $blockedVod);
+
+            $blockedStreams['series'] = array_map(fn($s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'num' => $s->num ?? null,
+                'category_id' => $s->category_id,
+            ], $blockedSeriesItems);
+
+            return $this->jsonResponse($response, [
+                'success' => true,
+                'data' => [
+                    'has_filter' => true,
+                    'filter_name' => $filter->name,
+                    'blocked_categories' => $blockedCategories,
+                    'blocked_streams' => $blockedStreams,
+                    'blocked_counts' => [
+                        'categories_live' => count($blockedCategories['live'] ?? []),
+                        'categories_vod' => count($blockedCategories['vod'] ?? []),
+                        'categories_series' => count($blockedCategories['series'] ?? []),
+                        'streams_live' => count($blockedLive),
+                        'streams_vod' => count($blockedVod),
+                        'streams_series' => count($blockedSeriesItems),
+                        'total_categories' => count($blockedCategories['live'] ?? []) + count($blockedCategories['vod'] ?? []) + count($blockedCategories['series'] ?? []),
+                        'total_streams' => count($blockedLive) + count($blockedVod) + count($blockedSeriesItems),
+                        'total' => count($blockedCategories['live'] ?? []) + count($blockedCategories['vod'] ?? []) + count($blockedCategories['series'] ?? []) + count($blockedLive) + count($blockedVod) + count($blockedSeriesItems),
+                    ],
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->jsonError($response, 'Failed to get blocked items: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Export blocked items for client (JSON export)
+     * GET /api/clients/{id}/export/blocked-items
+     */
+    public function exportBlockedItems(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        try {
+            $id = (int) ($args['id'] ?? 0);
+            $client = Client::find($id);
+            if (!$client) {
+                return $this->jsonError($response, 'Client not found', 404);
+            }
+
+            // If no filter is assigned, return empty
+            if (!$client->filter_id) {
+                return $this->jsonResponse($response, [
+                    'success' => true,
+                    'data' => [
+                        'has_filter' => false,
+                        'blocked_by_type' => [],
+                    ],
+                ]);
+            }
+
+            // Get the filter
+            $filter = Filter::find($client->filter_id);
+            if (!$filter) {
+                return $this->jsonResponse($response, [
+                    'success' => true,
+                    'data' => [
+                        'has_filter' => false,
+                        'blocked_by_type' => [],
+                    ],
+                ]);
+            }
+
+            $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
+            $proxyUrl = $_ENV['APP_URL'] ?? $request->getUri()->getScheme() . '://' . $request->getUri()->getHost();
+
+            // Get blocked categories
+            $blockedCategories = [];
+            $categoryTypes = ['live', 'vod', 'series'];
+            foreach ($categoryTypes as $type) {
+                $allCategories = Category::getBySourceAndType($client->source_id, $type);
+                $blockedCategories[$type] = array_map(fn($c) => [
+                    'category_id' => (string) $c->category_id,
+                    'category_name' => $c->category_name,
+                    'parent_id' => (int) ($c->parent_id ?? 0),
+                ], $allCategories);
+            }
+
+            // Get blocked streams
+            $blockedStreams = [];
+
+            // Check live streams
+            $liveStreams = LiveStream::getBySource($client->source_id, false);
+            $filteredLive = $filterService->applyToStreams($liveStreams);
+            $blockedLive = array_values(array_filter($liveStreams, function ($stream) use ($filteredLive) {
+                return !in_array($stream->id, array_column($filteredLive, 'id'));
+            }));
+
+            // Check VOD streams
+            $vodStreams = VodStream::getBySource($client->source_id, false);
+            $filteredVod = $filterService->applyToStreams($vodStreams);
+            $blockedVod = array_values(array_filter($vodStreams, function ($stream) use ($filteredVod) {
+                return !in_array($stream->id, array_column($filteredVod, 'id'));
+            }));
+
+            // Check series
+            $seriesList = Series::getBySource($client->source_id, false);
+            $filteredSeries = $filterService->applyToStreams($seriesList);
+            $blockedSeriesItems = array_values(array_filter($seriesList, function ($series) use ($filteredSeries) {
+                return !in_array($series->id, array_column($filteredSeries, 'id'));
+            }));
+
+            // Format response in Xtream format
+            $blockedStreams['live'] = array_map(fn($s) => $s->toXtreamFormat($proxyUrl, $client->username, $client->password), $blockedLive);
+            $blockedStreams['vod'] = array_map(fn($s) => $s->toXtreamFormat($proxyUrl, $client->username, $client->password), $blockedVod);
+            $blockedStreams['series'] = array_map(fn($s) => $s->toXtreamFormat($proxyUrl, $client->username, $client->password), $blockedSeriesItems);
+
+            return $this->jsonResponse($response, [
+                'success' => true,
+                'data' => [
+                    'has_filter' => true,
+                    'filter_name' => $filter->name,
+                    'blocked_categories' => $blockedCategories,
+                    'blocked_streams' => $blockedStreams,
+                    'blocked_counts' => [
+                        'categories_live' => count($blockedCategories['live'] ?? []),
+                        'categories_vod' => count($blockedCategories['vod'] ?? []),
+                        'categories_series' => count($blockedCategories['series'] ?? []),
+                        'streams_live' => count($blockedLive),
+                        'streams_vod' => count($blockedVod),
+                        'streams_series' => count($blockedSeriesItems),
+                        'total_categories' => count($blockedCategories['live'] ?? []) + count($blockedCategories['vod'] ?? []) + count($blockedCategories['series'] ?? []),
+                        'total_streams' => count($blockedLive) + count($blockedVod) + count($blockedSeriesItems),
+                        'total' => count($blockedCategories['live'] ?? []) + count($blockedCategories['vod'] ?? []) + count($blockedCategories['series'] ?? []) + count($blockedLive) + count($blockedVod) + count($blockedSeriesItems),
+                    ],
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->jsonError($response, 'Failed to export blocked items: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get live categories for client (JSON export)
+     * GET /api/clients/{id}/export/live-categories
+     */
+    public function exportLiveCategories(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        try {
+            $id = (int) ($args['id'] ?? 0);
+            $client = Client::find($id);
+            if (!$client) {
+                return $this->jsonError($response, 'Client not found', 404);
+            }
+
+            // Get categories from database
+            $regularCategories = Category::getBySourceAndType($client->source_id, 'live');
+
+            // Format as Xtream API response
+            $categories = [];
+            foreach ($regularCategories as $category) {
+                $categories[] = [
+                    'category_id' => (string) $category->category_id,
+                    'category_name' => $category->category_name,
+                    'parent_id' => (int) ($category->parent_id ?? 0),
+                ];
+            }
+
+            return $this->jsonResponse($response, [
+                'success' => true,
+                'data' => $categories,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->jsonError($response, 'Failed to get live categories: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get VOD categories for client (JSON export)
+     * GET /api/clients/{id}/export/vod-categories
+     */
+    public function exportVodCategories(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        try {
+            $id = (int) ($args['id'] ?? 0);
+            $client = Client::find($id);
+            if (!$client) {
+                return $this->jsonError($response, 'Client not found', 404);
+            }
+
+            // Get categories from database
+            $regularCategories = Category::getBySourceAndType($client->source_id, 'vod');
+
+            // Format as Xtream API response
+            $categories = [];
+            foreach ($regularCategories as $category) {
+                $categories[] = [
+                    'category_id' => (string) $category->category_id,
+                    'category_name' => $category->category_name,
+                    'parent_id' => (int) ($category->parent_id ?? 0),
+                ];
+            }
+
+            return $this->jsonResponse($response, [
+                'success' => true,
+                'data' => $categories,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->jsonError($response, 'Failed to get VOD categories: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get series categories for client (JSON export)
+     * GET /api/clients/{id}/export/series-categories
+     */
+    public function exportSeriesCategories(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        try {
+            $id = (int) ($args['id'] ?? 0);
+            $client = Client::find($id);
+            if (!$client) {
+                return $this->jsonError($response, 'Client not found', 404);
+            }
+
+            // Get categories from database
+            $regularCategories = Category::getBySourceAndType($client->source_id, 'series');
+
+            // Format as Xtream API response
+            $categories = [];
+            foreach ($regularCategories as $category) {
+                $categories[] = [
+                    'category_id' => (string) $category->category_id,
+                    'category_name' => $category->category_name,
+                    'parent_id' => (int) ($category->parent_id ?? 0),
+                ];
+            }
+
+            return $this->jsonResponse($response, [
+                'success' => true,
+                'data' => $categories,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->jsonError($response, 'Failed to get series categories: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get live streams for client (JSON export)
+     * GET /api/clients/{id}/export/live-streams?category_id=X
+     */
+    public function exportLiveStreams(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        try {
+            $id = (int) ($args['id'] ?? 0);
+            $categoryId = isset($request->getQueryParams()['category_id']) ? (int) $request->getQueryParams()['category_id'] : null;
+
+            $client = Client::find($id);
+            if (!$client) {
+                return $this->jsonError($response, 'Client not found', 404);
+            }
+
+            $proxyUrl = $_ENV['APP_URL'] ?? $request->getUri()->getScheme() . '://' . $request->getUri()->getHost();
+
+            // Get streams from database
+            if ($categoryId !== null && $categoryId < 100000) {
+                // Regular category filter
+                $streams = LiveStream::getByCategory($client->source_id, $categoryId);
+            } else {
+                // All streams
+                $streams = LiveStream::getBySource($client->source_id, true);
+            }
+
+            // Convert to Xtream format
+            $result = [];
+            foreach ($streams as $stream) {
+                $streamData = $stream->toXtreamFormat($proxyUrl, $client->username, $client->password);
+                $result[] = $streamData;
+            }
+
+            return $this->jsonResponse($response, [
+                'success' => true,
+                'data' => $result,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->jsonError($response, 'Failed to get live streams: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get VOD streams for client (JSON export)
+     * GET /api/clients/{id}/export/vod-streams?category_id=X
+     */
+    public function exportVodStreams(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        try {
+            $id = (int) ($args['id'] ?? 0);
+            $categoryId = isset($request->getQueryParams()['category_id']) ? (int) $request->getQueryParams()['category_id'] : null;
+
+            $client = Client::find($id);
+            if (!$client) {
+                return $this->jsonError($response, 'Client not found', 404);
+            }
+
+            $proxyUrl = $_ENV['APP_URL'] ?? $request->getUri()->getScheme() . '://' . $request->getUri()->getHost();
+
+            // Get streams from database
+            if ($categoryId !== null && $categoryId < 100000) {
+                // Regular category filter
+                $streams = VodStream::getByCategory($client->source_id, $categoryId);
+            } else {
+                // All streams
+                $streams = VodStream::getBySource($client->source_id, true);
+            }
+
+            // Convert to Xtream format
+            $result = [];
+            foreach ($streams as $stream) {
+                $streamData = $stream->toXtreamFormat($proxyUrl, $client->username, $client->password);
+                $result[] = $streamData;
+            }
+
+            return $this->jsonResponse($response, [
+                'success' => true,
+                'data' => $result,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->jsonError($response, 'Failed to get VOD streams: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get series for client (JSON export)
+     * GET /api/clients/{id}/export/series?category_id=X
+     */
+    public function exportSeries(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        try {
+            $id = (int) ($args['id'] ?? 0);
+            $categoryId = isset($request->getQueryParams()['category_id']) ? (int) $request->getQueryParams()['category_id'] : null;
+
+            $client = Client::find($id);
+            if (!$client) {
+                return $this->jsonError($response, 'Client not found', 404);
+            }
+
+            $proxyUrl = $_ENV['APP_URL'] ?? $request->getUri()->getScheme() . '://' . $request->getUri()->getHost();
+
+            // Get series from database
+            if ($categoryId !== null && $categoryId < 100000) {
+                // Regular category filter
+                $seriesList = Series::getByCategory($client->source_id, $categoryId);
+            } else {
+                // All series
+                $seriesList = Series::getBySource($client->source_id, true);
+            }
+
+            // Convert to Xtream format
+            $result = [];
+            foreach ($seriesList as $series) {
+                $seriesData = $series->toXtreamFormat($proxyUrl, $client->username, $client->password);
+                $result[] = $seriesData;
+            }
+
+            return $this->jsonResponse($response, [
+                'success' => true,
+                'data' => $result,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->jsonError($response, 'Failed to get series: ' . $e->getMessage(), 500);
         }
     }
 

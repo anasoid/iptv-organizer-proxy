@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard';
 import Sources from './pages/Sources';
 import SourceDetail from './pages/SourceDetail';
 import Clients from './pages/Clients';
+import ClientDetail from './pages/ClientDetail';
 import Filters from './pages/Filters';
 import AdminUsers from './pages/AdminUsers';
 import NotFound from './pages/NotFound';
@@ -70,6 +71,7 @@ function App() {
                 <Route path="/sources" element={<Sources />} />
                 <Route path="/sources/:id" element={<SourceDetail />} />
                 <Route path="/clients" element={<Clients />} />
+                <Route path="/clients/:id" element={<ClientDetail />} />
                 <Route path="/filters" element={<Filters />} />
                 <Route path="/admin-users" element={<AdminUsers />} />
               </Route>
