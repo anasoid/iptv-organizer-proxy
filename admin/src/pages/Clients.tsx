@@ -115,14 +115,14 @@ export default function Clients() {
       headerName: 'Source',
       flex: 1,
       minWidth: 120,
-      renderCell: (params) => sourcesMap.get(params.value) || '-',
+      renderCell: (params) => <>{sourcesMap.get(params.value) || '-'}</>,
     },
     {
       field: 'filter_id',
       headerName: 'Filter',
       flex: 1,
       minWidth: 120,
-      renderCell: (params) => (params.value ? filtersMap.get(params.value) || '-' : '-'),
+      renderCell: (params) => <>{params.value ? filtersMap.get(params.value) || '-' : '-'}</>,
     },
     {
       field: 'is_active',

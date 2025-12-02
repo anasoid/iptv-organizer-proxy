@@ -36,7 +36,7 @@ function App() {
   useEffect(() => {
     // Check for existing authentication on mount
     checkAuth();
-  }, []);
+  }, [checkAuth]);
 
   const toggleTheme = () => {
     setThemeMode((prevMode) => {
