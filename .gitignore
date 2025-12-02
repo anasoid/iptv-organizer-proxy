@@ -40,3 +40,4 @@ storage/
 phpunit.xml
 
 tmp
+/.phpunit.cache/test-results
