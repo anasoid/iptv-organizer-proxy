@@ -432,7 +432,7 @@ class SourceController
             ];
 
             $results = [];
-            $totalStats = ['added' => 0, 'updated' => 0, 'deleted' => 0, 'errors' => 0];
+            $totalStats = ['added' => 0, 'updated' => 0, 'deleted' => 0];
 
             foreach ($tasks as $taskType => $method) {
                 try {
@@ -440,20 +440,28 @@ class SourceController
                     $results[$taskType] = $stats;
 
                     if (isset($stats['error'])) {
-                        $totalStats['errors']++;
-                    } else {
-                        $totalStats['added'] += $stats['added'] ?? 0;
-                        $totalStats['updated'] += $stats['updated'] ?? 0;
-                        $totalStats['deleted'] += $stats['deleted'] ?? 0;
+                        continue;
                     }
+
+                    $totalStats['added'] += $stats['added'] ?? 0;
+                    $totalStats['updated'] += $stats['updated'] ?? 0;
+                    $totalStats['deleted'] += $stats['deleted'] ?? 0;
                 } catch (\Exception $e) {
                     $results[$taskType] = ['error' => $e->getMessage()];
-                    $totalStats['errors']++;
+                }
+            }
+
+            // Check if any task had an error
+            $hasErrors = false;
+            foreach ($results as $result) {
+                if (isset($result['error'])) {
+                    $hasErrors = true;
+                    break;
                 }
             }
 
             return $this->jsonResponse($response, [
-                'success' => $totalStats['errors'] === 0,
+                'success' => !$hasErrors,
                 'message' => 'Sync all completed',
                 'data' => [
                     'results' => $results,

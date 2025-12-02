@@ -182,7 +182,7 @@ class SyncService
         }
 
         $syncLog = $this->startSyncLog($syncType);
-        $stats = ['added' => 0, 'updated' => 0, 'deleted' => 0];
+        $stats = ['added' => 0, 'updated' => 0, 'deleted' => 0, 'missing_category_id' => []];
 
         try {
             $this->db->beginTransaction();
@@ -193,6 +193,18 @@ class SyncService
             foreach ($streams as $streamData) {
                 $streamId = $streamData['stream_id'] ?? $streamData['num'];
                 $fetchedStreamIds[] = $streamId;
+
+                // Check if category_id is provided
+                if (!isset($streamData['category_id'])) {
+                    $missingInfo = [
+                        'stream_id' => $streamId,
+                        'num' => $streamData['num'] ?? null,
+                        'name' => $streamData['name'] ?? 'Unknown',
+                    ];
+                    $stats['missing_category_id'][] = $missingInfo;
+                    $this->logger->warning('Live stream missing category_id', $missingInfo);
+                    continue;
+                }
 
                 $labels = LabelExtractor::extractLabels(
                     $streamData['name'] ?? '',
@@ -360,7 +372,7 @@ class SyncService
         }
 
         $syncLog = $this->startSyncLog($syncType);
-        $stats = ['added' => 0, 'updated' => 0, 'deleted' => 0];
+        $stats = ['added' => 0, 'updated' => 0, 'deleted' => 0, 'missing_category_id' => []];
 
         try {
             $this->db->beginTransaction();
@@ -371,6 +383,18 @@ class SyncService
             foreach ($streams as $streamData) {
                 $streamId = $streamData['stream_id'] ?? $streamData['num'];
                 $fetchedStreamIds[] = $streamId;
+
+                // Check if category_id is provided
+                if (!isset($streamData['category_id'])) {
+                    $missingInfo = [
+                        'stream_id' => $streamId,
+                        'num' => $streamData['num'] ?? null,
+                        'name' => $streamData['name'] ?? 'Unknown',
+                    ];
+                    $stats['missing_category_id'][] = $missingInfo;
+                    $this->logger->warning('VOD stream missing category_id', $missingInfo);
+                    continue;
+                }
 
                 $labels = LabelExtractor::extractLabels(
                     $streamData['name'] ?? '',
@@ -536,7 +560,7 @@ class SyncService
         }
 
         $syncLog = $this->startSyncLog($syncType);
-        $stats = ['added' => 0, 'updated' => 0, 'deleted' => 0];
+        $stats = ['added' => 0, 'updated' => 0, 'deleted' => 0, 'missing_category_id' => []];
 
         try {
             $this->db->beginTransaction();
@@ -547,6 +571,18 @@ class SyncService
             foreach ($seriesList as $streamData) {
                 $streamId = $streamData['series_id'] ?? $streamData['num'];
                 $fetchedStreamIds[] = $streamId;
+
+                // Check if category_id is provided
+                if (!isset($streamData['category_id'])) {
+                    $missingInfo = [
+                        'stream_id' => $streamId,
+                        'num' => $streamData['num'] ?? null,
+                        'name' => $streamData['name'] ?? 'Unknown',
+                    ];
+                    $stats['missing_category_id'][] = $missingInfo;
+                    $this->logger->warning('Series missing category_id', $missingInfo);
+                    continue;
+                }
 
                 $labels = LabelExtractor::extractLabels(
                     $streamData['name'] ?? '',
