@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -13,13 +14,14 @@ import {
 import { DataGrid, GridActionsCellItem } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Edit as EditIcon, Delete as DeleteIcon, PlayArrow as SyncIcon } from '@mui/icons-material';
+import { Edit as EditIcon, Delete as DeleteIcon, PlayArrow as SyncIcon, Visibility as ViewIcon } from '@mui/icons-material';
 import type { Source } from '../services/sourcesApi';
 import sourcesApi from '../services/sourcesApi';
 import { useAuthStore } from '../stores/authStore';
 import SourceForm from '../components/SourceForm';
 
 export default function Sources() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
   const [open, setOpen] = useState(false);
@@ -115,6 +117,12 @@ export default function Sources() {
       type: 'actions',
       width: 120,
       getActions: (params) => [
+        <GridActionsCellItem
+          key="view"
+          icon={<ViewIcon />}
+          label="View Details"
+          onClick={() => navigate(`/sources/${params.row.id}`)}
+        />,
         <GridActionsCellItem
           key="edit"
           icon={<EditIcon />}

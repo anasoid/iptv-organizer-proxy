@@ -16,6 +16,7 @@ use RuntimeException;
  * @property string $sync_type
  * @property string $started_at
  * @property string|null $completed_at
+ * @property int|null $duration_seconds
  * @property string $status
  * @property int $items_added
  * @property int $items_updated
@@ -30,6 +31,7 @@ class SyncLog extends BaseModel
         'sync_type',
         'started_at',
         'completed_at',
+        'duration_seconds',
         'status',
         'items_added',
         'items_updated',
@@ -97,7 +99,13 @@ class SyncLog extends BaseModel
             throw new RuntimeException("Invalid status: {$status}");
         }
 
+        // Calculate duration in seconds
+        $startTime = strtotime($this->started_at);
+        $endTime = time();
+        $duration = max(1, $endTime - $startTime); // At least 1 second
+
         $this->completed_at = $this->getCurrentTimestamp();
+        $this->duration_seconds = $duration;
         $this->status = $status;
         $this->items_added = $stats['added'] ?? 0;
         $this->items_updated = $stats['updated'] ?? 0;

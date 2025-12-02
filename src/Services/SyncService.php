@@ -148,15 +148,17 @@ class SyncService
 
             $this->db->commit();
 
-            $syncLog->logSyncComplete('success', $stats);
+            $syncLog->logSyncComplete(SyncLog::STATUS_COMPLETED, $stats);
 
             $this->logger->info('Live categories sync completed', $stats);
 
             return $stats;
         } catch (Exception $e) {
-            $this->db->rollBack();
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
 
-            $syncLog->logSyncComplete('error', $stats, $e->getMessage());
+            $syncLog->logSyncComplete(SyncLog::STATUS_FAILED, $stats, $e->getMessage());
 
             $this->logger->error('Live categories sync failed', [
                 'error' => $e->getMessage(),
@@ -249,15 +251,17 @@ class SyncService
 
             $this->db->commit();
 
-            $syncLog->logSyncComplete('success', $stats);
+            $syncLog->logSyncComplete(SyncLog::STATUS_COMPLETED, $stats);
 
             $this->logger->info('Live streams sync completed', $stats);
 
             return $stats;
         } catch (Exception $e) {
-            $this->db->rollBack();
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
 
-            $syncLog->logSyncComplete('error', $stats, $e->getMessage());
+            $syncLog->logSyncComplete(SyncLog::STATUS_FAILED, $stats, $e->getMessage());
 
             $this->logger->error('Live streams sync failed', [
                 'error' => $e->getMessage(),
@@ -322,15 +326,17 @@ class SyncService
 
             $this->db->commit();
 
-            $syncLog->logSyncComplete('success', $stats);
+            $syncLog->logSyncComplete(SyncLog::STATUS_COMPLETED, $stats);
 
             $this->logger->info('VOD categories sync completed', $stats);
 
             return $stats;
         } catch (Exception $e) {
-            $this->db->rollBack();
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
 
-            $syncLog->logSyncComplete('error', $stats, $e->getMessage());
+            $syncLog->logSyncComplete(SyncLog::STATUS_FAILED, $stats, $e->getMessage());
 
             $this->logger->error('VOD categories sync failed', [
                 'error' => $e->getMessage(),
@@ -421,15 +427,17 @@ class SyncService
 
             $this->db->commit();
 
-            $syncLog->logSyncComplete('success', $stats);
+            $syncLog->logSyncComplete(SyncLog::STATUS_COMPLETED, $stats);
 
             $this->logger->info('VOD streams sync completed', $stats);
 
             return $stats;
         } catch (Exception $e) {
-            $this->db->rollBack();
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
 
-            $syncLog->logSyncComplete('error', $stats, $e->getMessage());
+            $syncLog->logSyncComplete(SyncLog::STATUS_FAILED, $stats, $e->getMessage());
 
             $this->logger->error('VOD streams sync failed', [
                 'error' => $e->getMessage(),
@@ -494,15 +502,17 @@ class SyncService
 
             $this->db->commit();
 
-            $syncLog->logSyncComplete('success', $stats);
+            $syncLog->logSyncComplete(SyncLog::STATUS_COMPLETED, $stats);
 
             $this->logger->info('Series categories sync completed', $stats);
 
             return $stats;
         } catch (Exception $e) {
-            $this->db->rollBack();
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
 
-            $syncLog->logSyncComplete('error', $stats, $e->getMessage());
+            $syncLog->logSyncComplete(SyncLog::STATUS_FAILED, $stats, $e->getMessage());
 
             $this->logger->error('Series categories sync failed', [
                 'error' => $e->getMessage(),
@@ -593,15 +603,17 @@ class SyncService
 
             $this->db->commit();
 
-            $syncLog->logSyncComplete('success', $stats);
+            $syncLog->logSyncComplete(SyncLog::STATUS_COMPLETED, $stats);
 
             $this->logger->info('Series sync completed', $stats);
 
             return $stats;
         } catch (Exception $e) {
-            $this->db->rollBack();
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
 
-            $syncLog->logSyncComplete('error', $stats, $e->getMessage());
+            $syncLog->logSyncComplete(SyncLog::STATUS_FAILED, $stats, $e->getMessage());
 
             $this->logger->error('Series sync failed', [
                 'error' => $e->getMessage(),

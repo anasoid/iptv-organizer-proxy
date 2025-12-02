@@ -110,6 +110,31 @@ class SourcesApi {
     const response = await api.get('/sync/status');
     return response.data;
   }
+
+  /**
+   * Trigger sync for specific task type
+   */
+  async triggerSyncTaskType(id: number, taskType: string) {
+    const response = await api.post(`/sources/${id}/sync/${taskType}`);
+    return response.data;
+  }
+
+  /**
+   * Trigger sync for all task types in correct order
+   */
+  async triggerSyncAll(id: number) {
+    const response = await api.post(`/sources/${id}/sync-all`);
+    return response.data;
+  }
 }
+
+export const SYNC_TASK_TYPES = [
+  { id: 'live_categories', label: 'Live Categories' },
+  { id: 'live_streams', label: 'Live Streams' },
+  { id: 'vod_categories', label: 'VOD Categories' },
+  { id: 'vod_streams', label: 'VOD Streams' },
+  { id: 'series_categories', label: 'Series Categories' },
+  { id: 'series', label: 'Series' },
+] as const;
 
 export default new SourcesApi();

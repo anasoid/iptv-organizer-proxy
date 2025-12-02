@@ -9,6 +9,7 @@ import MainLayout from './components/Layout/MainLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Sources from './pages/Sources';
+import SourceDetail from './pages/SourceDetail';
 import Clients from './pages/Clients';
 import Filters from './pages/Filters';
 import AdminUsers from './pages/AdminUsers';
@@ -67,6 +68,7 @@ function App() {
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/sources" element={<Sources />} />
+                <Route path="/sources/:id" element={<SourceDetail />} />
                 <Route path="/clients" element={<Clients />} />
                 <Route path="/filters" element={<Filters />} />
                 <Route path="/admin-users" element={<AdminUsers />} />

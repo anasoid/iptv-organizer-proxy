@@ -67,6 +67,8 @@ $app->group('/api', function ($group) {
     $group->post('/sources/{id}/test', [$sourceController, 'testConnection']);
     $group->post('/sources/{id}/sync', [$sourceController, 'sync']);
     $group->get('/sources/{id}/sync-logs', [$sourceController, 'syncLogs']);
+    $group->post('/sources/{id}/sync/{taskType}', [$sourceController, 'syncTaskType']);
+    $group->post('/sources/{id}/sync-all', [$sourceController, 'syncAll']);
 
     // Client management
     $clientController = new ClientController();

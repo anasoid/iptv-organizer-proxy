@@ -332,6 +332,141 @@ class SourceController
     }
 
     /**
+     * Trigger sync for specific task type
+     *
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface $response
+     * @param array $args
+     * @return ResponseInterface
+     */
+    public function syncTaskType(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        try {
+            $id = (int) ($args['id'] ?? 0);
+            $taskType = $args['taskType'] ?? '';
+
+            if (!$id) {
+                return $this->jsonError($response, 'Invalid source ID', 400);
+            }
+
+            $validTaskTypes = ['live_categories', 'live_streams', 'vod_categories', 'vod_streams', 'series_categories', 'series'];
+            if (!in_array($taskType, $validTaskTypes)) {
+                return $this->jsonError($response, 'Invalid task type', 400);
+            }
+
+            $source = Source::find($id);
+            if (!$source) {
+                return $this->jsonError($response, 'Source not found', 404);
+            }
+
+            if (!$source->is_active) {
+                return $this->jsonError($response, 'Source is not active', 400);
+            }
+
+            // Create XtreamClient and SyncService
+            $client = new \App\Services\Xtream\XtreamClient($source);
+            $syncService = new \App\Services\SyncService($source, $client);
+
+            // Map task type to method
+            $methodMap = [
+                'live_categories' => 'syncLiveCategories',
+                'live_streams' => 'syncLiveStreams',
+                'vod_categories' => 'syncVodCategories',
+                'vod_streams' => 'syncVodStreams',
+                'series_categories' => 'syncSeriesCategories',
+                'series' => 'syncSeries',
+            ];
+
+            $method = $methodMap[$taskType];
+            $result = $syncService->$method();
+
+            return $this->jsonResponse($response, [
+                'success' => true,
+                'message' => "Sync completed for {$taskType}",
+                'data' => $result,
+            ]);
+
+        } catch (\Throwable $e) {
+            return $this->jsonError($response, 'Sync failed: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Trigger sync for all task types in correct order
+     *
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface $response
+     * @param array $args
+     * @return ResponseInterface
+     */
+    public function syncAll(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        try {
+            $id = (int) ($args['id'] ?? 0);
+
+            if (!$id) {
+                return $this->jsonError($response, 'Invalid source ID', 400);
+            }
+
+            $source = Source::find($id);
+            if (!$source) {
+                return $this->jsonError($response, 'Source not found', 404);
+            }
+
+            if (!$source->is_active) {
+                return $this->jsonError($response, 'Source is not active', 400);
+            }
+
+            // Create XtreamClient and SyncService
+            $client = new \App\Services\Xtream\XtreamClient($source);
+            $syncService = new \App\Services\SyncService($source, $client);
+
+            // Execute in correct dependency order: categories before streams
+            $tasks = [
+                'live_categories' => 'syncLiveCategories',
+                'live_streams' => 'syncLiveStreams',
+                'vod_categories' => 'syncVodCategories',
+                'vod_streams' => 'syncVodStreams',
+                'series_categories' => 'syncSeriesCategories',
+                'series' => 'syncSeries',
+            ];
+
+            $results = [];
+            $totalStats = ['added' => 0, 'updated' => 0, 'deleted' => 0, 'errors' => 0];
+
+            foreach ($tasks as $taskType => $method) {
+                try {
+                    $stats = $syncService->$method();
+                    $results[$taskType] = $stats;
+
+                    if (isset($stats['error'])) {
+                        $totalStats['errors']++;
+                    } else {
+                        $totalStats['added'] += $stats['added'] ?? 0;
+                        $totalStats['updated'] += $stats['updated'] ?? 0;
+                        $totalStats['deleted'] += $stats['deleted'] ?? 0;
+                    }
+                } catch (\Exception $e) {
+                    $results[$taskType] = ['error' => $e->getMessage()];
+                    $totalStats['errors']++;
+                }
+            }
+
+            return $this->jsonResponse($response, [
+                'success' => $totalStats['errors'] === 0,
+                'message' => 'Sync all completed',
+                'data' => [
+                    'results' => $results,
+                    'summary' => $totalStats,
+                ],
+            ]);
+
+        } catch (\Throwable $e) {
+            return $this->jsonError($response, 'Sync all failed: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * Return JSON response
      *
      * @param ResponseInterface $response
