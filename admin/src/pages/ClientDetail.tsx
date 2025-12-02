@@ -32,6 +32,35 @@ import { useAuthStore } from '../stores/authStore';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
+// Type definitions for category and stream data
+interface Category {
+  category_id: string | number;
+  category_name: string;
+  parent_id?: number | null;
+}
+
+interface Stream {
+  id?: number;
+  name: string;
+  num?: string | number | null;
+  category_id: string | number;
+}
+
+type AllowedItem = Category | Stream;
+
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+}
+
+interface ApiErrorResponse {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
+
 const EXPORT_TYPES = [
   { id: 'live_categories', label: 'Live Categories', variant: undefined },
   { id: 'live_streams', label: 'Live Streams', variant: undefined },
@@ -84,7 +113,7 @@ export default function ClientDetail() {
   const { data: allowedResponse, isLoading: allowedLoading } = useQuery({
     queryKey: ['allowed-items', id, selectedAllowedType],
     queryFn: async () => {
-      const methodMap: Record<string, (id: number) => Promise<any>> = {
+      const methodMap: Record<string, (id: number) => Promise<ApiResponse<AllowedItem[]>>> = {
         live_categories: (clientId) => clientsApi.exportLiveCategories(clientId),
         live_streams: (clientId) => clientsApi.exportLiveStreams(clientId),
         vod_categories: (clientId) => clientsApi.exportVodCategories(clientId),
@@ -105,7 +134,7 @@ export default function ClientDetail() {
 
   const exportMutation = useMutation({
     mutationFn: ({ exportType }: { exportType: string }) => {
-      const methodMap: Record<string, (id: number) => Promise<any>> = {
+      const methodMap: Record<string, (id: number) => Promise<ApiResponse<AllowedItem[] | Record<string, unknown>>>> = {
         live_categories: (clientId) => clientsApi.exportLiveCategories(clientId),
         live_streams: (clientId) => clientsApi.exportLiveStreams(clientId),
         vod_categories: (clientId) => clientsApi.exportVodCategories(clientId),
@@ -138,7 +167,7 @@ export default function ClientDetail() {
       });
       setExportingType(null);
     },
-    onError: (error: any) => {
+    onError: (error: ApiErrorResponse) => {
       setExportMessage({
         type: 'error',
         message: error?.response?.data?.message || 'Export failed',
@@ -158,7 +187,7 @@ export default function ClientDetail() {
 
   const handleOpenAllowedInNewTab = async (exportType: string) => {
     try {
-      const methodMap: Record<string, (id: number) => Promise<any>> = {
+      const methodMap: Record<string, (id: number) => Promise<ApiResponse<AllowedItem[]>>> = {
         live_categories: (clientId) => clientsApi.exportLiveCategories(clientId),
         live_streams: (clientId) => clientsApi.exportLiveStreams(clientId),
         vod_categories: (clientId) => clientsApi.exportVodCategories(clientId),
@@ -190,7 +219,7 @@ export default function ClientDetail() {
       const blockedItemsData = response.data;
 
       // Determine which type of data to show based on blockedType
-      let items: any[] = [];
+      let items: AllowedItem[] = [];
 
       if (blockedType === 'live_categories') {
         items = blockedItemsData.blocked_categories?.live || [];
@@ -223,7 +252,7 @@ export default function ClientDetail() {
       if (!response.data) return;
 
       const blockedData = response.data;
-      let itemsToDownload: any[] = [];
+      let itemsToDownload: AllowedItem[] = [];
       let filename = '';
 
       switch (blockedType) {
@@ -562,9 +591,9 @@ export default function ClientDetail() {
           ) : allowedData ? (
             <Box sx={{ mt: 2 }}>
               {selectedAllowedType && selectedAllowedType.includes('categories') ? (
-                <AllowedCategoriesTable items={allowedData as any[] || []} />
+                <AllowedCategoriesTable items={(allowedData as Category[]) || []} />
               ) : (
-                <AllowedStreamsTable items={allowedData as any[] || []} />
+                <AllowedStreamsTable items={(allowedData as Stream[]) || []} />
               )}
             </Box>
           ) : null}
@@ -657,7 +686,7 @@ function BlockedStreamsTable({ items }: { items: BlockedStream[] }) {
   );
 }
 
-function AllowedCategoriesTable({ items }: { items: any[] }) {
+function AllowedCategoriesTable({ items }: { items: Category[] }) {
   return (
     <TableContainer>
       <Table size="small" sx={{ mt: 2 }}>
@@ -690,7 +719,7 @@ function AllowedCategoriesTable({ items }: { items: any[] }) {
   );
 }
 
-function AllowedStreamsTable({ items }: { items: any[] }) {
+function AllowedStreamsTable({ items }: { items: Stream[] }) {
   return (
     <TableContainer>
       <Table size="small" sx={{ mt: 2 }}>
