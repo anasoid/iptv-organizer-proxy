@@ -392,10 +392,9 @@ class FilterService
                 }
             }
 
-            // Stream didn't match any rule
-            // If there are include rules, reject as "ignored"
-            // If only exclude rules, accept
-            return !$hasIncludeRules;
+            // Stream didn't match any rule → HIDE
+            // If a filter is assigned with rules, streams must explicitly match a rule to be shown
+            return false;
         });
     }
 
@@ -540,9 +539,10 @@ class FilterService
                 }
             }
 
-            // Category didn't match any rule
+            // Category didn't match any rule → KEEP
             // If there are include rules, reject as "ignored"
-            // If only exclude rules, accept
+            // If only exclude rules, accept (show)
+            // If no category rules, accept (show all)
             return !$hasIncludeRules;
         });
     }

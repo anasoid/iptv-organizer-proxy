@@ -10,6 +10,7 @@ use App\Models\Filter;
 use App\Models\Category;
 use App\Models\LiveStream;
 use App\Services\FilterService;
+use App\Services\ContentFilterService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\Psr7\Response;
@@ -100,17 +101,20 @@ class XtreamController
 
         $categories = [];
 
+        // Use ContentFilterService to get allowed categories
+        $filterService = new ContentFilterService($client);
+
         // Generate favoris virtual categories first (if filter assigned)
         if ($filter !== null) {
-            $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
-            $favorisCategories = $filterService->generateFavorisCategories();
+            $filterServiceBase = new FilterService($filter, (bool) $client->hide_adult_content);
+            $favorisCategories = $filterServiceBase->generateFavorisCategories();
             $categories = array_merge($categories, $favorisCategories);
         }
 
-        // Get regular categories from database
-        $regularCategories = Category::getBySourceAndType($source->id, 'live');
+        // Get allowed regular categories (filtered by rules)
+        $allowedCategories = $filterService->getAllowedCategories('live');
 
-        foreach ($regularCategories as $category) {
+        foreach ($allowedCategories as $category) {
             $categories[] = [
                 'category_id' => (string) $category->category_id,
                 'category_name' => $category->category_name,
@@ -198,17 +202,20 @@ class XtreamController
 
         $categories = [];
 
+        // Use ContentFilterService to get allowed categories
+        $filterService = new ContentFilterService($client);
+
         // Generate favoris virtual categories first (if filter assigned)
         if ($filter !== null) {
-            $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
-            $favorisCategories = $filterService->generateFavorisCategories();
+            $filterServiceBase = new FilterService($filter, (bool) $client->hide_adult_content);
+            $favorisCategories = $filterServiceBase->generateFavorisCategories();
             $categories = array_merge($categories, $favorisCategories);
         }
 
-        // Get regular categories from database
-        $regularCategories = Category::getBySourceAndType($source->id, 'vod');
+        // Get allowed regular categories (filtered by rules)
+        $allowedCategories = $filterService->getAllowedCategories('vod');
 
-        foreach ($regularCategories as $category) {
+        foreach ($allowedCategories as $category) {
             $categories[] = [
                 'category_id' => (string) $category->category_id,
                 'category_name' => $category->category_name,
@@ -243,17 +250,20 @@ class XtreamController
 
         $categories = [];
 
+        // Use ContentFilterService to get allowed categories
+        $filterService = new ContentFilterService($client);
+
         // Generate favoris virtual categories first (if filter assigned)
         if ($filter !== null) {
-            $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
-            $favorisCategories = $filterService->generateFavorisCategories();
+            $filterServiceBase = new FilterService($filter, (bool) $client->hide_adult_content);
+            $favorisCategories = $filterServiceBase->generateFavorisCategories();
             $categories = array_merge($categories, $favorisCategories);
         }
 
-        // Get regular categories from database
-        $regularCategories = Category::getBySourceAndType($source->id, 'series');
+        // Get allowed regular categories (filtered by rules)
+        $allowedCategories = $filterService->getAllowedCategories('series');
 
-        foreach ($regularCategories as $category) {
+        foreach ($allowedCategories as $category) {
             $categories[] = [
                 'category_id' => (string) $category->category_id,
                 'category_name' => $category->category_name,
