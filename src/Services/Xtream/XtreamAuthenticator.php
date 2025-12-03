@@ -24,9 +24,7 @@ class XtreamAuthenticator
     private bool $authenticated = false;
     private ?array $serverInfo = null;
     private ?array $userInfo = null;
-    private int $rateLimitDelay;
     private Logger $logger;
-    private int $lastRequestTime = 0;
 
     /**
      * Constructor
@@ -35,19 +33,16 @@ class XtreamAuthenticator
      * @param string $username Xtream username
      * @param string $password Xtream password
      * @param Client|null $httpClient Optional Guzzle client (for testing)
-     * @param int $rateLimitDelay Delay in milliseconds between requests (default: 0)
      */
     public function __construct(
         string $url,
         string $username,
         string $password,
-        ?Client $httpClient = null,
-        int $rateLimitDelay = 0
+        ?Client $httpClient = null
     ) {
         $this->baseUrl = rtrim($url, '/') . '/player_api.php';
         $this->username = $username;
         $this->password = $password;
-        $this->rateLimitDelay = $rateLimitDelay;
 
         $this->httpClient = $httpClient ?? new Client([
             'timeout' => 30,
@@ -66,8 +61,6 @@ class XtreamAuthenticator
      */
     public function authenticate(): array
     {
-        $this->applyRateLimit();
-
         try {
             $response = $this->httpClient->get($this->baseUrl, [
                 'query' => [
@@ -176,22 +169,6 @@ class XtreamAuthenticator
         return $this->userInfo;
     }
 
-    /**
-     * Apply rate limiting delay
-     */
-    public function applyRateLimit(): void
-    {
-        if ($this->rateLimitDelay > 0 && $this->lastRequestTime > 0) {
-            $elapsed = (int) ((microtime(true) * 1000) - $this->lastRequestTime);
-            $remaining = $this->rateLimitDelay - $elapsed;
-
-            if ($remaining > 0) {
-                usleep($remaining * 1000);
-            }
-        }
-
-        $this->lastRequestTime = (int) (microtime(true) * 1000);
-    }
 
     /**
      * Get logger instance

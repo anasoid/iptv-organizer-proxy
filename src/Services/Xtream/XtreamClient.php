@@ -25,10 +25,9 @@ class XtreamClient
      *
      * @param Source|array $config Source model or credentials array ['url', 'username', 'password']
      * @param Client|null $httpClient Optional Guzzle client (for testing)
-     * @param int $rateLimitDelay Optional rate limit delay in milliseconds
      * @throws XtreamApiException
      */
-    public function __construct($config, ?Client $httpClient = null, int $rateLimitDelay = 0)
+    public function __construct($config, ?Client $httpClient = null)
     {
         if ($config instanceof Source) {
             $url = $config->url;
@@ -50,8 +49,7 @@ class XtreamClient
             $url,
             $username,
             $password,
-            $httpClient,
-            $rateLimitDelay
+            $httpClient
         );
 
         // Initialize specialized clients

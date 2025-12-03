@@ -102,12 +102,6 @@ export default function ClientDetail() {
     enabled: isAuthenticated && !!client?.source_id,
   });
 
-  const { data: blockedResponse, isLoading: blockedLoading } = useQuery({
-    queryKey: ['blocked-items', id],
-    queryFn: () => clientsApi.getBlockedItems(Number(id)),
-    enabled: isAuthenticated && !!id && blockedModalOpen,
-  });
-
   const { data: allowedResponse, isLoading: allowedLoading } = useQuery({
     queryKey: ['allowed-items', id, selectedAllowedType],
     queryFn: async () => {
@@ -126,8 +120,26 @@ export default function ClientDetail() {
     enabled: isAuthenticated && !!id && allowedModalOpen && !!selectedAllowedType,
   });
 
+  const { data: blockedResponse, isLoading: blockedLoading } = useQuery({
+    queryKey: ['blocked-items', id, selectedBlockedType],
+    queryFn: async () => {
+      const methodMap: Record<string, (id: number) => Promise<ApiResponse<AllowedItem[]>>> = {
+        live_categories: (clientId) => clientsApi.exportBlockedLiveCategories(clientId),
+        live_streams: (clientId) => clientsApi.exportBlockedLiveStreams(clientId),
+        vod_categories: (clientId) => clientsApi.exportBlockedVodCategories(clientId),
+        vod_streams: (clientId) => clientsApi.exportBlockedVodStreams(clientId),
+        series_categories: (clientId) => clientsApi.exportBlockedSeriesCategories(clientId),
+        series: (clientId) => clientsApi.exportBlockedSeries(clientId),
+      };
+      if (!selectedBlockedType || !methodMap[selectedBlockedType]) return null;
+      const response = await methodMap[selectedBlockedType](Number(id));
+      return response;
+    },
+    enabled: isAuthenticated && !!id && blockedModalOpen && !!selectedBlockedType,
+  });
+
   const source = sourceResponse?.data;
-  const blockedData = blockedResponse?.data;
+  const blockedData = blockedResponse?.data?.data; // Extract just the data array from response
   const allowedData = allowedResponse?.data?.data; // Extract just the data array from response
 
   const exportMutation = useMutation({
@@ -139,7 +151,12 @@ export default function ClientDetail() {
         vod_streams: (clientId) => clientsApi.exportVodStreams(clientId),
         series_categories: (clientId) => clientsApi.exportSeriesCategories(clientId),
         series: (clientId) => clientsApi.exportSeries(clientId),
-        blocked_items: (clientId) => clientsApi.exportBlockedItems(clientId),
+        blocked_live_categories: (clientId) => clientsApi.exportBlockedLiveCategories(clientId),
+        blocked_live_streams: (clientId) => clientsApi.exportBlockedLiveStreams(clientId),
+        blocked_vod_categories: (clientId) => clientsApi.exportBlockedVodCategories(clientId),
+        blocked_vod_streams: (clientId) => clientsApi.exportBlockedVodStreams(clientId),
+        blocked_series_categories: (clientId) => clientsApi.exportBlockedSeriesCategories(clientId),
+        blocked_series: (clientId) => clientsApi.exportBlockedSeries(clientId),
       };
 
       return methodMap[exportType](Number(id));
@@ -213,27 +230,17 @@ export default function ClientDetail() {
 
   const handleOpenBlockedInNewTab = async (blockedType: string) => {
     try {
-      const response = await clientsApi.exportBlockedItems(Number(id));
-      const blockedItemsData = response.data;
+      const methodMap: Record<string, (id: number) => Promise<ApiResponse<AllowedItem[]>>> = {
+        live_categories: (clientId) => clientsApi.exportBlockedLiveCategories(clientId),
+        live_streams: (clientId) => clientsApi.exportBlockedLiveStreams(clientId),
+        vod_categories: (clientId) => clientsApi.exportBlockedVodCategories(clientId),
+        vod_streams: (clientId) => clientsApi.exportBlockedVodStreams(clientId),
+        series_categories: (clientId) => clientsApi.exportBlockedSeriesCategories(clientId),
+        series: (clientId) => clientsApi.exportBlockedSeries(clientId),
+      };
 
-      // Determine which type of data to show based on blockedType
-      let items: AllowedItem[] = [];
-
-      if (blockedType === 'live_categories') {
-        items = blockedItemsData.blocked_categories?.live || [];
-      } else if (blockedType === 'live_streams') {
-        items = blockedItemsData.blocked_streams?.live || [];
-      } else if (blockedType === 'vod_categories') {
-        items = blockedItemsData.blocked_categories?.vod || [];
-      } else if (blockedType === 'vod_streams') {
-        items = blockedItemsData.blocked_streams?.vod || [];
-      } else if (blockedType === 'series_categories') {
-        items = blockedItemsData.blocked_categories?.series || [];
-      } else if (blockedType === 'series') {
-        items = blockedItemsData.blocked_streams?.series || [];
-      }
-
-      const jsonStr = JSON.stringify(items, null, 2);
+      const response = await methodMap[blockedType](Number(id));
+      const jsonStr = JSON.stringify(response.data, null, 2);
 
       // Create blob and open in new tab
       const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -246,39 +253,36 @@ export default function ClientDetail() {
 
   const handleDownloadBlocked = async (blockedType: string) => {
     try {
-      const response = await clientsApi.exportBlockedItems(Number(id));
-      if (!response.data) return;
+      const methodMap: Record<string, (id: number) => Promise<ApiResponse<AllowedItem[]>>> = {
+        live_categories: (clientId) => clientsApi.exportBlockedLiveCategories(clientId),
+        live_streams: (clientId) => clientsApi.exportBlockedLiveStreams(clientId),
+        vod_categories: (clientId) => clientsApi.exportBlockedVodCategories(clientId),
+        vod_streams: (clientId) => clientsApi.exportBlockedVodStreams(clientId),
+        series_categories: (clientId) => clientsApi.exportBlockedSeriesCategories(clientId),
+        series: (clientId) => clientsApi.exportBlockedSeries(clientId),
+      };
 
-      const blockedData = response.data;
-      let itemsToDownload: AllowedItem[] = [];
-      let filename = '';
-
-      switch (blockedType) {
-        case 'live_categories':
-          itemsToDownload = blockedData.blocked_categories?.live || [];
-          filename = 'blocked-live-categories.json';
-          break;
-        case 'live_streams':
-          itemsToDownload = blockedData.blocked_streams?.live || [];
-          filename = 'blocked-live-streams.json';
-          break;
-        case 'vod_categories':
-          itemsToDownload = blockedData.blocked_categories?.vod || [];
-          filename = 'blocked-vod-categories.json';
-          break;
-        case 'vod_streams':
-          itemsToDownload = blockedData.blocked_streams?.vod || [];
-          filename = 'blocked-vod-streams.json';
-          break;
-        case 'series_categories':
-          itemsToDownload = blockedData.blocked_categories?.series || [];
-          filename = 'blocked-series-categories.json';
-          break;
-        case 'series':
-          itemsToDownload = blockedData.blocked_streams?.series || [];
-          filename = 'blocked-series.json';
-          break;
+      if (!methodMap[blockedType]) {
+        setExportMessage({
+          type: 'error',
+          message: 'Invalid blocked type',
+        });
+        return;
       }
+
+      const response = await methodMap[blockedType](Number(id));
+      if (!response.data?.data) return;
+
+      const itemsToDownload = response.data.data;
+      const filenameMap: Record<string, string> = {
+        live_categories: 'blocked-live-categories.json',
+        live_streams: 'blocked-live-streams.json',
+        vod_categories: 'blocked-vod-categories.json',
+        vod_streams: 'blocked-vod-streams.json',
+        series_categories: 'blocked-series-categories.json',
+        series: 'blocked-series.json',
+      };
+      const filename = filenameMap[blockedType];
 
       const dataStr = JSON.stringify(itemsToDownload, null, 2);
       const dataBlob = new Blob([dataStr], { type: 'application/json' });

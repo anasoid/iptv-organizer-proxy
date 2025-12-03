@@ -89,8 +89,6 @@ class XtreamEpgClient
 
         while ($attempt < $this->maxRetries) {
             try {
-                $this->authenticator->applyRateLimit();
-
                 $response = $httpClient->get($xmltvUrl, [
                     'query' => $params,
                 ]);
@@ -159,8 +157,6 @@ class XtreamEpgClient
 
         while ($attempt < $this->maxRetries) {
             try {
-                $this->authenticator->applyRateLimit();
-
                 $response = $httpClient->get($this->authenticator->getBaseUrl(), [
                     'query' => $params,
                 ]);

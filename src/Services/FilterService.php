@@ -5,232 +5,445 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Filter;
+use App\Models\Category;
+use Symfony\Component\Yaml\Yaml;
+use RuntimeException;
 
 /**
  * Filter Service
  *
- * Applies YAML-based filtering rules to streams and categories
+ * Applies YAML-based filtering with include/exclude rules and favoris virtual categories
+ *
+ * Filter structure has two separate sections:
+ * - rules: Include/exclude rules for filtering streams
+ * - favoris: Virtual category definitions for creating favorite groups
  */
 class FilterService
 {
-    private ?Filter $filter;
+    private object|null $filter;
     private bool $hideAdultContent;
+    private ?array $parsedFilter = null;
 
     /**
      * Constructor
      *
-     * @param Filter|null $filter Filter configuration
+     * @param object|null $filter The filter model (null = no filter applied)
      * @param bool $hideAdultContent Whether to hide adult content
      */
-    public function __construct(?Filter $filter = null, bool $hideAdultContent = false)
+    public function __construct(object|null $filter = null, bool $hideAdultContent = false)
     {
         $this->filter = $filter;
         $this->hideAdultContent = $hideAdultContent;
     }
 
     /**
-     * Generate virtual favoris categories
+     * Parse filter YAML configuration using symfony/yaml
      *
-     * @return array Array of favoris categories with IDs starting at 100000
+     * @return array Parsed filter with 'rules' and 'favoris' keys
+     * @throws RuntimeException
      */
-    public function generateFavorisCategories(): array
+    private function parseFilter(): array
     {
+        if ($this->parsedFilter !== null) {
+            return $this->parsedFilter;
+        }
+
         if ($this->filter === null) {
-            return [];
+            return ['rules' => [], 'favoris' => []];
         }
 
-        $config = $this->filter->parseYaml();
-        $favoris = $config['favoris'] ?? [];
+        try {
+            // Parse rules from filter_config
+            $config = Yaml::parse($this->filter->filter_config);
 
-        $categories = [];
-        $baseId = 100000;
-
-        foreach ($favoris as $index => $favorisItem) {
-            // Parse favoris item (can be string or array)
-            if (is_string($favorisItem)) {
-                // Simple format: "Sports HD"
-                $categories[] = [
-                    'category_id' => (string) ($baseId + $index),
-                    'category_name' => $favorisItem,
-                    'parent_id' => 0,
-                ];
-            } elseif (is_array($favorisItem)) {
-                // Complex format: {name: "Sports HD", labels: ["sports", "HD"]}
-                $categories[] = [
-                    'category_id' => (string) ($baseId + $index),
-                    'category_name' => $favorisItem['name'] ?? "Favoris " . ($index + 1),
-                    'parent_id' => 0,
-                ];
+            if (!is_array($config)) {
+                throw new RuntimeException('Filter configuration must be a YAML object');
             }
-        }
 
-        return $categories;
+            $rules = $config['rules'] ?? [];
+
+            // Parse favoris: try from filter_config first, then from separate favoris field
+            $favoris = [];
+            
+            // Check if favoris is in filter_config
+            if (!empty($config['favoris'])) {
+                $favoris = $config['favoris'];
+            } elseif (!empty($this->filter->favoris)) {
+                // Otherwise try to parse from separate favoris field
+                try {
+                    $favorisConfig = Yaml::parse($this->filter->favoris);
+                    if (is_array($favorisConfig)) {
+                        // Handle both direct array and wrapped in 'favoris' key
+                        $favoris = $favorisConfig['favoris'] ?? $favorisConfig;
+                    }
+                } catch (\Exception $e) {
+                    // If favoris parsing fails, log but don't crash
+                    throw new RuntimeException("Failed to parse favoris YAML: " . $e->getMessage());
+                }
+            }
+
+            $this->parsedFilter = [
+                'rules' => $rules,
+                'favoris' => $favoris,
+            ];
+
+            return $this->parsedFilter;
+        } catch (\Exception $e) {
+            throw new RuntimeException("Failed to parse filter YAML: " . $e->getMessage());
+        }
     }
 
     /**
-     * Apply filter to streams
+     * Parse comma-separated labels into lowercase array
      *
-     * @param array $streams Array of stream objects
-     * @param int|null $categoryId Optional category filter
+     * @param string $labelString Comma-separated labels
+     * @return array Array of lowercase labels
+     */
+    private function parseLabels(string $labelString): array
+    {
+        if (empty($labelString)) {
+            return [];
+        }
+
+        return array_map(
+            fn($label) => strtolower(trim($label)),
+            explode(',', $labelString)
+        );
+    }
+
+    /**
+     * Check if a stream matches given match criteria
+     *
+     * Match structure:
+     * {
+     *   categories: { by_name: [...], by_labels: [...] },
+     *   channels: { by_name: [...], by_labels: [...] }
+     * }
+     *
+     * Matching Rules:
+     * - by_name: Wildcard patterns (case-insensitive), matches if ANY pattern matches (OR logic)
+     * - by_labels: Exact match (case-insensitive), matches if stream has ALL labels (AND logic)
+     *
+     * @param array $stream Stream data
+     * @param array $match Match criteria
+     * @return bool True if stream matches criteria
+     */
+    private function matchStream(array $stream, array $match): bool
+    {
+        $match = array_merge(
+            ['categories' => ['by_name' => [], 'by_labels' => []], 'channels' => ['by_name' => [], 'by_labels' => []]],
+            $match
+        );
+
+        $hasChannelCriteria = !empty($match['channels']['by_name']) || !empty($match['channels']['by_labels']);
+        $hasCategoryCriteria = !empty($match['categories']['by_name']) || !empty($match['categories']['by_labels']);
+
+        // Evaluate channel criteria
+        $channelMatches = false;
+        if ($hasChannelCriteria) {
+            $channelMatches = $this->matchesChannelCriteria(
+                $stream['name'] ?? '',
+                $stream['labels'] ?? '',
+                $match['channels']
+            );
+        }
+
+        // Evaluate category criteria
+        $categoryMatches = false;
+        if ($hasCategoryCriteria) {
+            $categoryMatches = $this->matchesCategoryCriteria(
+                $stream['category_name'] ?? '',
+                $stream['category_labels'] ?? '',
+                $match['categories']
+            );
+        }
+
+        // If both channel and category criteria exist, both must match (AND)
+        // If only one type exists, that one must match
+        if ($hasChannelCriteria && $hasCategoryCriteria) {
+            return $channelMatches && $categoryMatches;
+        } elseif ($hasChannelCriteria) {
+            return $channelMatches;
+        } elseif ($hasCategoryCriteria) {
+            return $categoryMatches;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if stream matches channel criteria
+     *
+     * Matching Rules:
+     * - by_name: Wildcard patterns (case-insensitive), ANY pattern matches (OR logic)
+     * - by_labels: Exact match (case-insensitive), ALL labels must exist (AND logic)
+     *
+     * @param string $channelName Channel/stream name
+     * @param string $channelLabelsStr Comma-separated labels
+     * @param array $criteria Criteria with by_name and by_labels
+     * @return bool True if matches
+     */
+    private function matchesChannelCriteria(string $channelName, string $channelLabelsStr, array $criteria): bool
+    {
+        $channelName = strtolower($channelName);
+        $channelLabels = $this->parseLabels($channelLabelsStr);
+
+        // Check by_name: ANY pattern matches (OR logic)
+        $nameMatches = false;
+        if (!empty($criteria['by_name'])) {
+            foreach ($criteria['by_name'] as $pattern) {
+                if ($this->matchesPattern($channelName, $pattern)) {
+                    $nameMatches = true;
+                    break;
+                }
+            }
+        } else {
+            $nameMatches = true; // No name criteria = matches
+        }
+
+        // Check by_labels: ANY label must exist (OR logic)
+        $labelsMatch = false;
+        if (!empty($criteria['by_labels'])) {
+            foreach ($criteria['by_labels'] as $label) {
+                if (in_array(strtolower($label), $channelLabels, true)) {
+                    $labelsMatch = true;
+                    break;
+                }
+            }
+        } else {
+            $labelsMatch = true; // No label criteria = matches
+        }
+
+        // Both criteria must match (AND)
+        return $nameMatches && $labelsMatch;
+    }
+
+    /**
+     * Check if category matches criteria
+     *
+     * Matching Rules:
+     * - by_name: Wildcard patterns (case-insensitive), ANY pattern matches (OR logic)
+     * - by_labels: Exact match (case-insensitive), ALL labels must exist (AND logic)
+     *
+     * @param string $categoryName Category name
+     * @param string $categoryLabelsStr Comma-separated labels
+     * @param array $criteria Criteria with by_name and by_labels
+     * @return bool True if matches
+     */
+    private function matchesCategoryCriteria(string $categoryName, string $categoryLabelsStr, array $criteria): bool
+    {
+        $categoryName = strtolower($categoryName);
+        $categoryLabels = $this->parseLabels($categoryLabelsStr);
+
+        // Check by_name: ANY pattern matches (OR logic)
+        $nameMatches = false;
+        if (!empty($criteria['by_name'])) {
+            foreach ($criteria['by_name'] as $pattern) {
+                if ($this->matchesPattern($categoryName, $pattern)) {
+                    $nameMatches = true;
+                    break;
+                }
+            }
+        } else {
+            $nameMatches = true; // No name criteria = matches
+        }
+
+        // Check by_labels: ANY label must exist (OR logic)
+        $labelsMatch = false;
+        if (!empty($criteria['by_labels'])) {
+            foreach ($criteria['by_labels'] as $label) {
+                if (in_array(strtolower($label), $categoryLabels, true)) {
+                    $labelsMatch = true;
+                    break;
+                }
+            }
+        } else {
+            $labelsMatch = true; // No label criteria = matches
+        }
+
+        // Both criteria must match (AND)
+        return $nameMatches && $labelsMatch;
+    }
+
+    /**
+     * Match a string against a wildcard pattern (case-insensitive)
+     *
+     * Supports wildcards:
+     * - * matches any number of characters
+     * - ? matches exactly one character
+     *
+     * @param string $text Text to match
+     * @param string $pattern Wildcard pattern
+     * @return bool True if matches
+     */
+    private function matchesPattern(string $text, string $pattern): bool
+    {
+        // If pattern contains wildcards, use fnmatch
+        if (strpos($pattern, '*') !== false || strpos($pattern, '?') !== false) {
+            return fnmatch(strtolower($pattern), strtolower($text), FNM_CASEFOLD);
+        }
+        
+        // Otherwise, use substring matching (case-insensitive)
+        return stripos($text, $pattern) !== false;
+    }
+
+    /**
+     * Apply filters to streams with priority order:
+     * 1. Adult content filtering (if enabled) - FIRST PRIORITY
+     * 2. Include/exclude rules (if filter assigned)
+     * 3. Favoris category filtering (if categoryId >= 100000)
+     *
+     * @param array $streams Array of streams
+     * @param int|null $categoryId Optional category ID for favoris filtering
      * @return array Filtered streams
      */
     public function applyToStreams(array $streams, ?int $categoryId = null): array
     {
-        if (empty($streams)) {
-            return [];
+        // Batch load all categories for efficient lookup
+        $categoryCache = [];
+        if (!empty($streams)) {
+            // Get first stream to determine source_id
+            $firstStream = current($streams);
+            $sourceId = is_array($firstStream) ? ($firstStream['source_id'] ?? null) : ($firstStream->source_id ?? null);
+            
+            if ($sourceId) {
+                // Load all categories for this source in one query
+                $allCategories = Category::findAll(['source_id' => $sourceId]);
+                foreach ($allCategories as $cat) {
+                    // Index by category_id (not database id) for fast lookup
+                    $key = $sourceId . '_' . $cat->category_id;
+                    $categoryCache[$key] = $cat;
+                }
+            }
         }
+        
+        // Convert model objects to arrays for filtering
+        $streamArrays = array_map(function($stream) use ($categoryCache) {
+            if (is_array($stream)) {
+                return $stream;
+            }
 
-        // Filter by favoris category if ID >= 100000
+            // Get category information if stream has a category (using cache)
+            $categoryName = '';
+            $categoryLabels = '';
+            if ($stream->category_id) {
+                $key = $stream->source_id . '_' . $stream->category_id;
+                if (isset($categoryCache[$key])) {
+                    $category = $categoryCache[$key];
+                    $categoryName = $category->category_name ?? '';
+                    $categoryLabels = $category->labels ?? '';
+                }
+            }
+
+            // Convert model object to array
+            return [
+                'id' => $stream->id ?? null,
+                'stream_id' => $stream->stream_id ?? null,
+                'name' => $stream->name ?? '',
+                'labels' => $stream->labels ?? '',
+                'category_id' => $stream->category_id ?? null,
+                'category_ids' => $stream->category_ids ?? null,
+                'category_name' => $categoryName,
+                'category_labels' => $categoryLabels,
+                'is_adult' => (int) ($stream->is_adult ?? 0),
+                'num' => $stream->num ?? null,
+            ];
+        }, $streams);
+
+        // Handle favoris categories (ID >= 100000)
         if ($categoryId !== null && $categoryId >= 100000) {
-            $streams = $this->filterByFavorisCategory($streams, $categoryId);
+            return $this->filterByFavorisCategory($streamArrays, $categoryId);
         }
 
-        // Apply filter rules if filter is set
+        // Apply adult content filter first (highest priority)
+        $filtered = $this->filterAdultContent($streamArrays);
+
+        // Apply include/exclude rules if filter is assigned
         if ($this->filter !== null) {
-            $streams = $this->applyFilterRules($streams);
+            $filtered = $this->applyFilterRules($filtered);
         }
 
-        // Hide adult content if configured
-        if ($this->hideAdultContent) {
-            $streams = $this->filterAdultContent($streams);
-        }
-
-        return $streams;
+        return $filtered;
     }
 
     /**
-     * Filter streams by favoris category
+     * Apply include/exclude rules to streams in order
      *
-     * @param array $streams
-     * @param int $categoryId Favoris category ID (>= 100000)
-     * @return array
+     * Rules processing order:
+     * 1. Filter adult content first (if enabled)
+     * 2. Process rules IN ORDER:
+     *    - If type is "include": if stream matches → ACCEPT
+     *    - If type is "exclude": if stream matches → REJECT
+     *    - If stream matches a rule, stop processing
+     * 3. If stream doesn't match ANY rule:
+     *    - If there are include rules → REJECT (ignored)
+     *    - If only exclude rules → ACCEPT
+     *
+     * Rules structure:
+     * [
+     *   {
+     *     name: "rule name",
+     *     type: "include" or "exclude",
+     *     match: { categories: {...}, channels: {...} }
+     *   }
+     * ]
+     *
+     * @param array $streams Array of streams
+     * @return array Filtered streams
      */
-    private function filterByFavorisCategory(array $streams, int $categoryId): array
+     private function applyFilterRules(array $streams): array
     {
-        if ($this->filter === null) {
+        $config = $this->parseFilter();
+        $rules = $config['rules'] ?? [];
+
+        if (empty($rules)) {
             return $streams;
         }
 
-        $config = $this->filter->parseYaml();
-        $favoris = $config['favoris'] ?? [];
-
-        $favorisIndex = $categoryId - 100000;
-
-        if (!isset($favoris[$favorisIndex])) {
-            return [];
-        }
-
-        $favorisItem = $favoris[$favorisIndex];
-
-        // Get matching criteria
-        $matchLabels = [];
-        $matchName = null;
-
-        if (is_string($favorisItem)) {
-            $matchName = strtolower($favorisItem);
-        } elseif (is_array($favorisItem)) {
-            $matchName = isset($favorisItem['name']) ? strtolower($favorisItem['name']) : null;
-            $matchLabels = $favorisItem['labels'] ?? [];
-        }
-
-        // Filter streams that match the favoris criteria
-        return array_filter($streams, function ($stream) use ($matchLabels, $matchName) {
-            $streamName = strtolower($stream->name ?? '');
-            $streamLabels = !empty($stream->labels) ? explode(',', strtolower($stream->labels)) : [];
-
-            // Match by name if specified
-            if ($matchName !== null && strpos($streamName, $matchName) !== false) {
-                return true;
-            }
-
-            // Match by labels if specified
-            if (!empty($matchLabels)) {
-                foreach ($matchLabels as $label) {
-                    $label = strtolower(trim($label));
-                    if (in_array($label, $streamLabels)) {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        });
-    }
-
-    /**
-     * Apply include/exclude filter rules to streams
-     *
-     * @param array $streams
-     * @return array
-     */
-    private function applyFilterRules(array $streams): array
-    {
-        $config = $this->filter->parseYaml();
-        $rules = $config['rules'] ?? [];
-
-        $includeRules = [];
-        $excludeRules = [];
-
-        // Parse rules into include and exclude lists
+        // Check if there are any include rules
+        $hasIncludeRules = false;
         foreach ($rules as $rule) {
-            if (is_string($rule)) {
-                // Simple format: starts with "!" for exclude, otherwise include
-                if (strpos($rule, '!') === 0) {
-                    $excludeRules[] = strtolower(trim(substr($rule, 1)));
-                } else {
-                    $includeRules[] = strtolower(trim($rule));
-                }
-            } elseif (is_array($rule)) {
-                // Complex format: {type: "include|exclude", pattern: "..."}
-                $type = $rule['type'] ?? 'include';
-                $pattern = $rule['pattern'] ?? $rule['name'] ?? '';
-
-                if ($type === 'exclude') {
-                    $excludeRules[] = strtolower(trim($pattern));
-                } else {
-                    $includeRules[] = strtolower(trim($pattern));
-                }
+            if (is_array($rule) && ($rule['type'] ?? 'include') === 'include') {
+                $hasIncludeRules = true;
+                break;
             }
         }
 
-        // Apply filters
-        return array_filter($streams, function ($stream) use ($includeRules, $excludeRules) {
-            $streamName = strtolower($stream->name ?? '');
-            $streamLabels = !empty($stream->labels) ? explode(',', strtolower($stream->labels)) : [];
-
-            // Check exclude rules first (they take priority)
-            foreach ($excludeRules as $excludePattern) {
-                if (strpos($streamName, $excludePattern) !== false) {
-                    return false;
+        // Filter streams respecting rule priority: exclude > include
+        return array_filter($streams, function (array $stream) use ($rules, $hasIncludeRules) {
+            $matchedInclude = false;
+            $matchedExclude = false;
+            
+            // Check all rules to find any matches
+            foreach ($rules as $rule) {
+                if (!is_array($rule)) {
+                    continue;
                 }
 
-                // Also check labels
-                if (in_array($excludePattern, $streamLabels)) {
-                    return false;
+                $type = $rule['type'] ?? 'include';
+                $match = $rule['match'] ?? [];
+
+                // Check if stream matches this rule
+                if ($this->matchStream($stream, $match)) {
+                    if ($type === 'include') {
+                        $matchedInclude = true;
+                    } elseif ($type === 'exclude') {
+                        $matchedExclude = true;
+                    }
                 }
             }
 
-            // If include rules exist, stream must match at least one
-            if (!empty($includeRules)) {
-                $matched = false;
-
-                foreach ($includeRules as $includePattern) {
-                    if (strpos($streamName, $includePattern) !== false) {
-                        $matched = true;
-                        break;
-                    }
-
-                    // Also check labels
-                    if (in_array($includePattern, $streamLabels)) {
-                        $matched = true;
-                        break;
-                    }
-                }
-
-                return $matched;
+            // Exclude has priority over include
+            if ($matchedExclude) {
+                return false;
             }
 
-            // No include rules, so include by default (unless excluded above)
+            // If there are include rules, stream must match at least one
+            // If there are only exclude rules, stream is shown by default
+            if ($hasIncludeRules) {
+                return $matchedInclude;
+            }
+
             return true;
         });
     }
@@ -238,25 +451,328 @@ class FilterService
     /**
      * Filter out adult content streams
      *
-     * @param array $streams
-     * @return array
+     * @param array $streams Array of streams
+     * @return array Filtered streams
      */
     private function filterAdultContent(array $streams): array
     {
-        return array_filter($streams, function ($stream) {
-            return !($stream->is_adult ?? false);
+        if (!$this->hideAdultContent) {
+            return $streams;
+        }
+
+        return array_filter(
+            $streams,
+            fn($stream) => !($stream['is_adult'] ?? false)
+        );
+    }
+
+    /**
+     * Generate virtual categories from favoris configuration
+     *
+     * Each favoris gets an ID starting from 100000
+     *
+     * Favoris structure:
+     * {
+     *   name: "favoris name",
+     *   target_group: "virtual category name",
+     *   match: { categories: {...}, channels: {...} }
+     * }
+     *
+     * @return array Array of virtual category objects
+     */
+    public function generateFavorisCategories(): array
+    {
+        if ($this->filter === null) {
+            return [];
+        }
+
+        $config = $this->parseFilter();
+        $favoris = $config['favoris'] ?? [];
+
+        if (empty($favoris)) {
+            return [];
+        }
+
+        $categories = [];
+
+        foreach ($favoris as $index => $favRule) {
+            if (!is_array($favRule)) {
+                continue;
+            }
+
+            $categoryId = 100000 + $index;
+            $categoryName = $favRule['target_group'] ?? $favRule['name'] ?? '';
+
+            if (empty($categoryName)) {
+                continue;
+            }
+
+            $categories[] = [
+                'category_id' => $categoryId,
+                'category_name' => $categoryName,
+                'parent_id' => 0,
+            ];
+        }
+
+        return $categories;
+    }
+
+    /**
+     * Filter categories using rules that have category match criteria
+     *
+     * Only applies rules with match.categories (ignores channel-only rules)
+     * Uses same include/exclude logic as stream filtering
+     *
+     * @param array $categories Array of categories
+     * @return array Filtered categories
+     */
+    public function filterCategories(array $categories): array
+    {
+        if ($this->filter === null) {
+            return $categories;
+        }
+
+        $config = $this->parseFilter();
+        $rules = $config['rules'] ?? [];
+
+        if (empty($rules)) {
+            return $categories;
+        }
+
+        // Filter rules to only those with category match criteria
+        $categoryRules = [];
+        foreach ($rules as $rule) {
+            if (!is_array($rule)) {
+                continue;
+            }
+            // Only include rules that have category criteria
+            if (!empty($rule['match']['categories'])) {
+                $categoryRules[] = $rule;
+            }
+        }
+
+        // If no category rules, return all categories
+        if (empty($categoryRules)) {
+            return $categories;
+        }
+
+        // Check if there are any include rules
+        $hasIncludeRules = false;
+        foreach ($categoryRules as $rule) {
+            if (($rule['type'] ?? 'include') === 'include') {
+                $hasIncludeRules = true;
+                break;
+            }
+        }
+
+        // Filter categories respecting rule order
+        return array_filter($categories, function ($category) use ($categoryRules, $hasIncludeRules) {
+            // Process rules in order
+            foreach ($categoryRules as $rule) {
+                $type = $rule['type'] ?? 'include';
+                $match = $rule['match'] ?: [];
+
+                // Check if category matches this rule
+                if ($this->matchesCategoryCriteria(
+                    $category->category_name ?? '',
+                    $category->labels ?? '',
+                    $match['categories'] ?? []
+                )) {
+                    // If matches and type is include → ACCEPT
+                    if ($type === 'include') {
+                        return true;
+                    }
+                    // If matches and type is exclude → REJECT
+                    if ($type === 'exclude') {
+                        return false;
+                    }
+                }
+            }
+
+            // Category didn't match any rule → KEEP
+            // If there are include rules, reject as "ignored"
+            // If only exclude rules, accept (show)
+            // If no category rules, accept (show all)
+            return !$hasIncludeRules;
         });
     }
 
     /**
-     * Check if a stream matches filter criteria
+     * Filter streams by a specific favoris category
      *
-     * @param object $stream Stream object
+     * @param array $streams Array of streams
+     * @param int $favorisCategoryId Favoris category ID (100000+)
+     * @return array Filtered streams matching the favoris criteria
+     */
+    public function filterByFavorisCategory(array $streams, int $favorisCategoryId): array
+    {
+        if ($this->filter === null) {
+            return [];
+        }
+
+        $config = $this->parseFilter();
+        $favoris = $config['favoris'] ?? [];
+
+        // Calculate index from category ID
+        $index = $favorisCategoryId - 100000;
+
+        if ($index < 0 || $index >= count($favoris)) {
+            return []; // Invalid favoris category ID
+        }
+
+        $favRule = $favoris[$index];
+
+        if (!is_array($favRule)) {
+            return [];
+        }
+
+        $match = $favRule['match'] ?? [];
+
+        // Filter streams matching the favoris criteria
+        $filtered = array_filter(
+            $streams,
+            fn($stream) => $this->matchStream($stream, $match)
+        );
+
+        return array_values($filtered); // Re-index array
+    }
+
+    /**
+     * Check if filter is assigned
+     *
      * @return bool
      */
-    public function matchesFilter($stream): bool
+    public function hasFilter(): bool
     {
-        $result = $this->applyToStreams([$stream]);
-        return !empty($result);
+        return $this->filter !== null;
+    }
+
+    /**
+     * Get the assigned filter model
+     *
+     * @return object|null
+     */
+    public function getFilter(): ?object
+    {
+        return $this->filter;
+    }
+
+    /**
+     * Apply filters to streams and track rejection reasons
+     *
+     * Returns array with:
+     * - accepted: [] (filtered streams)
+     * - rejected: {
+     *     by_adult_content: [stream_ids],
+     *     by_rule: {
+     *       rule_name: [stream_ids],
+     *       ...
+     *     },
+     *     ignored: [stream_ids]  (didn't match any rule when include rules exist)
+     *   }
+     *
+     * @param array $streams Array of streams
+     * @param int|null $categoryId Optional category ID
+     * @return array Result with accepted and rejected streams with reasons
+     */
+    public function applyWithRejectionTracking(array $streams, ?int $categoryId = null): array
+    {
+        // Handle favoris categories
+        if ($categoryId !== null && $categoryId >= 100000) {
+            return [
+                'accepted' => $this->filterByFavorisCategory($streams, $categoryId),
+                'rejected' => [
+                    'by_adult_content' => [],
+                    'by_rule' => [],
+                    'ignored' => [],
+                ],
+            ];
+        }
+
+        $result = [
+            'accepted' => [],
+            'rejected' => [
+                'by_adult_content' => [],
+                'by_rule' => [],
+                'ignored' => [],
+            ],
+        ];
+
+        $config = $this->parseFilter();
+        $rules = $config['rules'] ?? [];
+
+        // Check if there are any include rules
+        $hasIncludeRules = false;
+        foreach ($rules as $rule) {
+            if (is_array($rule) && ($rule['type'] ?? 'include') === 'include') {
+                $hasIncludeRules = true;
+                break;
+            }
+        }
+
+        // Process each stream
+        foreach ($streams as $stream) {
+            $streamId = $stream['id'] ?? null;
+
+            // Check adult content first
+            if ($this->hideAdultContent && ($stream['is_adult'] ?? false)) {
+                if ($streamId) {
+                    $result['rejected']['by_adult_content'][] = $streamId;
+                }
+                continue;
+            }
+
+            // If no filter assigned, accept stream
+            if ($this->filter === null) {
+                $result['accepted'][] = $stream;
+                continue;
+            }
+
+            // Process rules in order
+            $matched = false;
+            foreach ($rules as $rule) {
+                if (!is_array($rule)) {
+                    continue;
+                }
+
+                $type = $rule['type'] ?? 'include';
+                $ruleName = $rule['name'] ?? 'Unknown Rule';
+                $match = $rule['match'] ?? [];
+
+                // Check if stream matches this rule
+                if ($this->matchStream($stream, $match)) {
+                    $matched = true;
+
+                    if ($type === 'include') {
+                        // Accept stream
+                        $result['accepted'][] = $stream;
+                    } else {
+                        // Reject by this rule
+                        if ($streamId) {
+                            if (!isset($result['rejected']['by_rule'][$ruleName])) {
+                                $result['rejected']['by_rule'][$ruleName] = [];
+                            }
+                            $result['rejected']['by_rule'][$ruleName][] = $streamId;
+                        }
+                    }
+                    break; // Stop processing rules
+                }
+            }
+
+            // If no rule matched
+            if (!$matched) {
+                if ($hasIncludeRules) {
+                    // Rejected as ignored (didn't match any include rule)
+                    if ($streamId) {
+                        $result['rejected']['ignored'][] = $streamId;
+                    }
+                } else {
+                    // Accept (only exclude rules and didn't match any)
+                    $result['accepted'][] = $stream;
+                }
+            }
+        }
+
+        return $result;
     }
 }

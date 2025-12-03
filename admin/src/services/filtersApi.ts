@@ -5,6 +5,7 @@ export interface Filter {
   name: string;
   description?: string;
   filter_config: string;
+  favoris?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -53,6 +54,7 @@ const filtersApi = {
     name: string;
     description?: string;
     filter_config: string;
+    favoris?: string;
   }): Promise<FilterResponse> {
     const response = await api.post('/filters', data);
     return response.data;
@@ -64,6 +66,7 @@ const filtersApi = {
       name?: string;
       description?: string;
       filter_config?: string;
+      favoris?: string;
     }
   ): Promise<FilterResponse> {
     const response = await api.put(`/filters/${id}`, data);

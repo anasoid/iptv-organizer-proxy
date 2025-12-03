@@ -78,8 +78,6 @@ class XtreamCategoryClient
 
         while ($attempt < $this->maxRetries) {
             try {
-                $this->authenticator->applyRateLimit();
-
                 $response = $httpClient->get($this->authenticator->getBaseUrl(), [
                     'query' => [
                         'username' => $credentials['username'],

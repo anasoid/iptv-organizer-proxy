@@ -8,6 +8,7 @@ export interface Client {
   filter_id?: number | null;
   email?: string | null;
   is_active: number;
+  hide_adult_content?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -126,18 +127,50 @@ class ClientsApi {
   }
 
   /**
-   * Get blocked categories and streams by type for client
+   * Export blocked live categories for client
    */
-  async getBlockedItems(id: number) {
-    const response = await api.get(`/clients/${id}/blocked-items`);
+  async exportBlockedLiveCategories(id: number) {
+    const response = await api.get(`/clients/${id}/export/blocked-live-categories`);
     return response.data;
   }
 
   /**
-   * Export blocked items for client
+   * Export blocked VOD categories for client
    */
-  async exportBlockedItems(id: number) {
-    const response = await api.get(`/clients/${id}/export/blocked-items`);
+  async exportBlockedVodCategories(id: number) {
+    const response = await api.get(`/clients/${id}/export/blocked-vod-categories`);
+    return response.data;
+  }
+
+  /**
+   * Export blocked series categories for client
+   */
+  async exportBlockedSeriesCategories(id: number) {
+    const response = await api.get(`/clients/${id}/export/blocked-series-categories`);
+    return response.data;
+  }
+
+  /**
+   * Export blocked live streams for client
+   */
+  async exportBlockedLiveStreams(id: number) {
+    const response = await api.get(`/clients/${id}/export/blocked-live-streams`);
+    return response.data;
+  }
+
+  /**
+   * Export blocked VOD streams for client
+   */
+  async exportBlockedVodStreams(id: number) {
+    const response = await api.get(`/clients/${id}/export/blocked-vod-streams`);
+    return response.data;
+  }
+
+  /**
+   * Export blocked series for client
+   */
+  async exportBlockedSeries(id: number) {
+    const response = await api.get(`/clients/${id}/export/blocked-series`);
     return response.data;
   }
 }

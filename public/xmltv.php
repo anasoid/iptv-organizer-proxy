@@ -1,0 +1,72 @@
+<?php
+
+declare(strict_types=1);
+
+use Dotenv\Dotenv;
+use App\Models\Client;
+use App\Models\Source;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+// Load environment variables
+$dotenv = Dotenv::createImmutable(__DIR__ . '/..');
+$dotenv->load();
+
+// Get credentials from query parameters
+$username = $_GET['username'] ?? null;
+$password = $_GET['password'] ?? null;
+
+if (!$username || !$password) {
+    http_response_code(401);
+    header('Content-Type: application/xml');
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    echo '<tv></tv>';
+    exit;
+}
+
+// Authenticate client
+$clients = Client::findAll(['username' => $username, 'password' => $password]);
+if (empty($clients)) {
+    http_response_code(401);
+    header('Content-Type: application/xml');
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    echo '<tv></tv>';
+    exit;
+}
+
+$client = $clients[0];
+
+// Check if client has source
+if (!$client->source_id) {
+    http_response_code(400);
+    header('Content-Type: application/xml');
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    echo '<tv></tv>';
+    exit;
+}
+
+// Load source
+$source = Source::find($client->source_id);
+if (!$source) {
+    http_response_code(404);
+    header('Content-Type: application/xml');
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    echo '<tv></tv>';
+    exit;
+}
+
+// Proxy XMLTV from original source
+try {
+    $xtreamClient = new \App\Services\Xtream\XtreamClient($source);
+    $xmltv = $xtreamClient->getEpgClient()->getXmltv();
+    
+    header('Content-Type: application/xml; charset=utf-8');
+    
+    echo $xmltv;
+} catch (\Exception $e) {
+    http_response_code(500);
+    header('Content-Type: application/xml');
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    echo '<tv><!-- Error: ' . htmlspecialchars($e->getMessage()) . ' --></tv>';
+}
+

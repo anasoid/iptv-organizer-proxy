@@ -5,17 +5,21 @@ declare(strict_types=1);
 use Dotenv\Dotenv;
 use Slim\Factory\AppFactory;
 use App\Middleware\CorsMiddleware;
-use App\Middleware\ClientAuthMiddleware;
 use App\Middleware\AdminAuthMiddleware;
-use App\Controllers\Xtream\XtreamController;
 use App\Controllers\Admin\AuthController;
 use App\Controllers\Admin\SourceController;
 use App\Controllers\Admin\ClientController;
 use App\Controllers\Admin\FilterController;
 use App\Controllers\Admin\AdminUserController;
 use App\Controllers\Admin\DashboardController;
+use App\Controllers\Xtream\StreamDataController;
 
 require __DIR__ . '/../vendor/autoload.php';
+
+// Handle REQUEST_URI for PHP built-in server
+if (!isset($_SERVER['REQUEST_URI'])) {
+    $_SERVER['REQUEST_URI'] = '/' . ltrim($_SERVER['PATH_INFO'] ?? '', '/');
+}
 
 // Load environment variables
 $dotenv = Dotenv::createImmutable(__DIR__ . '/..');
@@ -78,14 +82,18 @@ $app->group('/api', function ($group) {
     $group->put('/clients/{id}', [$clientController, 'update']);
     $group->delete('/clients/{id}', [$clientController, 'delete']);
     $group->get('/clients/{id}/logs', [$clientController, 'logs']);
-    $group->get('/clients/{id}/blocked-items', [$clientController, 'getBlockedItems']);
-    $group->get('/clients/{id}/export/blocked-items', [$clientController, 'exportBlockedItems']);
     $group->get('/clients/{id}/export/live-categories', [$clientController, 'exportLiveCategories']);
     $group->get('/clients/{id}/export/vod-categories', [$clientController, 'exportVodCategories']);
     $group->get('/clients/{id}/export/series-categories', [$clientController, 'exportSeriesCategories']);
     $group->get('/clients/{id}/export/live-streams', [$clientController, 'exportLiveStreams']);
     $group->get('/clients/{id}/export/vod-streams', [$clientController, 'exportVodStreams']);
     $group->get('/clients/{id}/export/series', [$clientController, 'exportSeries']);
+    $group->get('/clients/{id}/export/blocked-live-categories', [$clientController, 'exportBlockedLiveCategories']);
+    $group->get('/clients/{id}/export/blocked-vod-categories', [$clientController, 'exportBlockedVodCategories']);
+    $group->get('/clients/{id}/export/blocked-series-categories', [$clientController, 'exportBlockedSeriesCategories']);
+    $group->get('/clients/{id}/export/blocked-live-streams', [$clientController, 'exportBlockedLiveStreams']);
+    $group->get('/clients/{id}/export/blocked-vod-streams', [$clientController, 'exportBlockedVodStreams']);
+    $group->get('/clients/{id}/export/blocked-series', [$clientController, 'exportBlockedSeries']);
 
     // Filter management
     $filterController = new FilterController();
@@ -112,34 +120,12 @@ $app->group('/api', function ($group) {
     $group->get('/sync/status', [$dashboardController, 'syncStatus']);
 })->add(new AdminAuthMiddleware());
 
-// Xtream Codes API routes (protected by ClientAuthMiddleware)
-$app->group('/player_api.php', function ($group) {
-    $controller = new XtreamController();
-
-    // Live streams endpoints
-    $group->get('[/]', function ($request, $response) use ($controller) {
-        $queryParams = $request->getQueryParams();
-        $action = $queryParams['action'] ?? null;
-
-        switch ($action) {
-            case 'get_live_categories':
-                return $controller->getLiveCategories($request, $response);
-
-            case 'get_live_streams':
-                return $controller->getLiveStreams($request, $response);
-
-            case 'get_vod_categories':
-                return $controller->getVodCategories($request, $response);
-
-            case 'get_series_categories':
-                return $controller->getSeriesCategories($request, $response);
-
-            default:
-                // No action = authenticate
-                return $controller->authenticate($request, $response);
-        }
-    });
-})->add(new ClientAuthMiddleware());
+// Stream routing - /{type}/{username}/{password}/{stream_id}.{ext}
+// Supports: /live, /movie, /series
+$app->any('/{type:live|movie|series}/{username:[^/]+}/{password:[^/]+}/{streamId:\d+}.{ext:[a-zA-Z0-9]+}', function ($request, $response, $args) {
+    $controller = new StreamDataController();
+    return $controller->handleStreamRequest($response, $args['type'], $args['username'], $args['password'], (int)$args['streamId'], $args['ext']);
+});
 
 // Run application
 $app->run();
