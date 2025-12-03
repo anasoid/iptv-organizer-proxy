@@ -8,6 +8,7 @@ export interface Client {
   filter_id?: number | null;
   email?: string | null;
   is_active: number;
+  hide_adult_content?: number;
   created_at?: string;
   updated_at?: string;
 }

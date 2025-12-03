@@ -629,6 +629,15 @@ class ClientController
             // Get categories from database
             $regularCategories = Category::getBySourceAndType($client->source_id, 'live');
 
+            // Apply filter if client has one assigned
+            if ($client->filter_id) {
+                $filter = Filter::find($client->filter_id);
+                if ($filter) {
+                    $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
+                    $regularCategories = $filterService->filterCategories($regularCategories);
+                }
+            }
+
             // Format as Xtream API response
             $categories = [];
             foreach ($regularCategories as $category) {
@@ -664,6 +673,15 @@ class ClientController
             // Get categories from database
             $regularCategories = Category::getBySourceAndType($client->source_id, 'vod');
 
+            // Apply filter if client has one assigned
+            if ($client->filter_id) {
+                $filter = Filter::find($client->filter_id);
+                if ($filter) {
+                    $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
+                    $regularCategories = $filterService->filterCategories($regularCategories);
+                }
+            }
+
             // Format as Xtream API response
             $categories = [];
             foreach ($regularCategories as $category) {
@@ -698,6 +716,15 @@ class ClientController
 
             // Get categories from database
             $regularCategories = Category::getBySourceAndType($client->source_id, 'series');
+
+            // Apply filter if client has one assigned
+            if ($client->filter_id) {
+                $filter = Filter::find($client->filter_id);
+                if ($filter) {
+                    $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
+                    $regularCategories = $filterService->filterCategories($regularCategories);
+                }
+            }
 
             // Format as Xtream API response
             $categories = [];

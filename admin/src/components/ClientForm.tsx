@@ -47,6 +47,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
       filter_id: null,
       email: '',
       is_active: 1,
+      hide_adult_content: 0,
     },
   });
 
@@ -213,6 +214,16 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
             />
           }
           label="Active"
+        />
+
+        <FormControlLabel
+          control={
+            <Checkbox
+              {...register('hide_adult_content')}
+              defaultChecked={client?.hide_adult_content === 1}
+            />
+          }
+          label="Hide Adult Content"
         />
 
         {credentials && sourceId && (
