@@ -203,6 +203,17 @@ class ContentFilterService
     }
 
     /**
+     * Get favoris (virtual categories) generated from filter configuration
+     */
+    public function getFavorisCategories(): array
+    {
+        if (!$this->filterService) {
+            return [];
+        }
+        return $this->filterService->generateFavorisCategories();
+    }
+
+    /**
      * Format category for export
      */
     public static function formatCategory($category): array

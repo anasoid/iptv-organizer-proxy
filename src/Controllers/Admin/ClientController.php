@@ -8,6 +8,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use App\Models\Client;
 use App\Models\Filter;
+use App\Services\FilterService;
 use App\Services\ContentFilterService;
 
 class ClientController
@@ -243,11 +244,23 @@ class ClientController
                 return $this->jsonError($response, 'Client not found', 404);
             }
 
-            $filterService = new ContentFilterService($client);
-            $categories = array_map(
+            $categories = [];
+            $contentFilterService = new ContentFilterService($client);
+
+            // Add favoris virtual categories if filter assigned
+            $filter = $client->filter_id ? Filter::find($client->filter_id) : null;
+            if ($filter !== null) {
+                $filterServiceBase = new FilterService($filter, (bool) $client->hide_adult_content);
+                $favorisCategories = $filterServiceBase->generateFavorisCategories();
+                $categories = array_merge($categories, $favorisCategories);
+            }
+
+            // Add allowed regular categories (filtered by rules)
+            $allowedCategories = array_map(
                 [ContentFilterService::class, 'formatCategory'],
-                $filterService->getAllowedCategories('live')
+                $contentFilterService->getAllowedCategories('live')
             );
+            $categories = array_merge($categories, $allowedCategories);
 
             return $this->jsonResponse($response, [
                 'success' => true,
@@ -271,11 +284,23 @@ class ClientController
                 return $this->jsonError($response, 'Client not found', 404);
             }
 
-            $filterService = new ContentFilterService($client);
-            $categories = array_map(
+            $categories = [];
+            $contentFilterService = new ContentFilterService($client);
+
+            // Add favoris virtual categories if filter assigned
+            $filter = $client->filter_id ? Filter::find($client->filter_id) : null;
+            if ($filter !== null) {
+                $filterServiceBase = new FilterService($filter, (bool) $client->hide_adult_content);
+                $favorisCategories = $filterServiceBase->generateFavorisCategories();
+                $categories = array_merge($categories, $favorisCategories);
+            }
+
+            // Add allowed regular categories (filtered by rules)
+            $allowedCategories = array_map(
                 [ContentFilterService::class, 'formatCategory'],
-                $filterService->getAllowedCategories('vod')
+                $contentFilterService->getAllowedCategories('vod')
             );
+            $categories = array_merge($categories, $allowedCategories);
 
             return $this->jsonResponse($response, [
                 'success' => true,
@@ -299,11 +324,23 @@ class ClientController
                 return $this->jsonError($response, 'Client not found', 404);
             }
 
-            $filterService = new ContentFilterService($client);
-            $categories = array_map(
+            $categories = [];
+            $contentFilterService = new ContentFilterService($client);
+
+            // Add favoris virtual categories if filter assigned
+            $filter = $client->filter_id ? Filter::find($client->filter_id) : null;
+            if ($filter !== null) {
+                $filterServiceBase = new FilterService($filter, (bool) $client->hide_adult_content);
+                $favorisCategories = $filterServiceBase->generateFavorisCategories();
+                $categories = array_merge($categories, $favorisCategories);
+            }
+
+            // Add allowed regular categories (filtered by rules)
+            $allowedCategories = array_map(
                 [ContentFilterService::class, 'formatCategory'],
-                $filterService->getAllowedCategories('series')
+                $contentFilterService->getAllowedCategories('series')
             );
+            $categories = array_merge($categories, $allowedCategories);
 
             return $this->jsonResponse($response, [
                 'success' => true,

@@ -9,6 +9,8 @@ use App\Models\Source;
 use App\Models\Filter;
 use App\Models\Category;
 use App\Models\LiveStream;
+use App\Models\VodStream;
+use App\Models\Series;
 use App\Services\FilterService;
 use App\Services\ContentFilterService;
 use Psr\Http\Message\ResponseInterface;
@@ -274,5 +276,311 @@ class XtreamController
         $response->getBody()->write(json_encode($categories));
 
         return $response->withHeader('Content-Type', 'application/json');
+    }
+
+    /**
+     * Get VOD streams
+     *
+     * Endpoint: /player_api.php?action=get_vod_streams
+     * Optional: &category_id=X
+     *
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface $response
+     * @return ResponseInterface
+     */
+    public function getVodStreams(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        /** @var Client $client */
+        $client = $request->getAttribute('client');
+
+        /** @var Source $source */
+        $source = $request->getAttribute('source');
+
+        /** @var Filter|null $filter */
+        $filter = $request->getAttribute('filter');
+
+        $queryParams = $request->getQueryParams();
+        $categoryId = isset($queryParams['category_id']) ? (int) $queryParams['category_id'] : null;
+
+        // Get proxy URL from environment or request
+        $proxyUrl = $_ENV['APP_URL'] ??
+                    $request->getUri()->getScheme() . '://' . $request->getUri()->getHost();
+
+        // Query streams from database
+        if ($categoryId !== null && $categoryId < 100000) {
+            // Regular category filter
+            $streams = VodStream::getByCategory($source->id, $categoryId);
+        } else {
+            // All streams or favoris category
+            $streams = VodStream::getBySource($source->id, true);
+        }
+
+        // Apply filtering
+        $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
+        $streams = $filterService->applyToStreams($streams, $categoryId);
+
+        // Convert to Xtream format
+        $result = [];
+        foreach ($streams as $stream) {
+            $streamData = $stream->toXtreamFormat($proxyUrl, $client->username, $client->password);
+            $result[] = $streamData;
+        }
+
+        $response->getBody()->write(json_encode($result));
+
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+
+    /**
+     * Get series streams
+     *
+     * Endpoint: /player_api.php?action=get_series
+     * Optional: &category_id=X
+     *
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface $response
+     * @return ResponseInterface
+     */
+    public function getSeries(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        /** @var Client $client */
+        $client = $request->getAttribute('client');
+
+        /** @var Source $source */
+        $source = $request->getAttribute('source');
+
+        /** @var Filter|null $filter */
+        $filter = $request->getAttribute('filter');
+
+        $queryParams = $request->getQueryParams();
+        $categoryId = isset($queryParams['category_id']) ? (int) $queryParams['category_id'] : null;
+
+        // Get proxy URL from environment or request
+        $proxyUrl = $_ENV['APP_URL'] ??
+                    $request->getUri()->getScheme() . '://' . $request->getUri()->getHost();
+
+        // Query series from database
+        if ($categoryId !== null && $categoryId < 100000) {
+            // Regular category filter
+            $series = Series::getByCategory($source->id, $categoryId);
+        } else {
+            // All series or favoris category
+            $series = Series::getBySource($source->id, true);
+        }
+
+        // Apply filtering
+        $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
+        $series = $filterService->applyToStreams($series, $categoryId);
+
+        // Convert to Xtream format
+        $result = [];
+        foreach ($series as $item) {
+            $itemData = $item->toXtreamFormat($proxyUrl, $client->username, $client->password);
+            $result[] = $itemData;
+        }
+
+        $response->getBody()->write(json_encode($result));
+
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+
+    /**
+     * Get VOD stream information
+     *
+     * Endpoint: /player_api.php?action=get_vod_info
+     * Required: vod_id
+     *
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface $response
+     * @return ResponseInterface
+     */
+    public function getVodInfo(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        /** @var Client $client */
+        $client = $request->getAttribute('client');
+
+        /** @var Source $source */
+        $source = $request->getAttribute('source');
+
+        $queryParams = $request->getQueryParams();
+        $vodId = isset($queryParams['vod_id']) ? (int) $queryParams['vod_id'] : null;
+
+        if (!$vodId) {
+            return $this->jsonError($response, 'vod_id parameter is required', 400);
+        }
+
+        $vod = VodStream::find($vodId);
+        if (!$vod || $vod->source_id !== $source->id) {
+            return $this->jsonError($response, 'VOD not found', 404);
+        }
+
+        // Get proxy URL
+        $proxyUrl = $_ENV['APP_URL'] ??
+                    $request->getUri()->getScheme() . '://' . $request->getUri()->getHost();
+
+        $info = [
+            'id' => $vod->id,
+            'name' => $vod->name,
+            'category_id' => $vod->category_id,
+            'cover' => $vod->cover ?? '',
+            'plot' => $vod->plot ?? '',
+            'cast' => $vod->cast ?? '',
+            'director' => $vod->director ?? '',
+            'rating' => $vod->rating ?? '',
+            'duration' => $vod->duration ?? '',
+            'release_date' => $vod->release_date ?? '',
+            'url' => $vod->url ?? '',
+        ];
+
+        $response->getBody()->write(json_encode($info));
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+
+    /**
+     * Get series information
+     *
+     * Endpoint: /player_api.php?action=get_series_info
+     * Required: series_id
+     *
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface $response
+     * @return ResponseInterface
+     */
+    public function getSeriesInfo(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        /** @var Client $client */
+        $client = $request->getAttribute('client');
+
+        /** @var Source $source */
+        $source = $request->getAttribute('source');
+
+        $queryParams = $request->getQueryParams();
+        $seriesId = isset($queryParams['series_id']) ? (int) $queryParams['series_id'] : null;
+
+        if (!$seriesId) {
+            return $this->jsonError($response, 'series_id parameter is required', 400);
+        }
+
+        $series = Series::find($seriesId);
+        if (!$series || $series->source_id !== $source->id) {
+            return $this->jsonError($response, 'Series not found', 404);
+        }
+
+        $info = [
+            'id' => $series->id,
+            'name' => $series->name,
+            'category_id' => $series->category_id,
+            'cover' => $series->cover ?? '',
+            'plot' => $series->plot ?? '',
+            'cast' => $series->cast ?? '',
+            'director' => $series->director ?? '',
+            'rating' => $series->rating ?? '',
+            'episodes' => $series->episodes ?? [],
+        ];
+
+        $response->getBody()->write(json_encode($info));
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+
+    /**
+     * Get short EPG (upcoming programs)
+     *
+     * Endpoint: /player_api.php?action=get_short_epg
+     * Optional: stream_id, limit
+     *
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface $response
+     * @return ResponseInterface
+     */
+    public function getShortEpg(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $queryParams = $request->getQueryParams();
+        $streamId = isset($queryParams['stream_id']) ? (int) $queryParams['stream_id'] : null;
+        $limit = isset($queryParams['limit']) ? (int) $queryParams['limit'] : 10;
+
+        // EPG data structure (simplified - actual implementation would fetch from database)
+        $epg = [
+            'epg' => [
+                [
+                    'id' => '1',
+                    'title' => 'Program 1',
+                    'start' => date('Y-m-d H:i:s', time()),
+                    'end' => date('Y-m-d H:i:s', time() + 3600),
+                    'description' => 'Program description',
+                ],
+                [
+                    'id' => '2',
+                    'title' => 'Program 2',
+                    'start' => date('Y-m-d H:i:s', time() + 3600),
+                    'end' => date('Y-m-d H:i:s', time() + 7200),
+                    'description' => 'Program description',
+                ],
+            ],
+        ];
+
+        $response->getBody()->write(json_encode($epg));
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+
+    /**
+     * Get simple data table (full EPG for a stream)
+     *
+     * Endpoint: /player_api.php?action=get_simple_data_table
+     * Required: stream_id
+     *
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface $response
+     * @return ResponseInterface
+     */
+    public function getSimpleDataTable(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $queryParams = $request->getQueryParams();
+        $streamId = isset($queryParams['stream_id']) ? (int) $queryParams['stream_id'] : null;
+
+        if (!$streamId) {
+            return $this->jsonError($response, 'stream_id parameter is required', 400);
+        }
+
+        // EPG data table (simplified - actual implementation would fetch from database)
+        $table = [
+            'rows' => [
+                [
+                    'id' => '1',
+                    'title' => 'Program 1',
+                    'start' => date('Y-m-d H:i:s', time()),
+                    'end' => date('Y-m-d H:i:s', time() + 3600),
+                    'description' => 'Program description',
+                ],
+                [
+                    'id' => '2',
+                    'title' => 'Program 2',
+                    'start' => date('Y-m-d H:i:s', time() + 3600),
+                    'end' => date('Y-m-d H:i:s', time() + 7200),
+                    'description' => 'Program description',
+                ],
+            ],
+        ];
+
+        $response->getBody()->write(json_encode($table));
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+
+    /**
+     * Return JSON error response
+     *
+     * @param ResponseInterface $response
+     * @param string $message
+     * @param int $statusCode
+     * @return ResponseInterface
+     */
+    private function jsonError(ResponseInterface $response, string $message, int $statusCode = 400): ResponseInterface
+    {
+        $response->getBody()->write(json_encode([
+            'error' => $message,
+        ]));
+
+        return $response
+            ->withStatus($statusCode)
+            ->withHeader('Content-Type', 'application/json');
     }
 }

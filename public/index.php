@@ -5,9 +5,7 @@ declare(strict_types=1);
 use Dotenv\Dotenv;
 use Slim\Factory\AppFactory;
 use App\Middleware\CorsMiddleware;
-use App\Middleware\ClientAuthMiddleware;
 use App\Middleware\AdminAuthMiddleware;
-use App\Controllers\Xtream\XtreamController;
 use App\Controllers\Admin\AuthController;
 use App\Controllers\Admin\SourceController;
 use App\Controllers\Admin\ClientController;
@@ -115,35 +113,6 @@ $app->group('/api', function ($group) {
     $group->get('/dashboard/activity', [$dashboardController, 'activity']);
     $group->get('/sync/status', [$dashboardController, 'syncStatus']);
 })->add(new AdminAuthMiddleware());
-
-// Xtream Codes API routes (protected by ClientAuthMiddleware)
-$app->group('/player_api.php', function ($group) {
-    $controller = new XtreamController();
-
-    // Live streams endpoints
-    $group->get('[/]', function ($request, $response) use ($controller) {
-        $queryParams = $request->getQueryParams();
-        $action = $queryParams['action'] ?? null;
-
-        switch ($action) {
-            case 'get_live_categories':
-                return $controller->getLiveCategories($request, $response);
-
-            case 'get_live_streams':
-                return $controller->getLiveStreams($request, $response);
-
-            case 'get_vod_categories':
-                return $controller->getVodCategories($request, $response);
-
-            case 'get_series_categories':
-                return $controller->getSeriesCategories($request, $response);
-
-            default:
-                // No action = authenticate
-                return $controller->authenticate($request, $response);
-        }
-    });
-})->add(new ClientAuthMiddleware());
 
 // Run application
 $app->run();

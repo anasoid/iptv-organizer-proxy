@@ -20,17 +20,17 @@ use RuntimeException;
  */
 class FilterService
 {
-    private ?object $filter;
+    private ?Filter $filter;
     private bool $hideAdultContent;
     private ?array $parsedFilter = null;
 
     /**
      * Constructor
      *
-     * @param Filter|object|null $filter The filter model (null = no filter applied)
+     * @param Filter|null $filter The filter model (null = no filter applied)
      * @param bool $hideAdultContent Whether to hide adult content
      */
-    public function __construct(?object $filter = null, bool $hideAdultContent = false)
+    public function __construct(?Filter $filter = null, bool $hideAdultContent = false)
     {
         $this->filter = $filter;
         $this->hideAdultContent = $hideAdultContent;
@@ -53,15 +53,33 @@ class FilterService
         }
 
         try {
+            // Parse rules from filter_config
             $config = Yaml::parse($this->filter->filter_config);
 
             if (!is_array($config)) {
                 throw new RuntimeException('Filter configuration must be a YAML object');
             }
 
+            $rules = $config['rules'] ?? [];
+
+            // Parse favoris from separate favoris field
+            $favoris = [];
+            if (!empty($this->filter->favoris)) {
+                try {
+                    $favorisConfig = Yaml::parse($this->filter->favoris);
+                    if (is_array($favorisConfig)) {
+                        // Handle both direct array and wrapped in 'favoris' key
+                        $favoris = $favorisConfig['favoris'] ?? $favorisConfig;
+                    }
+                } catch (\Exception $e) {
+                    // If favoris parsing fails, log but don't crash
+                    throw new RuntimeException("Failed to parse favoris YAML: " . $e->getMessage());
+                }
+            }
+
             $this->parsedFilter = [
-                'rules' => $config['rules'] ?? [],
-                'favoris' => $config['favoris'] ?? [],
+                'rules' => $rules,
+                'favoris' => $favoris,
             ];
 
             return $this->parsedFilter;
