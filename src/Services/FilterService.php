@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Filter;
+use App\Models\Category;
 use Symfony\Component\Yaml\Yaml;
 use RuntimeException;
 
@@ -277,6 +278,23 @@ class FilterService
             if (is_array($stream)) {
                 return $stream;
             }
+
+            // Get category information if stream has a category
+            $categoryName = '';
+            $categoryLabels = '';
+            if ($stream->category_id) {
+                // Find category by category_id (not database id)
+                $categories = Category::findAll([
+                    'source_id' => $stream->source_id,
+                    'category_id' => $stream->category_id,
+                ]);
+                if (!empty($categories)) {
+                    $category = $categories[0];
+                    $categoryName = $category->category_name ?? '';
+                    $categoryLabels = $category->labels ?? '';
+                }
+            }
+
             // Convert model object to array
             return [
                 'id' => $stream->id ?? null,
@@ -284,8 +302,8 @@ class FilterService
                 'labels' => $stream->labels ?? '',
                 'category_id' => $stream->category_id ?? null,
                 'category_ids' => $stream->category_ids ?? null,
-                'category_name' => $stream->category_name ?? '',
-                'category_labels' => $stream->category_labels ?? '',
+                'category_name' => $categoryName,
+                'category_labels' => $categoryLabels,
                 'is_adult' => (int) ($stream->is_adult ?? 0),
                 'num' => $stream->num ?? null,
             ];

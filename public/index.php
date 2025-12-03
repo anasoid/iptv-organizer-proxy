@@ -78,14 +78,18 @@ $app->group('/api', function ($group) {
     $group->put('/clients/{id}', [$clientController, 'update']);
     $group->delete('/clients/{id}', [$clientController, 'delete']);
     $group->get('/clients/{id}/logs', [$clientController, 'logs']);
-    $group->get('/clients/{id}/blocked-items', [$clientController, 'getBlockedItems']);
-    $group->get('/clients/{id}/export/blocked-items', [$clientController, 'exportBlockedItems']);
     $group->get('/clients/{id}/export/live-categories', [$clientController, 'exportLiveCategories']);
     $group->get('/clients/{id}/export/vod-categories', [$clientController, 'exportVodCategories']);
     $group->get('/clients/{id}/export/series-categories', [$clientController, 'exportSeriesCategories']);
     $group->get('/clients/{id}/export/live-streams', [$clientController, 'exportLiveStreams']);
     $group->get('/clients/{id}/export/vod-streams', [$clientController, 'exportVodStreams']);
     $group->get('/clients/{id}/export/series', [$clientController, 'exportSeries']);
+    $group->get('/clients/{id}/export/blocked-live-categories', [$clientController, 'exportBlockedLiveCategories']);
+    $group->get('/clients/{id}/export/blocked-vod-categories', [$clientController, 'exportBlockedVodCategories']);
+    $group->get('/clients/{id}/export/blocked-series-categories', [$clientController, 'exportBlockedSeriesCategories']);
+    $group->get('/clients/{id}/export/blocked-live-streams', [$clientController, 'exportBlockedLiveStreams']);
+    $group->get('/clients/{id}/export/blocked-vod-streams', [$clientController, 'exportBlockedVodStreams']);
+    $group->get('/clients/{id}/export/blocked-series', [$clientController, 'exportBlockedSeries']);
 
     // Filter management
     $filterController = new FilterController();
