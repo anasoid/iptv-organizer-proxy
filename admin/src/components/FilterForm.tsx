@@ -311,6 +311,7 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
   const [showFavorisExamples, setShowFavorisExamples] = useState(false);
   const [rulesTabIndex, setRulesTabIndex] = useState(0);
   const [favorisTabIndex, setFavorisTabIndex] = useState(0);
+  const [mainTabIndex, setMainTabIndex] = useState(0);
 
   const createMutation = useMutation({
     mutationFn: (data: Parameters<typeof filtersApi.createFilter>[0]) =>
@@ -445,107 +446,123 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
           </Box>
         )}
 
-        {/* Rules YAML Editor */}
-        <Box sx={{ mt: 3, mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <p style={{ margin: '8px 0', fontSize: '0.875rem', fontWeight: 500 }}>
-              Filter Rules (YAML) *
-            </p>
-            <IconButton
-              size="small"
-              onClick={() => {
-                setShowRulesExamples(true);
-                setRulesTabIndex(0);
-              }}
-              title="View configuration examples"
-              sx={{ p: 0.5 }}
-            >
-              <HelpOutlineIcon sx={{ fontSize: '1.2rem' }} />
-            </IconButton>
-          </Box>
-          <Box
-            sx={{
-              border: '1px solid #ccc',
-              borderRadius: 1,
-              overflow: 'hidden',
-              height: 300,
-              backgroundColor: '#f5f5f5',
-            }}
+        {/* Main Tabs for Rules and Favoris */}
+        <Box sx={{ mt: 3, mb: 2, border: '1px solid #ccc', borderRadius: 1 }}>
+          <Tabs
+            value={mainTabIndex}
+            onChange={(_, newValue) => setMainTabIndex(newValue)}
+            sx={{ borderBottom: '1px solid #ccc', bgcolor: '#f5f5f5' }}
           >
-            <Editor
-              height="100%"
-              defaultLanguage="yaml"
-              value={rulesYaml}
-              onChange={(value) => {
-                setRulesYaml(value || '');
-                setError(null);
-              }}
-              theme="vs"
-              options={{
-                minimap: { enabled: false },
-                wordWrap: 'on',
-                lineNumbers: 'on',
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-              }}
-            />
-          </Box>
-          <p style={{ margin: '8px 0', fontSize: '0.75rem', color: '#999' }}>
-            Must start with "rules:" followed by array of rules. Each rule has name, type (include/exclude), and match criteria.
-            by_name supports wildcards: * and ?. by_labels uses AND logic (all must match).
-            Include rules ACCEPT matching streams, exclude rules REJECT matching streams. Unmatched ignored if include rules exist.
-          </p>
-        </Box>
+            <Tab label="Filter Rules *" />
+            <Tab label="Virtual Categories / Favoris" />
+          </Tabs>
 
-        {/* Favoris YAML Editor */}
-        <Box sx={{ mt: 3, mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <p style={{ margin: '8px 0', fontSize: '0.875rem', fontWeight: 500 }}>
-              Virtual Categories / Favoris (YAML)
-            </p>
-            <IconButton
-              size="small"
-              onClick={() => {
-                setShowFavorisExamples(true);
-                setFavorisTabIndex(0);
-              }}
-              title="View configuration examples"
-              sx={{ p: 0.5 }}
-            >
-              <HelpOutlineIcon sx={{ fontSize: '1.2rem' }} />
-            </IconButton>
-          </Box>
-          <Box
-            sx={{
-              border: '1px solid #ccc',
-              borderRadius: 1,
-              overflow: 'hidden',
-              height: 300,
-              backgroundColor: '#f5f5f5',
-            }}
-          >
-            <Editor
-              height="100%"
-              defaultLanguage="yaml"
-              value={favorisYaml}
-              onChange={(value) => {
-                setFavorisYaml(value || '');
-                setError(null);
-              }}
-              theme="vs"
-              options={{
-                minimap: { enabled: false },
-                wordWrap: 'on',
-                lineNumbers: 'on',
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-              }}
-            />
-          </Box>
-          <p style={{ margin: '8px 0', fontSize: '0.75rem', color: '#999' }}>
-            Array of virtual categories (no "favoris:" wrapper). Each has name, target_group (display name), and match criteria.
-            Generated IDs start at 100000 (first favoris), 100001 (second), etc. Stored separately from rules.
-          </p>
+          {/* Rules Tab */}
+          {mainTabIndex === 0 && (
+            <Box sx={{ p: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  Filter Rules (YAML)
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    setShowRulesExamples(true);
+                    setRulesTabIndex(0);
+                  }}
+                  title="View configuration examples"
+                  sx={{ p: 0.5 }}
+                >
+                  <HelpOutlineIcon sx={{ fontSize: '1.2rem' }} />
+                </IconButton>
+              </Box>
+              <Box
+                sx={{
+                  border: '1px solid #ccc',
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  height: 300,
+                  backgroundColor: '#f5f5f5',
+                }}
+              >
+                <Editor
+                  height="100%"
+                  defaultLanguage="yaml"
+                  value={rulesYaml}
+                  onChange={(value) => {
+                    setRulesYaml(value || '');
+                    setError(null);
+                  }}
+                  theme="vs"
+                  options={{
+                    minimap: { enabled: false },
+                    wordWrap: 'on',
+                    lineNumbers: 'on',
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                  }}
+                />
+              </Box>
+              <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#999' }}>
+                Must start with "rules:" followed by array of rules. Each rule has name, type (include/exclude), and match criteria.
+                by_name supports wildcards: * and ?. by_labels uses AND logic (all must match).
+                Include rules ACCEPT matching streams, exclude rules REJECT matching streams. Unmatched hidden if rules exist.
+              </Typography>
+            </Box>
+          )}
+
+          {/* Favoris Tab */}
+          {mainTabIndex === 1 && (
+            <Box sx={{ p: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  Virtual Categories / Favoris (Optional)
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    setShowFavorisExamples(true);
+                    setFavorisTabIndex(0);
+                  }}
+                  title="View configuration examples"
+                  sx={{ p: 0.5 }}
+                >
+                  <HelpOutlineIcon sx={{ fontSize: '1.2rem' }} />
+                </IconButton>
+              </Box>
+              <Box
+                sx={{
+                  border: '1px solid #ccc',
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  height: 300,
+                  backgroundColor: '#f5f5f5',
+                }}
+              >
+                <Editor
+                  height="100%"
+                  defaultLanguage="yaml"
+                  value={favorisYaml}
+                  onChange={(value) => {
+                    setFavorisYaml(value || '');
+                    setError(null);
+                  }}
+                  theme="vs"
+                  options={{
+                    minimap: { enabled: false },
+                    wordWrap: 'on',
+                    lineNumbers: 'on',
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                  }}
+                />
+              </Box>
+              <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#999' }}>
+                Array of virtual categories (no "favoris:" wrapper). Each has name, target_group (display name), and match criteria.
+                Generated IDs start at 100000 (first favoris), 100001 (second), etc. Stored separately from rules.
+              </Typography>
+            </Box>
+          )}
         </Box>
 
         {/* Validate Button */}
