@@ -291,23 +291,37 @@ class FilterService
      */
     public function applyToStreams(array $streams, ?int $categoryId = null): array
     {
+        // Batch load all categories for efficient lookup
+        $categoryCache = [];
+        if (!empty($streams)) {
+            // Get first stream to determine source_id
+            $firstStream = current($streams);
+            $sourceId = is_array($firstStream) ? ($firstStream['source_id'] ?? null) : ($firstStream->source_id ?? null);
+            
+            if ($sourceId) {
+                // Load all categories for this source in one query
+                $allCategories = Category::findAll(['source_id' => $sourceId]);
+                foreach ($allCategories as $cat) {
+                    // Index by category_id (not database id) for fast lookup
+                    $key = $sourceId . '_' . $cat->category_id;
+                    $categoryCache[$key] = $cat;
+                }
+            }
+        }
+        
         // Convert model objects to arrays for filtering
-        $streamArrays = array_map(function($stream) {
+        $streamArrays = array_map(function($stream) use ($categoryCache) {
             if (is_array($stream)) {
                 return $stream;
             }
 
-            // Get category information if stream has a category
+            // Get category information if stream has a category (using cache)
             $categoryName = '';
             $categoryLabels = '';
             if ($stream->category_id) {
-                // Find category by category_id (not database id)
-                $categories = Category::findAll([
-                    'source_id' => $stream->source_id,
-                    'category_id' => $stream->category_id,
-                ]);
-                if (!empty($categories)) {
-                    $category = $categories[0];
+                $key = $stream->source_id . '_' . $stream->category_id;
+                if (isset($categoryCache[$key])) {
+                    $category = $categoryCache[$key];
                     $categoryName = $category->category_name ?? '';
                     $categoryLabels = $category->labels ?? '';
                 }
