@@ -45,36 +45,88 @@ class XtreamController
         $proxyUrl = $_ENV['APP_URL'] ??
                     $request->getUri()->getScheme() . '://' . $request->getUri()->getHost();
 
-        // Build server info
-        $serverInfo = [
-            'url' => $proxyUrl,
-            'port' => '80',
-            'https_port' => '443',
-            'server_protocol' => 'http',
-            'rtmp_port' => '1935',
-            'timestamp_now' => time(),
-            'time_now' => date('Y-m-d H:i:s'),
-        ];
+        try {
+            // Fetch authentication data from original source
+            $xtreamClient = new \App\Services\Xtream\XtreamClient($source);
+            $authData = $xtreamClient->authenticate();
 
-        // Build user info
-        $userInfo = [
-            'username' => $client->username,
-            'password' => $client->password,
-            'message' => '',
-            'auth' => 1,
-            'status' => $client->is_active ? 'Active' : 'Inactive',
-            'exp_date' => $client->expiry_date ? strtotime($client->expiry_date) : null,
-            'is_trial' => '0',
-            'active_cons' => '0',
-            'created_at' => strtotime($client->created_at),
-            'max_connections' => (string) $client->max_connections,
-            'allowed_output_formats' => ['m3u8', 'ts', 'rtmp'],
-        ];
+            // Replace server URL with proxy URL (domain only, no protocol/port)
+            if (isset($authData['server_info'])) {
+                // Parse the proxy URL to extract domain and scheme
+                $parsedUrl = parse_url($proxyUrl);
+                $scheme = $parsedUrl['scheme'] ?? 'http';
+                $host = $parsedUrl['host'] ?? 'localhost';
+                $port = $parsedUrl['port'] ?? ($scheme === 'https' ? 443 : 80);
+                
+                // Set domain (without protocol and port)
+                $authData['server_info']['url'] = $host;
+                
+                // Set protocol
+                $authData['server_info']['server_protocol'] = $scheme;
+                
+                // Set ports based on protocol
+                if ($scheme === 'https') {
+                    // HTTPS: use current port in https_port, port is 80
+                    $authData['server_info']['https_port'] = (string) $port;
+                    $authData['server_info']['port'] = '80';
+                } else {
+                    // HTTP: use current port in port, https_port is 443
+                    $authData['server_info']['port'] = (string) $port;
+                    $authData['server_info']['https_port'] = '443';
+                }
+                
+                // Update timestamp to current time
+                $authData['server_info']['timestamp_now'] = time();
+                $authData['server_info']['time_now'] = date('Y-m-d H:i:s');
+            }
 
-        $data = [
-            'user_info' => $userInfo,
-            'server_info' => $serverInfo,
-        ];
+            $data = $authData;
+        } catch (\Exception $e) {
+            // Fallback to basic info if source fetch fails
+            $parsedUrl = parse_url($proxyUrl);
+            $scheme = $parsedUrl['scheme'] ?? 'http';
+            $host = $parsedUrl['host'] ?? 'localhost';
+            $port = $parsedUrl['port'] ?? ($scheme === 'https' ? 443 : 80);
+            
+            if ($scheme === 'https') {
+                // HTTPS: use current port in https_port, port is 80
+                $httpPort = '80';
+                $httpsPort = (string) $port;
+            } else {
+                // HTTP: use current port in port, https_port is 443
+                $httpPort = (string) $port;
+                $httpsPort = '443';
+            }
+            
+            $serverInfo = [
+                'url' => $host,
+                'port' => $httpPort,
+                'https_port' => $httpsPort,
+                'server_protocol' => $scheme,
+                'rtmp_port' => '1935',
+                'timestamp_now' => time(),
+                'time_now' => date('Y-m-d H:i:s'),
+            ];
+
+            $userInfo = [
+                'username' => $client->username,
+                'password' => $client->password,
+                'message' => '',
+                'auth' => 1,
+                'status' => $client->is_active ? 'Active' : 'Inactive',
+                'exp_date' => $client->expiry_date ? strtotime($client->expiry_date) : null,
+                'is_trial' => '0',
+                'active_cons' => '0',
+                'created_at' => strtotime($client->created_at),
+                'max_connections' => (string) $client->max_connections,
+                'allowed_output_formats' => ['m3u8', 'ts', 'rtmp'],
+            ];
+
+            $data = [
+                'user_info' => $userInfo,
+                'server_info' => $serverInfo,
+            ];
+        }
 
         $response->getBody()->write(json_encode($data));
 

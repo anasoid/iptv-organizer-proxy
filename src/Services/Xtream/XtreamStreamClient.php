@@ -116,8 +116,6 @@ class XtreamStreamClient
 
         while ($attempt < $this->maxRetries) {
             try {
-                $this->authenticator->applyRateLimit();
-
                 $response = $httpClient->get($this->authenticator->getBaseUrl(), [
                     'query' => $params,
                 ]);
