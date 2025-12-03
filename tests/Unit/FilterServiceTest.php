@@ -13,11 +13,12 @@ use App\Models\Filter;
  */
 class FilterTestFixture
 {
-    public function __construct(public string $filter_config) {}
+    public string $filter_config;
+    public ?string $favoris = null;
 
-    public function __get(string $name)
+    public function __construct(string $filter_config)
     {
-        return $this->$name ?? null;
+        $this->filter_config = $filter_config;
     }
 }
 

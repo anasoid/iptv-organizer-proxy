@@ -20,17 +20,17 @@ use RuntimeException;
  */
 class FilterService
 {
-    private ?Filter $filter;
+    private object|null $filter;
     private bool $hideAdultContent;
     private ?array $parsedFilter = null;
 
     /**
      * Constructor
      *
-     * @param Filter|null $filter The filter model (null = no filter applied)
+     * @param object|null $filter The filter model (null = no filter applied)
      * @param bool $hideAdultContent Whether to hide adult content
      */
-    public function __construct(?Filter $filter = null, bool $hideAdultContent = false)
+    public function __construct(object|null $filter = null, bool $hideAdultContent = false)
     {
         $this->filter = $filter;
         $this->hideAdultContent = $hideAdultContent;
@@ -62,9 +62,14 @@ class FilterService
 
             $rules = $config['rules'] ?? [];
 
-            // Parse favoris from separate favoris field
+            // Parse favoris: try from filter_config first, then from separate favoris field
             $favoris = [];
-            if (!empty($this->filter->favoris)) {
+            
+            // Check if favoris is in filter_config
+            if (!empty($config['favoris'])) {
+                $favoris = $config['favoris'];
+            } elseif (!empty($this->filter->favoris)) {
+                // Otherwise try to parse from separate favoris field
                 try {
                     $favorisConfig = Yaml::parse($this->filter->favoris);
                     if (is_array($favorisConfig)) {
@@ -196,13 +201,12 @@ class FilterService
             $nameMatches = true; // No name criteria = matches
         }
 
-        // Check by_labels: ALL labels must exist (AND logic)
+        // Check by_labels: ANY label must exist (OR logic)
         $labelsMatch = false;
         if (!empty($criteria['by_labels'])) {
-            $labelsMatch = true;
             foreach ($criteria['by_labels'] as $label) {
-                if (!in_array(strtolower($label), $channelLabels, true)) {
-                    $labelsMatch = false;
+                if (in_array(strtolower($label), $channelLabels, true)) {
+                    $labelsMatch = true;
                     break;
                 }
             }
@@ -244,13 +248,12 @@ class FilterService
             $nameMatches = true; // No name criteria = matches
         }
 
-        // Check by_labels: ALL labels must exist (AND logic)
+        // Check by_labels: ANY label must exist (OR logic)
         $labelsMatch = false;
         if (!empty($criteria['by_labels'])) {
-            $labelsMatch = true;
             foreach ($criteria['by_labels'] as $label) {
-                if (!in_array(strtolower($label), $categoryLabels, true)) {
-                    $labelsMatch = false;
+                if (in_array(strtolower($label), $categoryLabels, true)) {
+                    $labelsMatch = true;
                     break;
                 }
             }
@@ -275,8 +278,13 @@ class FilterService
      */
     private function matchesPattern(string $text, string $pattern): bool
     {
-        // Use fnmatch for wildcard matching (case-insensitive)
-        return fnmatch(strtolower($pattern), strtolower($text), FNM_CASEFOLD);
+        // If pattern contains wildcards, use fnmatch
+        if (strpos($pattern, '*') !== false || strpos($pattern, '?') !== false) {
+            return fnmatch(strtolower($pattern), strtolower($text), FNM_CASEFOLD);
+        }
+        
+        // Otherwise, use substring matching (case-insensitive)
+        return stripos($text, $pattern) !== false;
     }
 
     /**
@@ -383,7 +391,7 @@ class FilterService
      * @param array $streams Array of streams
      * @return array Filtered streams
      */
-    private function applyFilterRules(array $streams): array
+     private function applyFilterRules(array $streams): array
     {
         $config = $this->parseFilter();
         $rules = $config['rules'] ?? [];
@@ -401,9 +409,12 @@ class FilterService
             }
         }
 
-        // Filter streams respecting rule order
+        // Filter streams respecting rule priority: exclude > include
         return array_filter($streams, function (array $stream) use ($rules, $hasIncludeRules) {
-            // Process rules in order
+            $matchedInclude = false;
+            $matchedExclude = false;
+            
+            // Check all rules to find any matches
             foreach ($rules as $rule) {
                 if (!is_array($rule)) {
                     continue;
@@ -414,20 +425,26 @@ class FilterService
 
                 // Check if stream matches this rule
                 if ($this->matchStream($stream, $match)) {
-                    // If matches and type is include → ACCEPT
                     if ($type === 'include') {
-                        return true;
-                    }
-                    // If matches and type is exclude → REJECT
-                    if ($type === 'exclude') {
-                        return false;
+                        $matchedInclude = true;
+                    } elseif ($type === 'exclude') {
+                        $matchedExclude = true;
                     }
                 }
             }
 
-            // Stream didn't match any rule → HIDE
-            // If a filter is assigned with rules, streams must explicitly match a rule to be shown
-            return false;
+            // Exclude has priority over include
+            if ($matchedExclude) {
+                return false;
+            }
+
+            // If there are include rules, stream must match at least one
+            // If there are only exclude rules, stream is shown by default
+            if ($hasIncludeRules) {
+                return $matchedInclude;
+            }
+
+            return true;
         });
     }
 
@@ -553,7 +570,7 @@ class FilterService
             // Process rules in order
             foreach ($categoryRules as $rule) {
                 $type = $rule['type'] ?? 'include';
-                $match = $rule['match'] ?? [];
+                $match = $rule['match'] ?: [];
 
                 // Check if category matches this rule
                 if ($this->matchesCategoryCriteria(
