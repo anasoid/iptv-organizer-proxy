@@ -566,31 +566,16 @@ class XtreamController
             return $this->jsonError($response, 'vod_id parameter is required', 400);
         }
 
-        $vod = VodStream::find($vodId);
-        if (!$vod || $vod->source_id !== $source->id) {
-            return $this->jsonError($response, 'VOD not found', 404);
+        try {
+            // Proxy to original source
+            $xtreamClient = new \App\Services\Xtream\XtreamClient($source);
+            $info = $xtreamClient->getStreamClient()->getVodInfo($vodId);
+
+            $response->getBody()->write(json_encode($info));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            return $this->jsonError($response, 'Failed to fetch VOD info: ' . $e->getMessage(), 500);
         }
-
-        // Get proxy URL
-        $proxyUrl = $_ENV['APP_URL'] ??
-                    $request->getUri()->getScheme() . '://' . $request->getUri()->getHost();
-
-        $info = [
-            'id' => $vod->id,
-            'name' => $vod->name,
-            'category_id' => $vod->category_id,
-            'cover' => $vod->cover ?? '',
-            'plot' => $vod->plot ?? '',
-            'cast' => $vod->cast ?? '',
-            'director' => $vod->director ?? '',
-            'rating' => $vod->rating ?? '',
-            'duration' => $vod->duration ?? '',
-            'release_date' => $vod->release_date ?? '',
-            'url' => $vod->url ?? '',
-        ];
-
-        $response->getBody()->write(json_encode($info));
-        return $response->withHeader('Content-Type', 'application/json');
     }
 
     /**
@@ -618,25 +603,16 @@ class XtreamController
             return $this->jsonError($response, 'series_id parameter is required', 400);
         }
 
-        $series = Series::find($seriesId);
-        if (!$series || $series->source_id !== $source->id) {
-            return $this->jsonError($response, 'Series not found', 404);
+        try {
+            // Proxy to original source
+            $xtreamClient = new \App\Services\Xtream\XtreamClient($source);
+            $info = $xtreamClient->getSeriesInfo($seriesId);
+
+            $response->getBody()->write(json_encode($info));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            return $this->jsonError($response, 'Failed to fetch Series info: ' . $e->getMessage(), 500);
         }
-
-        $info = [
-            'id' => $series->id,
-            'name' => $series->name,
-            'category_id' => $series->category_id,
-            'cover' => $series->cover ?? '',
-            'plot' => $series->plot ?? '',
-            'cast' => $series->cast ?? '',
-            'director' => $series->director ?? '',
-            'rating' => $series->rating ?? '',
-            'episodes' => $series->episodes ?? [],
-        ];
-
-        $response->getBody()->write(json_encode($info));
-        return $response->withHeader('Content-Type', 'application/json');
     }
 
     /**

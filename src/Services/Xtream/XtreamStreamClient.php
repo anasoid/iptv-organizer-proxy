@@ -96,6 +96,23 @@ class XtreamStreamClient
     }
 
     /**
+     * Get VOD (movie) information
+     *
+     * @param int $vodId
+     * @return array
+     * @throws XtreamApiException
+     */
+    public function getVodInfo(int $vodId): array
+    {
+        $params = [
+            'action' => 'get_vod_info',
+            'vod_id' => $vodId,
+        ];
+
+        return $this->fetchStreams($params);
+    }
+
+    /**
      * Fetch streams from API
      *
      * @param array $params Query parameters
