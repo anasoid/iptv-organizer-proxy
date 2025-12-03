@@ -316,6 +316,7 @@ class FilterService
             // Convert model object to array
             return [
                 'id' => $stream->id ?? null,
+                'stream_id' => $stream->stream_id ?? null,
                 'name' => $stream->name ?? '',
                 'labels' => $stream->labels ?? '',
                 'category_id' => $stream->category_id ?? null,
