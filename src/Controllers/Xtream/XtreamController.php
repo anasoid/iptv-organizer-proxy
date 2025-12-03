@@ -597,10 +597,10 @@ class XtreamController
         $source = $request->getAttribute('source');
 
         $queryParams = $request->getQueryParams();
-        $seriesId = isset($queryParams['series_id']) ? (int) $queryParams['series_id'] : null;
+        $seriesId = isset($queryParams['series']) ? (int) $queryParams['series'] : null;
 
         if (!$seriesId) {
-            return $this->jsonError($response, 'series_id parameter is required', 400);
+            return $this->jsonError($response, 'series parameter is required', 400);
         }
 
         try {

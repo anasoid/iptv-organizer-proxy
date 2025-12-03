@@ -40,7 +40,7 @@
    - Method: getSeriesInfo($request, $response)
      - Get series_id from query
      - Verify client has access to series
-     - Proxy request to source: action=get_series_info&series_id=X
+     - Proxy request to source: action=get_series_info&series=X
      - Parse response and filter episodes if needed
      - Construct episode URLs: http://proxy-url/series/{username}/{password}/{episode_id}.{ext}
      - Return full series info with seasons and episodes
@@ -49,7 +49,7 @@
    - GET /player_api.php?action=get_vod_streams[&category_id=X]
    - GET /player_api.php?action=get_series_categories
    - GET /player_api.php?action=get_series[&category_id=X]
-   - GET /player_api.php?action=get_series_info&series_id=X
+   - GET /player_api.php?action=get_series_info&series=X
 3. Response formatting:
    - VOD streams include: stream_id, name, stream_icon, rating, added, category_id, container_extension, plot, cast, director, genre, year, etc.
    - Series include: series_id, name, cover, plot, cast, rating, genre, release_date, episode_run_time, etc.

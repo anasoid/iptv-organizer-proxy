@@ -558,7 +558,7 @@ GET /player_api.php?username=X&password=Y&action=get_vod_streams&category_id=X
 GET /player_api.php?username=X&password=Y&action=get_series_categories
 GET /player_api.php?username=X&password=Y&action=get_series
 GET /player_api.php?username=X&password=Y&action=get_series&category_id=X
-GET /player_api.php?username=X&password=Y&action=get_series_info&series_id=X
+GET /player_api.php?username=X&password=Y&action=get_series_info&series=X
 GET /player_api.php?username=X&password=Y&action=get_simple_data_table&stream_id=X
 GET /player_api.php?username=X&password=Y&action=get_short_epg&stream_id=X&limit=X
 GET /xmltv.php?username=X&password=Y
@@ -576,7 +576,7 @@ GET /player_api.php?username=X&password=Y&action=get_vod_streams&category_id=X
 GET /player_api.php?username=X&password=Y&action=get_series_categories
 GET /player_api.php?username=X&password=Y&action=get_series
 GET /player_api.php?username=X&password=Y&action=get_series&category_id=X
-GET /player_api.php?username=X&password=Y&action=get_series_info&series_id=X
+GET /player_api.php?username=X&password=Y&action=get_series_info&series=X
 GET /player_api.php?username=X&password=Y&action=get_simple_data_table&stream_id=X (proxied - no filtering)
 GET /player_api.php?username=X&password=Y&action=get_short_epg&stream_id=X&limit=X (proxied - no filtering)
 GET /xmltv.php?username=X&password=Y (proxied - filtered on-the-fly to client's streams)

@@ -29,7 +29,7 @@
    - getLiveStreams($categoryId = null) - action=get_live_streams
    - getVodStreams($categoryId = null) - action=get_vod_streams
    - getSeries($categoryId = null) - action=get_series
-   - getSeriesInfo($seriesId) - action=get_series_info&series_id=X
+   - getSeriesInfo($seriesId) - action=get_series_info&series=X
    - Returns array of streams/series
 5. Implement EPG methods:
    - getSimpleDataTable($streamId) - action=get_simple_data_table&stream_id=X
