@@ -272,13 +272,32 @@ class FilterService
      */
     public function applyToStreams(array $streams, ?int $categoryId = null): array
     {
+        // Convert model objects to arrays for filtering
+        $streamArrays = array_map(function($stream) {
+            if (is_array($stream)) {
+                return $stream;
+            }
+            // Convert model object to array
+            return [
+                'id' => $stream->id ?? null,
+                'name' => $stream->name ?? '',
+                'labels' => $stream->labels ?? '',
+                'category_id' => $stream->category_id ?? null,
+                'category_ids' => $stream->category_ids ?? null,
+                'category_name' => $stream->category_name ?? '',
+                'category_labels' => $stream->category_labels ?? '',
+                'is_adult' => (int) ($stream->is_adult ?? 0),
+                'num' => $stream->num ?? null,
+            ];
+        }, $streams);
+
         // Handle favoris categories (ID >= 100000)
         if ($categoryId !== null && $categoryId >= 100000) {
-            return $this->filterByFavorisCategory($streams, $categoryId);
+            return $this->filterByFavorisCategory($streamArrays, $categoryId);
         }
 
         // Apply adult content filter first (highest priority)
-        $filtered = $this->filterAdultContent($streams);
+        $filtered = $this->filterAdultContent($streamArrays);
 
         // Apply include/exclude rules if filter is assigned
         if ($this->filter !== null) {
@@ -486,16 +505,10 @@ class FilterService
                 $type = $rule['type'] ?? 'include';
                 $match = $rule['match'] ?? [];
 
-                // Create category array for matching
-                $categoryArray = [
-                    'category_name' => $category->category_name ?? '',
-                    'category_labels' => $category->category_labels ?? '',
-                ];
-
                 // Check if category matches this rule
                 if ($this->matchesCategoryCriteria(
-                    $categoryArray['category_name'],
-                    $categoryArray['category_labels'],
+                    $category->category_name ?? '',
+                    $category->labels ?? '',
                     $match['categories'] ?? []
                 )) {
                     // If matches and type is include → ACCEPT

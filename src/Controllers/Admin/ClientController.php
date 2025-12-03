@@ -309,7 +309,7 @@ class ClientController
 
             $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
 
-            // Get all streams first to determine blocked categories
+            // Get all streams first to determine blocked by rules
             $liveStreams = LiveStream::getBySource($client->source_id, false);
             $vodStreams = VodStream::getBySource($client->source_id, false);
             $seriesList = Series::getBySource($client->source_id, false);
@@ -319,20 +319,40 @@ class ClientController
             $filteredVod = $filterService->applyToStreams($vodStreams);
             $filteredSeries = $filterService->applyToStreams($seriesList);
 
-            // Get blocked categories (categories with NO allowed streams)
+            // Get all categories and apply category filters
+            $allLiveCategories = Category::getBySourceAndType($client->source_id, 'live');
+            $allVodCategories = Category::getBySourceAndType($client->source_id, 'vod');
+            $allSeriesCategories = Category::getBySourceAndType($client->source_id, 'series');
+
+            // Apply category filters
+            $filteredLiveCategories = $filterService->filterCategories($allLiveCategories);
+            $filteredVodCategories = $filterService->filterCategories($allVodCategories);
+            $filteredSeriesCategories = $filterService->filterCategories($allSeriesCategories);
+
+            // Get blocked categories: those blocked directly by filter rules OR have no allowed streams
             $blockedCategories = [];
 
-            // Helper function to get categories that have no allowed streams
-            $getCategoriesWithoutAllowedStreams = function($allStreams, $filteredStreams) {
+            // Helper function to get blocked categories
+            $getBlockedCategories = function($allStreams, $filteredStreams, $allCategories, $filteredCategories) {
                 // Get IDs of filtered streams
                 $allowedStreamIds = array_map(fn($s) => $s->id, $filteredStreams);
 
-                // Get all categories from streams
+                // Get IDs of filtered categories
+                $allowedCategoryIds = array_map(fn($c) => $c->category_id, $filteredCategories);
+
+                // Get all category IDs from streams
                 $allCategoryIds = array_unique(array_map(fn($s) => $s->category_id, $allStreams));
 
-                // For each category, check if it has any allowed streams
+                // For each category, check if it's blocked by filter rules OR has no allowed streams
                 $blockedCategoryIds = [];
                 foreach ($allCategoryIds as $catId) {
+                    // If category is not in filtered categories, it's blocked by rule
+                    if (!in_array($catId, $allowedCategoryIds)) {
+                        $blockedCategoryIds[] = $catId;
+                        continue;
+                    }
+
+                    // If category is allowed by rule, check if it has any allowed streams
                     $streamsInCategory = array_filter($allStreams, fn($s) => $s->category_id == $catId);
                     $allowedInCategory = array_filter($streamsInCategory, fn($s) => in_array($s->id, $allowedStreamIds));
 
@@ -342,27 +362,13 @@ class ClientController
                     }
                 }
 
-                return $blockedCategoryIds;
+                return array_filter($allCategories, fn($c) => in_array($c->category_id, $blockedCategoryIds));
             };
 
-            // Get blocked category IDs for each type
-            $blockedLiveCategoryIds = $getCategoriesWithoutAllowedStreams($liveStreams, $filteredLive);
-            $blockedVodCategoryIds = $getCategoriesWithoutAllowedStreams($vodStreams, $filteredVod);
-            $blockedSeriesCategoryIds = $getCategoriesWithoutAllowedStreams($seriesList, $filteredSeries);
-
-            // Get category objects for blocked categories
-            $blockedCategories['live'] = array_filter(
-                Category::getBySourceAndType($client->source_id, 'live'),
-                fn($c) => in_array($c->category_id, $blockedLiveCategoryIds)
-            );
-            $blockedCategories['vod'] = array_filter(
-                Category::getBySourceAndType($client->source_id, 'vod'),
-                fn($c) => in_array($c->category_id, $blockedVodCategoryIds)
-            );
-            $blockedCategories['series'] = array_filter(
-                Category::getBySourceAndType($client->source_id, 'series'),
-                fn($c) => in_array($c->category_id, $blockedSeriesCategoryIds)
-            );
+            // Get blocked categories for each type
+            $blockedCategories['live'] = $getBlockedCategories($liveStreams, $filteredLive, $allLiveCategories, $filteredLiveCategories);
+            $blockedCategories['vod'] = $getBlockedCategories($vodStreams, $filteredVod, $allVodCategories, $filteredVodCategories);
+            $blockedCategories['series'] = $getBlockedCategories($seriesList, $filteredSeries, $allSeriesCategories, $filteredSeriesCategories);
 
             // Format blocked categories
             $blockedCategories = [
@@ -390,9 +396,9 @@ class ClientController
             $blockedStreams = [];
 
             // Blocked streams are those not in the filtered list
-            $filteredLiveIds = array_map(fn($s) => $s->id, $filteredLive);
-            $filteredVodIds = array_map(fn($s) => $s->id, $filteredVod);
-            $filteredSeriesIds = array_map(fn($s) => $s->id, $filteredSeries);
+            $filteredLiveIds = array_map(fn($s) => is_array($s) ? $s['id'] : $s->id, $filteredLive);
+            $filteredVodIds = array_map(fn($s) => is_array($s) ? $s['id'] : $s->id, $filteredVod);
+            $filteredSeriesIds = array_map(fn($s) => is_array($s) ? $s['id'] : $s->id, $filteredSeries);
 
             $blockedLive = array_values(array_filter($liveStreams, function ($stream) use ($filteredLiveIds) {
                 return !in_array($stream->id, $filteredLiveIds);
@@ -492,7 +498,7 @@ class ClientController
             $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
             $proxyUrl = $_ENV['APP_URL'] ?? $request->getUri()->getScheme() . '://' . $request->getUri()->getHost();
 
-            // Get all streams first to determine blocked categories
+            // Get all streams first to determine blocked by rules
             $liveStreams = LiveStream::getBySource($client->source_id, false);
             $vodStreams = VodStream::getBySource($client->source_id, false);
             $seriesList = Series::getBySource($client->source_id, false);
@@ -502,20 +508,40 @@ class ClientController
             $filteredVod = $filterService->applyToStreams($vodStreams);
             $filteredSeries = $filterService->applyToStreams($seriesList);
 
-            // Get blocked categories (categories with NO allowed streams)
+            // Get all categories and apply category filters
+            $allLiveCategories = Category::getBySourceAndType($client->source_id, 'live');
+            $allVodCategories = Category::getBySourceAndType($client->source_id, 'vod');
+            $allSeriesCategories = Category::getBySourceAndType($client->source_id, 'series');
+
+            // Apply category filters
+            $filteredLiveCategories = $filterService->filterCategories($allLiveCategories);
+            $filteredVodCategories = $filterService->filterCategories($allVodCategories);
+            $filteredSeriesCategories = $filterService->filterCategories($allSeriesCategories);
+
+            // Get blocked categories: those blocked directly by filter rules OR have no allowed streams
             $blockedCategories = [];
 
-            // Helper function to get categories that have no allowed streams
-            $getCategoriesWithoutAllowedStreams = function($allStreams, $filteredStreams) {
+            // Helper function to get blocked categories
+            $getBlockedCategories = function($allStreams, $filteredStreams, $allCategories, $filteredCategories) {
                 // Get IDs of filtered streams
-                $allowedStreamIds = array_map(fn($s) => $s->id, $filteredStreams);
+                $allowedStreamIds = array_map(fn($s) => is_array($s) ? $s['id'] : $s->id, $filteredStreams);
 
-                // Get all categories from streams
+                // Get IDs of filtered categories
+                $allowedCategoryIds = array_map(fn($c) => $c->category_id, $filteredCategories);
+
+                // Get all category IDs from streams
                 $allCategoryIds = array_unique(array_map(fn($s) => $s->category_id, $allStreams));
 
-                // For each category, check if it has any allowed streams
+                // For each category, check if it's blocked by filter rules OR has no allowed streams
                 $blockedCategoryIds = [];
                 foreach ($allCategoryIds as $catId) {
+                    // If category is not in filtered categories, it's blocked by rule
+                    if (!in_array($catId, $allowedCategoryIds)) {
+                        $blockedCategoryIds[] = $catId;
+                        continue;
+                    }
+
+                    // If category is allowed by rule, check if it has any allowed streams
                     $streamsInCategory = array_filter($allStreams, fn($s) => $s->category_id == $catId);
                     $allowedInCategory = array_filter($streamsInCategory, fn($s) => in_array($s->id, $allowedStreamIds));
 
@@ -525,22 +551,13 @@ class ClientController
                     }
                 }
 
-                return $blockedCategoryIds;
+                return array_filter($allCategories, fn($c) => in_array($c->category_id, $blockedCategoryIds));
             };
 
-            // Get blocked category IDs for each type
-            $blockedLiveCategoryIds = $getCategoriesWithoutAllowedStreams($liveStreams, $filteredLive);
-            $blockedVodCategoryIds = $getCategoriesWithoutAllowedStreams($vodStreams, $filteredVod);
-            $blockedSeriesCategoryIds = $getCategoriesWithoutAllowedStreams($seriesList, $filteredSeries);
-
-            // Get category objects for blocked categories only
-            $allLiveCategories = Category::getBySourceAndType($client->source_id, 'live');
-            $allVodCategories = Category::getBySourceAndType($client->source_id, 'vod');
-            $allSeriesCategories = Category::getBySourceAndType($client->source_id, 'series');
-
-            $blockedLiveCategories = array_filter($allLiveCategories, fn($c) => in_array($c->category_id, $blockedLiveCategoryIds));
-            $blockedVodCategories = array_filter($allVodCategories, fn($c) => in_array($c->category_id, $blockedVodCategoryIds));
-            $blockedSeriesCategories = array_filter($allSeriesCategories, fn($c) => in_array($c->category_id, $blockedSeriesCategoryIds));
+            // Get blocked categories for each type
+            $blockedLiveCategories = $getBlockedCategories($liveStreams, $filteredLive, $allLiveCategories, $filteredLiveCategories);
+            $blockedVodCategories = $getBlockedCategories($vodStreams, $filteredVod, $allVodCategories, $filteredVodCategories);
+            $blockedSeriesCategories = $getBlockedCategories($seriesList, $filteredSeries, $allSeriesCategories, $filteredSeriesCategories);
 
             // Format blocked categories
             $blockedCategories = [
@@ -565,9 +582,9 @@ class ClientController
             $blockedStreams = [];
 
             // Blocked streams are those not in the filtered list
-            $filteredLiveIds = array_map(fn($s) => $s->id, $filteredLive);
-            $filteredVodIds = array_map(fn($s) => $s->id, $filteredVod);
-            $filteredSeriesIds = array_map(fn($s) => $s->id, $filteredSeries);
+            $filteredLiveIds = array_map(fn($s) => is_array($s) ? $s['id'] : $s->id, $filteredLive);
+            $filteredVodIds = array_map(fn($s) => is_array($s) ? $s['id'] : $s->id, $filteredVod);
+            $filteredSeriesIds = array_map(fn($s) => is_array($s) ? $s['id'] : $s->id, $filteredSeries);
 
             $blockedLive = array_values(array_filter($liveStreams, function ($stream) use ($filteredLiveIds) {
                 return !in_array($stream->id, $filteredLiveIds);
