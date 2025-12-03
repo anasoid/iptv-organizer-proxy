@@ -12,8 +12,14 @@ use App\Controllers\Admin\ClientController;
 use App\Controllers\Admin\FilterController;
 use App\Controllers\Admin\AdminUserController;
 use App\Controllers\Admin\DashboardController;
+use App\Controllers\Xtream\StreamDataController;
 
 require __DIR__ . '/../vendor/autoload.php';
+
+// Handle REQUEST_URI for PHP built-in server
+if (!isset($_SERVER['REQUEST_URI'])) {
+    $_SERVER['REQUEST_URI'] = '/' . ltrim($_SERVER['PATH_INFO'] ?? '', '/');
+}
 
 // Load environment variables
 $dotenv = Dotenv::createImmutable(__DIR__ . '/..');
@@ -113,6 +119,13 @@ $app->group('/api', function ($group) {
     $group->get('/dashboard/activity', [$dashboardController, 'activity']);
     $group->get('/sync/status', [$dashboardController, 'syncStatus']);
 })->add(new AdminAuthMiddleware());
+
+// Stream routing - /{type}/{username}/{password}/{stream_id}.{ext}
+// Supports: /live, /movie, /series
+$app->any('/{type:live|movie|series}/{username:[^/]+}/{password:[^/]+}/{streamId:\d+}.{ext:[a-zA-Z0-9]+}', function ($request, $response, $args) {
+    $controller = new StreamDataController();
+    return $controller->handleStreamRequest($response, $args['type'], $args['username'], $args['password'], (int)$args['streamId'], $args['ext']);
+});
 
 // Run application
 $app->run();
