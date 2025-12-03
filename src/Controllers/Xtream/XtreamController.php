@@ -627,32 +627,27 @@ class XtreamController
      */
     public function getShortEpg(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
+        /** @var Source $source */
+        $source = $request->getAttribute('source');
+
         $queryParams = $request->getQueryParams();
         $streamId = isset($queryParams['stream_id']) ? (int) $queryParams['stream_id'] : null;
         $limit = isset($queryParams['limit']) ? (int) $queryParams['limit'] : 10;
 
-        // EPG data structure (simplified - actual implementation would fetch from database)
-        $epg = [
-            'epg' => [
-                [
-                    'id' => '1',
-                    'title' => 'Program 1',
-                    'start' => date('Y-m-d H:i:s', time()),
-                    'end' => date('Y-m-d H:i:s', time() + 3600),
-                    'description' => 'Program description',
-                ],
-                [
-                    'id' => '2',
-                    'title' => 'Program 2',
-                    'start' => date('Y-m-d H:i:s', time() + 3600),
-                    'end' => date('Y-m-d H:i:s', time() + 7200),
-                    'description' => 'Program description',
-                ],
-            ],
-        ];
+        if (!$streamId) {
+            return $this->jsonError($response, 'stream_id parameter is required', 400);
+        }
 
-        $response->getBody()->write(json_encode($epg));
-        return $response->withHeader('Content-Type', 'application/json');
+        try {
+            // Proxy to original source
+            $xtreamClient = new \App\Services\Xtream\XtreamClient($source);
+            $epg = $xtreamClient->getEpgClient()->getShortEpg($streamId, $limit);
+
+            $response->getBody()->write(json_encode($epg));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            return $this->jsonError($response, 'Failed to fetch EPG: ' . $e->getMessage(), 500);
+        }
     }
 
     /**
@@ -667,6 +662,9 @@ class XtreamController
      */
     public function getSimpleDataTable(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
+        /** @var Source $source */
+        $source = $request->getAttribute('source');
+
         $queryParams = $request->getQueryParams();
         $streamId = isset($queryParams['stream_id']) ? (int) $queryParams['stream_id'] : null;
 
@@ -674,28 +672,46 @@ class XtreamController
             return $this->jsonError($response, 'stream_id parameter is required', 400);
         }
 
-        // EPG data table (simplified - actual implementation would fetch from database)
-        $table = [
-            'rows' => [
-                [
-                    'id' => '1',
-                    'title' => 'Program 1',
-                    'start' => date('Y-m-d H:i:s', time()),
-                    'end' => date('Y-m-d H:i:s', time() + 3600),
-                    'description' => 'Program description',
-                ],
-                [
-                    'id' => '2',
-                    'title' => 'Program 2',
-                    'start' => date('Y-m-d H:i:s', time() + 3600),
-                    'end' => date('Y-m-d H:i:s', time() + 7200),
-                    'description' => 'Program description',
-                ],
-            ],
-        ];
+        try {
+            // Proxy to original source
+            $xtreamClient = new \App\Services\Xtream\XtreamClient($source);
+            $table = $xtreamClient->getEpgClient()->getSimpleDataTable($streamId);
 
-        $response->getBody()->write(json_encode($table));
-        return $response->withHeader('Content-Type', 'application/json');
+            $response->getBody()->write(json_encode($table));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            return $this->jsonError($response, 'Failed to fetch EPG data: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get XMLTV EPG data
+     *
+     * Endpoint: /player_api.php?action=get_xmltv
+     * Optional: stream_id
+     *
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface $response
+     * @return ResponseInterface
+     */
+    public function getXmltv(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        /** @var Source $source */
+        $source = $request->getAttribute('source');
+
+        $queryParams = $request->getQueryParams();
+        $streamId = isset($queryParams['stream_id']) ? (int) $queryParams['stream_id'] : null;
+
+        try {
+            // Proxy to original source
+            $xtreamClient = new \App\Services\Xtream\XtreamClient($source);
+            $xmltv = $xtreamClient->getEpgClient()->getXmltv($streamId);
+
+            $response->getBody()->write($xmltv);
+            return $response->withHeader('Content-Type', 'application/xml');
+        } catch (\Exception $e) {
+            return $this->jsonError($response, 'Failed to fetch XMLTV: ' . $e->getMessage(), 500);
+        }
     }
 
     /**

@@ -224,6 +224,10 @@ try {
             $response = $controller->getSimpleDataTable($request, $response);
             break;
 
+        case 'get_xmltv':
+            $response = $controller->getXmltv($request, $response);
+            break;
+
         default:
             // No action = authenticate / server info
             $response = $controller->authenticate($request, $response);

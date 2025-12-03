@@ -55,28 +55,18 @@ if (!$source) {
     exit;
 }
 
-// Generate XMLTV EPG data
-header('Content-Type: application/xml; charset=utf-8');
-header('Content-Disposition: attachment; filename="epg.xml"');
+// Proxy XMLTV from original source
+try {
+    $xtreamClient = new \App\Services\Xtream\XtreamClient($source);
+    $xmltv = $xtreamClient->getEpgClient()->getXmltv();
+    
+    header('Content-Type: application/xml; charset=utf-8');
+    
+    echo $xmltv;
+} catch (\Exception $e) {
+    http_response_code(500);
+    header('Content-Type: application/xml');
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    echo '<tv><!-- Error: ' . htmlspecialchars($e->getMessage()) . ' --></tv>';
+}
 
-echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-echo '<!DOCTYPE tv SYSTEM "xmltv.dtd">' . "\n";
-echo '<tv>' . "\n";
-
-// Generate sample EPG data
-// In a real implementation, this would fetch actual EPG data from the database
-echo '  <channel id="1">' . "\n";
-echo '    <display-name>Sample Channel 1</display-name>' . "\n";
-echo '  </channel>' . "\n";
-
-echo '  <programme start="' . date('YmdHis O') . '" stop="' . date('YmdHis O', time() + 3600) . '" channel="1">' . "\n";
-echo '    <title lang="en">Sample Program 1</title>' . "\n";
-echo '    <desc lang="en">This is a sample program description</desc>' . "\n";
-echo '  </programme>' . "\n";
-
-echo '  <programme start="' . date('YmdHis O', time() + 3600) . '" stop="' . date('YmdHis O', time() + 7200) . '" channel="1">' . "\n";
-echo '    <title lang="en">Sample Program 2</title>' . "\n";
-echo '    <desc lang="en">This is another sample program description</desc>' . "\n";
-echo '  </programme>' . "\n";
-
-echo '</tv>' . "\n";
