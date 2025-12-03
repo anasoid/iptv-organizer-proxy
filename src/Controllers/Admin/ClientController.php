@@ -325,10 +325,10 @@ class ClientController
             // Helper function to get categories that have no allowed streams
             $getCategoriesWithoutAllowedStreams = function($allStreams, $filteredStreams) {
                 // Get IDs of filtered streams
-                $allowedStreamIds = array_column($filteredStreams, 'id');
+                $allowedStreamIds = array_map(fn($s) => $s->id, $filteredStreams);
 
                 // Get all categories from streams
-                $allCategoryIds = array_unique(array_column($allStreams, 'category_id'));
+                $allCategoryIds = array_unique(array_map(fn($s) => $s->category_id, $allStreams));
 
                 // For each category, check if it has any allowed streams
                 $blockedCategoryIds = [];
@@ -390,16 +390,20 @@ class ClientController
             $blockedStreams = [];
 
             // Blocked streams are those not in the filtered list
-            $blockedLive = array_values(array_filter($liveStreams, function ($stream) use ($filteredLive) {
-                return !in_array($stream->id, array_column($filteredLive, 'id'));
+            $filteredLiveIds = array_map(fn($s) => $s->id, $filteredLive);
+            $filteredVodIds = array_map(fn($s) => $s->id, $filteredVod);
+            $filteredSeriesIds = array_map(fn($s) => $s->id, $filteredSeries);
+
+            $blockedLive = array_values(array_filter($liveStreams, function ($stream) use ($filteredLiveIds) {
+                return !in_array($stream->id, $filteredLiveIds);
             }));
 
-            $blockedVod = array_values(array_filter($vodStreams, function ($stream) use ($filteredVod) {
-                return !in_array($stream->id, array_column($filteredVod, 'id'));
+            $blockedVod = array_values(array_filter($vodStreams, function ($stream) use ($filteredVodIds) {
+                return !in_array($stream->id, $filteredVodIds);
             }));
 
-            $blockedSeriesItems = array_values(array_filter($seriesList, function ($series) use ($filteredSeries) {
-                return !in_array($series->id, array_column($filteredSeries, 'id'));
+            $blockedSeriesItems = array_values(array_filter($seriesList, function ($series) use ($filteredSeriesIds) {
+                return !in_array($series->id, $filteredSeriesIds);
             }));
 
             // Format response
@@ -504,10 +508,10 @@ class ClientController
             // Helper function to get categories that have no allowed streams
             $getCategoriesWithoutAllowedStreams = function($allStreams, $filteredStreams) {
                 // Get IDs of filtered streams
-                $allowedStreamIds = array_column($filteredStreams, 'id');
+                $allowedStreamIds = array_map(fn($s) => $s->id, $filteredStreams);
 
                 // Get all categories from streams
-                $allCategoryIds = array_unique(array_column($allStreams, 'category_id'));
+                $allCategoryIds = array_unique(array_map(fn($s) => $s->category_id, $allStreams));
 
                 // For each category, check if it has any allowed streams
                 $blockedCategoryIds = [];
@@ -561,18 +565,22 @@ class ClientController
             $blockedStreams = [];
 
             // Blocked streams are those not in the filtered list
-            $blockedLive = array_values(array_filter($liveStreams, function ($stream) use ($filteredLive) {
-                return !in_array($stream->id, array_column($filteredLive, 'id'));
+            $filteredLiveIds = array_map(fn($s) => $s->id, $filteredLive);
+            $filteredVodIds = array_map(fn($s) => $s->id, $filteredVod);
+            $filteredSeriesIds = array_map(fn($s) => $s->id, $filteredSeries);
+
+            $blockedLive = array_values(array_filter($liveStreams, function ($stream) use ($filteredLiveIds) {
+                return !in_array($stream->id, $filteredLiveIds);
             }));
 
             // Check VOD streams
-            $blockedVod = array_values(array_filter($vodStreams, function ($stream) use ($filteredVod) {
-                return !in_array($stream->id, array_column($filteredVod, 'id'));
+            $blockedVod = array_values(array_filter($vodStreams, function ($stream) use ($filteredVodIds) {
+                return !in_array($stream->id, $filteredVodIds);
             }));
 
             // Check series
-            $blockedSeriesItems = array_values(array_filter($seriesList, function ($series) use ($filteredSeries) {
-                return !in_array($series->id, array_column($filteredSeries, 'id'));
+            $blockedSeriesItems = array_values(array_filter($seriesList, function ($series) use ($filteredSeriesIds) {
+                return !in_array($series->id, $filteredSeriesIds);
             }));
 
             // Format response in Xtream format

@@ -23,48 +23,66 @@ interface FilterFormProps {
 const FILTER_TEMPLATES = {
   blockAdult: {
     name: 'Block Adult Content',
-    config: `rules:
-  include: []
-  exclude:
-    - pattern: "adult|xxx|18\\+"
-      case_sensitive: false
-    - pattern: "porn|xxx"
-      case_sensitive: false
-favoris: []
+    rules: `include: []
+exclude:
+  - pattern: "adult|xxx|18\\+"
+    case_sensitive: false
+  - pattern: "porn|xxx"
+    case_sensitive: false
+`,
+    favoris: `# Virtual categories for organizing content
+# Each favoris gets a unique ID starting at 100000
+# - name: "Kids Favorites"
+#   target_group: "Kids Corner"
+#   match:
+#     channels:
+#       by_name: ["Disney", "Cartoon"]
 `,
   },
   sportsOnly: {
     name: 'Sports Only',
-    config: `rules:
-  include:
-    - pattern: "sports|soccer|football|basketball|nba|nfl|premier"
-      case_sensitive: false
-    - pattern: "espn|bein|dazn"
-      case_sensitive: false
-  exclude: []
-favoris: []
+    rules: `include:
+  - pattern: "sports|soccer|football|basketball|nba|nfl|premier"
+    case_sensitive: false
+  - pattern: "espn|bein|dazn"
+    case_sensitive: false
+exclude: []
+`,
+    favoris: `# - name: "My Favorites"
+#   target_group: "Favorites"
+#   match:
+#     channels:
+#       by_name: ["ESPN", "Sports"]
 `,
   },
   hdChannels: {
     name: 'HD Channels Only',
-    config: `rules:
-  include:
-    - pattern: "hd|1080|4k|ultra"
-      case_sensitive: false
-  exclude:
-    - pattern: "sd|480p"
-      case_sensitive: false
-favoris: []
+    rules: `include:
+  - pattern: "hd|1080|4k|ultra"
+    case_sensitive: false
+exclude:
+  - pattern: "sd|480p"
+    case_sensitive: false
+`,
+    favoris: `# - name: "Premium"
+#   target_group: "Premium HD"
+#   match:
+#     channels:
+#       by_name: ["4K"]
 `,
   },
   kidsChannels: {
     name: 'Kids Channels',
-    config: `rules:
-  include:
-    - pattern: "kids|cartoon|disney|nickelodeon|boomerang"
-      case_sensitive: false
-  exclude: []
-favoris: []
+    rules: `include:
+  - pattern: "kids|cartoon|disney|nickelodeon|boomerang"
+    case_sensitive: false
+exclude: []
+`,
+    favoris: `- name: "Kids Favorites"
+  target_group: "Kids Corner"
+  match:
+    channels:
+      by_name: ["Disney", "Cartoon", "Nickelodeon"]
 `,
   },
 };
@@ -72,7 +90,8 @@ favoris: []
 export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormProps) {
   const [name, setName] = useState(filter?.name || '');
   const [description, setDescription] = useState(filter?.description || '');
-  const [yamlConfig, setYamlConfig] = useState(filter?.filter_config || '');
+  const [rulesYaml, setRulesYaml] = useState(filter?.filter_config || '');
+  const [favorisYaml, setFavorisYaml] = useState(filter?.favoris || '');
   const [error, setError] = useState<string | null>(null);
 
   const createMutation = useMutation({
@@ -99,9 +118,14 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
 
   const validateYAML = () => {
     try {
-      // Basic YAML validation - check for required sections
-      if (!yamlConfig.includes('rules:') && !yamlConfig.includes('favoris:')) {
-        setError('YAML must contain "rules:" or "favoris:" sections');
+      // Rules section is required
+      if (!rulesYaml.trim()) {
+        setError('Rules configuration is required');
+        return false;
+      }
+      // Check for basic YAML structure in rules
+      if (!rulesYaml.includes('include:') && !rulesYaml.includes('exclude:')) {
+        setError('Rules must contain "include:" or "exclude:" sections');
         return false;
       }
       setError(null);
@@ -115,7 +139,8 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
   const handleApplyTemplate = (templateKey: keyof typeof FILTER_TEMPLATES) => {
     const template = FILTER_TEMPLATES[templateKey];
     setName(filter?.name || template.name);
-    setYamlConfig(template.config);
+    setRulesYaml(template.rules);
+    setFavorisYaml(template.favoris);
     setError(null);
   };
 
@@ -132,7 +157,8 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
     const data = {
       name: name.trim(),
       description: description.trim() || undefined,
-      filter_config: yamlConfig,
+      filter_config: rulesYaml,
+      ...(favorisYaml.trim() && { favoris: favorisYaml }),
     };
 
     if (filter) {
@@ -191,26 +217,26 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
           </Box>
         )}
 
-        {/* YAML Editor */}
+        {/* Rules YAML Editor */}
         <Box sx={{ mt: 3, mb: 2 }}>
           <p style={{ margin: '8px 0', fontSize: '0.875rem', fontWeight: 500 }}>
-            Filter Configuration (YAML)
+            Filter Rules (YAML) *
           </p>
           <Box
             sx={{
               border: '1px solid #ccc',
               borderRadius: 1,
               overflow: 'hidden',
-              height: 400,
+              height: 300,
               backgroundColor: '#f5f5f5',
             }}
           >
             <Editor
               height="100%"
               defaultLanguage="yaml"
-              value={yamlConfig}
+              value={rulesYaml}
               onChange={(value) => {
-                setYamlConfig(value || '');
+                setRulesYaml(value || '');
                 setError(null);
               }}
               theme="vs"
@@ -224,7 +250,44 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
             />
           </Box>
           <p style={{ margin: '8px 0', fontSize: '0.75rem', color: '#999' }}>
-            Define filter rules with include/exclude patterns and favorite categories (100000+)
+            Define include/exclude patterns to filter streams and categories
+          </p>
+        </Box>
+
+        {/* Favoris YAML Editor */}
+        <Box sx={{ mt: 3, mb: 2 }}>
+          <p style={{ margin: '8px 0', fontSize: '0.875rem', fontWeight: 500 }}>
+            Virtual Categories / Favoris (YAML)
+          </p>
+          <Box
+            sx={{
+              border: '1px solid #ccc',
+              borderRadius: 1,
+              overflow: 'hidden',
+              height: 300,
+              backgroundColor: '#f5f5f5',
+            }}
+          >
+            <Editor
+              height="100%"
+              defaultLanguage="yaml"
+              value={favorisYaml}
+              onChange={(value) => {
+                setFavorisYaml(value || '');
+                setError(null);
+              }}
+              theme="vs"
+              options={{
+                minimap: { enabled: false },
+                wordWrap: 'on',
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+              }}
+            />
+          </Box>
+          <p style={{ margin: '8px 0', fontSize: '0.75rem', color: '#999' }}>
+            Define virtual categories using target_group with match criteria (generates category IDs starting at 100000)
           </p>
         </Box>
 
