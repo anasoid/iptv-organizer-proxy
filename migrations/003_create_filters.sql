@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS filters (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     filter_config TEXT NOT NULL COMMENT 'YAML configuration for filter rules and favoris',
+    favoris LONGTEXT DEFAULT NULL COMMENT 'YAML configuration for favoris (separate from rules)',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_name (name)
