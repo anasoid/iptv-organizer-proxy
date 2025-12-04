@@ -49,6 +49,26 @@ class Category extends BaseModel
     }
 
     /**
+     * Get only category IDs for a source and type (memory efficient)
+     *
+     * @param int $sourceId
+     * @param string $categoryType Category type (live, vod, series)
+     * @return array Associative array of category IDs (id => true)
+     */
+    public static function getIdsBySourceAndType(int $sourceId, string $categoryType): array
+    {
+        $instance = new static();
+        $stmt = $instance->db->prepare("SELECT category_id FROM {$instance->table} WHERE source_id = ? AND category_type = ?");
+        $stmt->execute([$sourceId, $categoryType]);
+        
+        $ids = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_COLUMN, 0) as $categoryId) {
+            $ids[$categoryId] = true;
+        }
+        return $ids;
+    }
+
+    /**
      * Extract labels from category name
      *
      * @param string $name

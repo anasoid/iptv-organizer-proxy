@@ -121,7 +121,7 @@ class SyncService
 
             foreach ($categories as $categoryData) {
                 $categoryId = $categoryData['category_id'];
-                $fetchedCategoryIds[] = $categoryId;
+                $fetchedCategoryIds[$categoryId] = true;
 
                 $existingCategories = Category::findAll([
                     'source_id' => $this->source->id,
@@ -152,19 +152,24 @@ class SyncService
                     $category->save();
                     $stats['added']++;
                 }
+                
+                unset($categoryData, $existingCategories, $labels);
             }
 
-            // Delete missing categories
-            $allCategories = Category::findAll([
-                'source_id' => $this->source->id,
-                'category_type' => $categoryType,
-            ]);
-            foreach ($allCategories as $category) {
-                if (!in_array($category->category_id, $fetchedCategoryIds)) {
+            unset($categories);
+
+            // Load existing category IDs and delete those not in fetched list
+            $dbCategoryIds = Category::getIdsBySourceAndType($this->source->id, $categoryType);
+            foreach ($dbCategoryIds as $id => $true) {
+                if (!isset($fetchedCategoryIds[$id])) {
+                    $category = new Category();
+                    $category->attributes = ['id' => $id];
                     $category->delete();
                     $stats['deleted']++;
                 }
             }
+
+            unset($dbCategoryIds, $fetchedCategoryIds);
 
             $this->db->commit();
 
@@ -264,10 +269,11 @@ class SyncService
                         'num' => $streamData['num'] ?? null,
                         'name' => $streamData['name'] ?? 'Unknown',
                     ]);
+                    unset($streamData);
                     continue;
                 }
                 
-                $fetchedStreamIds[] = $streamId;
+                $fetchedStreamIds[$streamId] = true;
 
                 // Check if category_id is provided
                 if (!isset($streamData['category_id'])) {
@@ -278,6 +284,7 @@ class SyncService
                     ];
                     $stats['missing_category_id'][] = $missingInfo;
                     $this->logger->warning('Live stream missing category_id', $missingInfo);
+                    unset($streamData, $missingInfo);
                     continue;
                 }
 
@@ -296,6 +303,7 @@ class SyncService
                 $categoryIds = isset($streamData['category_ids']) && is_array($streamData['category_ids'])
                     ? json_encode($streamData['category_ids'])
                     : null;
+                $streamDataJson = json_encode($streamData);
 
                 if (!empty($existingStreams)) {
                     // Update existing
@@ -305,9 +313,10 @@ class SyncService
                     $existing->category_ids = $categoryIds;
                     $existing->is_adult = $isAdult ? 1 : 0;
                     $existing->labels = $labels;
-                    $existing->data = json_encode($streamData);
+                    $existing->data = $streamDataJson;
                     $existing->save();
                     $stats['updated']++;
+                    unset($existing);
                 } else {
                     // Insert new
                     $stream = new LiveStream();
@@ -318,20 +327,29 @@ class SyncService
                     $stream->category_ids = $categoryIds;
                     $stream->is_adult = $isAdult ? 1 : 0;
                     $stream->labels = $labels;
-                    $stream->data = json_encode($streamData);
+                    $stream->data = $streamDataJson;
                     $stream->save();
                     $stats['added']++;
+                    unset($stream);
                 }
+                
+                unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson);
             }
 
-            // Delete missing streams
-            $allStreams = LiveStream::findAll(['source_id' => $this->source->id]);
-            foreach ($allStreams as $stream) {
-                if (!in_array($stream->stream_id, $fetchedStreamIds)) {
+            unset($streams);
+
+            // Load existing stream IDs and delete those not in fetched list
+            $dbStreamIds = LiveStream::getIdsBySource($this->source->id);
+            foreach ($dbStreamIds as $id => $true) {
+                if (!isset($fetchedStreamIds[$id])) {
+                    $stream = new LiveStream();
+                    $stream->attributes = ['id' => $id];
                     $stream->delete();
                     $stats['deleted']++;
                 }
             }
+
+            unset($dbStreamIds, $fetchedStreamIds);
 
             $this->db->commit();
 
@@ -386,10 +404,11 @@ class SyncService
                         'num' => $streamData['num'] ?? null,
                         'name' => $streamData['name'] ?? 'Unknown',
                     ]);
+                    unset($streamData);
                     continue;
                 }
                 
-                $fetchedStreamIds[] = $streamId;
+                $fetchedStreamIds[$streamId] = true;
 
                 // Check if category_id is provided
                 if (!isset($streamData['category_id'])) {
@@ -400,6 +419,7 @@ class SyncService
                     ];
                     $stats['missing_category_id'][] = $missingInfo;
                     $this->logger->warning('VOD stream missing category_id', $missingInfo);
+                    unset($streamData, $missingInfo);
                     continue;
                 }
 
@@ -418,6 +438,7 @@ class SyncService
                 $categoryIds = isset($streamData['category_ids']) && is_array($streamData['category_ids'])
                     ? json_encode($streamData['category_ids'])
                     : null;
+                $streamDataJson = json_encode($streamData);
 
                 if (!empty($existingStreams)) {
                     $existing = $existingStreams[0];
@@ -426,9 +447,10 @@ class SyncService
                     $existing->category_ids = $categoryIds;
                     $existing->is_adult = $isAdult ? 1 : 0;
                     $existing->labels = $labels;
-                    $existing->data = json_encode($streamData);
+                    $existing->data = $streamDataJson;
                     $existing->save();
                     $stats['updated']++;
+                    unset($existing);
                 } else {
                     $stream = new VodStream();
                     $stream->source_id = $this->source->id;
@@ -438,20 +460,29 @@ class SyncService
                     $stream->category_ids = $categoryIds;
                     $stream->is_adult = $isAdult ? 1 : 0;
                     $stream->labels = $labels;
-                    $stream->data = json_encode($streamData);
+                    $stream->data = $streamDataJson;
                     $stream->save();
                     $stats['added']++;
+                    unset($stream);
                 }
+                
+                unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson);
             }
 
-            // Delete missing streams
-            $allStreams = VodStream::findAll(['source_id' => $this->source->id]);
-            foreach ($allStreams as $stream) {
-                if (!in_array($stream->stream_id, $fetchedStreamIds)) {
+            unset($streams);
+
+            // Load existing stream IDs and delete those not in fetched list
+            $dbStreamIds = VodStream::getIdsBySource($this->source->id);
+            foreach ($dbStreamIds as $id => $true) {
+                if (!isset($fetchedStreamIds[$id])) {
+                    $stream = new VodStream();
+                    $stream->attributes = ['id' => $id];
                     $stream->delete();
                     $stats['deleted']++;
                 }
             }
+
+            unset($dbStreamIds, $fetchedStreamIds);
 
             $this->db->commit();
 
@@ -506,10 +537,11 @@ class SyncService
                         'num' => $streamData['num'] ?? null,
                         'name' => $streamData['name'] ?? 'Unknown',
                     ]);
+                    unset($streamData);
                     continue;
                 }
                 
-                $fetchedStreamIds[] = $streamId;
+                $fetchedStreamIds[$streamId] = true;
 
                 // Check if category_id is provided
                 if (!isset($streamData['category_id'])) {
@@ -520,6 +552,7 @@ class SyncService
                     ];
                     $stats['missing_category_id'][] = $missingInfo;
                     $this->logger->warning('Series missing category_id', $missingInfo);
+                    unset($streamData, $missingInfo);
                     continue;
                 }
 
@@ -538,6 +571,7 @@ class SyncService
                 $categoryIds = isset($streamData['category_ids']) && is_array($streamData['category_ids'])
                     ? json_encode($streamData['category_ids'])
                     : null;
+                $streamDataJson = json_encode($streamData);
 
                 if (!empty($existingStreams)) {
                     $existing = $existingStreams[0];
@@ -546,9 +580,10 @@ class SyncService
                     $existing->category_ids = $categoryIds;
                     $existing->is_adult = $isAdult ? 1 : 0;
                     $existing->labels = $labels;
-                    $existing->data = json_encode($streamData);
+                    $existing->data = $streamDataJson;
                     $existing->save();
                     $stats['updated']++;
+                    unset($existing);
                 } else {
                     $stream = new Series();
                     $stream->source_id = $this->source->id;
@@ -558,20 +593,29 @@ class SyncService
                     $stream->category_ids = $categoryIds;
                     $stream->is_adult = $isAdult ? 1 : 0;
                     $stream->labels = $labels;
-                    $stream->data = json_encode($streamData);
+                    $stream->data = $streamDataJson;
                     $stream->save();
                     $stats['added']++;
+                    unset($stream);
                 }
+                
+                unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson);
             }
 
-            // Delete missing streams
-            $allStreams = Series::findAll(['source_id' => $this->source->id]);
-            foreach ($allStreams as $stream) {
-                if (!in_array($stream->stream_id, $fetchedStreamIds)) {
+            unset($seriesList);
+
+            // Load existing stream IDs and delete those not in fetched list
+            $dbStreamIds = Series::getIdsBySource($this->source->id);
+            foreach ($dbStreamIds as $id => $true) {
+                if (!isset($fetchedStreamIds[$id])) {
+                    $stream = new Series();
+                    $stream->attributes = ['id' => $id];
                     $stream->delete();
                     $stats['deleted']++;
                 }
             }
+
+            unset($dbStreamIds, $fetchedStreamIds);
 
             $this->db->commit();
 

@@ -64,6 +64,25 @@ class LiveStream extends BaseModel
     }
 
     /**
+     * Get only stream IDs for a source (memory efficient)
+     *
+     * @param int $sourceId
+     * @return array Associative array of stream IDs (id => true)
+     */
+    public static function getIdsBySource(int $sourceId): array
+    {
+        $instance = new static();
+        $stmt = $instance->db->prepare("SELECT stream_id FROM {$instance->table} WHERE source_id = ?");
+        $stmt->execute([$sourceId]);
+        
+        $ids = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_COLUMN, 0) as $streamId) {
+            $ids[$streamId] = true;
+        }
+        return $ids;
+    }
+
+    /**
      * Extract labels from stream name
      *
      * @param string $text
