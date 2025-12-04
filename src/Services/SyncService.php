@@ -92,14 +92,20 @@ class SyncService
     }
 
     /**
-     * Sync live categories
+     * Sync categories by type
      *
+     * @param string $syncType Type of sync (live_categories, vod_categories, series_categories)
+     * @param string $categoryType Category type (live, vod, series)
+     * @param string $labelType Label type (live, movie, series)
+     * @param callable $getFn Callback to fetch categories from client
      * @return array Statistics (added, updated, deleted)
      */
-    public function syncLiveCategories(): array
-    {
-        $syncType = 'live_categories';
-
+    private function syncCategories(
+        string $syncType,
+        string $categoryType,
+        string $labelType,
+        callable $getFn
+    ): array {
         if ($this->isSyncRunning($syncType)) {
             return ['error' => 'Sync already running'];
         }
@@ -110,22 +116,25 @@ class SyncService
         try {
             $this->db->beginTransaction();
 
-            $categories = $this->client->getLiveCategories();
+            $categories = $getFn();
+            $fetchedCategoryIds = [];
 
             foreach ($categories as $categoryData) {
+                $categoryId = $categoryData['category_id'];
+                $fetchedCategoryIds[] = $categoryId;
+
                 $existingCategories = Category::findAll([
                     'source_id' => $this->source->id,
-                    'category_id' => $categoryData['category_id'],
-                    'category_type' => 'live',
+                    'category_id' => $categoryId,
+                    'category_type' => $categoryType,
                 ]);
 
                 $labels = LabelExtractor::extractLabels(
                     $categoryData['category_name'] ?? '',
-                    'live'
+                    $labelType
                 );
 
                 if (!empty($existingCategories)) {
-                    // Update existing
                     $existing = $existingCategories[0];
                     $existing->category_name = $categoryData['category_name'];
                     $existing->parent_id = $categoryData['parent_id'] ?? null;
@@ -133,12 +142,11 @@ class SyncService
                     $existing->save();
                     $stats['updated']++;
                 } else {
-                    // Insert new
                     $category = new Category();
                     $category->source_id = $this->source->id;
-                    $category->category_id = $categoryData['category_id'];
+                    $category->category_id = $categoryId;
                     $category->category_name = $categoryData['category_name'];
-                    $category->category_type = 'live';
+                    $category->category_type = $categoryType;
                     $category->parent_id = $categoryData['parent_id'] ?? null;
                     $category->labels = $labels;
                     $category->save();
@@ -146,11 +154,23 @@ class SyncService
                 }
             }
 
+            // Delete missing categories
+            $allCategories = Category::findAll([
+                'source_id' => $this->source->id,
+                'category_type' => $categoryType,
+            ]);
+            foreach ($allCategories as $category) {
+                if (!in_array($category->category_id, $fetchedCategoryIds)) {
+                    $category->delete();
+                    $stats['deleted']++;
+                }
+            }
+
             $this->db->commit();
 
             $syncLog->logSyncComplete(SyncLog::STATUS_COMPLETED, $stats);
 
-            $this->logger->info('Live categories sync completed', $stats);
+            $this->logger->info(ucfirst(str_replace('_', ' ', $syncType)) . ' completed', $stats);
 
             return $stats;
         } catch (Exception $e) {
@@ -160,12 +180,57 @@ class SyncService
 
             $syncLog->logSyncComplete(SyncLog::STATUS_FAILED, $stats, $e->getMessage());
 
-            $this->logger->error('Live categories sync failed', [
+            $this->logger->error(ucfirst(str_replace('_', ' ', $syncType)) . ' failed', [
                 'error' => $e->getMessage(),
             ]);
 
             throw $e;
         }
+    }
+
+    /**
+     * Sync live categories
+     *
+     * @return array Statistics (added, updated, deleted)
+     */
+    public function syncLiveCategories(): array
+    {
+        return $this->syncCategories(
+            'live_categories',
+            'live',
+            'live',
+            fn() => $this->client->getLiveCategories()
+        );
+    }
+
+    /**
+     * Sync VOD categories
+     *
+     * @return array Statistics (added, updated, deleted)
+     */
+    public function syncVodCategories(): array
+    {
+        return $this->syncCategories(
+            'vod_categories',
+            'vod',
+            'movie',
+            fn() => $this->client->getVodCategories()
+        );
+    }
+
+    /**
+     * Sync series categories
+     *
+     * @return array Statistics (added, updated, deleted)
+     */
+    public function syncSeriesCategories(): array
+    {
+        return $this->syncCategories(
+            'series_categories',
+            'series',
+            'series',
+            fn() => $this->client->getSeriesCategories()
+        );
     }
 
     /**
@@ -284,81 +349,6 @@ class SyncService
     }
 
     /**
-     * Sync VOD categories
-     *
-     * @return array Statistics (added, updated, deleted)
-     */
-    public function syncVodCategories(): array
-    {
-        $syncType = 'vod_categories';
-
-        if ($this->isSyncRunning($syncType)) {
-            return ['error' => 'Sync already running'];
-        }
-
-        $syncLog = $this->startSyncLog($syncType);
-        $stats = ['added' => 0, 'updated' => 0, 'deleted' => 0];
-
-        try {
-            $this->db->beginTransaction();
-
-            $categories = $this->client->getVodCategories();
-
-            foreach ($categories as $categoryData) {
-                $existingCategories = Category::findAll([
-                    'source_id' => $this->source->id,
-                    'category_id' => $categoryData['category_id'],
-                    'category_type' => 'vod',
-                ]);
-
-                $labels = LabelExtractor::extractLabels(
-                    $categoryData['category_name'] ?? '',
-                    'movie'
-                );
-
-                if (!empty($existingCategories)) {
-                    $existing = $existingCategories[0];
-                    $existing->category_name = $categoryData['category_name'];
-                    $existing->parent_id = $categoryData['parent_id'] ?? null;
-                    $existing->labels = $labels;
-                    $existing->save();
-                    $stats['updated']++;
-                } else {
-                    $category = new Category();
-                    $category->source_id = $this->source->id;
-                    $category->category_id = $categoryData['category_id'];
-                    $category->category_name = $categoryData['category_name'];
-                    $category->category_type = 'vod';
-                    $category->parent_id = $categoryData['parent_id'] ?? null;
-                    $category->labels = $labels;
-                    $category->save();
-                    $stats['added']++;
-                }
-            }
-
-            $this->db->commit();
-
-            $syncLog->logSyncComplete(SyncLog::STATUS_COMPLETED, $stats);
-
-            $this->logger->info('VOD categories sync completed', $stats);
-
-            return $stats;
-        } catch (Exception $e) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-
-            $syncLog->logSyncComplete(SyncLog::STATUS_FAILED, $stats, $e->getMessage());
-
-            $this->logger->error('VOD categories sync failed', [
-                'error' => $e->getMessage(),
-            ]);
-
-            throw $e;
-        }
-    }
-
-    /**
      * Sync VOD streams
      *
      * @return array Statistics (added, updated, deleted)
@@ -464,81 +454,6 @@ class SyncService
             $syncLog->logSyncComplete(SyncLog::STATUS_FAILED, $stats, $e->getMessage());
 
             $this->logger->error('VOD streams sync failed', [
-                'error' => $e->getMessage(),
-            ]);
-
-            throw $e;
-        }
-    }
-
-    /**
-     * Sync series categories
-     *
-     * @return array Statistics (added, updated, deleted)
-     */
-    public function syncSeriesCategories(): array
-    {
-        $syncType = 'series_categories';
-
-        if ($this->isSyncRunning($syncType)) {
-            return ['error' => 'Sync already running'];
-        }
-
-        $syncLog = $this->startSyncLog($syncType);
-        $stats = ['added' => 0, 'updated' => 0, 'deleted' => 0];
-
-        try {
-            $this->db->beginTransaction();
-
-            $categories = $this->client->getSeriesCategories();
-
-            foreach ($categories as $categoryData) {
-                $existingCategories = Category::findAll([
-                    'source_id' => $this->source->id,
-                    'category_id' => $categoryData['category_id'],
-                    'category_type' => 'series',
-                ]);
-
-                $labels = LabelExtractor::extractLabels(
-                    $categoryData['category_name'] ?? '',
-                    'series'
-                );
-
-                if (!empty($existingCategories)) {
-                    $existing = $existingCategories[0];
-                    $existing->category_name = $categoryData['category_name'];
-                    $existing->parent_id = $categoryData['parent_id'] ?? null;
-                    $existing->labels = $labels;
-                    $existing->save();
-                    $stats['updated']++;
-                } else {
-                    $category = new Category();
-                    $category->source_id = $this->source->id;
-                    $category->category_id = $categoryData['category_id'];
-                    $category->category_name = $categoryData['category_name'];
-                    $category->category_type = 'series';
-                    $category->parent_id = $categoryData['parent_id'] ?? null;
-                    $category->labels = $labels;
-                    $category->save();
-                    $stats['added']++;
-                }
-            }
-
-            $this->db->commit();
-
-            $syncLog->logSyncComplete(SyncLog::STATUS_COMPLETED, $stats);
-
-            $this->logger->info('Series categories sync completed', $stats);
-
-            return $stats;
-        } catch (Exception $e) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-
-            $syncLog->logSyncComplete(SyncLog::STATUS_FAILED, $stats, $e->getMessage());
-
-            $this->logger->error('Series categories sync failed', [
                 'error' => $e->getMessage(),
             ]);
 
