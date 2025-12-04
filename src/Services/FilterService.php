@@ -296,19 +296,36 @@ class FilterService
      * @param array $streams Array of streams
      * @param int|null $categoryId Optional category ID for favoris filtering
      * @return array Filtered streams
+     * @throws RuntimeException If stream type cannot be determined
      */
     public function applyToStreams(array $streams, ?int $categoryId = null): array
     {
         // Batch load all categories for efficient lookup
         $categoryCache = [];
         if (!empty($streams)) {
-            // Get first stream to determine source_id
+            // Get first stream to determine source_id and stream type
             $firstStream = current($streams);
             $sourceId = is_array($firstStream) ? ($firstStream['source_id'] ?? null) : ($firstStream->source_id ?? null);
+            // Detect stream type from the model class name
+            $streamType = null;
+            if (!is_array($firstStream)) {
+                $className = (new \ReflectionClass($firstStream))->getShortName();
+                if ($className === 'VodStream') {
+                    $streamType = 'vod';
+                } elseif ($className === 'Series') {
+                    $streamType = 'series';
+                } elseif ($className === 'LiveStream') {
+                    $streamType = 'live';
+                }
+            }
+            
+            if ($streamType === null) {
+                throw new RuntimeException('Unable to determine stream type for filtering');
+            }
             
             if ($sourceId) {
-                // Load all categories for this source in one query
-                $allCategories = Category::findAll(['source_id' => $sourceId]);
+                // Load categories for this source AND type to avoid conflicts between types
+                $allCategories = Category::getBySourceAndType($sourceId, $streamType);
                 foreach ($allCategories as $cat) {
                     // Index by category_id (not database id) for fast lookup
                     $key = $sourceId . '_' . $cat->category_id;
@@ -332,6 +349,10 @@ class FilterService
                     $category = $categoryCache[$key];
                     $categoryName = $category->category_name ?? '';
                     $categoryLabels = $category->labels ?? '';
+                    // Ensure labels are extracted if null
+                    if (empty($categoryLabels)) {
+                        $categoryLabels = Category::extractLabels($categoryName);
+                    }
                 }
             }
 
@@ -526,7 +547,7 @@ class FilterService
      * @param array $categories Array of categories
      * @return array Filtered categories
      */
-    public function filterCategories(array $categories): array
+    public function filterCategories(array $categories, ?string $type = null): array
     {
         if ($this->filter === null) {
             return $categories;
@@ -539,26 +560,35 @@ class FilterService
             return $categories;
         }
 
-        // Filter rules to only those with category match criteria
-        $categoryRules = [];
+        // Filter rules to only those matching the category stream type
+        $typeRules = [];
         foreach ($rules as $rule) {
             if (!is_array($rule)) {
                 continue;
             }
+            
+            // Skip if rule has stream type requirement that doesn't match
+            if ($type !== null && !empty($rule['match']['stream_type'])) {
+                $ruleTypes = (array) $rule['match']['stream_type'];
+                if (!in_array($type, $ruleTypes)) {
+                    continue;
+                }
+            }
+            
             // Only include rules that have category criteria
             if (!empty($rule['match']['categories'])) {
-                $categoryRules[] = $rule;
+                $typeRules[] = $rule;
             }
         }
 
-        // If no category rules, return all categories
-        if (empty($categoryRules)) {
+        // If no matching rules, return all categories
+        if (empty($typeRules)) {
             return $categories;
         }
 
         // Check if there are any include rules
         $hasIncludeRules = false;
-        foreach ($categoryRules as $rule) {
+        foreach ($typeRules as $rule) {
             if (($rule['type'] ?? 'include') === 'include') {
                 $hasIncludeRules = true;
                 break;
@@ -566,24 +596,30 @@ class FilterService
         }
 
         // Filter categories respecting rule order
-        return array_filter($categories, function ($category) use ($categoryRules, $hasIncludeRules) {
+        return array_filter($categories, function ($category) use ($typeRules, $hasIncludeRules) {
+            // Ensure labels are extracted if null
+            $categoryLabels = $category->labels;
+            if (empty($categoryLabels)) {
+                $categoryLabels = Category::extractLabels($category->category_name ?? '');
+            }
+            
             // Process rules in order
-            foreach ($categoryRules as $rule) {
-                $type = $rule['type'] ?? 'include';
+            foreach ($typeRules as $rule) {
+                $ruleType = $rule['type'] ?? 'include';
                 $match = $rule['match'] ?: [];
 
                 // Check if category matches this rule
                 if ($this->matchesCategoryCriteria(
                     $category->category_name ?? '',
-                    $category->labels ?? '',
+                    $categoryLabels,
                     $match['categories'] ?? []
                 )) {
                     // If matches and type is include → ACCEPT
-                    if ($type === 'include') {
+                    if ($ruleType === 'include') {
                         return true;
                     }
                     // If matches and type is exclude → REJECT
-                    if ($type === 'exclude') {
+                    if ($ruleType === 'exclude') {
                         return false;
                     }
                 }

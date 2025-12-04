@@ -55,7 +55,7 @@ class ContentFilterService
             return $allCategories;
         }
 
-        return $this->filterService->filterCategories($allCategories);
+        return $this->filterService->filterCategories($allCategories, $type);
     }
 
     /**
@@ -73,7 +73,7 @@ class ContentFilterService
             return [];
         }
 
-        $allowedCategories = $this->filterService->filterCategories($allCategories);
+        $allowedCategories = $this->filterService->filterCategories($allCategories, $type);
         $allowedIds = array_map(fn($c) => $c->category_id, $allowedCategories);
 
         return array_filter($allCategories, fn($c) => !in_array($c->category_id, $allowedIds));
