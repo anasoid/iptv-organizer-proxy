@@ -44,11 +44,14 @@ try {
 
     log_info("Database type: " . strtoupper($dbType));
 
-    // Determine migration suffix based on database type
-    $suffix = $dbType === 'sqlite' ? '_sqlite.sql' : '.sql';
-
-    // Migration directory
-    $migrationDir = __DIR__ . '/../migrations';
+    // Determine migration suffix and folder based on database type
+    if ($dbType === 'sqlite') {
+        $suffix = '_sqlite.sql';
+        $migrationDir = __DIR__ . '/../migrations/sqlite';
+    } else {
+        $suffix = '.sql';
+        $migrationDir = __DIR__ . '/../migrations/mysql';
+    }
 
     if (!is_dir($migrationDir)) {
         log_error("Migrations directory not found: {$migrationDir}");

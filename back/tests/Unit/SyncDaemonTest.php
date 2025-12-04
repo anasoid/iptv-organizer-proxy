@@ -187,8 +187,8 @@ class SyncDaemonTest extends TestCase
      */
     public function testMigrationFilesExist(): void
     {
-        $mysqlMigration = __DIR__ . '/../../migrations/011_create_sync_schedule.sql';
-        $sqliteMigration = __DIR__ . '/../../migrations/011_create_sync_schedule_sqlite.sql';
+        $mysqlMigration = __DIR__ . '/../../migrations/mysql/011_create_sync_schedule.sql';
+        $sqliteMigration = __DIR__ . '/../../migrations/sqlite/011_create_sync_schedule_sqlite.sql';
 
         $this->assertFileExists($mysqlMigration, 'MySQL migration should exist');
         $this->assertFileExists($sqliteMigration, 'SQLite migration should exist');
