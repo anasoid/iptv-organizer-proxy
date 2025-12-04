@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --skipLibCheck && vite build",
-    "build:php": "tsc --skipLibCheck && VITE_BASE_PATH=/admin/ vite build && rm -rf ../public/admin/* && cp -r dist/* ../public/admin/",
+    "build:php": "tsc --skipLibCheck && VITE_BASE_PATH=/admin/ vite build && rm -rf ../back/public/admin/* && cp -r dist/* ../back/public/admin/",
     "lint": "eslint .",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",

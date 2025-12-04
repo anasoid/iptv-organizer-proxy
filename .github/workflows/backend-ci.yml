@@ -16,6 +16,10 @@ jobs:
       DB_TYPE: sqlite
       DB_SQLITE_PATH: ":memory:"
 
+    defaults:
+      run:
+        working-directory: back
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -39,7 +43,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('back/composer.lock') }}
           restore-keys: |
             ${{ runner.os }}-composer-
 
@@ -53,13 +57,13 @@ jobs:
         run: composer analyse
 
       - name: Generate coverage report
-        if: matrix.php-version == '8.2'
+        if: matrix.php-version == '8.3'
         run: composer test -- --coverage-clover=coverage.xml
 
       - name: Upload coverage to Codecov
-        if: matrix.php-version == '8.2'
+        if: matrix.php-version == '8.3'
         uses: codecov/codecov-action@v3
         with:
-          files: ./coverage.xml
+          files: ./back/coverage.xml
           flags: backend
           fail_ci_if_error: false
