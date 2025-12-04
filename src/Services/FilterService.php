@@ -293,10 +293,9 @@ class FilterService
      * 2. Include/exclude rules (if filter assigned)
      * 3. Favoris category filtering (if categoryId >= 100000)
      *
-     * @param array $streams Array of streams
+     * @param array $streams Array of streams (can be plain arrays or model objects)
      * @param int|null $categoryId Optional category ID for favoris filtering
      * @return array Filtered streams
-     * @throws RuntimeException If stream type cannot be determined
      */
     public function applyToStreams(array $streams, ?int $categoryId = null): array
     {
@@ -318,12 +317,10 @@ class FilterService
                     $streamType = 'live';
                 }
             }
-            
-            if ($streamType === null) {
-                throw new RuntimeException('Unable to determine stream type for filtering');
-            }
-            
-            if ($sourceId) {
+
+            // Only load categories from database if we can determine stream type (model objects)
+            // Plain arrays already have category information included
+            if ($streamType !== null && $sourceId) {
                 // Load categories for this source AND type to avoid conflicts between types
                 $allCategories = Category::getBySourceAndType($sourceId, $streamType);
                 foreach ($allCategories as $cat) {
