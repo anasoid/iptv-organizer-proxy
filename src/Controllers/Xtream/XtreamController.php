@@ -621,24 +621,26 @@ class XtreamController
             }
 
             // Build complete Xtream response with all fields
+            // Database fields (direct from model):
             $xtreamData = [
                 'num' => $num,
+                'source_id' => $originalStream->source_id ?? null,
+                'stream_id' => (int) $streamId,
                 'name' => $streamArray['name'] ?? '',
-                'stream_type' => $dataJson['stream_type'] ?? $defaultStreamType,
-                'stream_id' => $streamId,
-                'stream_icon' => $dataJson['stream_icon'] ?? '',
-                'epg_channel_id' => $dataJson['epg_channel_id'] ?? '',
-                'added' => $dataJson['added'] ?? null,
-                'is_adult' => (int) ($streamArray['is_adult'] ?? 0),
                 'category_id' => (int) ($streamArray['category_id'] ?? 0),
                 'category_ids' => !empty($streamArray['category_ids'])
                     ? json_decode($streamArray['category_ids'], true)
                     : [],
-                'custom_sid' => $dataJson['custom_sid'] ?? null,
-                'tv_archive' => (int) ($dataJson['tv_archive'] ?? 0),
-                'direct_source' => $dataJson['direct_source'] ?? '',
-                'tv_archive_duration' => (int) ($dataJson['tv_archive_duration'] ?? 0),
+                'is_adult' => (int) ($streamArray['is_adult'] ?? 0),
+                'stream_type' => $defaultStreamType,
             ];
+
+            // Add all JSON data fields to response (allow custom field override if present)
+            foreach ($dataJson as $key => $value) {
+                // Use custom field value if present in filtered data, otherwise use JSON value
+                $xtreamData[$key] = $streamArray[$key] ?? $value;
+            }
+
             $result[] = $xtreamData;
             $num++;
         }
