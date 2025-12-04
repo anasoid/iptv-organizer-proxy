@@ -19,7 +19,6 @@ use RuntimeException;
  * @property string|null $category_ids
  * @property int $is_adult
  * @property string|null $labels
- * @property int $is_active
  * @property string|null $data
  * @property string $created_at
  * @property string $updated_at
@@ -35,7 +34,6 @@ class VodStream extends BaseModel
         'category_ids',
         'is_adult',
         'labels',
-        'is_active',
         'data',
     ];
 
@@ -43,17 +41,11 @@ class VodStream extends BaseModel
      * Get streams by source
      *
      * @param int $sourceId
-     * @param bool $activeOnly
      * @return array
      */
-    public static function getBySource(int $sourceId, bool $activeOnly = true): array
+    public static function getBySource(int $sourceId): array
     {
-        $conditions = ['source_id' => $sourceId];
-        if ($activeOnly) {
-            $conditions['is_active'] = 1;
-        }
-
-        return static::findAll($conditions);
+        return static::findAll(['source_id' => $sourceId]);
     }
 
     /**
@@ -68,7 +60,6 @@ class VodStream extends BaseModel
         return static::findAll([
             'source_id' => $sourceId,
             'category_id' => $categoryId,
-            'is_active' => 1,
         ]);
     }
 
@@ -203,7 +194,6 @@ class VodStream extends BaseModel
             $existing->is_adult = $streamData['is_adult'] ?? $existing->is_adult;
             $existing->labels = static::extractLabels($streamData['name'] ?? $existing->name);
             $existing->data = json_encode($streamData);
-            $existing->is_active = 1;
             $existing->save();
 
             return $existing;
@@ -217,7 +207,6 @@ class VodStream extends BaseModel
         $instance->category_ids = isset($streamData['category_ids']) ? json_encode($streamData['category_ids']) : null;
         $instance->is_adult = $streamData['is_adult'] ?? 0;
         $instance->labels = static::extractLabels($streamData['name'] ?? 'Unknown');
-        $instance->is_active = 1;
         $instance->data = json_encode($streamData);
 
         if (!$instance->save()) {

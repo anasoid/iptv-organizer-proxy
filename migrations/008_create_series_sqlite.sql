@@ -10,7 +10,6 @@ CREATE TABLE IF NOT EXISTS series (
     category_ids TEXT, -- JSON array of all category IDs
     is_adult INTEGER NOT NULL DEFAULT 0 CHECK(is_adult IN (0, 1)),
     labels TEXT, -- Comma-separated extracted labels
-    is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
     data TEXT, -- Complete API response data (JSON)
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
@@ -21,7 +20,6 @@ CREATE TABLE IF NOT EXISTS series (
 CREATE INDEX IF NOT EXISTS idx_series_source_id ON series(source_id);
 CREATE INDEX IF NOT EXISTS idx_series_category_id ON series(category_id);
 CREATE INDEX IF NOT EXISTS idx_series_is_adult ON series(is_adult);
-CREATE INDEX IF NOT EXISTS idx_series_is_active ON series(is_active);
 CREATE INDEX IF NOT EXISTS idx_series_name ON series(name);
 
 -- Trigger to update updated_at timestamp

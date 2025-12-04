@@ -256,7 +256,17 @@ class SyncService
             $fetchedStreamIds = [];
 
             foreach ($streams as $streamData) {
-                $streamId = $streamData['stream_id'] ?? $streamData['num'];
+                $streamId = $streamData['stream_id'] ?? $streamData['num'] ?? null;
+                
+                // Skip if stream_id is missing
+                if (!$streamId) {
+                    $this->logger->warning('Live stream missing stream_id', [
+                        'num' => $streamData['num'] ?? null,
+                        'name' => $streamData['name'] ?? 'Unknown',
+                    ]);
+                    continue;
+                }
+                
                 $fetchedStreamIds[] = $streamId;
 
                 // Check if category_id is provided
@@ -290,12 +300,11 @@ class SyncService
                 if (!empty($existingStreams)) {
                     // Update existing
                     $existing = $existingStreams[0];
-                    $existing->name = $streamData['name'];
+                    $existing->name = $streamData['name'] ?? null;
                     $existing->category_id = $streamData['category_id'] ?? null;
                     $existing->category_ids = $categoryIds;
                     $existing->is_adult = $isAdult ? 1 : 0;
                     $existing->labels = $labels;
-                    $existing->is_active = 1;
                     $existing->data = json_encode($streamData);
                     $existing->save();
                     $stats['updated']++;
@@ -304,24 +313,22 @@ class SyncService
                     $stream = new LiveStream();
                     $stream->source_id = $this->source->id;
                     $stream->stream_id = $streamId;
-                    $stream->name = $streamData['name'];
+                    $stream->name = $streamData['name'] ?? null;
                     $stream->category_id = $streamData['category_id'] ?? null;
                     $stream->category_ids = $categoryIds;
                     $stream->is_adult = $isAdult ? 1 : 0;
                     $stream->labels = $labels;
-                    $stream->is_active = 1;
                     $stream->data = json_encode($streamData);
                     $stream->save();
                     $stats['added']++;
                 }
             }
 
-            // Mark missing streams as inactive (soft delete)
-            $allStreams = LiveStream::findAll(['source_id' => $this->source->id, 'is_active' => 1]);
+            // Delete missing streams
+            $allStreams = LiveStream::findAll(['source_id' => $this->source->id]);
             foreach ($allStreams as $stream) {
                 if (!in_array($stream->stream_id, $fetchedStreamIds)) {
-                    $stream->is_active = 0;
-                    $stream->save();
+                    $stream->delete();
                     $stats['deleted']++;
                 }
             }
@@ -371,7 +378,17 @@ class SyncService
             $fetchedStreamIds = [];
 
             foreach ($streams as $streamData) {
-                $streamId = $streamData['stream_id'] ?? $streamData['num'];
+                $streamId = $streamData['stream_id'] ?? $streamData['num'] ?? null;
+                
+                // Skip if stream_id is missing
+                if (!$streamId) {
+                    $this->logger->warning('VOD stream missing stream_id', [
+                        'num' => $streamData['num'] ?? null,
+                        'name' => $streamData['name'] ?? 'Unknown',
+                    ]);
+                    continue;
+                }
+                
                 $fetchedStreamIds[] = $streamId;
 
                 // Check if category_id is provided
@@ -404,12 +421,11 @@ class SyncService
 
                 if (!empty($existingStreams)) {
                     $existing = $existingStreams[0];
-                    $existing->name = $streamData['name'];
+                    $existing->name = $streamData['name'] ?? null;
                     $existing->category_id = $streamData['category_id'] ?? null;
                     $existing->category_ids = $categoryIds;
                     $existing->is_adult = $isAdult ? 1 : 0;
                     $existing->labels = $labels;
-                    $existing->is_active = 1;
                     $existing->data = json_encode($streamData);
                     $existing->save();
                     $stats['updated']++;
@@ -417,24 +433,22 @@ class SyncService
                     $stream = new VodStream();
                     $stream->source_id = $this->source->id;
                     $stream->stream_id = $streamId;
-                    $stream->name = $streamData['name'];
+                    $stream->name = $streamData['name'] ?? null;
                     $stream->category_id = $streamData['category_id'] ?? null;
                     $stream->category_ids = $categoryIds;
                     $stream->is_adult = $isAdult ? 1 : 0;
                     $stream->labels = $labels;
-                    $stream->is_active = 1;
                     $stream->data = json_encode($streamData);
                     $stream->save();
                     $stats['added']++;
                 }
             }
 
-            // Soft delete
-            $allStreams = VodStream::findAll(['source_id' => $this->source->id, 'is_active' => 1]);
+            // Delete missing streams
+            $allStreams = VodStream::findAll(['source_id' => $this->source->id]);
             foreach ($allStreams as $stream) {
                 if (!in_array($stream->stream_id, $fetchedStreamIds)) {
-                    $stream->is_active = 0;
-                    $stream->save();
+                    $stream->delete();
                     $stats['deleted']++;
                 }
             }
@@ -484,7 +498,17 @@ class SyncService
             $fetchedStreamIds = [];
 
             foreach ($seriesList as $streamData) {
-                $streamId = $streamData['series_id'] ?? $streamData['num'];
+                $streamId = $streamData['series_id'] ?? $streamData['num'] ?? null;
+                
+                // Skip if stream_id is missing
+                if (!$streamId) {
+                    $this->logger->warning('Series missing stream_id', [
+                        'num' => $streamData['num'] ?? null,
+                        'name' => $streamData['name'] ?? 'Unknown',
+                    ]);
+                    continue;
+                }
+                
                 $fetchedStreamIds[] = $streamId;
 
                 // Check if category_id is provided
@@ -517,12 +541,11 @@ class SyncService
 
                 if (!empty($existingStreams)) {
                     $existing = $existingStreams[0];
-                    $existing->name = $streamData['name'];
+                    $existing->name = $streamData['name'] ?? null;
                     $existing->category_id = $streamData['category_id'] ?? null;
                     $existing->category_ids = $categoryIds;
                     $existing->is_adult = $isAdult ? 1 : 0;
                     $existing->labels = $labels;
-                    $existing->is_active = 1;
                     $existing->data = json_encode($streamData);
                     $existing->save();
                     $stats['updated']++;
@@ -530,24 +553,22 @@ class SyncService
                     $stream = new Series();
                     $stream->source_id = $this->source->id;
                     $stream->stream_id = $streamId;
-                    $stream->name = $streamData['name'];
+                    $stream->name = $streamData['name'] ?? null;
                     $stream->category_id = $streamData['category_id'] ?? null;
                     $stream->category_ids = $categoryIds;
                     $stream->is_adult = $isAdult ? 1 : 0;
                     $stream->labels = $labels;
-                    $stream->is_active = 1;
                     $stream->data = json_encode($streamData);
                     $stream->save();
                     $stats['added']++;
                 }
             }
 
-            // Soft delete
-            $allStreams = Series::findAll(['source_id' => $this->source->id, 'is_active' => 1]);
+            // Delete missing streams
+            $allStreams = Series::findAll(['source_id' => $this->source->id]);
             foreach ($allStreams as $stream) {
                 if (!in_array($stream->stream_id, $fetchedStreamIds)) {
-                    $stream->is_active = 0;
-                    $stream->save();
+                    $stream->delete();
                     $stats['deleted']++;
                 }
             }

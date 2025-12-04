@@ -10,7 +10,6 @@ CREATE TABLE IF NOT EXISTS vod_streams (
     category_ids TEXT, -- JSON array of all category IDs
     is_adult INTEGER NOT NULL DEFAULT 0 CHECK(is_adult IN (0, 1)),
     labels TEXT, -- Comma-separated extracted labels
-    is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
     data TEXT, -- Complete API response data (JSON)
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
@@ -21,7 +20,6 @@ CREATE TABLE IF NOT EXISTS vod_streams (
 CREATE INDEX IF NOT EXISTS idx_vod_streams_source_id ON vod_streams(source_id);
 CREATE INDEX IF NOT EXISTS idx_vod_streams_category_id ON vod_streams(category_id);
 CREATE INDEX IF NOT EXISTS idx_vod_streams_is_adult ON vod_streams(is_adult);
-CREATE INDEX IF NOT EXISTS idx_vod_streams_is_active ON vod_streams(is_active);
 CREATE INDEX IF NOT EXISTS idx_vod_streams_name ON vod_streams(name);
 
 -- Trigger to update updated_at timestamp
