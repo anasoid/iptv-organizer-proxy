@@ -109,16 +109,16 @@ class XtreamController
             ];
 
             $userInfo = [
-                'username' => $client->username,
-                'password' => $client->password,
+                'username' => $client->getAttribute('username'),
+                'password' => $client->getAttribute('password'),
                 'message' => '',
                 'auth' => 1,
-                'status' => $client->is_active ? 'Active' : 'Inactive',
-                'exp_date' => $client->expiry_date ? strtotime($client->expiry_date) : null,
+                'status' => $client->getAttribute('is_active') ? 'Active' : 'Inactive',
+                'exp_date' => ($expDate = $client->getAttribute('expiry_date')) ? strtotime($expDate) : null,
                 'is_trial' => '0',
                 'active_cons' => '0',
-                'created_at' => strtotime($client->created_at),
-                'max_connections' => (string) $client->max_connections,
+                'created_at' => strtotime($client->getAttribute('created_at')),
+                'max_connections' => (string) $client->getAttribute('max_connections'),
                 'allowed_output_formats' => ['m3u8', 'ts', 'rtmp'],
             ];
 
@@ -170,9 +170,9 @@ class XtreamController
 
         foreach ($allowedCategories as $category) {
             $categories[] = [
-                'category_id' => (string) $category->category_id,
-                'category_name' => $category->category_name,
-                'parent_id' => (int) ($category->parent_id ?? 0),
+                'category_id' => (string) $category->getAttribute('category_id'),
+                'category_name' => $category->getAttribute('category_name'),
+                'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
             ];
         }
 
@@ -208,7 +208,7 @@ class XtreamController
         // Format streams response using helper method
         $result = $this->formatStreamsResponse(
             LiveStream::class,
-            $source->id,
+            $source->getAttribute('id'),
             $client,
             $filter,
             $categoryId,
@@ -257,9 +257,9 @@ class XtreamController
 
         foreach ($allowedCategories as $category) {
             $categories[] = [
-                'category_id' => (string) $category->category_id,
-                'category_name' => $category->category_name,
-                'parent_id' => (int) ($category->parent_id ?? 0),
+                'category_id' => (string) $category->getAttribute('category_id'),
+                'category_name' => $category->getAttribute('category_name'),
+                'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
             ];
         }
 
@@ -305,9 +305,9 @@ class XtreamController
 
         foreach ($allowedCategories as $category) {
             $categories[] = [
-                'category_id' => (string) $category->category_id,
-                'category_name' => $category->category_name,
-                'parent_id' => (int) ($category->parent_id ?? 0),
+                'category_id' => (string) $category->getAttribute('category_id'),
+                'category_name' => $category->getAttribute('category_name'),
+                'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
             ];
         }
 
@@ -343,7 +343,7 @@ class XtreamController
         // Format streams response using helper method
         $result = $this->formatStreamsResponse(
             VodStream::class,
-            $source->id,
+            $source->getAttribute('id'),
             $client,
             $filter,
             $categoryId,
@@ -382,7 +382,7 @@ class XtreamController
         // Format streams response using helper method
         $result = $this->formatStreamsResponse(
             Series::class,
-            $source->id,
+            $source->getAttribute('id'),
             $client,
             $filter,
             $categoryId,
@@ -598,13 +598,13 @@ class XtreamController
         }
 
         // Apply filtering (FilterService needs objects to lookup category info, returns arrays)
-        $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
+        $filterService = new FilterService($filter, (bool) $client->getAttribute('hide_adult_content'));
         $filteredArrays = $filterService->applyToStreams($streams, $categoryId);
 
         // Build a map of stream_id to original stream object for data extraction
         $streamMap = [];
         foreach ($streams as $stream) {
-            $streamMap[$stream->stream_id] = $stream;
+            $streamMap[$stream->getAttribute('stream_id')] = $stream;
         }
 
         // Convert filtered result arrays to complete Xtream format
@@ -616,15 +616,15 @@ class XtreamController
 
             // Parse the JSON data field from database
             $dataJson = [];
-            if ($originalStream && !empty($originalStream->data)) {
-                $dataJson = json_decode($originalStream->data, true) ?? [];
+            if ($originalStream && !empty($originalStream->getAttribute('data'))) {
+                $dataJson = json_decode($originalStream->getAttribute('data'), true) ?? [];
             }
 
             // Build complete Xtream response with all fields
             // Database fields (direct from model):
             $xtreamData = [
                 'num' => $num,
-                'source_id' => $originalStream->source_id ?? null,
+                'source_id' => $originalStream->getAttribute('source_id') ?? null,
                 'stream_id' => (int) $streamId,
                 'name' => $streamArray['name'] ?? '',
                 'category_id' => (int) ($streamArray['category_id'] ?? 0),

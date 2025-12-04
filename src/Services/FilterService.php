@@ -340,12 +340,15 @@ class FilterService
             // Get category information if stream has a category (using cache)
             $categoryName = '';
             $categoryLabels = '';
-            if ($stream->category_id) {
-                $key = $stream->source_id . '_' . $stream->category_id;
+            $categoryId = $stream->getAttribute('category_id');
+            $sourceId = $stream->getAttribute('source_id');
+
+            if ($categoryId) {
+                $key = $sourceId . '_' . $categoryId;
                 if (isset($categoryCache[$key])) {
                     $category = $categoryCache[$key];
-                    $categoryName = $category->category_name ?? '';
-                    $categoryLabels = $category->labels ?? '';
+                    $categoryName = $category->getAttribute('category_name') ?? '';
+                    $categoryLabels = $category->getAttribute('labels') ?? '';
                     // Ensure labels are extracted if null
                     if (empty($categoryLabels)) {
                         $categoryLabels = Category::extractLabels($categoryName);
@@ -355,16 +358,16 @@ class FilterService
 
             // Convert model object to array
             return [
-                'id' => $stream->id ?? null,
-                'stream_id' => $stream->stream_id ?? null,
-                'name' => $stream->name ?? '',
-                'labels' => $stream->labels ?? '',
-                'category_id' => $stream->category_id ?? null,
-                'category_ids' => $stream->category_ids ?? null,
+                'id' => $stream->getAttribute('id'),
+                'stream_id' => $stream->getAttribute('stream_id'),
+                'name' => $stream->getAttribute('name') ?? '',
+                'labels' => $stream->getAttribute('labels') ?? '',
+                'category_id' => $stream->getAttribute('category_id'),
+                'category_ids' => $stream->getAttribute('category_ids'),
                 'category_name' => $categoryName,
                 'category_labels' => $categoryLabels,
-                'is_adult' => (int) ($stream->is_adult ?? 0),
-                'num' => $stream->num ?? null,
+                'is_adult' => (int) ($stream->getAttribute('is_adult') ?? 0),
+                'num' => $stream->getAttribute('num'),
             ];
         }, $streams);
 

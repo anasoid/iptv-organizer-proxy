@@ -182,7 +182,6 @@ abstract class BaseStreamModel extends BaseModel
      * Implemented by subclasses with optional stream type parameter
      *
      * @param string $text
-     * @param string|null $streamType Optional stream type (live, movie, series)
      * @return string Comma-separated labels
      */
     abstract public static function extractLabels(string $text): string;

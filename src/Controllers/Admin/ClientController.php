@@ -29,9 +29,9 @@ class ClientController
 
             if ($search) {
                 $allClients = array_filter($allClients, function ($client) use ($search) {
-                    return stripos($client->username, $search) !== false ||
-                           stripos($client->password, $search) !== false ||
-                           stripos($client->email ?? '', $search) !== false;
+                    return stripos($client->getAttribute('username'), $search) !== false ||
+                           stripos($client->getAttribute('password'), $search) !== false ||
+                           stripos($client->getAttribute('email') ?? '', $search) !== false;
                 });
             }
 
