@@ -215,7 +215,7 @@ class XtreamController
             $streams = LiveStream::getByCategory($source->id, $categoryId);
         } else {
             // All streams or favoris category
-            $streams = LiveStream::getBySource($source->id, true);
+            $streams = LiveStream::getBySource($source->id);
         }
 
         // Apply filtering (FilterService needs objects to lookup category info, returns arrays)
@@ -399,7 +399,7 @@ class XtreamController
             $streams = VodStream::getByCategory($source->id, $categoryId);
         } else {
             // All streams or favoris category
-            $streams = VodStream::getBySource($source->id, true);
+            $streams = VodStream::getBySource($source->id);
         }
 
         // Apply filtering (FilterService needs objects to lookup category info, returns arrays)
@@ -487,7 +487,7 @@ class XtreamController
             $series = Series::getByCategory($source->id, $categoryId);
         } else {
             // All series or favoris category
-            $series = Series::getBySource($source->id, true);
+            $series = Series::getBySource($source->id);
         }
 
         // Apply filtering (FilterService needs objects to lookup category info, returns arrays)

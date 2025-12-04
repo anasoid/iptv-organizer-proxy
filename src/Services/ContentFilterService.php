@@ -89,8 +89,8 @@ class ContentFilterService
         }
 
         $allStreams = match ($type) {
-            'live' => LiveStream::getBySource($this->client->source_id, false),
-            'vod' => VodStream::getBySource($this->client->source_id, false),
+            'live' => LiveStream::getBySource($this->client->source_id),
+            'vod' => VodStream::getBySource($this->client->source_id),
             default => [],
         };
 
@@ -117,8 +117,8 @@ class ContentFilterService
         }
 
         $allStreams = match ($type) {
-            'live' => LiveStream::getBySource($this->client->source_id, false),
-            'vod' => VodStream::getBySource($this->client->source_id, false),
+            'live' => LiveStream::getBySource($this->client->source_id),
+            'vod' => VodStream::getBySource($this->client->source_id),
             default => [],
         };
 
@@ -144,7 +144,7 @@ class ContentFilterService
             return [];
         }
 
-        $allSeries = Series::getBySource($this->client->source_id, false);
+        $allSeries = Series::getBySource($this->client->source_id);
 
         if (!$this->filterService) {
             return $allSeries;
@@ -168,7 +168,7 @@ class ContentFilterService
             return [];
         }
 
-        $allSeries = Series::getBySource($this->client->source_id, false);
+        $allSeries = Series::getBySource($this->client->source_id);
 
         if (!$this->filterService) {
             return [];
