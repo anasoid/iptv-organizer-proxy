@@ -205,64 +205,15 @@ class XtreamController
         $queryParams = $request->getQueryParams();
         $categoryId = isset($queryParams['category_id']) ? (int) $queryParams['category_id'] : null;
 
-        // Get proxy URL from environment or request
-        $proxyUrl = $_ENV['APP_URL'] ??
-                    $request->getUri()->getScheme() . '://' . $request->getUri()->getHost();
-
-        // Query streams from database
-        if ($categoryId !== null && $categoryId < 100000) {
-            // Regular category filter
-            $streams = LiveStream::getByCategory($source->id, $categoryId);
-        } else {
-            // All streams or favoris category
-            $streams = LiveStream::getBySource($source->id);
-        }
-
-        // Apply filtering (FilterService needs objects to lookup category info, returns arrays)
-        $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
-        $filteredArrays = $filterService->applyToStreams($streams, $categoryId);
-
-        // Build a map of stream_id to original LiveStream object for data extraction
-        $streamMap = [];
-        foreach ($streams as $stream) {
-            $streamMap[$stream->stream_id] = $stream;
-        }
-
-        // Convert filtered result arrays to complete Xtream format
-        $result = [];
-        $num = 1;
-        foreach ($filteredArrays as $streamArray) {
-            $streamId = (int) ($streamArray['stream_id'] ?? 0);
-            $originalStream = $streamMap[$streamId] ?? null;
-            
-            // Parse the JSON data field from database
-            $dataJson = [];
-            if ($originalStream && !empty($originalStream->data)) {
-                $dataJson = json_decode($originalStream->data, true) ?? [];
-            }
-            
-            // Build complete Xtream response with all fields
-            $xtreamData = [
-                'num' => $dataJson['num'] ?? $num,
-                'name' => $streamArray['name'] ?? '',
-                'stream_type' => $dataJson['stream_type'] ?? 'live',
-                'stream_id' => $streamId,
-                'stream_icon' => $dataJson['stream_icon'] ?? '',
-                'epg_channel_id' => $dataJson['epg_channel_id'] ?? '',
-                'added' => $dataJson['added'] ?? null,
-                'is_adult' => (int) ($streamArray['is_adult'] ?? 0),
-                'category_id' => (int) ($streamArray['category_id'] ?? 0),
-                'category_ids' => !empty($streamArray['category_ids']) 
-                    ? json_decode($streamArray['category_ids'], true) 
-                    : [],
-                'custom_sid' => $dataJson['custom_sid'] ?? null,
-                'tv_archive' => (int) ($dataJson['tv_archive'] ?? 0),
-                'direct_source' => $dataJson['direct_source'] ?? '',
-                'tv_archive_duration' => (int) ($dataJson['tv_archive_duration'] ?? 0),
-            ];
-            $result[] = $xtreamData;
-            $num++;
-        }
+        // Format streams response using helper method
+        $result = $this->formatStreamsResponse(
+            LiveStream::class,
+            $source->id,
+            $client,
+            $filter,
+            $categoryId,
+            'live'
+        );
 
         $response->getBody()->write(json_encode($result));
 
@@ -389,64 +340,15 @@ class XtreamController
         $queryParams = $request->getQueryParams();
         $categoryId = isset($queryParams['category_id']) ? (int) $queryParams['category_id'] : null;
 
-        // Get proxy URL from environment or request
-        $proxyUrl = $_ENV['APP_URL'] ??
-                    $request->getUri()->getScheme() . '://' . $request->getUri()->getHost();
-
-        // Query streams from database
-        if ($categoryId !== null && $categoryId < 100000) {
-            // Regular category filter
-            $streams = VodStream::getByCategory($source->id, $categoryId);
-        } else {
-            // All streams or favoris category
-            $streams = VodStream::getBySource($source->id);
-        }
-
-        // Apply filtering (FilterService needs objects to lookup category info, returns arrays)
-        $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
-        $filteredArrays = $filterService->applyToStreams($streams, $categoryId);
-
-        // Build a map of stream_id to original VodStream object for data extraction
-        $streamMap = [];
-        foreach ($streams as $stream) {
-            $streamMap[$stream->stream_id] = $stream;
-        }
-
-        // Convert filtered result arrays to complete Xtream format
-        $result = [];
-        $num = 1;
-        foreach ($filteredArrays as $streamArray) {
-            $streamId = (int) ($streamArray['stream_id'] ?? 0);
-            $originalStream = $streamMap[$streamId] ?? null;
-            
-            // Parse the JSON data field from database
-            $dataJson = [];
-            if ($originalStream && !empty($originalStream->data)) {
-                $dataJson = json_decode($originalStream->data, true) ?? [];
-            }
-            
-            // Build complete Xtream response with all fields
-            $xtreamData = [
-                'num' => $dataJson['num'] ?? $num,
-                'name' => $streamArray['name'] ?? '',
-                'stream_type' => $dataJson['stream_type'] ?? 'movie',
-                'stream_id' => $streamId,
-                'stream_icon' => $dataJson['stream_icon'] ?? '',
-                'epg_channel_id' => $dataJson['epg_channel_id'] ?? '',
-                'added' => $dataJson['added'] ?? null,
-                'is_adult' => (int) ($streamArray['is_adult'] ?? 0),
-                'category_id' => (int) ($streamArray['category_id'] ?? 0),
-                'category_ids' => !empty($streamArray['category_ids']) 
-                    ? json_decode($streamArray['category_ids'], true) 
-                    : [],
-                'custom_sid' => $dataJson['custom_sid'] ?? null,
-                'tv_archive' => (int) ($dataJson['tv_archive'] ?? 0),
-                'direct_source' => $dataJson['direct_source'] ?? '',
-                'tv_archive_duration' => (int) ($dataJson['tv_archive_duration'] ?? 0),
-            ];
-            $result[] = $xtreamData;
-            $num++;
-        }
+        // Format streams response using helper method
+        $result = $this->formatStreamsResponse(
+            VodStream::class,
+            $source->id,
+            $client,
+            $filter,
+            $categoryId,
+            'movie'
+        );
 
         $response->getBody()->write(json_encode($result));
 
@@ -477,64 +379,15 @@ class XtreamController
         $queryParams = $request->getQueryParams();
         $categoryId = isset($queryParams['category_id']) ? (int) $queryParams['category_id'] : null;
 
-        // Get proxy URL from environment or request
-        $proxyUrl = $_ENV['APP_URL'] ??
-                    $request->getUri()->getScheme() . '://' . $request->getUri()->getHost();
-
-        // Query series from database
-        if ($categoryId !== null && $categoryId < 100000) {
-            // Regular category filter
-            $series = Series::getByCategory($source->id, $categoryId);
-        } else {
-            // All series or favoris category
-            $series = Series::getBySource($source->id);
-        }
-
-        // Apply filtering (FilterService needs objects to lookup category info, returns arrays)
-        $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
-        $filteredArrays = $filterService->applyToStreams($series, $categoryId);
-
-        // Build a map of stream_id to original Series object for data extraction
-        $streamMap = [];
-        foreach ($series as $item) {
-            $streamMap[$item->stream_id] = $item;
-        }
-
-        // Convert filtered result arrays to complete Xtream format
-        $result = [];
-        $num = 1;
-        foreach ($filteredArrays as $itemArray) {
-            $streamId = (int) ($itemArray['stream_id'] ?? 0);
-            $originalSeries = $streamMap[$streamId] ?? null;
-            
-            // Parse the JSON data field from database
-            $dataJson = [];
-            if ($originalSeries && !empty($originalSeries->data)) {
-                $dataJson = json_decode($originalSeries->data, true) ?? [];
-            }
-            
-            // Build complete Xtream response with all fields
-            $xtreamData = [
-                'num' => $dataJson['num'] ?? $num,
-                'name' => $itemArray['name'] ?? '',
-                'stream_type' => $dataJson['stream_type'] ?? 'series',
-                'stream_id' => $streamId,
-                'stream_icon' => $dataJson['stream_icon'] ?? '',
-                'epg_channel_id' => $dataJson['epg_channel_id'] ?? '',
-                'added' => $dataJson['added'] ?? null,
-                'is_adult' => (int) ($itemArray['is_adult'] ?? 0),
-                'category_id' => (int) ($itemArray['category_id'] ?? 0),
-                'category_ids' => !empty($itemArray['category_ids']) 
-                    ? json_decode($itemArray['category_ids'], true) 
-                    : [],
-                'custom_sid' => $dataJson['custom_sid'] ?? null,
-                'tv_archive' => (int) ($dataJson['tv_archive'] ?? 0),
-                'direct_source' => $dataJson['direct_source'] ?? '',
-                'tv_archive_duration' => (int) ($dataJson['tv_archive_duration'] ?? 0),
-            ];
-            $result[] = $xtreamData;
-            $num++;
-        }
+        // Format streams response using helper method
+        $result = $this->formatStreamsResponse(
+            Series::class,
+            $source->id,
+            $client,
+            $filter,
+            $categoryId,
+            'series'
+        );
 
         $response->getBody()->write(json_encode($result));
 
@@ -712,6 +565,85 @@ class XtreamController
         } catch (\Exception $e) {
             return $this->jsonError($response, 'Failed to fetch XMLTV: ' . $e->getMessage(), 500);
         }
+    }
+
+    /**
+     * Format streams response for Xtream API
+     *
+     * Common logic for getLiveStreams, getVodStreams, and getSeries
+     *
+     * @param string $modelClass Stream model class (LiveStream, VodStream, or Series)
+     * @param int $sourceId Source ID
+     * @param Client $client Authenticated client
+     * @param Filter|null $filter Optional client filter
+     * @param int|null $categoryId Optional category filter
+     * @param string $defaultStreamType Default stream_type if not in data
+     * @return array Formatted streams response
+     */
+    private function formatStreamsResponse(
+        string $modelClass,
+        int $sourceId,
+        Client $client,
+        ?Filter $filter,
+        ?int $categoryId,
+        string $defaultStreamType
+    ): array {
+        // Query streams from database
+        if ($categoryId !== null && $categoryId < 100000) {
+            // Regular category filter
+            $streams = $modelClass::getByCategory($sourceId, $categoryId);
+        } else {
+            // All streams or favoris category
+            $streams = $modelClass::getBySource($sourceId);
+        }
+
+        // Apply filtering (FilterService needs objects to lookup category info, returns arrays)
+        $filterService = new FilterService($filter, (bool) $client->hide_adult_content);
+        $filteredArrays = $filterService->applyToStreams($streams, $categoryId);
+
+        // Build a map of stream_id to original stream object for data extraction
+        $streamMap = [];
+        foreach ($streams as $stream) {
+            $streamMap[$stream->stream_id] = $stream;
+        }
+
+        // Convert filtered result arrays to complete Xtream format
+        $result = [];
+        $num = 1;
+        foreach ($filteredArrays as $streamArray) {
+            $streamId = (int) ($streamArray['stream_id'] ?? 0);
+            $originalStream = $streamMap[$streamId] ?? null;
+
+            // Parse the JSON data field from database
+            $dataJson = [];
+            if ($originalStream && !empty($originalStream->data)) {
+                $dataJson = json_decode($originalStream->data, true) ?? [];
+            }
+
+            // Build complete Xtream response with all fields
+            $xtreamData = [
+                'num' => $dataJson['num'] ?? $num,
+                'name' => $streamArray['name'] ?? '',
+                'stream_type' => $dataJson['stream_type'] ?? $defaultStreamType,
+                'stream_id' => $streamId,
+                'stream_icon' => $dataJson['stream_icon'] ?? '',
+                'epg_channel_id' => $dataJson['epg_channel_id'] ?? '',
+                'added' => $dataJson['added'] ?? null,
+                'is_adult' => (int) ($streamArray['is_adult'] ?? 0),
+                'category_id' => (int) ($streamArray['category_id'] ?? 0),
+                'category_ids' => !empty($streamArray['category_ids'])
+                    ? json_decode($streamArray['category_ids'], true)
+                    : [],
+                'custom_sid' => $dataJson['custom_sid'] ?? null,
+                'tv_archive' => (int) ($dataJson['tv_archive'] ?? 0),
+                'direct_source' => $dataJson['direct_source'] ?? '',
+                'tv_archive_duration' => (int) ($dataJson['tv_archive_duration'] ?? 0),
+            ];
+            $result[] = $xtreamData;
+            $num++;
+        }
+
+        return $result;
     }
 
     /**
