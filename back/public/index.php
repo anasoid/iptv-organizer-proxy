@@ -14,15 +14,36 @@ use App\Controllers\Admin\AdminUserController;
 use App\Controllers\Admin\DashboardController;
 use App\Controllers\Xtream\StreamDataController;
 
-require __DIR__ . '/../vendor/autoload.php';
+// Determine environment based on directory structure
+// In development: vendor is at ../vendor relative to public/
+// In production: vendor is at ./vendor same level as index.php
+$vendorPath = __DIR__ . '/vendor/autoload.php';
+if (!file_exists($vendorPath)) {
+    $vendorPath = __DIR__ . '/../vendor/autoload.php';
+}
+require $vendorPath;
 
-// Handle REQUEST_URI for PHP built-in server
+// Handle REQUEST_URI for PHP built-in server and direct file access
 if (!isset($_SERVER['REQUEST_URI'])) {
     $_SERVER['REQUEST_URI'] = '/' . ltrim($_SERVER['PATH_INFO'] ?? '', '/');
 }
 
+// Strip /index.php from REQUEST_URI if present
+if (strpos($_SERVER['REQUEST_URI'], '/index.php') === 0) {
+    $_SERVER['REQUEST_URI'] = substr($_SERVER['REQUEST_URI'], 10); // strlen('/index.php') = 10
+    if (empty($_SERVER['REQUEST_URI'])) {
+        $_SERVER['REQUEST_URI'] = '/';
+    }
+}
+
 // Load environment variables
-$dotenv = Dotenv::createImmutable(__DIR__ . '/..');
+// In development: .env is at ../  relative to public/
+// In production: .env is at ./  same level as index.php
+$envPath = __DIR__;
+if (!file_exists(__DIR__ . '/.env')) {
+    $envPath = __DIR__ . '/..';
+}
+$dotenv = Dotenv::createImmutable($envPath);
 $dotenv->load();
 
 // Create Slim application
@@ -51,6 +72,16 @@ $app->get('/health', function ($request, $response) {
         'timestamp' => time(),
     ]));
     return $response->withHeader('Content-Type', 'application/json');
+});
+
+// Debug endpoint - check if routing works
+$app->get('/debug', function ($request, $response) {
+    return $response->withHeader('Content-Type', 'application/json')->write(json_encode([
+        'message' => 'Debug endpoint reached',
+        'uri' => $_SERVER['REQUEST_URI'],
+        'method' => $_SERVER['REQUEST_METHOD'],
+        'auth_header' => $request->getHeaderLine('Authorization') ?: 'none',
+    ]));
 });
 
 // Admin authentication API routes

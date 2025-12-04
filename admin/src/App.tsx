@@ -53,7 +53,7 @@ function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Box sx={{ width: '100%', height: '100%' }}>
-          <BrowserRouter>
+          <BrowserRouter basename={__BASE_PATH__}>
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={<Login />} />

@@ -11,6 +11,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use Firebase\JWT\ExpiredException;
+use GuzzleHttp\Psr7\Response;
 
 class AdminAuthMiddleware implements MiddlewareInterface
 {
@@ -20,22 +21,20 @@ class AdminAuthMiddleware implements MiddlewareInterface
             // Get authorization header
             $authHeader = $request->getHeaderLine('Authorization');
             if (empty($authHeader)) {
-                return $this->unauthorizedResponse(
-                    $handler->handle($request),
-                    'Authorization header missing'
-                );
+                return $this->unauthorizedResponse('Authorization header missing');
             }
 
             // Extract token from "Bearer <token>"
             if (!preg_match('/Bearer\s+(.+)/', $authHeader, $matches)) {
-                return $this->unauthorizedResponse(
-                    $handler->handle($request),
-                    'Invalid authorization header format'
-                );
+                return $this->unauthorizedResponse('Invalid authorization header format');
             }
 
             $token = $matches[1];
-            $secret = $_ENV['JWT_SECRET'] ?? 'your-secret-key-change-this-in-production';
+            $secret = $_ENV['JWT_SECRET'] ?? null;
+
+            if (!$secret) {
+                return $this->unauthorizedResponse('JWT_SECRET environment variable is not set');
+            }
 
             // Verify token
             $decoded = JWT::decode($token, new Key($secret, 'HS256'));
@@ -47,34 +46,27 @@ class AdminAuthMiddleware implements MiddlewareInterface
 
             return $handler->handle($request);
         } catch (ExpiredException $e) {
-            return $this->unauthorizedResponse(
-                $handler->handle($request),
-                'Token has expired'
-            );
+            return $this->unauthorizedResponse('Token has expired: ' . $e->getMessage());
         } catch (\Throwable $e) {
-            return $this->unauthorizedResponse(
-                $handler->handle($request),
-                'Invalid token: ' . $e->getMessage()
-            );
+            error_log('JWT Error: ' . $e->getMessage());
+            return $this->unauthorizedResponse('Invalid token: ' . $e->getMessage());
         }
     }
 
     /**
      * Return unauthorized JSON response
      *
-     * @param ResponseInterface $response
      * @param string $message
      * @return ResponseInterface
      */
-    private function unauthorizedResponse(ResponseInterface $response, string $message): ResponseInterface
+    private function unauthorizedResponse(string $message): ResponseInterface
     {
+        $response = new Response(401, ['Content-Type' => 'application/json']);
         $response->getBody()->write(json_encode([
             'success' => false,
             'message' => $message,
         ]));
 
-        return $response
-            ->withHeader('Content-Type', 'application/json')
-            ->withStatus(401);
+        return $response;
     }
 }

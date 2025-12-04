@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import type { LoginRequest, LoginResponse } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = __API_BASE_URL__;
 
 // Create Axios instance
 export const api = axios.create({
@@ -33,7 +33,7 @@ api.interceptors.response.use(
       // Clear auth state and redirect to login
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
-      window.location.href = '/login';
+      window.location.href = `${__BASE_PATH__}login`;
     }
     return Promise.reject(error);
   }

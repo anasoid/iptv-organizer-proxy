@@ -11,10 +11,19 @@ use App\Models\LiveStream;
 use App\Models\VodStream;
 use App\Models\Series;
 
-require __DIR__ . '/../vendor/autoload.php';
+// Determine environment based on directory structure
+$vendorPath = __DIR__ . '/vendor/autoload.php';
+if (!file_exists($vendorPath)) {
+    $vendorPath = __DIR__ . '/../vendor/autoload.php';
+}
+require $vendorPath;
 
 // Load environment variables
-$dotenv = Dotenv::createImmutable(__DIR__ . '/..');
+$envPath = __DIR__;
+if (!file_exists(__DIR__ . '/.env')) {
+    $envPath = __DIR__ . '/..';
+}
+$dotenv = Dotenv::createImmutable($envPath);
 $dotenv->load();
 
 // Get credentials from query parameters

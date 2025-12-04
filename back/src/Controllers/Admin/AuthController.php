@@ -112,7 +112,10 @@ class AuthController
      */
     private function generateToken(AdminUser $user): string
     {
-        $secret = $_ENV['JWT_SECRET'] ?? 'your-secret-key-change-this-in-production';
+        $secret = $_ENV['JWT_SECRET'] ?? null;
+        if (!$secret) {
+            throw new \RuntimeException('JWT_SECRET environment variable is not set');
+        }
         $issuedAt = time();
         $expire = $issuedAt + (24 * 60 * 60); // 24 hours
 
