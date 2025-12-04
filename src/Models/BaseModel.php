@@ -15,6 +15,9 @@ use RuntimeException;
  * Provides common CRUD operations and utilities for all models
  *
  * @phpstan-consistent-constructor
+ * @property int $id
+ * @property string $created_at
+ * @property string $updated_at
  */
 abstract class BaseModel
 {

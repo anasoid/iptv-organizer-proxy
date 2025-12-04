@@ -22,21 +22,6 @@ export interface FilterResponse {
   };
 }
 
-export interface FilterPreviewResult {
-  success: boolean;
-  data?: {
-    filter_id: number;
-    filter_name: string;
-    preview_count: number;
-    preview_samples: Array<{
-      id: string;
-      name: string;
-      type: 'live' | 'vod' | 'series';
-      matched_rules: string[];
-    }>;
-  };
-}
-
 const filtersApi = {
   async getFilters(page: number = 1, limit: number = 10): Promise<FilterResponse> {
     const response = await api.get('/filters', {
@@ -75,13 +60,6 @@ const filtersApi = {
 
   async deleteFilter(id: number): Promise<FilterResponse> {
     const response = await api.delete(`/filters/${id}`);
-    return response.data;
-  },
-
-  async previewFilter(id: number, sourceId?: number): Promise<FilterPreviewResult> {
-    const response = await api.get(`/filters/${id}/preview`, {
-      params: sourceId ? { source_id: sourceId } : {},
-    });
     return response.data;
   },
 };

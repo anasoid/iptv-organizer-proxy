@@ -15,22 +15,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Preview as PreviewIcon,
   ContentCopy as CloneIcon,
 } from '@mui/icons-material';
 import type { Filter } from '../services/filtersApi';
 import filtersApi from '../services/filtersApi';
 import { useAuthStore } from '../stores/authStore';
 import FilterForm from '../components/FilterForm';
-import FilterPreview from '../components/FilterPreview';
 
 export default function Filters() {
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
   const [open, setOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [editingFilter, setEditingFilter] = useState<Filter | null>(null);
-  const [previewFilter, setPreviewFilter] = useState<Filter | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
@@ -61,11 +57,6 @@ export default function Filters() {
     setOpen(true);
   };
 
-  const handlePreviewFilter = (filter: Filter) => {
-    setPreviewFilter(filter);
-    setPreviewOpen(true);
-  };
-
   const handleCloneFilter = async (filter: Filter) => {
     try {
       const cloneData = {
@@ -90,11 +81,6 @@ export default function Filters() {
     handleCloseForm();
   };
 
-  const handleClosePreview = () => {
-    setPreviewOpen(false);
-    setPreviewFilter(null);
-  };
-
   const columns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 70 },
     { field: 'name', headerName: 'Name', width: 200, flex: 1 },
@@ -116,12 +102,6 @@ export default function Filters() {
           icon={<EditIcon />}
           label="Edit"
           onClick={() => handleEditFilter(params.row as Filter)}
-        />,
-        <GridActionsCellItem
-          key="preview"
-          icon={<PreviewIcon />}
-          label="Preview"
-          onClick={() => handlePreviewFilter(params.row as Filter)}
         />,
         <GridActionsCellItem
           key="clone"
@@ -179,15 +159,6 @@ export default function Filters() {
           onCancel={handleCloseForm}
         />
       </Dialog>
-
-      {/* Filter Preview Modal */}
-      {previewFilter && (
-        <FilterPreview
-          open={previewOpen}
-          filter={previewFilter}
-          onClose={handleClosePreview}
-        />
-      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirm !== null} onClose={() => setDeleteConfirm(null)}>

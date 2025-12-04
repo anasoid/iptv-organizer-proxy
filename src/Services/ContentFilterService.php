@@ -55,7 +55,7 @@ class ContentFilterService
             return $allCategories;
         }
 
-        return $this->filterService->filterCategories($allCategories);
+        return $this->filterService->filterCategories($allCategories, $type);
     }
 
     /**
@@ -73,7 +73,7 @@ class ContentFilterService
             return [];
         }
 
-        $allowedCategories = $this->filterService->filterCategories($allCategories);
+        $allowedCategories = $this->filterService->filterCategories($allCategories, $type);
         $allowedIds = array_map(fn($c) => $c->category_id, $allowedCategories);
 
         return array_filter($allCategories, fn($c) => !in_array($c->category_id, $allowedIds));
@@ -89,8 +89,8 @@ class ContentFilterService
         }
 
         $allStreams = match ($type) {
-            'live' => LiveStream::getBySource($this->client->source_id, false),
-            'vod' => VodStream::getBySource($this->client->source_id, false),
+            'live' => LiveStream::getBySource($this->client->source_id),
+            'vod' => VodStream::getBySource($this->client->source_id),
             default => [],
         };
 
@@ -117,8 +117,8 @@ class ContentFilterService
         }
 
         $allStreams = match ($type) {
-            'live' => LiveStream::getBySource($this->client->source_id, false),
-            'vod' => VodStream::getBySource($this->client->source_id, false),
+            'live' => LiveStream::getBySource($this->client->source_id),
+            'vod' => VodStream::getBySource($this->client->source_id),
             default => [],
         };
 
@@ -144,7 +144,7 @@ class ContentFilterService
             return [];
         }
 
-        $allSeries = Series::getBySource($this->client->source_id, false);
+        $allSeries = Series::getBySource($this->client->source_id);
 
         if (!$this->filterService) {
             return $allSeries;
@@ -168,7 +168,7 @@ class ContentFilterService
             return [];
         }
 
-        $allSeries = Series::getBySource($this->client->source_id, false);
+        $allSeries = Series::getBySource($this->client->source_id);
 
         if (!$this->filterService) {
             return [];

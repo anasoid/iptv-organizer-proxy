@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS filters (
     name TEXT NOT NULL,
     description TEXT,
     filter_config TEXT NOT NULL, -- YAML configuration for filter rules and favoris
+    favoris TEXT DEFAULT NULL, -- YAML configuration for favoris (separate from rules)
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );

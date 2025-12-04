@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS sync_logs (
     items_updated INT NOT NULL DEFAULT 0,
     items_deleted INT NOT NULL DEFAULT 0,
     error_message TEXT NULL,
+    duration_seconds INTEGER DEFAULT 0,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     INDEX idx_source_id (source_id),
     INDEX idx_sync_type (sync_type),
