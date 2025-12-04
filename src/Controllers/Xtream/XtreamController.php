@@ -622,7 +622,7 @@ class XtreamController
 
             // Build complete Xtream response with all fields
             $xtreamData = [
-                'num' => $dataJson['num'] ?? $num,
+                'num' => $num,
                 'name' => $streamArray['name'] ?? '',
                 'stream_type' => $dataJson['stream_type'] ?? $defaultStreamType,
                 'stream_id' => $streamId,

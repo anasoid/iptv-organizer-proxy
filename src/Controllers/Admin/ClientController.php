@@ -365,8 +365,7 @@ class ClientController
             }
 
             $filterService = new ContentFilterService($client);
-            $streams = array_map(
-                [ContentFilterService::class, 'formatStream'],
+            $streams = $this->formatStreamsWithNum(
                 $filterService->getAllowedStreams('live')
             );
 
@@ -393,8 +392,7 @@ class ClientController
             }
 
             $filterService = new ContentFilterService($client);
-            $streams = array_map(
-                [ContentFilterService::class, 'formatStream'],
+            $streams = $this->formatStreamsWithNum(
                 $filterService->getAllowedStreams('vod')
             );
 
@@ -421,8 +419,7 @@ class ClientController
             }
 
             $filterService = new ContentFilterService($client);
-            $series = array_map(
-                [ContentFilterService::class, 'formatStream'],
+            $series = $this->formatStreamsWithNum(
                 $filterService->getAllowedSeries()
             );
 
@@ -612,6 +609,32 @@ class ClientController
         return $response
             ->withHeader('Content-Type', 'application/json')
             ->withStatus($statusCode);
+    }
+
+    /**
+     * Format streams with incremental num field
+     *
+     * Converts streams to export format with incremental num starting from 1
+     *
+     * @param array $streams Array of stream objects
+     * @return array Formatted streams with num field
+     */
+    private function formatStreamsWithNum(array $streams): array
+    {
+        $result = [];
+        $num = 1;
+
+        foreach ($streams as $stream) {
+            $result[] = [
+                'id' => $stream->id,
+                'name' => $stream->name,
+                'num' => $num,
+                'category_id' => $stream->category_id,
+            ];
+            $num++;
+        }
+
+        return $result;
     }
 
     /**
