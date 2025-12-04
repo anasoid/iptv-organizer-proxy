@@ -102,7 +102,6 @@ $app->group('/api', function ($group) {
     $group->get('/filters/{id}', [$filterController, 'get']);
     $group->put('/filters/{id}', [$filterController, 'update']);
     $group->delete('/filters/{id}', [$filterController, 'delete']);
-    $group->post('/filters/{id}/preview', [$filterController, 'preview']);
 
     // Admin user management
     $adminUserController = new AdminUserController();

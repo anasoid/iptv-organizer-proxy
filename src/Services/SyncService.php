@@ -178,7 +178,7 @@ class SyncService
             foreach ($dbCategoryIds as $id => $true) {
                 if (!isset($fetchedCategoryIds[$id])) {
                     $category = new Category();
-                    $category->attributes = ['id' => $id];
+                    $category->id = $id;
                     $category->delete();
                     $stats['deleted']++;
                 }
@@ -381,7 +381,7 @@ class SyncService
             foreach ($dbStreamIds as $id => $true) {
                 if (!isset($fetchedStreamIds[$id])) {
                     $stream = new LiveStream();
-                    $stream->attributes = ['id' => $id];
+                    $stream->id = $id;
                     $stream->delete();
                     $stats['deleted']++;
                 }
@@ -538,7 +538,7 @@ class SyncService
             foreach ($dbStreamIds as $id => $true) {
                 if (!isset($fetchedStreamIds[$id])) {
                     $stream = new VodStream();
-                    $stream->attributes = ['id' => $id];
+                    $stream->id = $id;
                     $stream->delete();
                     $stats['deleted']++;
                 }
@@ -695,7 +695,7 @@ class SyncService
             foreach ($dbStreamIds as $id => $true) {
                 if (!isset($fetchedStreamIds[$id])) {
                     $stream = new Series();
-                    $stream->attributes = ['id' => $id];
+                    $stream->id = $id;
                     $stream->delete();
                     $stats['deleted']++;
                 }

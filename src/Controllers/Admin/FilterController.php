@@ -215,45 +215,6 @@ class FilterController
     }
 
     /**
-     * Preview filter results
-     *
-     * @param ServerRequestInterface $request
-     * @param ResponseInterface $response
-     * @param array $args
-     * @return ResponseInterface
-     */
-    public function preview(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
-    {
-        try {
-            $id = (int) ($args['id'] ?? 0);
-            if (!$id) {
-                return $this->jsonError($response, 'Invalid filter ID', 400);
-            }
-
-            $filter = Filter::find($id);
-            if (!$filter) {
-                return $this->jsonError($response, 'Filter not found', 404);
-            }
-
-            // Parse filter rules and apply to streams
-            // This is a simplified preview - full implementation would need actual filtering logic
-            $preview = [
-                'filter_id' => $filter->id,
-                'filter_name' => $filter->name,
-                'preview_count' => 0,
-                'preview_samples' => [],
-            ];
-
-            return $this->jsonResponse($response, [
-                'success' => true,
-                'data' => $preview,
-            ]);
-        } catch (\Throwable $e) {
-            return $this->jsonError($response, 'Failed to preview filter: ' . $e->getMessage(), 500);
-        }
-    }
-
-    /**
      * Return JSON response
      *
      * @param ResponseInterface $response
