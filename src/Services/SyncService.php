@@ -136,11 +136,26 @@ class SyncService
 
                 if (!empty($existingCategories)) {
                     $existing = $existingCategories[0];
-                    $existing->category_name = $categoryData['category_name'];
-                    $existing->parent_id = $categoryData['parent_id'] ?? null;
-                    $existing->labels = $labels;
-                    $existing->save();
-                    $stats['updated']++;
+                    
+                    // Only update if values changed
+                    $hasChanges = false;
+                    if ($existing->category_name !== $categoryData['category_name']) {
+                        $existing->category_name = $categoryData['category_name'];
+                        $hasChanges = true;
+                    }
+                    if ($existing->parent_id !== ($categoryData['parent_id'] ?? null)) {
+                        $existing->parent_id = $categoryData['parent_id'] ?? null;
+                        $hasChanges = true;
+                    }
+                    if ($existing->labels !== $labels) {
+                        $existing->labels = $labels;
+                        $hasChanges = true;
+                    }
+                    
+                    if ($hasChanges) {
+                        $existing->save();
+                        $stats['updated']++;
+                    }
                 } else {
                     $category = new Category();
                     $category->source_id = $this->source->id;
@@ -306,16 +321,39 @@ class SyncService
                 $streamDataJson = json_encode($streamData);
 
                 if (!empty($existingStreams)) {
-                    // Update existing
+                    // Update existing - only if values changed
                     $existing = $existingStreams[0];
-                    $existing->name = $streamData['name'] ?? null;
-                    $existing->category_id = $streamData['category_id'] ?? null;
-                    $existing->category_ids = $categoryIds;
-                    $existing->is_adult = $isAdult ? 1 : 0;
-                    $existing->labels = $labels;
-                    $existing->data = $streamDataJson;
-                    $existing->save();
-                    $stats['updated']++;
+                    $hasChanges = false;
+                    
+                    if ($existing->name !== ($streamData['name'] ?? null)) {
+                        $existing->name = $streamData['name'] ?? null;
+                        $hasChanges = true;
+                    }
+                    if ($existing->category_id !== ($streamData['category_id'] ?? null)) {
+                        $existing->category_id = $streamData['category_id'] ?? null;
+                        $hasChanges = true;
+                    }
+                    if ($existing->category_ids !== $categoryIds) {
+                        $existing->category_ids = $categoryIds;
+                        $hasChanges = true;
+                    }
+                    if ($existing->is_adult !== ($isAdult ? 1 : 0)) {
+                        $existing->is_adult = $isAdult ? 1 : 0;
+                        $hasChanges = true;
+                    }
+                    if ($existing->labels !== $labels) {
+                        $existing->labels = $labels;
+                        $hasChanges = true;
+                    }
+                    if ($existing->data !== $streamDataJson) {
+                        $existing->data = $streamDataJson;
+                        $hasChanges = true;
+                    }
+                    
+                    if ($hasChanges) {
+                        $existing->save();
+                        $stats['updated']++;
+                    }
                     unset($existing);
                 } else {
                     // Insert new
@@ -441,15 +479,39 @@ class SyncService
                 $streamDataJson = json_encode($streamData);
 
                 if (!empty($existingStreams)) {
+                    // Update existing - only if values changed
                     $existing = $existingStreams[0];
-                    $existing->name = $streamData['name'] ?? null;
-                    $existing->category_id = $streamData['category_id'] ?? null;
-                    $existing->category_ids = $categoryIds;
-                    $existing->is_adult = $isAdult ? 1 : 0;
-                    $existing->labels = $labels;
-                    $existing->data = $streamDataJson;
-                    $existing->save();
-                    $stats['updated']++;
+                    $hasChanges = false;
+                    
+                    if ($existing->name !== ($streamData['name'] ?? null)) {
+                        $existing->name = $streamData['name'] ?? null;
+                        $hasChanges = true;
+                    }
+                    if ($existing->category_id !== ($streamData['category_id'] ?? null)) {
+                        $existing->category_id = $streamData['category_id'] ?? null;
+                        $hasChanges = true;
+                    }
+                    if ($existing->category_ids !== $categoryIds) {
+                        $existing->category_ids = $categoryIds;
+                        $hasChanges = true;
+                    }
+                    if ($existing->is_adult !== ($isAdult ? 1 : 0)) {
+                        $existing->is_adult = $isAdult ? 1 : 0;
+                        $hasChanges = true;
+                    }
+                    if ($existing->labels !== $labels) {
+                        $existing->labels = $labels;
+                        $hasChanges = true;
+                    }
+                    if ($existing->data !== $streamDataJson) {
+                        $existing->data = $streamDataJson;
+                        $hasChanges = true;
+                    }
+                    
+                    if ($hasChanges) {
+                        $existing->save();
+                        $stats['updated']++;
+                    }
                     unset($existing);
                 } else {
                     $stream = new VodStream();
@@ -574,15 +636,39 @@ class SyncService
                 $streamDataJson = json_encode($streamData);
 
                 if (!empty($existingStreams)) {
+                    // Update existing - only if values changed
                     $existing = $existingStreams[0];
-                    $existing->name = $streamData['name'] ?? null;
-                    $existing->category_id = $streamData['category_id'] ?? null;
-                    $existing->category_ids = $categoryIds;
-                    $existing->is_adult = $isAdult ? 1 : 0;
-                    $existing->labels = $labels;
-                    $existing->data = $streamDataJson;
-                    $existing->save();
-                    $stats['updated']++;
+                    $hasChanges = false;
+                    
+                    if ($existing->name !== ($streamData['name'] ?? null)) {
+                        $existing->name = $streamData['name'] ?? null;
+                        $hasChanges = true;
+                    }
+                    if ($existing->category_id !== ($streamData['category_id'] ?? null)) {
+                        $existing->category_id = $streamData['category_id'] ?? null;
+                        $hasChanges = true;
+                    }
+                    if ($existing->category_ids !== $categoryIds) {
+                        $existing->category_ids = $categoryIds;
+                        $hasChanges = true;
+                    }
+                    if ($existing->is_adult !== ($isAdult ? 1 : 0)) {
+                        $existing->is_adult = $isAdult ? 1 : 0;
+                        $hasChanges = true;
+                    }
+                    if ($existing->labels !== $labels) {
+                        $existing->labels = $labels;
+                        $hasChanges = true;
+                    }
+                    if ($existing->data !== $streamDataJson) {
+                        $existing->data = $streamDataJson;
+                        $hasChanges = true;
+                    }
+                    
+                    if ($hasChanges) {
+                        $existing->save();
+                        $stats['updated']++;
+                    }
                     unset($existing);
                 } else {
                     $stream = new Series();
