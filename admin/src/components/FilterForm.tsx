@@ -327,7 +327,7 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
   const [showFavorisExamples, setShowFavorisExamples] = useState(false);
   const [rulesTabIndex, setRulesTabIndex] = useState(0);
   const [favorisTabIndex, setFavorisTabIndex] = useState(0);
-  const [mainTabIndex, setMainTabIndex] = useState(0);
+  const [tabIndex, setTabIndex] = useState(0);
 
   const createMutation = useMutation({
     mutationFn: (data: Parameters<typeof filtersApi.createFilter>[0]) =>
@@ -418,179 +418,180 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
   return (
     <>
       <DialogTitle>{filter ? 'Edit Filter' : 'Create New Filter'}</DialogTitle>
-      <DialogContent sx={{ minWidth: 800, pt: 2 }}>
+      <DialogContent sx={{ minWidth: 900, pt: 2 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        {/* Basic Info */}
-        <TextField
-          fullWidth
-          label="Filter Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          margin="normal"
-          required
-        />
+        {/* Main Tabs */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+          <Tabs
+            value={tabIndex}
+            onChange={(_, newValue) => setTabIndex(newValue)}
+          >
+            <Tab label="Basics" />
+            <Tab label="Filter" />
+            <Tab label="Favorite" />
+          </Tabs>
+        </Box>
 
-        <TextField
-          fullWidth
-          label="Description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          margin="normal"
-          multiline
-          rows={2}
-        />
+        {/* Basics Tab */}
+        {tabIndex === 0 && (
+          <Box sx={{ p: 2 }}>
+            <TextField
+              fullWidth
+              label="Filter Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              margin="normal"
+              required
+            />
 
-        {/* Template Buttons */}
-        {!filter && (
-          <Box sx={{ mt: 3, mb: 3 }}>
-            <p style={{ margin: '8px 0', fontSize: '0.875rem', color: '#666' }}>
-              Quick Templates:
-            </p>
-            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
-              {Object.entries(FILTER_TEMPLATES).map(([key, template]) => (
-                <Button
-                  key={key}
-                  variant="outlined"
-                  size="small"
-                  onClick={() => handleApplyTemplate(key as keyof typeof FILTER_TEMPLATES)}
-                >
-                  {template.name}
-                </Button>
-              ))}
-            </Stack>
+            <TextField
+              fullWidth
+              label="Description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              margin="normal"
+              multiline
+              rows={4}
+            />
+
+            {/* Template Buttons */}
+            {!filter && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="body2" sx={{ fontWeight: 500, mb: 1.5 }}>
+                  Quick Templates:
+                </Typography>
+                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+                  {Object.entries(FILTER_TEMPLATES).map(([key, template]) => (
+                    <Button
+                      key={key}
+                      variant="outlined"
+                      size="small"
+                      onClick={() => handleApplyTemplate(key as keyof typeof FILTER_TEMPLATES)}
+                    >
+                      {template.name}
+                    </Button>
+                  ))}
+                </Stack>
+              </Box>
+            )}
           </Box>
         )}
 
-        {/* Main Tabs for Rules and Favoris */}
-        <Box sx={{ mt: 3, mb: 2, border: '1px solid #ccc', borderRadius: 1 }}>
-          <Tabs
-            value={mainTabIndex}
-            onChange={(_, newValue) => setMainTabIndex(newValue)}
-            sx={{ borderBottom: '1px solid #ccc', bgcolor: '#f5f5f5' }}
-          >
-            <Tab label="Filter Rules *" />
-            <Tab label="Virtual Categories / Favoris" />
-          </Tabs>
-
-          {/* Rules Tab */}
-          {mainTabIndex === 0 && (
-            <Box sx={{ p: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  Filter Rules (YAML)
-                </Typography>
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    setShowRulesExamples(true);
-                    setRulesTabIndex(0);
-                  }}
-                  title="View configuration examples"
-                  sx={{ p: 0.5 }}
-                >
-                  <HelpOutlineIcon sx={{ fontSize: '1.2rem' }} />
-                </IconButton>
-              </Box>
-              <Box
-                sx={{
-                  border: '1px solid #ccc',
-                  borderRadius: 1,
-                  overflow: 'hidden',
-                  height: 300,
-                  backgroundColor: '#f5f5f5',
-                }}
-              >
-                <Editor
-                  height="100%"
-                  defaultLanguage="yaml"
-                  value={rulesYaml}
-                  onChange={(value) => {
-                    setRulesYaml(value || '');
-                    setError(null);
-                  }}
-                  theme="vs"
-                  options={{
-                    minimap: { enabled: false },
-                    wordWrap: 'on',
-                    lineNumbers: 'on',
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                  }}
-                />
-              </Box>
-              <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#999' }}>
-                Must start with "rules:" followed by array of rules. Each rule has name, type (include/exclude), and match criteria.
-                by_name supports wildcards: * and ?. by_labels uses AND logic (all must match).
-                Include rules ACCEPT matching streams, exclude rules REJECT matching streams. Unmatched hidden if rules exist.
+        {/* Filter Tab */}
+        {tabIndex === 1 && (
+          <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                Filter Rules (YAML) *
               </Typography>
-            </Box>
-          )}
-
-          {/* Favoris Tab */}
-          {mainTabIndex === 1 && (
-            <Box sx={{ p: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  Virtual Categories / Favoris (Optional)
-                </Typography>
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    setShowFavorisExamples(true);
-                    setFavorisTabIndex(0);
-                  }}
-                  title="View configuration examples"
-                  sx={{ p: 0.5 }}
-                >
-                  <HelpOutlineIcon sx={{ fontSize: '1.2rem' }} />
-                </IconButton>
-              </Box>
-              <Box
-                sx={{
-                  border: '1px solid #ccc',
-                  borderRadius: 1,
-                  overflow: 'hidden',
-                  height: 300,
-                  backgroundColor: '#f5f5f5',
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setShowRulesExamples(true);
+                  setRulesTabIndex(0);
                 }}
+                title="View configuration examples"
+                sx={{ p: 0.5 }}
               >
-                <Editor
-                  height="100%"
-                  defaultLanguage="yaml"
-                  value={favorisYaml}
-                  onChange={(value) => {
-                    setFavorisYaml(value || '');
-                    setError(null);
-                  }}
-                  theme="vs"
-                  options={{
-                    minimap: { enabled: false },
-                    wordWrap: 'on',
-                    lineNumbers: 'on',
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                  }}
-                />
-              </Box>
-              <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#999' }}>
-                Array of virtual categories (no "favoris:" wrapper). Each has name, target_group (display name), and match criteria.
-                Generated IDs start at 100000 (first favoris), 100001 (second), etc. Stored separately from rules.
-              </Typography>
+                <HelpOutlineIcon sx={{ fontSize: '1.2rem' }} />
+              </IconButton>
             </Box>
-          )}
-        </Box>
+            <Box
+              sx={{
+                border: '1px solid #ccc',
+                borderRadius: 1,
+                overflow: 'hidden',
+                height: 350,
+                backgroundColor: '#f5f5f5',
+              }}
+            >
+              <Editor
+                height="100%"
+                defaultLanguage="yaml"
+                value={rulesYaml}
+                onChange={(value) => {
+                  setRulesYaml(value || '');
+                  setError(null);
+                }}
+                theme="vs"
+                options={{
+                  minimap: { enabled: false },
+                  wordWrap: 'on',
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                }}
+              />
+            </Box>
+            <Typography variant="caption" sx={{ color: '#999' }}>
+              Must start with "rules:" followed by array of rules. Each rule has name, type (include/exclude), and match criteria.
+              by_name supports wildcards: * and ?. by_labels uses AND logic (all must match).
+              Include rules ACCEPT matching streams, exclude rules REJECT matching streams. Unmatched hidden if rules exist.
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={validateYAML}
+              sx={{ alignSelf: 'flex-start' }}
+            >
+              Validate YAML
+            </Button>
+          </Box>
+        )}
 
-        {/* Validate Button */}
-        <Box sx={{ mb: 2 }}>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={validateYAML}
-          >
-            Validate YAML
-          </Button>
-        </Box>
+        {/* Favorite Tab */}
+        {tabIndex === 2 && (
+          <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                Virtual Categories / Favoris (Optional)
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setShowFavorisExamples(true);
+                  setFavorisTabIndex(0);
+                }}
+                title="View configuration examples"
+                sx={{ p: 0.5 }}
+              >
+                <HelpOutlineIcon sx={{ fontSize: '1.2rem' }} />
+              </IconButton>
+            </Box>
+            <Box
+              sx={{
+                border: '1px solid #ccc',
+                borderRadius: 1,
+                overflow: 'hidden',
+                height: 350,
+                backgroundColor: '#f5f5f5',
+              }}
+            >
+              <Editor
+                height="100%"
+                defaultLanguage="yaml"
+                value={favorisYaml}
+                onChange={(value) => {
+                  setFavorisYaml(value || '');
+                  setError(null);
+                }}
+                theme="vs"
+                options={{
+                  minimap: { enabled: false },
+                  wordWrap: 'on',
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                }}
+              />
+            </Box>
+            <Typography variant="caption" sx={{ color: '#999' }}>
+              Array of virtual categories (no "favoris:" wrapper). Each has name, target_group (display name), and match criteria.
+              Generated IDs start at 100000 (first favoris), 100001 (second), etc. Stored separately from rules.
+            </Typography>
+          </Box>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onCancel} disabled={isLoading}>
