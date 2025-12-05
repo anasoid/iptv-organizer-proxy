@@ -17,7 +17,6 @@ vendor/
 
 # PHP
 composer.phar
-composer.lock
 
 # Editor directories and files
 .idea
