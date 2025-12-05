@@ -67,11 +67,12 @@ if (!$source) {
 // Proxy XMLTV from original source
 try {
     $xtreamClient = new \App\Services\Xtream\XtreamClient($source);
-    $xmltv = $xtreamClient->getEpgClient()->getXmltv();
-    
+    $xmltvResponse = $xtreamClient->getEpgClient()->getXmltv();
+
     header('Content-Type: application/xml; charset=utf-8');
-    
-    echo $xmltv;
+
+    // Stream the response body directly without loading into memory
+    echo $xmltvResponse->getBody();
 } catch (\Exception $e) {
     http_response_code(500);
     header('Content-Type: application/xml');

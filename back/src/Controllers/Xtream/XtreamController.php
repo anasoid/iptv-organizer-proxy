@@ -580,12 +580,17 @@ class XtreamController
         $streamId = isset($queryParams['stream_id']) ? (int) $queryParams['stream_id'] : null;
 
         try {
-            // Proxy to original source
+            // Proxy to original source (streamed to avoid memory overhead for large XMLTV files)
             $xtreamClient = new \App\Services\Xtream\XtreamClient($source);
-            $xmltv = $xtreamClient->getEpgClient()->getXmltv($streamId);
+            $xmltvResponse = $xtreamClient->getEpgClient()->getXmltv($streamId);
 
-            $response->getBody()->write($xmltv);
-            return $response->withHeader('Content-Type', 'application/xml');
+            // Pipe source response stream directly to client response
+            $sourceBody = $xmltvResponse->getBody();
+            $response = $response
+                ->withBody($sourceBody)
+                ->withHeader('Content-Type', 'application/xml');
+
+            return $response;
         } catch (\Exception $e) {
             return $this->jsonError($response, 'Failed to fetch XMLTV: ' . $e->getMessage(), 500);
         }

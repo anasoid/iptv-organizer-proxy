@@ -6,6 +6,7 @@ namespace App\Services\Xtream;
 
 use App\Exceptions\XtreamApiException;
 use GuzzleHttp\Exception\GuzzleException;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Xtream Codes EPG Client
@@ -60,13 +61,13 @@ class XtreamEpgClient
     }
 
     /**
-     * Get XMLTV data
+     * Get XMLTV data (streamed to avoid memory overhead)
      *
      * @param int|null $streamId Optional stream ID filter
-     * @return string Raw XMLTV XML data
+     * @return ResponseInterface PSR-7 response with streamed XMLTV data
      * @throws XtreamApiException
      */
-    public function getXmltv(?int $streamId = null): string
+    public function getXmltv(?int $streamId = null): ResponseInterface
     {
         $credentials = $this->authenticator->getCredentials();
         $httpClient = $this->authenticator->getHttpClient();
@@ -91,23 +92,14 @@ class XtreamEpgClient
             try {
                 $response = $httpClient->get($xmltvUrl, [
                     'query' => $params,
+                    'stream' => true,  // Stream response instead of loading into memory
                 ]);
 
-                $body = (string) $response->getBody();
-
-                if (empty($body)) {
-                    $logger->warning('Empty XMLTV response', [
-                        'stream_id' => $streamId,
-                    ]);
-                    return '';
-                }
-
-                $logger->info('XMLTV data fetched successfully', [
+                $logger->info('XMLTV data stream opened successfully', [
                     'stream_id' => $streamId,
-                    'size' => strlen($body),
                 ]);
 
-                return $body;
+                return $response;
             } catch (GuzzleException $e) {
                 $attempt++;
                 $lastException = $e;

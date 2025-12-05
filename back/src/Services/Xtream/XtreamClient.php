@@ -7,6 +7,7 @@ namespace App\Services\Xtream;
 use App\Exceptions\XtreamApiException;
 use App\Models\Source;
 use GuzzleHttp\Client;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Xtream Codes API Client (Main Facade)
@@ -176,13 +177,13 @@ class XtreamClient
     }
 
     /**
-     * Get XMLTV data
+     * Get XMLTV data (streamed to avoid memory overhead)
      *
      * @param int|null $streamId Optional stream ID filter
-     * @return string
+     * @return ResponseInterface PSR-7 response with streamed XMLTV data
      * @throws XtreamApiException
      */
-    public function getXmltv(?int $streamId = null): string
+    public function getXmltv(?int $streamId = null): ResponseInterface
     {
         return $this->epgClient->getXmltv($streamId);
     }
