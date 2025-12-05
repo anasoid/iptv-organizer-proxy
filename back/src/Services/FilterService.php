@@ -201,13 +201,16 @@ class FilterService
             $nameMatches = true; // No name criteria = matches
         }
 
-        // Check by_labels: ANY label must exist (OR logic)
+        // Check by_labels: ANY label must match (OR logic)
         $labelsMatch = false;
         if (!empty($criteria['by_labels'])) {
-            foreach ($criteria['by_labels'] as $label) {
-                if (in_array(strtolower($label), $channelLabels, true)) {
-                    $labelsMatch = true;
-                    break;
+            foreach ($criteria['by_labels'] as $pattern) {
+                // Check if pattern matches any of the channel's labels
+                foreach ($channelLabels as $label) {
+                    if ($this->matchesPattern($label, $pattern)) {
+                        $labelsMatch = true;
+                        break 2; // Break both loops
+                    }
                 }
             }
         } else {
@@ -223,7 +226,7 @@ class FilterService
      *
      * Matching Rules:
      * - by_name: Wildcard patterns (case-insensitive), ANY pattern matches (OR logic)
-     * - by_labels: Exact match (case-insensitive), ALL labels must exist (AND logic)
+     * - by_labels: Wildcard patterns (case-insensitive), ANY label must match (OR logic)
      *
      * @param string $categoryName Category name
      * @param string $categoryLabelsStr Comma-separated labels
@@ -248,13 +251,16 @@ class FilterService
             $nameMatches = true; // No name criteria = matches
         }
 
-        // Check by_labels: ANY label must exist (OR logic)
+        // Check by_labels: ANY label must match (OR logic)
         $labelsMatch = false;
         if (!empty($criteria['by_labels'])) {
-            foreach ($criteria['by_labels'] as $label) {
-                if (in_array(strtolower($label), $categoryLabels, true)) {
-                    $labelsMatch = true;
-                    break;
+            foreach ($criteria['by_labels'] as $pattern) {
+                // Check if pattern matches any of the category's labels
+                foreach ($categoryLabels as $label) {
+                    if ($this->matchesPattern($label, $pattern)) {
+                        $labelsMatch = true;
+                        break 2; // Break both loops
+                    }
                 }
             }
         } else {
