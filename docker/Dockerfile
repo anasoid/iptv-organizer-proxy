@@ -52,14 +52,14 @@ RUN mkdir -p /app/data && chown -R app:app /app/data
 RUN mkdir -p /app/logs && chown -R app:app /app/logs
 
 # Copy nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
-COPY nginx-default.conf /etc/nginx/conf.d/default.conf
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY docker/nginx-default.conf /etc/nginx/conf.d/default.conf
 
 # Copy supervisord configuration
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Copy entrypoint script
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY docker/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Create .env file with SQLite configuration
