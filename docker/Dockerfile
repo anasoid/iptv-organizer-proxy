@@ -18,6 +18,13 @@ RUN composer install --no-dev --optimize-autoloader --classmap-authoritative
 # Runtime stage - minimal PHP-FPM image
 FROM php:8.2-fpm-alpine
 
+# Install build dependencies temporarily
+RUN apk add --no-cache --virtual .build-deps \
+    $PHPIZE_DEPS
+
+# Install PHP extensions
+RUN docker-php-ext-install pdo_sqlite
+
 # Install runtime dependencies
 RUN apk add --no-cache \
     sqlite \
@@ -25,8 +32,8 @@ RUN apk add --no-cache \
     nginx \
     supervisor
 
-# Copy PHP extensions configuration
-RUN docker-php-ext-install pdo pdo_sqlite
+# Clean up build dependencies to keep image small
+RUN apk del .build-deps
 
 # Create app user for security
 RUN addgroup -g 1000 app && \
