@@ -67,7 +67,7 @@ COPY docker/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Install openssl for generating secrets
-RUN apk add --no-cache openssl
+RUN apk add --no-cache --no-scripts openssl
 
 # Create .env file with SQLite configuration and auto-generated secrets
 RUN JWT_SECRET=$(openssl rand -hex 32) && \
