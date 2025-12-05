@@ -42,8 +42,18 @@ class XtreamController
         $source = $request->getAttribute('source');
 
         // Get proxy URL from environment or request
-        $proxyUrl = $_ENV['APP_URL'] ??
-                    $request->getUri()->getScheme() . '://' . $request->getUri()->getHost();
+        $proxyUrl = $_ENV['APP_URL'] ?? (function() use ($request) {
+            $uri = $request->getUri();
+            $scheme = $uri->getScheme();
+            $host = $uri->getHost();
+            $port = $uri->getPort();
+
+            // Include port if it's not a default port for the scheme
+            if ($port && !(($scheme === 'http' && $port === 80) || ($scheme === 'https' && $port === 443))) {
+                return $scheme . '://' . $host . ':' . $port;
+            }
+            return $scheme . '://' . $host;
+        })();
 
         try {
             // Fetch authentication data from original source
@@ -57,13 +67,13 @@ class XtreamController
                 $scheme = $parsedUrl['scheme'] ?? 'http';
                 $host = $parsedUrl['host'] ?? 'localhost';
                 $port = $parsedUrl['port'] ?? ($scheme === 'https' ? 443 : 80);
-                
+
                 // Set domain (without protocol and port)
                 $authData['server_info']['url'] = $host;
-                
+
                 // Set protocol
                 $authData['server_info']['server_protocol'] = $scheme;
-                
+
                 // Set ports based on protocol
                 if ($scheme === 'https') {
                     // HTTPS: use current port in https_port, port is 80
@@ -74,14 +84,28 @@ class XtreamController
                     $authData['server_info']['port'] = (string) $port;
                     $authData['server_info']['https_port'] = '443';
                 }
-                
+
                 // Update timestamp to current time
                 $authData['server_info']['timestamp_now'] = time();
                 $authData['server_info']['time_now'] = date('Y-m-d H:i:s');
             }
 
+            // Replace user info with client credentials (not source credentials)
+            if (isset($authData['user_info'])) {
+                $authData['user_info']['username'] = $client->getAttribute('username');
+                $authData['user_info']['password'] = $client->getAttribute('password');
+            }
+
             $data = $authData;
         } catch (\Exception $e) {
+            // Log the exception
+            error_log(sprintf(
+                'Failed to fetch authentication from source %d for client %d: %s',
+                $source->getAttribute('id'),
+                $client->getAttribute('id'),
+                $e->getMessage()
+            ));
+
             // Fallback to basic info if source fetch fails
             $parsedUrl = parse_url($proxyUrl);
             $scheme = $parsedUrl['scheme'] ?? 'http';
