@@ -47,6 +47,9 @@ COPY --chown=app:app back/bin ./bin
 COPY --chown=app:app back/migrations ./migrations
 COPY --chown=app:app back/bootstrap.php ./
 
+# Copy admin frontend build
+COPY --chown=app:app admin/dist ./public/admin
+
 # Create data and logs directories with proper permissions
 RUN mkdir -p /app/data /app/logs && \
     chown -R app:app /app/data /app/logs && \
