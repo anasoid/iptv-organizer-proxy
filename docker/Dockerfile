@@ -24,7 +24,7 @@ RUN apk add --no-cache --no-scripts \
     mkdir -p /etc/nginx/conf.d /var/log/nginx
 
 # Install build dependencies for PHP extensions
-RUN apk add --no-cache --virtual .build-deps \
+RUN apk add --no-cache --no-scripts --virtual .build-deps \
     $PHPIZE_DEPS \
     sqlite-dev
 
