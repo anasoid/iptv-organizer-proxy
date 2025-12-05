@@ -36,7 +36,7 @@ jobs:
         working-directory: ./admin
         run: |
           npm install
-          npm run build
+          VITE_BASE_PATH=/admin/ npm run build
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
