@@ -1,11 +1,6 @@
 # Multi-stage build for minimal image size
-FROM php:8.2-fpm-alpine AS builder
-
-# Install build dependencies
-RUN apk add --no-cache \
-    composer \
-    git \
-    curl
+# Use official Composer image for dependency installation
+FROM composer:2.6-alpine AS builder
 
 WORKDIR /app
 
