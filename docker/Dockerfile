@@ -53,7 +53,7 @@ COPY --chown=app:app admin/dist ./public/admin
 # Create data and logs directories with proper permissions
 RUN mkdir -p /app/data /app/logs && \
     chown -R app:app /app/data /app/logs && \
-    chmod 775 /app/data /app/logs && \
+    chmod 777 /app/data /app/logs && \
     chmod -R 755 /app/src /app/config /app/bin /app/migrations /app/public && \
     chmod 644 /app/src/**/*.php /app/config/**/*.php /app/bin/**/*.php /app/migrations/**/*.php /app/public/**/*.php 2>/dev/null || true
 
