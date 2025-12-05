@@ -131,14 +131,71 @@ class Filter extends BaseModel
             throw new RuntimeException("Rules YAML must contain 'rules:' section");
         }
 
-        // Try to parse it
+        // Try to parse it and validate structure
         try {
-            $instance = new static();
-            $instance->filter_config = $yaml;
-            $rulesConfig = $instance->parseYamlBasic($yaml);
-            if (!isset($rulesConfig['rules'])) {
+            // Use Symfony YAML parser for proper validation
+            $parser = new \Symfony\Component\Yaml\Parser();
+            $config = $parser->parse($yaml);
+
+            if (!isset($config['rules'])) {
                 throw new RuntimeException("Rules YAML must contain 'rules:' section");
             }
+
+            if (!is_array($config['rules'])) {
+                throw new RuntimeException("'rules' section must be an array");
+            }
+
+            // Validate each rule structure
+            foreach ($config['rules'] as $index => $rule) {
+                if (!is_array($rule)) {
+                    throw new RuntimeException("Rule " . ($index + 1) . " must be an object");
+                }
+
+                // Check required fields
+                if (empty($rule['name'])) {
+                    throw new RuntimeException("Rule " . ($index + 1) . " is missing 'name' field");
+                }
+
+                if (!isset($rule['type']) || !in_array($rule['type'], ['include', 'exclude'])) {
+                    throw new RuntimeException("Rule '{$rule['name']}' has invalid 'type' (must be 'include' or 'exclude')");
+                }
+
+                if (empty($rule['match'])) {
+                    throw new RuntimeException("Rule '{$rule['name']}' is missing 'match' section");
+                }
+
+                if (!is_array($rule['match'])) {
+                    throw new RuntimeException("Rule '{$rule['name']}' match section must be an object");
+                }
+
+                // Validate match criteria keys
+                $validCriteriaKeys = ['categories', 'channels', 'stream_type'];
+                foreach ($rule['match'] as $key => $value) {
+                    if (!in_array($key, $validCriteriaKeys)) {
+                        throw new RuntimeException("Rule '{$rule['name']}' has invalid match criteria key '{$key}' (valid keys: " . implode(', ', $validCriteriaKeys) . ")");
+                    }
+
+                    // Validate categories/channels structure
+                    if ($key === 'categories' || $key === 'channels') {
+                        if (!is_array($value)) {
+                            throw new RuntimeException("Rule '{$rule['name']}' {$key} must be an object");
+                        }
+
+                        // Check for valid keys
+                        $validKeys = ['by_name', 'by_labels'];
+                        foreach ($value as $subKey => $subValue) {
+                            if (!in_array($subKey, $validKeys)) {
+                                throw new RuntimeException("Rule '{$rule['name']}' has unexpected {$key} key '{$subKey}'. Valid keys: " . implode(', ', $validKeys));
+                            }
+
+                            if (!is_array($subValue)) {
+                                throw new RuntimeException("Rule '{$rule['name']}' {$key}.{$subKey} must be an array");
+                            }
+                        }
+                    }
+                }
+            }
+
             return true;
         } catch (\Exception $e) {
             throw new RuntimeException("Invalid rules YAML: " . $e->getMessage());

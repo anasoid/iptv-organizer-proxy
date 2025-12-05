@@ -17,8 +17,24 @@ import {
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import Editor from '@monaco-editor/react';
 import { useMutation } from '@tanstack/react-query';
+import type { AxiosError } from 'axios';
 import type { Filter } from '../services/filtersApi';
 import filtersApi from '../services/filtersApi';
+
+/**
+ * Extract error message from axios error response
+ */
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    // Check if it's an axios error with response data
+    const axiosErr = err as AxiosError<{ message?: string; success?: boolean }>;
+    if (axiosErr.response?.data?.message) {
+      return axiosErr.response.data.message;
+    }
+    return err.message;
+  }
+  return 'An unexpected error occurred';
+}
 
 interface FilterFormProps {
   filter: Filter | null;
@@ -320,7 +336,7 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
       onSuccess();
     },
     onError: (err) => {
-      setError(err instanceof Error ? err.message : 'Failed to create filter');
+      setError(getErrorMessage(err));
     },
   });
 
@@ -331,7 +347,7 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
       onSuccess();
     },
     onError: (err) => {
-      setError(err instanceof Error ? err.message : 'Failed to update filter');
+      setError(getErrorMessage(err));
     },
   });
 
