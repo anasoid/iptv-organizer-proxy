@@ -104,98 +104,112 @@ const RULES_CONFIG_EXAMPLES = {
 const FAVORIS_CONFIG_EXAMPLES = {
   sports: {
     title: 'Sports Organization',
-    description: 'Organize sports content by type and region',
+    description: 'Organize sports content by type and region (supports channels, categories, wildcards, case-insensitive)',
     yaml: `- name: "Live Sports Events"
   target_group: "Live Sports"
   match:
     channels:
       by_name: ["ESPN*", "Fox*Sports*", "*League*"]
       by_labels: ["live", "sports"]
+    categories:
+      by_name: ["*Sports*", "*Football*"]
 
 - name: "Regional Sports"
   target_group: "Regional"
   match:
     channels:
       by_name: ["*Sports*"]
-      by_labels: ["sports", "regional"]
+    categories:
+      by_name: ["*Regional*"]
 
 - name: "Premium Sports"
   target_group: "Premium"
   match:
     channels:
       by_name: ["DAZN*", "BeIN*"]
-      by_labels: ["premium", "sports"]`,
+    categories:
+      by_name: ["*Premium*"]`,
   },
   entertainment: {
     title: 'Entertainment Categories',
-    description: 'Organize movies and shows by genre',
+    description: 'Organize movies and shows by genre (supports categories and channel matching)',
     yaml: `- name: "Movies - Action"
   target_group: "Action"
   match:
     channels:
       by_name: ["*Action*", "*Thriller*"]
-      by_labels: ["action"]
+    categories:
+      by_name: ["*Action*", "*Thriller*"]
 
 - name: "Movies - Comedy"
   target_group: "Comedy"
   match:
     channels:
       by_name: ["*Comedy*"]
-      by_labels: ["comedy"]
+    categories:
+      by_name: ["*Comedy*"]
 
 - name: "TV Series"
   target_group: "Series"
   match:
     channels:
       by_name: ["*Series*", "*Episode*"]
-      by_labels: ["series"]`,
+    categories:
+      by_name: ["*Series*"]`,
   },
   family: {
     title: 'Family Content',
-    description: 'Organize family-friendly content by age group',
+    description: 'Organize family-friendly content by age group with categories and channels',
     yaml: `- name: "Kids Cartoons"
   target_group: "Cartoons"
   match:
     channels:
-      by_name: ["Disney*", "*Cartoon*", "Nickelodeon*"]
-      by_labels: ["kids"]
+      by_name: ["*Cartoon*", "*Anime*"]
+    categories:
+      by_name: ["*Kids*", "*Cartoons*"]
 
 - name: "Family Movies"
   target_group: "Family"
   match:
     channels:
       by_name: ["*Family*", "*Kids*"]
-      by_labels: ["family", "kids"]
+    categories:
+      by_name: ["*Family*"]
 
 - name: "Educational"
   target_group: "Educational"
   match:
     channels:
       by_name: ["PBS*", "*Educational*"]
-      by_labels: ["educational"]`,
+    categories:
+      by_name: ["*Educational*", "*Learning*"]`,
   },
   regional: {
     title: 'Regional News',
-    description: 'Organize news channels by region',
+    description: 'Organize news channels by region (categories and channels with wildcards)',
     yaml: `- name: "International News"
   target_group: "World News"
   match:
     channels:
       by_name: ["BBC*", "France*", "Al Jazeera*", "Reuters*", "Euro*"]
-      by_labels: ["international"]
+    categories:
+      by_name: ["*International*", "*World*", "*News*"]
 
 - name: "Local News"
   target_group: "Local"
   match:
     channels:
       by_name: ["*Local*", "*Regional*"]
-      by_labels: ["local"]
+    categories:
+      by_name: ["*Local*", "*Regional*"]
 
 - name: "Breaking News"
   target_group: "Breaking"
   match:
     channels:
-      by_labels: ["breaking", "live"]`,
+      by_labels: ["breaking", "live"]
+    categories:
+      by_labels: ["breaking"]`,
   },
 };
 
@@ -305,14 +319,16 @@ const FILTER_TEMPLATES = {
   match:
     channels:
       by_name: ["Disney*", "Nickelodeon*", "*PBS*"]
-      by_labels: ["kids", "hd"]
+    categories:
+      by_name: ["*Premium*", "*HD*"]
 
 - name: "All Kids Cartoons"
   target_group: "Cartoons"
   match:
     channels:
       by_name: ["*Cartoon*", "*Anime*"]
-      by_labels: ["kids"]
+    categories:
+      by_name: ["*Kids*", "*Cartoons*"]
 `,
   },
 };

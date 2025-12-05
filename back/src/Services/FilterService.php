@@ -390,6 +390,11 @@ class FilterService
             $filtered = $this->applyFilterRules($filtered);
         }
 
+        // Enrich streams with matching favoris category IDs
+        if ($this->filter !== null) {
+            $filtered = $this->enrichStreamsWithFavorisCategories($filtered);
+        }
+
         return $filtered;
     }
 
@@ -670,13 +675,148 @@ class FilterService
 
         $match = $favRule['match'] ?? [];
 
+        // Batch load all categories for efficient lookup (to enrich streams with category labels)
+        $categoryCache = [];
+        if (!empty($streams)) {
+            $firstStream = current($streams);
+            $sourceId = $firstStream['source_id'] ?? null;
+            if ($sourceId) {
+                // Determine stream type from the stream data
+                $streamType = $firstStream['stream_type'] ?? 'live';
+                $allCategories = Category::getBySourceAndType($sourceId, $streamType);
+                foreach ($allCategories as $cat) {
+                    $key = $sourceId . '_' . $cat->category_id;
+                    $categoryCache[$key] = $cat;
+                }
+            }
+        }
+
+        // Enrich streams with category labels if missing
+        $enrichedStreams = array_map(function($stream) use ($categoryCache) {
+            if (!empty($stream['category_labels'])) {
+                return $stream; // Already has labels
+            }
+
+            // Try to enrich with category labels from cache
+            $categoryId = $stream['category_id'] ?? null;
+            $sourceId = $stream['source_id'] ?? null;
+            if ($categoryId && $sourceId) {
+                $key = $sourceId . '_' . $categoryId;
+                if (isset($categoryCache[$key])) {
+                    $category = $categoryCache[$key];
+                    $categoryLabels = $category->getAttribute('labels') ?? '';
+                    if (empty($categoryLabels)) {
+                        $categoryLabels = Category::extractLabels($category->getAttribute('category_name') ?? '');
+                    }
+                    $stream['category_labels'] = $categoryLabels;
+                    // Also set category_name if missing
+                    if (empty($stream['category_name'])) {
+                        $stream['category_name'] = $category->getAttribute('category_name') ?? '';
+                    }
+                }
+            }
+            return $stream;
+        }, $streams);
+
         // Filter streams matching the favoris criteria
         $filtered = array_filter(
-            $streams,
+            $enrichedStreams,
             fn($stream) => $this->matchStream($stream, $match)
         );
 
         return array_values($filtered); // Re-index array
+    }
+
+    /**
+     * Enrich streams with matching favoris category IDs
+     *
+     * For each stream, check if it matches any favoris rule and add the corresponding
+     * favoris category ID (100000 + favoris index) to the stream's category_ids field.
+     *
+     * @param array $streams Filtered streams
+     * @return array Streams enriched with favoris category IDs
+     */
+    private function enrichStreamsWithFavorisCategories(array $streams): array
+    {
+        $config = $this->parseFilter();
+        $favoris = $config['favoris'] ?? [];
+
+        if (empty($favoris)) {
+            return $streams; // No favoris to match
+        }
+
+        // Batch load all categories for efficient lookup (to enrich streams with category labels)
+        $categoryCache = [];
+        if (!empty($streams)) {
+            $firstStream = current($streams);
+            $sourceId = $firstStream['source_id'] ?? null;
+            if ($sourceId) {
+                $streamType = $firstStream['stream_type'] ?? 'live';
+                $allCategories = Category::getBySourceAndType($sourceId, $streamType);
+                foreach ($allCategories as $cat) {
+                    $key = $sourceId . '_' . $cat->category_id;
+                    $categoryCache[$key] = $cat;
+                }
+            }
+        }
+
+        // Enrich each stream with matching favoris category IDs
+        return array_map(function($stream) use ($favoris, $categoryCache) {
+            // Enrich with category labels if missing (needed for matching)
+            if (empty($stream['category_labels'])) {
+                $categoryId = $stream['category_id'] ?? null;
+                $sourceId = $stream['source_id'] ?? null;
+                if ($categoryId && $sourceId) {
+                    $key = $sourceId . '_' . $categoryId;
+                    if (isset($categoryCache[$key])) {
+                        $category = $categoryCache[$key];
+                        $categoryLabels = $category->getAttribute('labels') ?? '';
+                        if (empty($categoryLabels)) {
+                            $categoryLabels = Category::extractLabels($category->getAttribute('category_name') ?? '');
+                        }
+                        $stream['category_labels'] = $categoryLabels;
+                        if (empty($stream['category_name'])) {
+                            $stream['category_name'] = $category->getAttribute('category_name') ?? '';
+                        }
+                    }
+                }
+            }
+
+            // Parse existing category_ids
+            $categoryIds = [];
+            if (!empty($stream['category_ids'])) {
+                $categoryIds = json_decode($stream['category_ids'], true) ?? [];
+            }
+            if (!is_array($categoryIds)) {
+                $categoryIds = [];
+            }
+
+            // Check if stream matches any favoris rule
+            foreach ($favoris as $index => $favRule) {
+                if (!is_array($favRule)) {
+                    continue;
+                }
+
+                $match = $favRule['match'] ?? [];
+
+                // Check if stream matches this favoris rule
+                if ($this->matchStream($stream, $match)) {
+                    $favorisCategoryId = 100000 + $index;
+
+                    // Add favoris category ID if not already present
+                    if (!in_array($favorisCategoryId, $categoryIds)) {
+                        $categoryIds[] = $favorisCategoryId;
+                    }
+                }
+            }
+
+            // Update stream with enriched category_ids
+            if (!empty($categoryIds)) {
+                $stream['category_ids'] = json_encode($categoryIds);
+            }
+
+            return $stream;
+        }, $streams);
     }
 
     /**
