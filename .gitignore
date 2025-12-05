@@ -42,7 +42,4 @@ phpunit.xml
 tmp
 /.phpunit.cache/test-results
 /public/debug.php
-/public/admin/assets/index-B5N21YfO.css
-/public/admin/assets/index-CsuOG719.js
-/public/admin/index.html
-/public/admin/vite.svg
+/back/public/admin
