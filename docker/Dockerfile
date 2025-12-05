@@ -33,7 +33,9 @@ RUN docker-php-ext-install pdo_sqlite && \
     docker-php-ext-enable pdo_sqlite
 
 # Clean up build dependencies to keep image small
-RUN apk del .build-deps
+# Note: apk del may fail on ARM64 QEMU due to busybox trigger issues
+# Using || true to continue on failure (ARM64 will have larger image but still functional)
+RUN apk del --no-scripts .build-deps 2>/dev/null || true
 
 # Create app user for security
 RUN addgroup -g 1000 app && \
