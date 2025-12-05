@@ -51,11 +51,11 @@ COPY --chown=app:app back/bin ./bin
 COPY --chown=app:app back/migrations ./migrations
 COPY --chown=app:app back/bootstrap.php ./
 
-# Create data directory for SQLite with proper permissions
+# Create data directory for SQLite with proper permissions (used as volume)
 RUN mkdir -p /app/data && chown -R app:app /app/data
 
-# Create logs directory
-RUN mkdir -p /app/logs && chown -R app:app /app/logs
+# Create logs directory (stored in container, not persisted)
+RUN mkdir -p /app/logs
 
 # Copy nginx configuration
 COPY docker/nginx.conf /etc/nginx/nginx.conf
@@ -77,6 +77,9 @@ SESSION_SECRET=${SESSION_SECRET:-changeme-in-production}
 CORS_ALLOWED_ORIGINS=*
 APP_DEBUG=false
 EOF
+
+# Declare data directory as volume
+VOLUME ["/app/data"]
 
 # Set user
 USER app

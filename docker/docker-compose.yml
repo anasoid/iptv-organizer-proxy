@@ -14,9 +14,6 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:-changeme-default-key}
       - CORS_ALLOWED_ORIGINS=*
       - APP_DEBUG=${APP_DEBUG:-false}
-    volumes:
-      - ../data:/app/data
-      - ../logs:/app/logs
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
@@ -24,7 +21,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-
-volumes:
-  data:
-  logs:
