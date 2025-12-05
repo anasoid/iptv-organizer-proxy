@@ -17,7 +17,6 @@ services:
       - APP_DEBUG=${APP_DEBUG:-false}
     volumes:
       - app-data:/app/data
-      - app-logs:/app/logs
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
@@ -28,6 +27,4 @@ services:
 
 volumes:
   app-data:
-    driver: local
-  app-logs:
     driver: local

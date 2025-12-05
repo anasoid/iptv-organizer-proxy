@@ -9,20 +9,19 @@ Multi-stage Docker build configuration that creates a minimal Alpine-based PHP i
 
 - **Builder stage**: Installs Composer dependencies
 - **Runtime stage**: Creates the final minimal image with only needed files
-- Includes PHP 8.2-FPM, Nginx, and Supervisor
+- Includes PHP 8.2-FPM and Nginx
 - Runs migrations automatically on startup
 - Non-root user for security
 
 ### `docker-compose.yml`
 Docker Compose configuration for easy local development and testing.
 
-- Single service: `app` (PHP-FPM + Nginx + Supervisor)
+- Single service: `app` (PHP-FPM + Nginx)
 - SQLite database with persistent volume
 - Configurable via environment variables
 - Health checks included
 - Volumes:
   - `../data`: SQLite database directory
-  - `../logs`: Application logs
 
 **Usage:**
 ```bash
@@ -47,20 +46,13 @@ Nginx site configuration for the application:
 - PHP-FPM backend routing
 - API request routing to `index.php`
 
-### `supervisord.conf`
-Process manager configuration:
-- Manages PHP-FPM process
-- Manages Nginx process
-- Auto-restart on failure
-- Logs to `/app/logs/`
-
 ### `docker-entrypoint.sh`
 Entrypoint script that runs when the container starts:
 - Creates SQLite database directory
 - Waits for external database (if configured)
 - Runs database migrations
 - Sets proper file permissions
-- Starts the main process (supervisord)
+- Starts PHP-FPM and Nginx
 
 ### `.dockerignore`
 Files and directories to exclude from the Docker build context:
@@ -104,7 +96,6 @@ docker/
 ├── docker-compose.yml       # Local development setup
 ├── nginx.conf               # Nginx main config
 ├── nginx-default.conf       # Nginx site config
-├── supervisord.conf         # Process manager config
 ├── docker-entrypoint.sh     # Startup script
 ├── .dockerignore             # Exclude from build context
 └── README.md                 # This file
@@ -117,7 +108,7 @@ docker/
 - **Auto-migrations**: Database schema created automatically
 - **Health Checks**: Built-in health endpoint monitoring
 - **Easy Configuration**: Environment variable based configuration
-- **Logs**: All logs written to `/app/logs/`
+- **Logs**: Docker captures all logs (access via `docker logs`)
 - **Persistence**: SQLite database persists via volumes
 
 ## For More Information

@@ -38,7 +38,6 @@ docker build -f docker/Dockerfile -t iptv-organizer-proxy .
 docker run -d \
   -p 8080:8080 \
   -v $(pwd)/data:/app/data \
-  -v $(pwd)/logs:/app/logs \
   -e JWT_SECRET=your-secure-jwt-secret \
   -e SESSION_SECRET=your-secure-session-secret \
   --name iptv-proxy \
@@ -86,13 +85,14 @@ docker-compose -f docker/docker-compose.yml --env-file docker/.env up
 
 ## Volumes
 
-The container uses two volumes for persistent data:
+The container uses a volume for persistent data:
 
 ```yaml
 volumes:
   data:  /app/data        # SQLite database file
-  logs:  /app/logs        # Application logs
 ```
+
+Application logs are written to stderr/stdout and captured by Docker. Use `docker logs` to view them.
 
 ## Default Credentials
 
@@ -116,7 +116,6 @@ docker pull ghcr.io/yourusername/iptv-organizer-proxy:latest
 docker run -d \
   -p 8080:8080 \
   -v data:/app/data \
-  -v logs:/app/logs \
   -e JWT_SECRET=$(openssl rand -hex 32) \
   -e SESSION_SECRET=$(openssl rand -hex 32) \
   -e CORS_ALLOWED_ORIGINS=https://yourdomain.com \
@@ -145,11 +144,6 @@ docker-compose logs -f app
 
 # Using Docker CLI
 docker logs -f iptv-proxy
-
-# View log files directly
-tail -f logs/supervisord.log
-tail -f logs/php-fpm.out.log
-tail -f logs/nginx.out.log
 ```
 
 ## Troubleshooting
@@ -200,7 +194,6 @@ For production environments:
    docker run -d \
      --env-file production.env \
      -v prod-data:/app/data \
-     -v prod-logs:/app/logs \
      ghcr.io/yourusername/iptv-organizer-proxy:latest
    ```
 
@@ -259,8 +252,6 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /app/data
-        - name: logs
-          mountPath: /app/logs
         livenessProbe:
           httpGet:
             path: /health
@@ -271,8 +262,6 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: app-data
-      - name: logs
-        emptyDir: {}
 ```
 
 ## Image Sizes

@@ -40,12 +40,6 @@ if [ "$DB_TYPE" = "sqlite" ]; then
     chown app:app /app/data/*.sqlite 2>&1 || true
 fi
 
-# Create logs directory
-mkdir -p /app/logs
-# Allow app user to write to logs
-chown -R app:app /app/logs 2>&1 || true
-chmod -R 777 /app/logs 2>&1 || true
-
 # Run migrations
 echo "Running database migrations..."
 php /app/bin/migrate.php || true
