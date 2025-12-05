@@ -8,20 +8,16 @@ WORKDIR /app
 COPY back/composer.json back/composer.lock ./
 
 # Install PHP dependencies (production only)
-RUN composer install --no-dev --optimize-autoloader --classmap-authoritative
+RUN composer install --no-dev --optimize-autoloader
 
 # Runtime stage - minimal PHP-FPM image
 FROM php:8.2-fpm-alpine
-
-# Update APK package index
-RUN apk update
 
 # Install runtime dependencies
 RUN apk add --no-cache \
     sqlite \
     sqlite-libs \
-    nginx \
-    supervisor
+    nginx
 
 # Install build dependencies for PHP extensions
 RUN apk add --no-cache --virtual .build-deps \
@@ -54,14 +50,13 @@ COPY --chown=app:app back/bootstrap.php ./
 
 # Create data and logs directories with proper permissions
 RUN mkdir -p /app/data /app/logs && \
-    chown -R app:app /app/data /app/logs
+    chown -R app:app /app/data /app/logs && \
+    chmod -R 755 /app/src /app/config /app/bin /app/migrations /app/public && \
+    chmod 644 /app/src/**/*.php /app/config/**/*.php /app/bin/**/*.php /app/migrations/**/*.php /app/public/**/*.php 2>/dev/null || true
 
 # Copy nginx configuration
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/nginx-default.conf /etc/nginx/conf.d/default.conf
-
-# Copy supervisord configuration
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Copy entrypoint script
 COPY docker/docker-entrypoint.sh /app/docker-entrypoint.sh
@@ -94,4 +89,3 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 # Run entrypoint
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

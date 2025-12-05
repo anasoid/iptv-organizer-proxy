@@ -19,12 +19,21 @@ if [ "$DB_TYPE" = "sqlite" ]; then
     echo "SQLite database directory: /app/data"
 fi
 
+# Create logs directory
+mkdir -p /app/logs
+
 # Run migrations
 echo "Running database migrations..."
 php /app/bin/migrate.php || true
 
 # Set permissions
-chown -R app:app /app/data /app/logs 2>/dev/null || true
+chown -R root:root /app/logs 2>/dev/null || true
+chmod 755 /app/logs
 
-# Run the main command
-exec "$@"
+# Start PHP-FPM in background
+echo "Starting PHP-FPM..."
+php-fpm &
+
+# Start Nginx in foreground (main process)
+echo "Starting Nginx..."
+exec nginx -g "daemon off;"
