@@ -19,14 +19,14 @@ if [ "$DB_TYPE" = "sqlite" ]; then
     echo "SQLite database directory: /app/data"
     # Ensure the app user can write to the data directory
     chown -R app:app /app/data
-    chmod -R 755 /app/data
+    chmod 775 /app/data
 fi
 
 # Create logs directory
 mkdir -p /app/logs
 # Allow app user to write to logs
 chown -R app:app /app/logs
-chmod 755 /app/logs
+chmod 775 /app/logs
 
 # Run migrations
 echo "Running database migrations..."
