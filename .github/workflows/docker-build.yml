@@ -55,10 +55,10 @@ jobs:
         with:
           context: .
           file: ./docker/Dockerfile
-          # Build for reliable architectures with buildx/QEMU support
-          # - linux/amd64: Standard x86-64 (desktop, server, cloud) - most reliable
-          # - linux/arm64: 64-bit ARM (newer routers, Raspberry Pi 4+) - reliable with QEMU
-          # Note: linux/arm/v7 and linux/386 removed due to QEMU emulation issues with Alpine package installation
+          # Build for multiple architectures
+          # - linux/amd64: Servers, desktops, cloud platforms
+          # - linux/arm64: Modern routers, Raspberry Pi 4+, ARM servers
+          # Uses apk --no-scripts to work around QEMU post-install script issues
           platforms: |
             linux/amd64
             linux/arm64

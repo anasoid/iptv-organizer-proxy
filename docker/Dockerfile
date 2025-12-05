@@ -14,10 +14,14 @@ RUN composer install --no-dev --optimize-autoloader
 FROM php:8.2-fpm-alpine
 
 # Install runtime dependencies
-RUN apk add --no-cache \
+# Note: Using --no-scripts to work around QEMU emulation issues with post-install scripts
+# This allows multi-architecture builds (amd64, arm64) to succeed in GitHub Actions
+RUN apk add --no-cache --no-scripts \
     sqlite \
     sqlite-libs \
-    nginx
+    nginx && \
+    # Manually fix nginx configuration after install without scripts
+    mkdir -p /etc/nginx/conf.d /var/log/nginx
 
 # Install build dependencies for PHP extensions
 RUN apk add --no-cache --virtual .build-deps \
