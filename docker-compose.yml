@@ -17,7 +17,7 @@ services:
     container_name: iptv-organizer-proxy
 
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "${APP_PORT:-9090}:8080"
     restart: unless-stopped
 
     healthcheck:
@@ -26,10 +26,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-
-    # Optional: Add logging configuration
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
