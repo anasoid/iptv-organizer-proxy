@@ -1,5 +1,5 @@
 # Multi-stage build for minimal image size
-FROM php:8.2-fpm-alpine as builder
+FROM php:8.2-fpm-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -18,22 +18,21 @@ RUN composer install --no-dev --optimize-autoloader --classmap-authoritative
 # Runtime stage - minimal PHP-FPM image
 FROM php:8.2-fpm-alpine
 
-# Install build dependencies temporarily
-RUN apk add --no-cache --virtual .build-deps \
-    $PHPIZE_DEPS
-
-# Install PHP extensions
-RUN docker-php-ext-install pdo_sqlite
-
-# Install runtime dependencies
+# Install runtime dependencies and build tools for extensions
 RUN apk add --no-cache \
+    $PHPIZE_DEPS \
+    sqlite-dev \
     sqlite \
     sqlite-libs \
     nginx \
     supervisor
 
+# Install PHP extensions
+RUN docker-php-ext-install pdo_sqlite && \
+    docker-php-ext-enable pdo_sqlite
+
 # Clean up build dependencies to keep image small
-RUN apk del .build-deps
+RUN apk del $PHPIZE_DEPS
 
 # Create app user for security
 RUN addgroup -g 1000 app && \
