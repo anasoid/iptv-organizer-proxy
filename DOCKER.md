@@ -295,6 +295,91 @@ For additional tuning:
 - Adjust PHP-FPM `pm.max_children` based on available memory
 - Use CDN for static assets in production
 
+## OpenWRT Deployment
+
+The Docker image is built for multiple architectures including ARM support for OpenWRT routers.
+
+### Supported Architectures
+
+- **linux/amd64** - x86-64 servers and desktops
+- **linux/arm/v7** - 32-bit ARM (most common OpenWRT routers: TP-Link, ASUS, Linksys, etc.)
+- **linux/arm64** - 64-bit ARM (newer routers: Raspberry Pi 4+, newer high-end routers)
+- **linux/386** - 32-bit x86 legacy systems
+
+### Quick Start on OpenWRT
+
+1. **Determine your router's architecture**:
+   ```bash
+   # SSH into your OpenWRT router
+   ssh root@192.168.1.1
+
+   # Check architecture
+   uname -m
+   # Output: armv7l (32-bit ARM) or aarch64 (64-bit ARM)
+   ```
+
+2. **Pull and run the image**:
+   ```bash
+   # Replace with your architecture if needed
+   docker pull ghcr.io/yourusername/iptv-organizer-proxy:latest
+
+   docker run -d \
+     --name iptv-proxy \
+     -p 8080:8080 \
+     -e JWT_SECRET=$(openssl rand -hex 32) \
+     -e SESSION_SECRET=$(openssl rand -hex 32) \
+     -e CORS_ALLOWED_ORIGINS=* \
+     -e APP_DEBUG=false \
+     ghcr.io/yourusername/iptv-organizer-proxy:latest
+   ```
+
+3. **Persist data across reboots**:
+   ```bash
+   # Create persistent storage
+   mkdir -p /mnt/sda1/iptv-data
+
+   docker run -d \
+     --name iptv-proxy \
+     -p 8080:8080 \
+     -v /mnt/sda1/iptv-data:/app/data \
+     -e JWT_SECRET=$(openssl rand -hex 32) \
+     -e SESSION_SECRET=$(openssl rand -hex 32) \
+     ghcr.io/yourusername/iptv-organizer-proxy:latest
+   ```
+
+### OpenWRT Resources
+
+- **Docker on OpenWRT**: https://openwrt.org/packages/pkgdata/docker
+- **OpenWrt Wiki**: https://openwrt.org/
+- **Router Architecture Guide**: Check your router model on OpenWrt Table of Hardware
+
+### Performance Notes for OpenWRT
+
+- **Memory**: The image runs on ~50-100MB RAM, suitable for most routers
+- **Storage**: Minimal footprint (~150MB compressed image)
+- **CPU**: Optimized for ARM processors
+- **Network**: Configure port forwarding in OpenWrt to expose admin panel if needed
+
+### Accessing the Admin Panel on OpenWRT
+
+If running on a router at `192.168.1.1`:
+```
+http://192.168.1.1:8080/admin
+```
+
+### Backing Up Data on OpenWRT
+
+```bash
+# Backup SQLite database
+docker exec iptv-proxy cp /app/data/app.sqlite /mnt/sda1/backup/app.sqlite.backup
+
+# Or mount backup location
+docker run -d \
+  -v /mnt/sda1/iptv-data:/app/data \
+  -v /mnt/sda1/backup:/backup \
+  ... # rest of options
+```
+
 ## Support
 
 For issues with Docker deployment:
@@ -302,3 +387,4 @@ For issues with Docker deployment:
 2. Verify environment variables: `docker inspect iptv-proxy`
 3. Test connectivity: `docker exec iptv-proxy wget http://localhost:8080/health`
 4. Check volumes: `docker volume inspect <volume-name>`
+5. For OpenWRT-specific issues: Check available disk space with `df -h`

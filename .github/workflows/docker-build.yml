@@ -55,6 +55,16 @@ jobs:
         with:
           context: .
           file: ./docker/Dockerfile
+          # Build for multiple architectures including OpenWRT support
+          # - linux/amd64: Standard x86-64 (desktop, server, cloud)
+          # - linux/arm/v7: 32-bit ARM (most common OpenWRT routers)
+          # - linux/arm64: 64-bit ARM (newer routers, Raspberry Pi 4+)
+          # - linux/386: 32-bit x86 (older systems)
+          platforms: |
+            linux/amd64
+            linux/arm/v7
+            linux/arm64
+            linux/386
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
