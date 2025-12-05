@@ -17,18 +17,20 @@ fi
 if [ "$DB_TYPE" = "sqlite" ]; then
     mkdir -p /app/data
     echo "SQLite database directory: /app/data"
+    # Ensure the app user can write to the data directory
+    chown -R app:app /app/data
+    chmod -R 755 /app/data
 fi
 
 # Create logs directory
 mkdir -p /app/logs
+# Allow app user to write to logs
+chown -R app:app /app/logs
+chmod 755 /app/logs
 
 # Run migrations
 echo "Running database migrations..."
 php /app/bin/migrate.php || true
-
-# Set permissions
-chown -R root:root /app/logs 2>/dev/null || true
-chmod 755 /app/logs
 
 # Start PHP-FPM in background
 echo "Starting PHP-FPM..."

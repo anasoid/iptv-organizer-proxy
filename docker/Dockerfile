@@ -60,6 +60,10 @@ RUN mkdir -p /app/data /app/logs && \
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/nginx-default.conf /etc/nginx/conf.d/default.conf
 
+# Configure PHP-FPM to run as app user
+RUN sed -i 's/user = www-data/user = app/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/group = www-data/group = app/' /usr/local/etc/php-fpm.d/www.conf
+
 # Copy entrypoint script
 COPY docker/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh

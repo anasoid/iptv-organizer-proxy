@@ -5,15 +5,19 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+    container_name: iptv-organizer-proxy
     ports:
       - "8080:8080"
     environment:
       - DB_TYPE=sqlite
-      - DB_PATH=/app/data/app.sqlite
+      - DB_SQLITE_PATH=/app/data/database.sqlite
       - JWT_SECRET=${JWT_SECRET:-changeme-default-key}
       - SESSION_SECRET=${SESSION_SECRET:-changeme-default-key}
       - CORS_ALLOWED_ORIGINS=*
       - APP_DEBUG=${APP_DEBUG:-false}
+    volumes:
+      - app-data:/app/data
+      - app-logs:/app/logs
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
@@ -21,3 +25,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+volumes:
+  app-data:
+    driver: local
+  app-logs:
+    driver: local
