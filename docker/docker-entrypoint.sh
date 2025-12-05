@@ -8,6 +8,15 @@ echo "Starting IPTV Organizer Proxy..."
 export DB_TYPE="${DB_TYPE:-sqlite}"
 echo "Database type: $DB_TYPE"
 
+# Set APP_PORT (default to 9090)
+export APP_PORT="${APP_PORT:-9090}"
+echo "Application port: $APP_PORT"
+
+# Configure nginx to listen on APP_PORT
+echo "Configuring nginx to listen on port $APP_PORT..."
+sed -i "s/listen 9090;/listen $APP_PORT;/" /etc/nginx/conf.d/default.conf
+sed -i "s/listen :9090;/listen :$APP_PORT;/" /etc/nginx/conf.d/default.conf
+
 # Wait for database to be ready (if using external DB)
 if [ ! -z "$DB_HOST" ]; then
     echo "Waiting for database at $DB_HOST:${DB_PORT:-3306}..."

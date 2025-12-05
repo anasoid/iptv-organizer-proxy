@@ -88,11 +88,11 @@ EOF
 VOLUME ["/app/data"]
 
 # Expose port
-EXPOSE 8080
+EXPOSE 9090
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
+    CMD wget --quiet --tries=1 --spider http://localhost:9090/health || exit 1
 
 # Run entrypoint
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

@@ -7,7 +7,7 @@ services:
       dockerfile: docker/Dockerfile
     container_name: iptv-organizer-proxy
     ports:
-      - "8080:8080"
+      - "9090:9090"
     environment:
       - DB_TYPE=sqlite
       - DB_SQLITE_PATH=/app/data/database.sqlite
