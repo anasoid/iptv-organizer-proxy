@@ -32,6 +32,13 @@ chmod -R 777 /app/logs
 echo "Running database migrations..."
 php /app/bin/migrate.php || true
 
+# Fix database file permissions after migration
+if [ "$DB_TYPE" = "sqlite" ]; then
+    echo "Fixing database file permissions..."
+    chmod 666 /app/data/*.sqlite 2>/dev/null || true
+    chown app:app /app/data/*.sqlite 2>/dev/null || true
+fi
+
 # Start PHP-FPM in background
 echo "Starting PHP-FPM..."
 php-fpm &
