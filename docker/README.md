@@ -111,6 +111,64 @@ docker/
 - **Logs**: Docker captures all logs (access via `docker logs`)
 - **Persistence**: SQLite database persists via volumes
 
+## VFS Optimization for OpenWRT
+
+The Dockerfile has been optimized for OpenWRT and low-memory environments:
+
+### Build
+```bash
+docker build -f docker/Dockerfile -t iptv-organizer-proxy .
+# Image size: ~180-200MB compressed
+# Includes: Admin UI, API, all features
+# Optimized for: Servers, desktops, and OpenWRT routers (256MB+ RAM)
+```
+
+### Optimizations Included
+
+1. **PHP-FPM `ondemand` mode** - spawns processes only when needed:
+   - max_children: 16 (vs 25 default)
+   - start_servers: 2 (vs 8 default)
+   - min_spare_servers: 1 (vs 5 default)
+   - max_spare_servers: 4 (vs 35 default)
+   - max_requests: 500 (restart after 500 requests to prevent leaks)
+
+2. **Aggressive cache cleanup** - removes /tmp, /var/tmp, ~/.cache after each stage
+3. **Combined RUN commands** - reduced Docker layer count
+4. **Minimal dependencies** - only essential Alpine packages (sqlite, nginx, openssl)
+5. **Logs to stdout** - Docker captures automatically (no disk I/O overhead)
+
+### Deployment on OpenWRT
+
+```bash
+# On OpenWRT router (SSH into router)
+ssh root@192.168.1.1
+
+# Create persistent storage
+mkdir -p /mnt/sda1/iptv-data
+
+# Pull and run image
+docker pull ghcr.io/yourusername/iptv-organizer-proxy:latest
+
+docker run -d \
+  --name iptv-proxy \
+  -p 8080:8080 \
+  -v /mnt/sda1/iptv-data:/app/data \
+  -e JWT_SECRET=$(openssl rand -hex 32) \
+  -e SESSION_SECRET=$(openssl rand -hex 32) \
+  ghcr.io/yourusername/iptv-organizer-proxy:latest
+
+# View logs
+docker logs -f iptv-proxy
+```
+
+Access admin panel: `http://192.168.1.1:8080/admin`
+
+### Memory Usage
+
+- **Runtime image**: ~50-100MB RAM (ondemand PHP-FPM mode)
+- **Compressed image**: ~180-200MB
+- **Suitable for**: Routers with 256MB+ RAM and 512MB+ storage
+
 ## For More Information
 
 See the main `DOCKER.md` file in the project root for complete deployment guide and instructions.

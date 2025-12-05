@@ -26,6 +26,26 @@ if [ ! -z "$DB_HOST" ]; then
     echo "Database is ready!"
 fi
 
+# Generate .env file if it doesn't exist
+if [ ! -f /app/.env ]; then
+    echo "Generating .env file..."
+    JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 32)}"
+    SESSION_SECRET="${SESSION_SECRET:-$(openssl rand -hex 32)}"
+
+    cat > /app/.env << EOF
+DB_TYPE=${DB_TYPE:-sqlite}
+DB_SQLITE_PATH=/app/data/database.sqlite
+JWT_SECRET=${JWT_SECRET}
+SESSION_SECRET=${SESSION_SECRET}
+CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-*}
+APP_DEBUG=${APP_DEBUG:-false}
+EOF
+
+    echo ".env file created with auto-generated secrets"
+else
+    echo ".env file already exists, skipping generation"
+fi
+
 # Create SQLite database directory and fix permissions
 if [ "$DB_TYPE" = "sqlite" ]; then
     mkdir -p /app/data

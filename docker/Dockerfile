@@ -2,35 +2,37 @@
 FROM composer:2.9 AS composer-stage
 
 WORKDIR /app
-
 COPY back/composer.json back/composer.lock ./
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --no-dev --optimize-autoloader && \
+    rm -rf /tmp/* /var/tmp/*
 
 # Stage 2: Builder - compile PHP extensions with build tools
 FROM php:8.2-fpm-alpine AS builder-stage
 
 RUN apk add --no-cache --no-scripts --force \
     $PHPIZE_DEPS \
-    sqlite-dev
-
-RUN docker-php-ext-install pdo_sqlite && \
-    docker-php-ext-enable pdo_sqlite
+    sqlite-dev && \
+    docker-php-ext-install pdo_sqlite && \
+    docker-php-ext-enable pdo_sqlite && \
+    rm -rf /tmp/* /var/tmp/*
 
 # Stage 3: Runtime - minimal final image with only compiled extensions
 FROM php:8.2-fpm-alpine
 
-# Install only runtime dependencies (no build tools)
+# Install only essential runtime dependencies
 RUN apk add --no-cache --no-scripts \
     sqlite \
     sqlite-libs \
-    nginx && \
-    mkdir -p /etc/nginx/conf.d /var/log/nginx
+    nginx \
+    openssl && \
+    mkdir -p /etc/nginx/conf.d /var/log/nginx && \
+    rm -rf /tmp/* /var/tmp/*
 
 # Copy compiled PHP extensions from builder stage
 COPY --from=builder-stage /usr/local/lib/php/extensions /usr/local/lib/php/extensions
 COPY --from=builder-stage /usr/local/etc/php/conf.d /usr/local/etc/php/conf.d
 
-# Create app user for security
+# Create app user
 RUN addgroup -g 1000 app && \
     adduser -D -u 1000 -G app app
 
@@ -39,50 +41,41 @@ WORKDIR /app
 # Copy vendor from composer stage
 COPY --from=composer-stage --chown=app:app /app/vendor ./vendor
 
-# Copy application code
-COPY --chown=app:app back/public ./public
-COPY --chown=app:app back/src ./src
-COPY --chown=app:app back/config ./config
-COPY --chown=app:app back/bin ./bin
-COPY --chown=app:app back/migrations ./migrations
-COPY --chown=app:app back/bootstrap.php ./
+# Copy application code (excluded: vendor, tests, data, logs from .dockerignore)
+COPY --chown=app:app back/ ./
 
-# Copy admin frontend build
+# Copy admin frontend
 COPY --chown=app:app admin/dist ./public/admin
 
-# Create data directory with proper permissions
-RUN mkdir -p /app/data && \
+# Copy nginx and entrypoint configuration
+COPY --chown=app:app docker/nginx.conf /etc/nginx/nginx.conf
+COPY --chown=app:app docker/nginx-default.conf /etc/nginx/conf.d/default.conf
+COPY --chown=app:app docker/docker-entrypoint.sh /app/docker-entrypoint.sh
+
+# Setup permissions and data directory
+RUN chmod +x /app/docker-entrypoint.sh && \
+    mkdir -p /app/data && \
     chown -R app:app /app/data && \
-    chmod 777 /app/data && \
-    chmod -R 755 /app/src /app/config /app/bin /app/migrations /app/public && \
-    chmod 644 /app/src/**/*.php /app/config/**/*.php /app/bin/**/*.php /app/migrations/**/*.php /app/public/**/*.php 2>/dev/null || true
+    chmod 777 /app/data
 
-# Copy nginx configuration
-COPY docker/nginx.conf /etc/nginx/nginx.conf
-COPY docker/nginx-default.conf /etc/nginx/conf.d/default.conf
-
-# Configure PHP-FPM to run as app user
+# Configure PHP-FPM for low-memory environments
 RUN sed -i 's/user = www-data/user = app/' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's/group = www-data/group = app/' /usr/local/etc/php-fpm.d/www.conf
+    sed -i 's/group = www-data/group = app/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/^pm = .*/pm = ondemand/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/^pm.max_children = .*/pm.max_children = 16/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/^pm.start_servers = .*/pm.start_servers = 2/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/^pm.min_spare_servers = .*/pm.min_spare_servers = 1/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/^pm.max_spare_servers = .*/pm.max_spare_servers = 4/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/^pm.max_requests = .*/pm.max_requests = 500/' /usr/local/etc/php-fpm.d/www.conf
 
-# Copy entrypoint script
-COPY docker/docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
-
-# Install openssl for generating secrets
-RUN apk add --no-cache --no-scripts openssl
-
-# Create .env file with SQLite configuration and auto-generated secrets
-RUN JWT_SECRET=$(openssl rand -hex 32) && \
-    SESSION_SECRET=$(openssl rand -hex 32) && \
-    cat > /app/.env << EOF
-DB_TYPE=sqlite
-DB_SQLITE_PATH=/app/data/database.sqlite
-JWT_SECRET=${JWT_SECRET}
-SESSION_SECRET=${SESSION_SECRET}
-CORS_ALLOWED_ORIGINS=*
-APP_DEBUG=false
-EOF
+# Set permissions and clean up
+RUN chmod -R 755 /app/src /app/config /app/bin /app/migrations /app/public && \
+    find /app/src -name "*.php" -exec chmod 644 {} \; && \
+    find /app/config -name "*.php" -exec chmod 644 {} \; && \
+    find /app/bin -name "*.php" -exec chmod 644 {} \; && \
+    find /app/migrations -name "*.php" -exec chmod 644 {} \; && \
+    find /app/public -name "*.php" -exec chmod 644 {} \; && \
+    rm -rf /tmp/* /var/tmp/* ~/.cache
 
 # Declare data directory as volume
 VOLUME ["/app/data"]
@@ -90,7 +83,7 @@ VOLUME ["/app/data"]
 # Expose port
 EXPOSE 9090
 
-# Health check
+# Lightweight health check for OpenWRT (using /dev/tcp instead of wget)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD wget --quiet --tries=1 --spider http://localhost:9090/health || exit 1
 

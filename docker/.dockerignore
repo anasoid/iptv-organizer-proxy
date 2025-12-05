@@ -21,6 +21,5 @@ back/vendor
 back/logs
 back/data
 back/tests
-back/bin/migrate.php
 back/.htaccess
 .taskmaster
