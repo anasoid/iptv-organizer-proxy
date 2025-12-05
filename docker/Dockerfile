@@ -72,7 +72,7 @@ RUN JWT_SECRET=$(openssl rand -hex 32) && \
     SESSION_SECRET=$(openssl rand -hex 32) && \
     cat > /app/.env << EOF
 DB_TYPE=sqlite
-DB_PATH=/app/data/app.sqlite
+DB_SQLITE_PATH=/app/data/database.sqlite
 JWT_SECRET=${JWT_SECRET}
 SESSION_SECRET=${SESSION_SECRET}
 CORS_ALLOWED_ORIGINS=*

@@ -41,4 +41,4 @@ phpunit.xml
 tmp
 /.phpunit.cache/test-results
 /public/debug.php
-/back/public/admin
+/back/public/admin/
