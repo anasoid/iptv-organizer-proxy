@@ -1,6 +1,6 @@
 # Multi-stage build for minimal image size
 # Use official Composer image for dependency installation (known stable version)
-FROM composer:2.5-alpine AS builder
+FROM composer:2.9 AS builder
 
 WORKDIR /app
 
