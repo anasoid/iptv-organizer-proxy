@@ -1,41 +1,34 @@
-# Multi-stage build for minimal image size
-# Use official Composer image for dependency installation (known stable version)
-FROM composer:2.9 AS builder
+# Stage 1: Composer - install PHP dependencies
+FROM composer:2.9 AS composer-stage
 
 WORKDIR /app
 
-# Copy composer files
 COPY back/composer.json back/composer.lock ./
-
-# Install PHP dependencies (production only)
 RUN composer install --no-dev --optimize-autoloader
 
-# Runtime stage - minimal PHP-FPM image
+# Stage 2: Builder - compile PHP extensions with build tools
+FROM php:8.2-fpm-alpine AS builder-stage
+
+RUN apk add --no-cache --no-scripts --force \
+    $PHPIZE_DEPS \
+    sqlite-dev
+
+RUN docker-php-ext-install pdo_sqlite && \
+    docker-php-ext-enable pdo_sqlite
+
+# Stage 3: Runtime - minimal final image with only compiled extensions
 FROM php:8.2-fpm-alpine
 
-# Install runtime dependencies
-# Note: Using --no-scripts to work around QEMU emulation issues with post-install scripts
-# This allows multi-architecture builds (amd64, arm64) to succeed in GitHub Actions
+# Install only runtime dependencies (no build tools)
 RUN apk add --no-cache --no-scripts \
     sqlite \
     sqlite-libs \
     nginx && \
-    # Manually fix nginx configuration after install without scripts
     mkdir -p /etc/nginx/conf.d /var/log/nginx
 
-# Install build dependencies for PHP extensions
-RUN apk add --no-cache --no-scripts --virtual .build-deps \
-    $PHPIZE_DEPS \
-    sqlite-dev
-
-# Install PHP extensions
-RUN docker-php-ext-install pdo_sqlite && \
-    docker-php-ext-enable pdo_sqlite
-
-# Clean up build dependencies to keep image small
-# Note: apk del may fail on ARM64 QEMU due to busybox trigger issues
-# Using || true to continue on failure (ARM64 will have larger image but still functional)
-RUN apk del --no-scripts .build-deps 2>/dev/null || true
+# Copy compiled PHP extensions from builder stage
+COPY --from=builder-stage /usr/local/lib/php/extensions /usr/local/lib/php/extensions
+COPY --from=builder-stage /usr/local/etc/php/conf.d /usr/local/etc/php/conf.d
 
 # Create app user for security
 RUN addgroup -g 1000 app && \
@@ -43,8 +36,8 @@ RUN addgroup -g 1000 app && \
 
 WORKDIR /app
 
-# Copy vendor from builder
-COPY --from=builder --chown=app:app /app/vendor ./vendor
+# Copy vendor from composer stage
+COPY --from=composer-stage --chown=app:app /app/vendor ./vendor
 
 # Copy application code
 COPY --chown=app:app back/public ./public
