@@ -51,11 +51,9 @@ COPY --chown=app:app back/bin ./bin
 COPY --chown=app:app back/migrations ./migrations
 COPY --chown=app:app back/bootstrap.php ./
 
-# Create data directory for SQLite with proper permissions (used as volume)
-RUN mkdir -p /app/data && chown -R app:app /app/data
-
-# Create logs directory (stored in container, not persisted)
-RUN mkdir -p /app/logs
+# Create data and logs directories with proper permissions
+RUN mkdir -p /app/data /app/logs && \
+    chown -R app:app /app/data /app/logs
 
 # Copy nginx configuration
 COPY docker/nginx.conf /etc/nginx/nginx.conf
@@ -85,9 +83,6 @@ EOF
 
 # Declare data directory as volume
 VOLUME ["/app/data"]
-
-# Set user
-USER app
 
 # Expose port
 EXPOSE 8080
