@@ -68,12 +68,17 @@ COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-# Create .env file with SQLite configuration
-RUN cat > /app/.env << 'EOF'
+# Install openssl for generating secrets
+RUN apk add --no-cache openssl
+
+# Create .env file with SQLite configuration and auto-generated secrets
+RUN JWT_SECRET=$(openssl rand -hex 32) && \
+    SESSION_SECRET=$(openssl rand -hex 32) && \
+    cat > /app/.env << EOF
 DB_TYPE=sqlite
 DB_PATH=/app/data/app.sqlite
-JWT_SECRET=${JWT_SECRET:-changeme-in-production}
-SESSION_SECRET=${SESSION_SECRET:-changeme-in-production}
+JWT_SECRET=${JWT_SECRET}
+SESSION_SECRET=${SESSION_SECRET}
 CORS_ALLOWED_ORIGINS=*
 APP_DEBUG=false
 EOF
