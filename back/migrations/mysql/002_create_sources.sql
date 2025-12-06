@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS sources (
     url VARCHAR(500) NOT NULL,
     username VARCHAR(255) NOT NULL,
     password VARCHAR(255) NOT NULL,
-    sync_interval INT NOT NULL DEFAULT 3600 COMMENT 'Sync interval in seconds',
+    sync_interval INT NOT NULL DEFAULT 1 COMMENT 'Sync interval in days',
     last_sync DATETIME NULL,
     next_sync DATETIME NULL,
     sync_status ENUM('idle', 'syncing', 'error') NOT NULL DEFAULT 'idle',

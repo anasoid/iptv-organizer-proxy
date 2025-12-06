@@ -112,7 +112,7 @@ class SourceController
             $source->url = $body['url'];
             $source->username = $body['username'];
             $source->password = $body['password'];
-            $source->sync_interval = $body['sync_interval'] ?? 3600;
+            $source->sync_interval = $body['sync_interval'] ?? 1;
             $source->sync_status = 'idle';
             $source->is_active = $body['is_active'] ?? 1;
 

@@ -32,7 +32,7 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
       url: '',
       username: '',
       password: '',
-      sync_interval: 3600,
+      sync_interval: 1,
       is_active: 1,
       sync_status: 'idle',
     },
@@ -141,13 +141,13 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
         />
 
         <TextField
-          label="Sync Interval (seconds)"
+          label="Sync Interval (days)"
           fullWidth
           type="number"
-          inputProps={{ min: 60 }}
+          inputProps={{ min: 1 }}
           {...register('sync_interval', {
             required: 'Sync interval is required',
-            min: { value: 60, message: 'Minimum is 60 seconds' },
+            min: { value: 1, message: 'Minimum is 1 day' },
           })}
           error={!!errors.sync_interval}
           helperText={errors.sync_interval?.message}

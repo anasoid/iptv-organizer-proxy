@@ -157,7 +157,7 @@ export default function SourceDetail() {
           </Grid>
           <Grid item xs={12} md={6}>
             <Typography>
-              <strong>Sync Interval:</strong> {sourceData.sync_interval}s
+              <strong>Sync Interval:</strong> {sourceData.sync_interval} day{sourceData.sync_interval !== 1 ? 's' : ''}
             </Typography>
           </Grid>
           <Grid item xs={12} md={6}>

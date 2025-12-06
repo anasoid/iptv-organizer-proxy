@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS sync_schedule (
     task_type TEXT NOT NULL CHECK(task_type IN ('live_categories', 'live_streams', 'vod_categories', 'vod_streams', 'series_categories', 'series')),
     next_sync TEXT NOT NULL,
     last_sync TEXT,
-    sync_interval INTEGER NOT NULL DEFAULT 3600,
+    sync_interval INTEGER NOT NULL DEFAULT 1,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,

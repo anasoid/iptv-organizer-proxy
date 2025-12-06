@@ -91,9 +91,10 @@ class Source extends BaseModel
      */
     public function updateNextSyncTime(): bool
     {
-        $interval = (int) ($this->sync_interval ?? 3600);
+        $intervalDays = (int) ($this->sync_interval ?? 1);
+        $intervalSeconds = $intervalDays * 86400;
         $nextSync = new DateTime();
-        $nextSync->modify("+{$interval} seconds");
+        $nextSync->modify("+{$intervalSeconds} seconds");
 
         $this->last_sync = $this->getCurrentTimestamp();
         $this->next_sync = $nextSync->format('Y-m-d H:i:s');
@@ -176,8 +177,8 @@ class Source extends BaseModel
         // Sync interval must be positive
         if (isset($this->attributes['sync_interval'])) {
             $interval = (int) $this->attributes['sync_interval'];
-            if ($interval < 60) {
-                throw new RuntimeException("Sync interval must be at least 60 seconds");
+            if ($interval < 1) {
+                throw new RuntimeException("Sync interval must be at least 1 day");
             }
         }
 

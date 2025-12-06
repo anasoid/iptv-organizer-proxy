@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS sync_schedule (
     task_type ENUM('live_categories', 'live_streams', 'vod_categories', 'vod_streams', 'series_categories', 'series') NOT NULL,
     next_sync DATETIME NOT NULL,
     last_sync DATETIME NULL,
-    sync_interval INT NOT NULL DEFAULT 3600 COMMENT 'Interval in seconds',
+    sync_interval INT NOT NULL DEFAULT 1 COMMENT 'Interval in days',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,

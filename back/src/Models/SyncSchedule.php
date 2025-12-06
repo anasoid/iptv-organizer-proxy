@@ -49,10 +49,10 @@ class SyncSchedule extends BaseModel
      *
      * @param int $sourceId
      * @param string $taskType
-     * @param int $syncInterval Default sync interval in seconds
+     * @param int $syncInterval Default sync interval in days
      * @return static
      */
-    public static function getOrCreate(int $sourceId, string $taskType, int $syncInterval = 3600): static
+    public static function getOrCreate(int $sourceId, string $taskType, int $syncInterval = 1): static
     {
         $instance = new static();
         $stmt = $instance->db->prepare(
@@ -101,9 +101,10 @@ class SyncSchedule extends BaseModel
      */
     public function updateNextSync(): bool
     {
-        $interval = (int) ($this->sync_interval ?? 3600);
+        $intervalDays = (int) ($this->sync_interval ?? 1);
+        $intervalSeconds = $intervalDays * 86400;
         $nextSync = new DateTime();
-        $nextSync->modify("+{$interval} seconds");
+        $nextSync->modify("+{$intervalSeconds} seconds");
 
         $this->last_sync = $this->getCurrentTimestamp();
         $this->next_sync = $nextSync->format('Y-m-d H:i:s');
@@ -179,10 +180,10 @@ class SyncSchedule extends BaseModel
      * Initialize schedules for a new source
      *
      * @param int $sourceId
-     * @param int $syncInterval Default sync interval in seconds
+     * @param int $syncInterval Default sync interval in days
      * @return void
      */
-    public static function initializeForSource(int $sourceId, int $syncInterval = 3600): void
+    public static function initializeForSource(int $sourceId, int $syncInterval = 1): void
     {
         foreach (static::TASK_TYPES as $taskType) {
             static::getOrCreate($sourceId, $taskType, $syncInterval);
@@ -214,8 +215,8 @@ class SyncSchedule extends BaseModel
 
         if (isset($this->attributes['sync_interval'])) {
             $interval = (int) $this->attributes['sync_interval'];
-            if ($interval < 60) {
-                throw new RuntimeException("Sync interval must be at least 60 seconds");
+            if ($interval < 1) {
+                throw new RuntimeException("Sync interval must be at least 1 day");
             }
         }
 
