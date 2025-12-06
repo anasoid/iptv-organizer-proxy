@@ -147,22 +147,25 @@ class FilterController
             $body = json_decode($request->getBody()->getContents(), true);
 
             // Update fields
-            if (isset($body['name'])) {
+            if (array_key_exists('name', $body)) {
                 $filter->name = $body['name'];
             }
-            if (isset($body['filter_config'])) {
+            if (array_key_exists('filter_config', $body)) {
                 if (!is_string($body['filter_config'])) {
                     return $this->jsonError($response, 'Filter configuration must be a valid YAML string', 400);
                 }
                 $filter->filter_config = $body['filter_config'];
             }
-            if (isset($body['favoris'])) {
+            if (array_key_exists('favoris', $body)) {
                 if ($body['favoris'] !== null && !is_string($body['favoris'])) {
                     return $this->jsonError($response, 'Favoris must be a valid YAML string or null', 400);
                 }
                 $filter->favoris = $body['favoris'];
             }
-            if (isset($body['description'])) {
+            if (array_key_exists('description', $body)) {
+                if ($body['description'] !== null && !is_string($body['description'])) {
+                    return $this->jsonError($response, 'Description must be a valid string or null', 400);
+                }
                 $filter->description = $body['description'];
             }
 

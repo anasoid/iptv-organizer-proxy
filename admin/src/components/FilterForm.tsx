@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -345,6 +345,16 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
   const [favorisTabIndex, setFavorisTabIndex] = useState(0);
   const [tabIndex, setTabIndex] = useState(0);
 
+  // Sync form state when filter changes
+  useEffect(() => {
+    setName(filter?.name || '');
+    setDescription(filter?.description || '');
+    setRulesYaml(filter?.filter_config || '');
+    setFavorisYaml(filter?.favoris || '');
+    setError(null);
+    setTabIndex(0);
+  }, [filter]);
+
   const createMutation = useMutation({
     mutationFn: (data: Parameters<typeof filtersApi.createFilter>[0]) =>
       filtersApi.createFilter(data),
@@ -417,9 +427,9 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
 
     const data = {
       name: name.trim(),
-      description: description.trim() || undefined,
+      description: description.trim() || null,
       filter_config: rulesYaml,
-      ...(favorisYaml.trim() && { favoris: favorisYaml }),
+      favoris: favorisYaml.trim() ? favorisYaml : null,
     };
 
     if (filter) {
