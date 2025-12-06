@@ -71,8 +71,11 @@ try {
 
     header('Content-Type: application/xml; charset=utf-8');
 
-    // Stream the response body directly without loading into memory
-    echo $xmltvResponse->getBody();
+    // Stream the response body directly in chunks without loading entire file into memory
+    $body = $xmltvResponse->getBody();
+    while (!$body->eof()) {
+        echo $body->read(8192); // Read and output 8KB chunks
+    }
 } catch (\Exception $e) {
     http_response_code(500);
     header('Content-Type: application/xml');

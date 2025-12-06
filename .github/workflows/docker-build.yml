@@ -83,11 +83,14 @@ jobs:
       - name: Flatten ARM image (VFS)
         if: github.event_name != 'pull_request'
         run: |
+          # Get the first tag (full image reference)
+          FIRST_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n 1)
+
           # Pull the ARM image that was just built and pushed
-          docker pull --platform linux/arm64 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$(echo "${{ steps.meta.outputs.tags }}" | head -n 1 | xargs -I {} basename {})
+          docker pull --platform linux/arm64 "$FIRST_TAG"
 
           # Export container to tar
-          CONTAINER_ID=$(docker run -d ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$(echo "${{ steps.meta.outputs.tags }}" | head -n 1 | xargs -I {} basename {}) /bin/bash)
+          CONTAINER_ID=$(docker run -d "$FIRST_TAG" /bin/bash)
           docker export $CONTAINER_ID > image-arm-vfs.tar
 
           # Import as flattened image
