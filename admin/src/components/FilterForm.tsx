@@ -347,6 +347,7 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
 
   // Sync form state when filter changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setName(filter?.name || '');
     setDescription(filter?.description || '');
     setRulesYaml(filter?.filter_config || '');

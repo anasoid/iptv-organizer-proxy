@@ -38,6 +38,7 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
     },
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const urlValue = watch('url');
 
   // Create mutation
