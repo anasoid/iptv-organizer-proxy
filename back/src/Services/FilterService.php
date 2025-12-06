@@ -471,12 +471,12 @@ class FilterService
             }
 
             // If there are include rules, stream must match at least one
-            // If there are only exclude rules, stream is shown by default
+            // If there are only exclude rules, stream is hidden by default (must match a rule)
             if ($hasIncludeRules) {
                 return $matchedInclude;
             }
 
-            return true;
+            return false;
         });
     }
 
@@ -637,10 +637,8 @@ class FilterService
             }
 
             // Category didn't match any rule → KEEP
-            // If there are include rules, reject as "ignored"
-            // If only exclude rules, accept (show)
-            // If no category rules, accept (show all)
-            return !$hasIncludeRules;
+            // Categories are always visible unless explicitly excluded
+            return true;
         });
     }
 
