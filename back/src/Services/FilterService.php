@@ -597,17 +597,8 @@ class FilterService
             return $categories;
         }
 
-        // Check if there are any include rules
-        $hasIncludeRules = false;
-        foreach ($typeRules as $rule) {
-            if (($rule['type'] ?? 'include') === 'include') {
-                $hasIncludeRules = true;
-                break;
-            }
-        }
-
         // Filter categories respecting rule order
-        return array_filter($categories, function ($category) use ($typeRules, $hasIncludeRules) {
+        return array_filter($categories, function ($category) use ($typeRules) {
             // Ensure labels are extracted if null
             $categoryLabels = $category->labels;
             if (empty($categoryLabels)) {
