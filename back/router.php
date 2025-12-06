@@ -45,6 +45,7 @@ $phpFiles = [
     'xmltv.php',
     'get.php',
     'debug.php',
+    'streaming/timeshift.php',
 ];
 
 // Check if request matches any of these PHP files
