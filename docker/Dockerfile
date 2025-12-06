@@ -63,6 +63,7 @@ RUN chmod +x /app/docker-entrypoint.sh && \
     sed -i '/^pm.min_spare_servers/d' /usr/local/etc/php-fpm.d/www.conf && \
     sed -i '/^pm.max_spare_servers/d' /usr/local/etc/php-fpm.d/www.conf && \
     sed -i 's/^pm.max_requests = .*/pm.max_requests = 100/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/^;access.log = .*/access.log = \/dev\/null/' /usr/local/etc/php-fpm.d/www.conf && \
     echo "output_buffering = 8K" >> /usr/local/etc/php.ini-production && \
     echo "memory_limit = 32M" >> /usr/local/etc/php.ini-production && \
     echo "post_max_size = 25M" >> /usr/local/etc/php.ini-production && \
