@@ -64,6 +64,17 @@ if (!$source) {
     exit;
 }
 
+// Check if we should redirect instead of proxy
+$useRedirect = filter_var($_ENV['XMLTV_USE_REDIRECT'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+if ($useRedirect) {
+    // Redirect to source XMLTV with source credentials
+    $xmltvUrl = rtrim($source->url, '/') . '/xmltv.php?username=' . urlencode($source->username) . '&password=' . urlencode($source->password);
+    http_response_code(302);
+    header('Location: ' . $xmltvUrl);
+    exit;
+}
+
 // Proxy XMLTV from original source
 try {
     $xtreamClient = new \App\Services\Xtream\XtreamClient($source);

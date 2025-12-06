@@ -48,13 +48,19 @@ class StreamDataController
                 return $response->withStatus(404);
             }
 
-            // Build proxy URL using source credentials
+            // Build stream URL using source credentials
             $sourceUsername = $source->username;
             $sourcePassword = $source->password;
-            $proxyUrl = rtrim($source->url, '/') . '/' . $type . '/' . $sourceUsername . '/' . $sourcePassword . '/' . $streamId . '.' . $ext;
+            $streamUrl = rtrim($source->url, '/') . '/' . $type . '/' . $sourceUsername . '/' . $sourcePassword . '/' . $streamId . '.' . $ext;
+
+            // Check if we should redirect instead of proxy
+            $useRedirect = filter_var($_ENV['STREAM_USE_REDIRECT'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            if ($useRedirect) {
+                return $response->withStatus(302)->withHeader('Location', $streamUrl);
+            }
 
             // Proxy the stream
-            return $this->proxyStreamRequest($response, $proxyUrl, $ext);
+            return $this->proxyStreamRequest($response, $streamUrl, $ext);
 
         } catch (\Exception $e) {
             $response->getBody()->write('Error: ' . htmlspecialchars($e->getMessage()));
