@@ -139,8 +139,8 @@ export default function ClientDetail() {
   });
 
   const source = sourceResponse?.data;
-  const blockedData = blockedResponse?.data?.data; // Extract just the data array from response
-  const allowedData = allowedResponse?.data?.data; // Extract just the data array from response
+  const blockedData = blockedResponse?.data; // Extract just the data array from response
+  const allowedData = allowedResponse?.data; // Extract just the data array from response
 
   const exportMutation = useMutation({
     mutationFn: ({ exportType }: { exportType: string }) => {
@@ -542,28 +542,12 @@ export default function ClientDetail() {
             </Box>
           ) : (
             <Box sx={{ mt: 2 }}>
-              {blockedData?.has_filter && selectedBlockedType && (
+              {selectedBlockedType && (
                 <>
                   {selectedBlockedType.includes('categories') ? (
-                    <BlockedCategoriesTable
-                      items={
-                        selectedBlockedType === 'live_categories'
-                          ? blockedData.blocked_categories?.live || []
-                          : selectedBlockedType === 'vod_categories'
-                            ? blockedData.blocked_categories?.vod || []
-                            : blockedData.blocked_categories?.series || []
-                      }
-                    />
+                    <BlockedCategoriesTable items={(blockedData as Category[]) || []} />
                   ) : (
-                    <BlockedStreamsTable
-                      items={
-                        selectedBlockedType === 'live_streams'
-                          ? blockedData.blocked_streams?.live || []
-                          : selectedBlockedType === 'vod_streams'
-                            ? blockedData.blocked_streams?.vod || []
-                            : blockedData.blocked_streams?.series || []
-                      }
-                    />
+                    <BlockedStreamsTable items={(blockedData as Stream[]) || []} />
                   )}
                 </>
               )}
@@ -609,10 +593,9 @@ export default function ClientDetail() {
 }
 
 interface BlockedCategory {
-  id: number;
   category_id: string | number;
   category_name: string;
-  parent_id: number;
+  parent_id: number | null;
 }
 
 interface BlockedStream {
@@ -641,11 +624,11 @@ function BlockedCategoriesTable({ items }: { items: BlockedCategory[] }) {
               </TableCell>
             </TableRow>
           ) : (
-            items.map((item) => (
-              <TableRow key={item.id}>
+            items.map((item, idx) => (
+              <TableRow key={idx}>
                 <TableCell>{item.category_id}</TableCell>
                 <TableCell>{item.category_name}</TableCell>
-                <TableCell>{item.parent_id}</TableCell>
+                <TableCell>{item.parent_id || '-'}</TableCell>
               </TableRow>
             ))
           )}
