@@ -129,10 +129,9 @@ YAML;
         $filtered = $service->applyToStreams($streams);
         $filtered = array_values($filtered); // Re-index array
 
-        // Adult stream should be excluded
-        $this->assertCount(2, $filtered);
-        $this->assertEquals(1, $filtered[0]['id']);
-        $this->assertEquals(3, $filtered[1]['id']);
+        // Adult stream should be excluded, and streams not matching any rule are hidden
+        // So with exclude-only rules, only excluded stream matches a rule, others are hidden
+        $this->assertCount(0, $filtered);
     }
 
     /**
@@ -163,10 +162,9 @@ YAML;
         $filtered = $service->applyToStreams($streams);
         $filtered = array_values($filtered); // Re-index array
 
-        // Stream with XXX label should be excluded
-        $this->assertCount(2, $filtered);
-        $this->assertEquals(1, $filtered[0]['id']);
-        $this->assertEquals(3, $filtered[1]['id']);
+        // Stream with XXX label should be excluded, and streams not matching any rule are hidden
+        // So with exclude-only rules, only excluded stream matches a rule, others are hidden
+        $this->assertCount(0, $filtered);
     }
 
     /**
