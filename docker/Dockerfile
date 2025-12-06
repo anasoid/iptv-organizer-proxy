@@ -52,17 +52,23 @@ COPY --chown=app:app docker/docker-entrypoint.sh /app/docker-entrypoint.sh
 
 # Configure PHP-FPM, set file permissions, and setup data directory
 RUN chmod +x /app/docker-entrypoint.sh && \
-    mkdir -p /app/data && \
-    chown -R app:app /app/data && \
-    chmod 777 /app/data && \
+    mkdir -p /app/data /tmp/nginx_temp && \
+    chown -R app:app /app/data /tmp/nginx_temp && \
+    chmod 777 /app/data /tmp/nginx_temp && \
     sed -i 's/user = www-data/user = app/' /usr/local/etc/php-fpm.d/www.conf && \
     sed -i 's/group = www-data/group = app/' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's/^pm = .*/pm = ondemand/' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's/^pm.max_children = .*/pm.max_children = 16/' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's/^pm.start_servers = .*/pm.start_servers = 2/' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's/^pm.min_spare_servers = .*/pm.min_spare_servers = 1/' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's/^pm.max_spare_servers = .*/pm.max_spare_servers = 4/' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's/^pm.max_requests = .*/pm.max_requests = 500/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/^pm = .*/pm = static/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/^pm.max_children = .*/pm.max_children = 2/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/^pm.start_servers = .*/pm.start_servers = 1/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i '/^pm.min_spare_servers/d' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i '/^pm.max_spare_servers/d' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/^pm.max_requests = .*/pm.max_requests = 100/' /usr/local/etc/php-fpm.d/www.conf && \
+    echo "output_buffering = 8K" >> /usr/local/etc/php.ini-production && \
+    echo "memory_limit = 32M" >> /usr/local/etc/php.ini-production && \
+    echo "post_max_size = 25M" >> /usr/local/etc/php.ini-production && \
+    echo "upload_max_filesize = 25M" >> /usr/local/etc/php.ini-production && \
+    echo "default_socket_timeout = 300" >> /usr/local/etc/php.ini-production && \
+    cp /usr/local/etc/php.ini-production /usr/local/etc/php.ini && \
     chmod -R 755 /app/src /app/config /app/bin /app/migrations /app/public && \
     find /app/src -name "*.php" -exec chmod 644 {} \; && \
     find /app/config -name "*.php" -exec chmod 644 {} \; && \
