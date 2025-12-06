@@ -129,9 +129,12 @@ YAML;
         $filtered = $service->applyToStreams($streams);
         $filtered = array_values($filtered); // Re-index array
 
-        // Adult stream should be excluded, and streams not matching any rule are hidden
-        // So with exclude-only rules, only excluded stream matches a rule, others are hidden
-        $this->assertCount(0, $filtered);
+        // With exclude-only rules: stream matching exclude rule is hidden, others are shown
+        // Stream 2 matches exclude rule → hidden
+        // Streams 1, 3 don't match any rule → shown by default
+        $this->assertCount(2, $filtered);
+        $this->assertEquals(1, $filtered[0]['id']);
+        $this->assertEquals(3, $filtered[1]['id']);
     }
 
     /**
@@ -162,9 +165,12 @@ YAML;
         $filtered = $service->applyToStreams($streams);
         $filtered = array_values($filtered); // Re-index array
 
-        // Stream with XXX label should be excluded, and streams not matching any rule are hidden
-        // So with exclude-only rules, only excluded stream matches a rule, others are hidden
-        $this->assertCount(0, $filtered);
+        // With exclude-only rules: stream matching exclude rule is hidden, others are shown
+        // Stream 2 matches exclude rule → hidden
+        // Streams 1, 3 don't match any rule → shown by default
+        $this->assertCount(2, $filtered);
+        $this->assertEquals(1, $filtered[0]['id']);
+        $this->assertEquals(3, $filtered[1]['id']);
     }
 
     /**
@@ -236,7 +242,7 @@ YAML;
     }
 
     /**
-     * Test: Exclude rules have priority over include rules
+     * Test: First matching rule wins (rule order matters)
      */
     public function testExcludeHasPriorityOverInclude(): void
     {
@@ -267,9 +273,12 @@ YAML;
 
         $filtered = $service->applyToStreams($streams);
 
-        // Only stream 1 should pass (includes sports, doesn't have adult)
-        $this->assertCount(1, $filtered);
+        // Stream 1: matches include rule (first) → ACCEPT
+        // Stream 2: matches include rule (first) → ACCEPT (even though it also has adult label)
+        // Stream 3: doesn't match any rule, has include rules → REJECT
+        $this->assertCount(2, $filtered);
         $this->assertEquals(1, $filtered[0]['id']);
+        $this->assertEquals(2, $filtered[1]['id']);
     }
 
     /**

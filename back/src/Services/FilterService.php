@@ -399,17 +399,17 @@ class FilterService
     }
 
     /**
-     * Apply include/exclude rules to streams in order
+     * Apply include/exclude rules to streams in order (first match wins)
      *
-     * Rules processing order:
-     * 1. Filter adult content first (if enabled)
-     * 2. Process rules IN ORDER:
-     *    - If type is "include": if stream matches → ACCEPT
-     *    - If type is "exclude": if stream matches → REJECT
-     *    - If stream matches a rule, stop processing
+     * Rules processing:
+     * 1. Filter adult content first (if enabled) - HIGHEST PRIORITY
+     * 2. Process rules IN ORDER - FIRST MATCHING RULE WINS:
+     *    - If type is "include": if stream matches → ACCEPT and STOP
+     *    - If type is "exclude": if stream matches → REJECT and STOP
+     *    - Category rules apply to all channels in that category
      * 3. If stream doesn't match ANY rule:
-     *    - If there are include rules → REJECT (ignored)
-     *    - If only exclude rules → ACCEPT
+     *    - If there are include rules → REJECT (must match an include rule)
+     *    - If only exclude rules → ACCEPT (not explicitly excluded)
      *
      * Rules structure:
      * [
@@ -441,12 +441,9 @@ class FilterService
             }
         }
 
-        // Filter streams respecting rule priority: exclude > include
+        // Filter streams respecting rule order: first matching rule wins
         return array_filter($streams, function (array $stream) use ($rules, $hasIncludeRules) {
-            $matchedInclude = false;
-            $matchedExclude = false;
-            
-            // Check all rules to find any matches
+            // Process rules IN ORDER - first matching rule determines the outcome
             foreach ($rules as $rule) {
                 if (!is_array($rule)) {
                     continue;
@@ -457,26 +454,23 @@ class FilterService
 
                 // Check if stream matches this rule
                 if ($this->matchStream($stream, $match)) {
+                    // First matching rule wins - no further processing
                     if ($type === 'include') {
-                        $matchedInclude = true;
+                        return true;  // ACCEPT
                     } elseif ($type === 'exclude') {
-                        $matchedExclude = true;
+                        return false;  // REJECT
                     }
                 }
             }
 
-            // Exclude has priority over include
-            if ($matchedExclude) {
+            // No rule matched - apply default behavior
+            // If there are include rules, reject (must match an include rule)
+            // If only exclude rules, accept (not explicitly excluded)
+            if ($hasIncludeRules) {
                 return false;
             }
 
-            // If there are include rules, stream must match at least one
-            // If there are only exclude rules, stream is hidden by default (must match a rule)
-            if ($hasIncludeRules) {
-                return $matchedInclude;
-            }
-
-            return false;
+            return true;
         });
     }
 
