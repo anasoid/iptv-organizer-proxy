@@ -80,35 +80,28 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Flatten ARM image (VFS)
+      - name: Generate VFS tags
         if: github.event_name != 'pull_request'
-        run: |
-          # Get the first tag (full image reference)
-          FIRST_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n 1)
-
-          # Pull the ARM image that was just built and pushed
-          docker pull --platform linux/arm64 "$FIRST_TAG"
-
-          # Export container to tar
-          CONTAINER_ID=$(docker run -d "$FIRST_TAG" /bin/bash)
-          docker export $CONTAINER_ID > image-arm-vfs.tar
-
-          # Import as flattened image
-          docker import image-arm-vfs.tar ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:arm-vfs-build
-
-          # Clean up container
-          docker rm $CONTAINER_ID
-          rm image-arm-vfs.tar
-
-      - name: Push ARM VFS image with tags
-        if: github.event_name != 'pull_request'
+        id: vfs-tags
         run: |
           TAGS="${{ steps.meta.outputs.tags }}"
-          for TAG in $TAGS; do
-            VFS_TAG="${TAG}-vfs"
-            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:arm-vfs-build "$VFS_TAG"
-            docker push "$VFS_TAG"
-          done
+          VFS_TAGS=$(echo "$TAGS" | sed 's/$/-vfs/')
+          echo "tags<<EOF" >> $GITHUB_OUTPUT
+          echo "$VFS_TAGS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Build and push flattened ARM image (VFS)
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          platforms: linux/arm64
+          push: true
+          squash: true
+          tags: ${{ steps.vfs-tags.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
 
   test:
     needs: build
