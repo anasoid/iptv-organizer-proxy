@@ -1,10 +1,13 @@
 # Use already built image from Dockerfile as base
 ARG BASE_IMAGE=iptv-organizer-proxy:latest
 
-# VFS Single Layer - copy entire filesystem to scratch for true single layer
+# Stage 1: Define base image using ARG
+FROM ${BASE_IMAGE} AS base
+
+# Stage 2: VFS Single Layer - copy entire filesystem to scratch for true single layer
 FROM scratch
 
-COPY --from=${BASE_IMAGE} / /
+COPY --from=base / /
 
 VOLUME ["/app/data"]
 EXPOSE 9090
