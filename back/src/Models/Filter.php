@@ -10,13 +10,11 @@ use RuntimeException;
  * Filter Model
  *
  * Handles YAML-based stream filtering configuration
- * Separates rules (filtering logic) from favoris (virtual categories)
  *
  * @property int $id
  * @property string $name
  * @property string|null $description
  * @property string $filter_config YAML rules section (include/exclude rules)
- * @property string|null $favoris YAML favoris section (virtual category definitions)
  * @property string $created_at
  * @property string $updated_at
  */
@@ -27,17 +25,16 @@ class Filter extends BaseModel
         'name',
         'description',
         'filter_config',
-        'favoris',
     ];
 
     private ?array $parsedConfig = null;
 
     /**
-     * Parse YAML configuration (rules and favoris)
+     * Parse YAML configuration (rules)
      *
-     * Returns array with both rules (from filter_config) and favoris (from separate field)
+     * Returns array with rules from filter_config
      *
-     * @return array ['rules' => [...], 'favoris' => [...]]
+     * @return array ['rules' => [...]]
      */
     public function parseYaml(): array
     {
@@ -46,7 +43,6 @@ class Filter extends BaseModel
         }
 
         $rules = [];
-        $favoris = [];
 
         // Parse rules from filter_config
         if (!empty($this->filter_config)) {
@@ -58,17 +54,7 @@ class Filter extends BaseModel
             }
         }
 
-        // Parse favoris from separate favoris field
-        if (!empty($this->favoris)) {
-            try {
-                $favorisConfig = $this->parseYamlBasic($this->favoris);
-                $favoris = $favorisConfig['favoris'] ?? $favorisConfig;
-            } catch (\Exception $e) {
-                throw new RuntimeException("Failed to parse favoris YAML: " . $e->getMessage());
-            }
-        }
-
-        $this->parsedConfig = ['rules' => $rules, 'favoris' => $favoris];
+        $this->parsedConfig = ['rules' => $rules];
         return $this->parsedConfig;
     }
 
@@ -84,7 +70,7 @@ class Filter extends BaseModel
         // In Task 9, this will use Symfony\Component\Yaml\Yaml::parse()
 
         $lines = explode("\n", $yaml);
-        $result = ['rules' => [], 'favoris' => []];
+        $result = ['rules' => []];
         $currentSection = null;
         $currentItem = null;
 
@@ -97,11 +83,6 @@ class Filter extends BaseModel
 
             if ($line === 'rules:') {
                 $currentSection = 'rules';
-                continue;
-            }
-
-            if ($line === 'favoris:') {
-                $currentSection = 'favoris';
                 continue;
             }
 
@@ -203,30 +184,6 @@ class Filter extends BaseModel
     }
 
     /**
-     * Validate YAML favoris configuration
-     *
-     * @param string $yaml Favoris YAML
-     * @return bool
-     */
-    public static function validateFavorisYaml(string $yaml): bool
-    {
-        if (empty($yaml)) {
-            return true; // Favoris is optional
-        }
-
-        // Try to parse it
-        try {
-            $instance = new static();
-            $instance->favoris = $yaml;
-            $favorisConfig = $instance->parseYamlBasic($yaml);
-            // Favoris can be a list directly or under 'favoris:' key
-            return true;
-        } catch (\Exception $e) {
-            throw new RuntimeException("Invalid favoris YAML: " . $e->getMessage());
-        }
-    }
-
-    /**
      * Apply filter to streams (placeholder - full implementation in Task 9)
      *
      * @param array $streams
@@ -261,11 +218,6 @@ class Filter extends BaseModel
         // Validate rules YAML syntax
         static::validateYaml($this->attributes['filter_config']);
 
-        // Validate favoris YAML if provided
-        if (!empty($this->attributes['favoris'])) {
-            static::validateFavorisYaml($this->attributes['favoris']);
-        }
-
         return true;
     }
 
@@ -278,17 +230,6 @@ class Filter extends BaseModel
     {
         $config = $this->parseYaml();
         return $config['rules'] ?? [];
-    }
-
-    /**
-     * Get favoris configuration
-     *
-     * @return array
-     */
-    public function getFavoris(): array
-    {
-        $config = $this->parseYaml();
-        return $config['favoris'] ?? [];
     }
 
     /**
@@ -305,10 +246,6 @@ class Filter extends BaseModel
         $yaml = "rules:\n";
         foreach ($config['rules'] ?? [] as $rule) {
             $yaml .= "  - {$rule}\n";
-        }
-        $yaml .= "\nfavoris:\n";
-        foreach ($config['favoris'] ?? [] as $favoris) {
-            $yaml .= "  - {$favoris}\n";
         }
 
         $instance = new static();

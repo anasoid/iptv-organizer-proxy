@@ -177,32 +177,54 @@ class XtreamController
         /** @var Filter|null $filter */
         $filter = $request->getAttribute('filter');
 
-        $categories = [];
+        // Set Content-Type header BEFORE writing to body
+        $response = $response->withHeader('Content-Type', 'application/json');
+        $body = $response->getBody();
+
+        // Start array
+        $body->write('[');
+
+        $isFirst = true;
 
         // Use ContentFilterService to get allowed categories
         $filterService = new ContentFilterService($client);
 
-        // Generate favoris virtual categories first (if filter assigned)
-        if ($filter !== null) {
-            $filterServiceBase = new FilterService($filter, (bool) $client->hide_adult_content);
-            $favorisCategories = $filterServiceBase->generateFavorisCategories();
-            $categories = array_merge($categories, $favorisCategories);
+        // Get allowed regular categories with pagination and stream them
+        $pageSize = (int) ($_ENV['XTREAM_API_PAGINATION_LIMIT'] ?? 10000);
+        $offset = 0;
+
+        while (true) {
+            $allowedCategories = $filterService->getAllowedCategories('live', $pageSize, $offset);
+
+            if (empty($allowedCategories)) {
+                break;
+            }
+
+            foreach ($allowedCategories as $category) {
+                if (!$isFirst) {
+                    $body->write(',');
+                }
+                $categoryData = [
+                    'category_id' => (string) $category->getAttribute('category_id'),
+                    'category_name' => $category->getAttribute('category_name'),
+                    'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
+                ];
+                $body->write(json_encode($categoryData, JSON_UNESCAPED_SLASHES));
+                $isFirst = false;
+            }
+
+            // If we got fewer items than page size, we're done
+            if (count($allowedCategories) < $pageSize) {
+                break;
+            }
+
+            $offset += $pageSize;
         }
 
-        // Get allowed regular categories (filtered by rules)
-        $allowedCategories = $filterService->getAllowedCategories('live');
+        // Close array
+        $body->write(']');
 
-        foreach ($allowedCategories as $category) {
-            $categories[] = [
-                'category_id' => (string) $category->getAttribute('category_id'),
-                'category_name' => $category->getAttribute('category_name'),
-                'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
-            ];
-        }
-
-        $response->getBody()->write(json_encode($categories));
-
-        return $response->withHeader('Content-Type', 'application/json');
+        return $response;
     }
 
     /**
@@ -229,8 +251,9 @@ class XtreamController
         $queryParams = $request->getQueryParams();
         $categoryId = isset($queryParams['category_id']) ? (int) $queryParams['category_id'] : null;
 
-        // Format streams response using helper method
-        $result = $this->formatStreamsResponse(
+        // Stream response to avoid memory overhead
+        return $this->streamStreamsResponse(
+            $response,
             LiveStream::class,
             $source->getAttribute('id'),
             $client,
@@ -238,10 +261,6 @@ class XtreamController
             $categoryId,
             'live'
         );
-
-        $response->getBody()->write(json_encode($result));
-
-        return $response->withHeader('Content-Type', 'application/json');
     }
 
     /**
@@ -264,32 +283,54 @@ class XtreamController
         /** @var Filter|null $filter */
         $filter = $request->getAttribute('filter');
 
-        $categories = [];
+        // Set Content-Type header BEFORE writing to body
+        $response = $response->withHeader('Content-Type', 'application/json');
+        $body = $response->getBody();
+
+        // Start array
+        $body->write('[');
+
+        $isFirst = true;
 
         // Use ContentFilterService to get allowed categories
         $filterService = new ContentFilterService($client);
 
-        // Generate favoris virtual categories first (if filter assigned)
-        if ($filter !== null) {
-            $filterServiceBase = new FilterService($filter, (bool) $client->hide_adult_content);
-            $favorisCategories = $filterServiceBase->generateFavorisCategories();
-            $categories = array_merge($categories, $favorisCategories);
+        // Get allowed regular categories with pagination and stream them
+        $pageSize = (int) ($_ENV['XTREAM_API_PAGINATION_LIMIT'] ?? 10000);
+        $offset = 0;
+
+        while (true) {
+            $allowedCategories = $filterService->getAllowedCategories('vod', $pageSize, $offset);
+
+            if (empty($allowedCategories)) {
+                break;
+            }
+
+            foreach ($allowedCategories as $category) {
+                if (!$isFirst) {
+                    $body->write(',');
+                }
+                $categoryData = [
+                    'category_id' => (string) $category->getAttribute('category_id'),
+                    'category_name' => $category->getAttribute('category_name'),
+                    'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
+                ];
+                $body->write(json_encode($categoryData, JSON_UNESCAPED_SLASHES));
+                $isFirst = false;
+            }
+
+            // If we got fewer items than page size, we're done
+            if (count($allowedCategories) < $pageSize) {
+                break;
+            }
+
+            $offset += $pageSize;
         }
 
-        // Get allowed regular categories (filtered by rules)
-        $allowedCategories = $filterService->getAllowedCategories('vod');
+        // Close array
+        $body->write(']');
 
-        foreach ($allowedCategories as $category) {
-            $categories[] = [
-                'category_id' => (string) $category->getAttribute('category_id'),
-                'category_name' => $category->getAttribute('category_name'),
-                'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
-            ];
-        }
-
-        $response->getBody()->write(json_encode($categories));
-
-        return $response->withHeader('Content-Type', 'application/json');
+        return $response;
     }
 
     /**
@@ -312,32 +353,54 @@ class XtreamController
         /** @var Filter|null $filter */
         $filter = $request->getAttribute('filter');
 
-        $categories = [];
+        // Set Content-Type header BEFORE writing to body
+        $response = $response->withHeader('Content-Type', 'application/json');
+        $body = $response->getBody();
+
+        // Start array
+        $body->write('[');
+
+        $isFirst = true;
 
         // Use ContentFilterService to get allowed categories
         $filterService = new ContentFilterService($client);
 
-        // Generate favoris virtual categories first (if filter assigned)
-        if ($filter !== null) {
-            $filterServiceBase = new FilterService($filter, (bool) $client->hide_adult_content);
-            $favorisCategories = $filterServiceBase->generateFavorisCategories();
-            $categories = array_merge($categories, $favorisCategories);
+        // Get allowed regular categories with pagination and stream them
+        $pageSize = (int) ($_ENV['XTREAM_API_PAGINATION_LIMIT'] ?? 10000);
+        $offset = 0;
+
+        while (true) {
+            $allowedCategories = $filterService->getAllowedCategories('series', $pageSize, $offset);
+
+            if (empty($allowedCategories)) {
+                break;
+            }
+
+            foreach ($allowedCategories as $category) {
+                if (!$isFirst) {
+                    $body->write(',');
+                }
+                $categoryData = [
+                    'category_id' => (string) $category->getAttribute('category_id'),
+                    'category_name' => $category->getAttribute('category_name'),
+                    'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
+                ];
+                $body->write(json_encode($categoryData, JSON_UNESCAPED_SLASHES));
+                $isFirst = false;
+            }
+
+            // If we got fewer items than page size, we're done
+            if (count($allowedCategories) < $pageSize) {
+                break;
+            }
+
+            $offset += $pageSize;
         }
 
-        // Get allowed regular categories (filtered by rules)
-        $allowedCategories = $filterService->getAllowedCategories('series');
+        // Close array
+        $body->write(']');
 
-        foreach ($allowedCategories as $category) {
-            $categories[] = [
-                'category_id' => (string) $category->getAttribute('category_id'),
-                'category_name' => $category->getAttribute('category_name'),
-                'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
-            ];
-        }
-
-        $response->getBody()->write(json_encode($categories));
-
-        return $response->withHeader('Content-Type', 'application/json');
+        return $response;
     }
 
     /**
@@ -364,8 +427,9 @@ class XtreamController
         $queryParams = $request->getQueryParams();
         $categoryId = isset($queryParams['category_id']) ? (int) $queryParams['category_id'] : null;
 
-        // Format streams response using helper method
-        $result = $this->formatStreamsResponse(
+        // Stream response to avoid memory overhead
+        return $this->streamStreamsResponse(
+            $response,
             VodStream::class,
             $source->getAttribute('id'),
             $client,
@@ -373,10 +437,6 @@ class XtreamController
             $categoryId,
             'movie'
         );
-
-        $response->getBody()->write(json_encode($result));
-
-        return $response->withHeader('Content-Type', 'application/json');
     }
 
     /**
@@ -403,8 +463,9 @@ class XtreamController
         $queryParams = $request->getQueryParams();
         $categoryId = isset($queryParams['category_id']) ? (int) $queryParams['category_id'] : null;
 
-        // Format streams response using helper method
-        $result = $this->formatStreamsResponse(
+        // Stream response to avoid memory overhead
+        return $this->streamStreamsResponse(
+            $response,
             Series::class,
             $source->getAttribute('id'),
             $client,
@@ -412,10 +473,6 @@ class XtreamController
             $categoryId,
             'series'
         );
-
-        $response->getBody()->write(json_encode($result));
-
-        return $response->withHeader('Content-Type', 'application/json');
     }
 
     /**
@@ -597,84 +654,124 @@ class XtreamController
     }
 
     /**
-     * Format streams response for Xtream API
+     * Stream formatted streams response for Xtream API
      *
      * Common logic for getLiveStreams, getVodStreams, and getSeries
+     * Streams response to avoid memory overhead
      *
+     * @param ResponseInterface $response
      * @param string $modelClass Stream model class (LiveStream, VodStream, or Series)
      * @param int $sourceId Source ID
      * @param Client $client Authenticated client
      * @param Filter|null $filter Optional client filter
      * @param int|null $categoryId Optional category filter
      * @param string $defaultStreamType Default stream_type if not in data
-     * @return array Formatted streams response
+     * @return ResponseInterface
      */
-    private function formatStreamsResponse(
+    private function streamStreamsResponse(
+        ResponseInterface $response,
         string $modelClass,
         int $sourceId,
         Client $client,
         ?Filter $filter,
         ?int $categoryId,
         string $defaultStreamType
-    ): array {
-        // Query streams from database
-        if ($categoryId !== null && $categoryId < 100000) {
-            // Regular category filter
-            $streams = $modelClass::getByCategory($sourceId, $categoryId);
-        } else {
-            // All streams or favoris category
-            $streams = $modelClass::getBySource($sourceId);
-        }
+    ): ResponseInterface {
+        // Set Content-Type header BEFORE writing to body
+        $response = $response->withHeader('Content-Type', 'application/json');
+        $body = $response->getBody();
 
-        // Apply filtering (FilterService needs objects to lookup category info, returns arrays)
+        // Start array
+        $body->write('[');
+
+        // Set up pagination
+        $pageSize = (int) ($_ENV['XTREAM_API_PAGINATION_LIMIT'] ?? 10000);
+        $offset = 0;
+
+        // Apply filtering service for use in loop
         $filterService = new FilterService($filter, (bool) $client->getAttribute('hide_adult_content'));
-        $filteredArrays = $filterService->applyToStreams($streams, $categoryId);
 
-        // Build a map of stream_id to original stream object for data extraction
-        $streamMap = [];
-        foreach ($streams as $stream) {
-            $streamMap[$stream->getAttribute('stream_id')] = $stream;
-        }
-
-        // Convert filtered result arrays to complete Xtream format
-        $result = [];
+        $isFirst = true;
         $num = 1;
-        foreach ($filteredArrays as $streamArray) {
-            $streamId = (int) ($streamArray['stream_id'] ?? 0);
-            $originalStream = $streamMap[$streamId] ?? null;
 
-            // Parse the JSON data field from database
-            $dataJson = [];
-            if ($originalStream && !empty($originalStream->getAttribute('data'))) {
-                $dataJson = json_decode($originalStream->getAttribute('data'), true) ?? [];
+        // Load streams with pagination and stream them
+        while (true) {
+            // Query streams from database with pagination
+            if ($categoryId !== null && $categoryId < 100000) {
+                // Regular category filter
+                $streams = $modelClass::getByCategory($sourceId, $categoryId, $pageSize, $offset);
+            } else {
+                // All streams
+                $streams = $modelClass::getBySource($sourceId, $pageSize, $offset);
             }
 
-            // Build complete Xtream response with all fields
-            // Database fields (direct from model):
-            $xtreamData = [
-                'num' => $num,
-                'source_id' => $originalStream->getAttribute('source_id') ?? null,
-                'stream_id' => (int) $streamId,
-                'name' => $streamArray['name'] ?? '',
-                'category_id' => (int) ($streamArray['category_id'] ?? 0),
-                'category_ids' => !empty($streamArray['category_ids'])
-                    ? json_decode($streamArray['category_ids'], true)
-                    : [],
-                'is_adult' => (int) ($streamArray['is_adult'] ?? 0),
-                'stream_type' => $defaultStreamType,
-            ];
-
-            // Add all JSON data fields to response (allow custom field override if present)
-            foreach ($dataJson as $key => $value) {
-                // Use custom field value if present in filtered data, otherwise use JSON value
-                $xtreamData[$key] = $streamArray[$key] ?? $value;
+            if (empty($streams)) {
+                break;
             }
 
-            $result[] = $xtreamData;
-            $num++;
+            // Apply filtering to this batch (FilterService needs objects to lookup category info, returns arrays)
+            $filteredArrays = $filterService->applyToStreams($streams, $categoryId);
+
+            // Build a map of stream_id to original stream object for data extraction
+            $streamMap = [];
+            foreach ($streams as $stream) {
+                $streamMap[$stream->getAttribute('stream_id')] = $stream;
+            }
+
+            // Convert filtered result arrays to complete Xtream format and stream
+            foreach ($filteredArrays as $streamArray) {
+                if (!$isFirst) {
+                    $body->write(',');
+                }
+
+                $streamId = (int) ($streamArray['stream_id'] ?? 0);
+                $originalStream = $streamMap[$streamId] ?? null;
+
+                // Parse the JSON data field from database
+                $dataJson = [];
+                if ($originalStream && !empty($originalStream->getAttribute('data'))) {
+                    $dataJson = json_decode($originalStream->getAttribute('data'), true) ?? [];
+                }
+
+                // Build complete Xtream response with all fields
+                // Database fields (direct from model):
+                $xtreamData = [
+                    'num' => $num,
+                    'source_id' => $originalStream->getAttribute('source_id') ?? null,
+                    'stream_id' => (int) $streamId,
+                    'name' => $streamArray['name'] ?? '',
+                    'category_id' => (int) ($streamArray['category_id'] ?? 0),
+                    'category_ids' => !empty($streamArray['category_ids'])
+                        ? json_decode($streamArray['category_ids'], true)
+                        : [],
+                    'is_adult' => (int) ($streamArray['is_adult'] ?? 0),
+                    'stream_type' => $defaultStreamType,
+                ];
+
+                // Add all JSON data fields to response (allow custom field override if present)
+                foreach ($dataJson as $key => $value) {
+                    // Use custom field value if present in filtered data, otherwise use JSON value
+                    $xtreamData[$key] = $streamArray[$key] ?? $value;
+                }
+
+                // Write this stream to response
+                $body->write(json_encode($xtreamData, JSON_UNESCAPED_SLASHES));
+                $isFirst = false;
+                $num++;
+            }
+
+            // If we got fewer items than page size, we're done
+            if (count($streams) < $pageSize) {
+                break;
+            }
+
+            $offset += $pageSize;
         }
 
-        return $result;
+        // Close array
+        $body->write(']');
+
+        return $response;
     }
 
     /**

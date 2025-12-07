@@ -43,13 +43,13 @@ class ContentFilterService
     /**
      * Get allowed categories by type
      */
-    public function getAllowedCategories(string $type): array
+    public function getAllowedCategories(string $type, ?int $limit = null, int $offset = 0): array
     {
         if (!$this->client) {
             return [];
         }
 
-        $allCategories = Category::getBySourceAndType($this->client->source_id, $type);
+        $allCategories = Category::getBySourceAndType($this->client->source_id, $type, $limit, $offset);
 
         if (!$this->filterService) {
             return $allCategories;
@@ -200,17 +200,6 @@ class ContentFilterService
             return null;
         }
         return Filter::find($this->client->filter_id);
-    }
-
-    /**
-     * Get favoris (virtual categories) generated from filter configuration
-     */
-    public function getFavorisCategories(): array
-    {
-        if (!$this->filterService) {
-            return [];
-        }
-        return $this->filterService->generateFavorisCategories();
     }
 
     /**

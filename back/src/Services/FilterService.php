@@ -12,11 +12,7 @@ use RuntimeException;
 /**
  * Filter Service
  *
- * Applies YAML-based filtering with include/exclude rules and favoris virtual categories
- *
- * Filter structure has two separate sections:
- * - rules: Include/exclude rules for filtering streams
- * - favoris: Virtual category definitions for creating favorite groups
+ * Applies YAML-based filtering with include/exclude rules
  */
 class FilterService
 {
@@ -39,7 +35,7 @@ class FilterService
     /**
      * Parse filter YAML configuration using symfony/yaml
      *
-     * @return array Parsed filter with 'rules' and 'favoris' keys
+     * @return array Parsed filter with 'rules' key
      * @throws RuntimeException
      */
     private function parseFilter(): array
@@ -49,7 +45,7 @@ class FilterService
         }
 
         if ($this->filter === null) {
-            return ['rules' => [], 'favoris' => []];
+            return ['rules' => []];
         }
 
         try {
@@ -62,29 +58,8 @@ class FilterService
 
             $rules = $config['rules'] ?? [];
 
-            // Parse favoris: try from filter_config first, then from separate favoris field
-            $favoris = [];
-            
-            // Check if favoris is in filter_config
-            if (!empty($config['favoris'])) {
-                $favoris = $config['favoris'];
-            } elseif (!empty($this->filter->favoris)) {
-                // Otherwise try to parse from separate favoris field
-                try {
-                    $favorisConfig = Yaml::parse($this->filter->favoris);
-                    if (is_array($favorisConfig)) {
-                        // Handle both direct array and wrapped in 'favoris' key
-                        $favoris = $favorisConfig['favoris'] ?? $favorisConfig;
-                    }
-                } catch (\Exception $e) {
-                    // If favoris parsing fails, log but don't crash
-                    throw new RuntimeException("Failed to parse favoris YAML: " . $e->getMessage());
-                }
-            }
-
             $this->parsedFilter = [
                 'rules' => $rules,
-                'favoris' => $favoris,
             ];
 
             return $this->parsedFilter;
@@ -297,10 +272,9 @@ class FilterService
      * Apply filters to streams with priority order:
      * 1. Adult content filtering (if enabled) - FIRST PRIORITY
      * 2. Include/exclude rules (if filter assigned)
-     * 3. Favoris category filtering (if categoryId >= 100000)
      *
      * @param array $streams Array of streams (can be plain arrays or model objects)
-     * @param int|null $categoryId Optional category ID for favoris filtering
+     * @param int|null $categoryId Optional category ID (unused, kept for backwards compatibility)
      * @return array Filtered streams
      */
     public function applyToStreams(array $streams, ?int $categoryId = null): array
@@ -377,22 +351,12 @@ class FilterService
             ];
         }, $streams);
 
-        // Handle favoris categories (ID >= 100000)
-        if ($categoryId !== null && $categoryId >= 100000) {
-            return $this->filterByFavorisCategory($streamArrays, $categoryId);
-        }
-
         // Apply adult content filter first (highest priority)
         $filtered = $this->filterAdultContent($streamArrays);
 
         // Apply include/exclude rules if filter is assigned
         if ($this->filter !== null) {
             $filtered = $this->applyFilterRules($filtered);
-        }
-
-        // Enrich streams with matching favoris category IDs
-        if ($this->filter !== null) {
-            $filtered = $this->enrichStreamsWithFavorisCategories($filtered);
         }
 
         return $filtered;
@@ -493,57 +457,6 @@ class FilterService
     }
 
     /**
-     * Generate virtual categories from favoris configuration
-     *
-     * Each favoris gets an ID starting from 100000
-     *
-     * Favoris structure:
-     * {
-     *   name: "favoris name",
-     *   target_group: "virtual category name",
-     *   match: { categories: {...}, channels: {...} }
-     * }
-     *
-     * @return array Array of virtual category objects
-     */
-    public function generateFavorisCategories(): array
-    {
-        if ($this->filter === null) {
-            return [];
-        }
-
-        $config = $this->parseFilter();
-        $favoris = $config['favoris'] ?? [];
-
-        if (empty($favoris)) {
-            return [];
-        }
-
-        $categories = [];
-
-        foreach ($favoris as $index => $favRule) {
-            if (!is_array($favRule)) {
-                continue;
-            }
-
-            $categoryId = 100000 + $index;
-            $categoryName = $favRule['target_group'] ?? $favRule['name'] ?? '';
-
-            if (empty($categoryName)) {
-                continue;
-            }
-
-            $categories[] = [
-                'category_id' => $categoryId,
-                'category_name' => $categoryName,
-                'parent_id' => 0,
-            ];
-        }
-
-        return $categories;
-    }
-
-    /**
      * Filter categories using rules that have category match criteria
      *
      * Only applies rules with match.categories (ignores channel-only rules)
@@ -627,180 +540,6 @@ class FilterService
         });
     }
 
-    /**
-     * Filter streams by a specific favoris category
-     *
-     * @param array $streams Array of streams
-     * @param int $favorisCategoryId Favoris category ID (100000+)
-     * @return array Filtered streams matching the favoris criteria
-     */
-    public function filterByFavorisCategory(array $streams, int $favorisCategoryId): array
-    {
-        if ($this->filter === null) {
-            return [];
-        }
-
-        $config = $this->parseFilter();
-        $favoris = $config['favoris'] ?? [];
-
-        // Calculate index from category ID
-        $index = $favorisCategoryId - 100000;
-
-        if ($index < 0 || $index >= count($favoris)) {
-            return []; // Invalid favoris category ID
-        }
-
-        $favRule = $favoris[$index];
-
-        if (!is_array($favRule)) {
-            return [];
-        }
-
-        $match = $favRule['match'] ?? [];
-
-        // Batch load all categories for efficient lookup (to enrich streams with category labels)
-        $categoryCache = [];
-        if (!empty($streams)) {
-            $firstStream = current($streams);
-            $sourceId = $firstStream['source_id'] ?? null;
-            if ($sourceId) {
-                // Determine stream type from the stream data
-                $streamType = $firstStream['stream_type'] ?? 'live';
-                $allCategories = Category::getBySourceAndType($sourceId, $streamType);
-                foreach ($allCategories as $cat) {
-                    $key = $sourceId . '_' . $cat->category_id;
-                    $categoryCache[$key] = $cat;
-                }
-            }
-        }
-
-        // Enrich streams with category labels if missing
-        $enrichedStreams = array_map(function($stream) use ($categoryCache) {
-            if (!empty($stream['category_labels'])) {
-                return $stream; // Already has labels
-            }
-
-            // Try to enrich with category labels from cache
-            $categoryId = $stream['category_id'] ?? null;
-            $sourceId = $stream['source_id'] ?? null;
-            if ($categoryId && $sourceId) {
-                $key = $sourceId . '_' . $categoryId;
-                if (isset($categoryCache[$key])) {
-                    $category = $categoryCache[$key];
-                    $categoryLabels = $category->getAttribute('labels') ?? '';
-                    if (empty($categoryLabels)) {
-                        $categoryLabels = Category::extractLabels($category->getAttribute('category_name') ?? '');
-                    }
-                    $stream['category_labels'] = $categoryLabels;
-                    // Also set category_name if missing
-                    if (empty($stream['category_name'])) {
-                        $stream['category_name'] = $category->getAttribute('category_name') ?? '';
-                    }
-                }
-            }
-            return $stream;
-        }, $streams);
-
-        // Filter streams matching the favoris criteria
-        $filtered = array_filter(
-            $enrichedStreams,
-            fn($stream) => $this->matchStream($stream, $match)
-        );
-
-        return array_values($filtered); // Re-index array
-    }
-
-    /**
-     * Enrich streams with matching favoris category IDs
-     *
-     * For each stream, check if it matches any favoris rule and add the corresponding
-     * favoris category ID (100000 + favoris index) to the stream's category_ids field.
-     *
-     * @param array $streams Filtered streams
-     * @return array Streams enriched with favoris category IDs
-     */
-    private function enrichStreamsWithFavorisCategories(array $streams): array
-    {
-        $config = $this->parseFilter();
-        $favoris = $config['favoris'] ?? [];
-
-        if (empty($favoris)) {
-            return $streams; // No favoris to match
-        }
-
-        // Batch load all categories for efficient lookup (to enrich streams with category labels)
-        $categoryCache = [];
-        if (!empty($streams)) {
-            $firstStream = current($streams);
-            $sourceId = $firstStream['source_id'] ?? null;
-            if ($sourceId) {
-                $streamType = $firstStream['stream_type'] ?? 'live';
-                $allCategories = Category::getBySourceAndType($sourceId, $streamType);
-                foreach ($allCategories as $cat) {
-                    $key = $sourceId . '_' . $cat->category_id;
-                    $categoryCache[$key] = $cat;
-                }
-            }
-        }
-
-        // Enrich each stream with matching favoris category IDs
-        return array_map(function($stream) use ($favoris, $categoryCache) {
-            // Enrich with category labels if missing (needed for matching)
-            if (empty($stream['category_labels'])) {
-                $categoryId = $stream['category_id'] ?? null;
-                $sourceId = $stream['source_id'] ?? null;
-                if ($categoryId && $sourceId) {
-                    $key = $sourceId . '_' . $categoryId;
-                    if (isset($categoryCache[$key])) {
-                        $category = $categoryCache[$key];
-                        $categoryLabels = $category->getAttribute('labels') ?? '';
-                        if (empty($categoryLabels)) {
-                            $categoryLabels = Category::extractLabels($category->getAttribute('category_name') ?? '');
-                        }
-                        $stream['category_labels'] = $categoryLabels;
-                        if (empty($stream['category_name'])) {
-                            $stream['category_name'] = $category->getAttribute('category_name') ?? '';
-                        }
-                    }
-                }
-            }
-
-            // Parse existing category_ids
-            $categoryIds = [];
-            if (!empty($stream['category_ids'])) {
-                $categoryIds = json_decode($stream['category_ids'], true) ?? [];
-            }
-            if (!is_array($categoryIds)) {
-                $categoryIds = [];
-            }
-
-            // Check if stream matches any favoris rule
-            foreach ($favoris as $index => $favRule) {
-                if (!is_array($favRule)) {
-                    continue;
-                }
-
-                $match = $favRule['match'] ?? [];
-
-                // Check if stream matches this favoris rule
-                if ($this->matchStream($stream, $match)) {
-                    $favorisCategoryId = 100000 + $index;
-
-                    // Add favoris category ID if not already present
-                    if (!in_array($favorisCategoryId, $categoryIds)) {
-                        $categoryIds[] = $favorisCategoryId;
-                    }
-                }
-            }
-
-            // Update stream with enriched category_ids
-            if (!empty($categoryIds)) {
-                $stream['category_ids'] = json_encode($categoryIds);
-            }
-
-            return $stream;
-        }, $streams);
-    }
 
     /**
      * Check if filter is assigned
@@ -837,22 +576,11 @@ class FilterService
      *   }
      *
      * @param array $streams Array of streams
-     * @param int|null $categoryId Optional category ID
+     * @param int|null $categoryId Optional category ID (unused, kept for backwards compatibility)
      * @return array Result with accepted and rejected streams with reasons
      */
     public function applyWithRejectionTracking(array $streams, ?int $categoryId = null): array
     {
-        // Handle favoris categories
-        if ($categoryId !== null && $categoryId >= 100000) {
-            return [
-                'accepted' => $this->filterByFavorisCategory($streams, $categoryId),
-                'rejected' => [
-                    'by_adult_content' => [],
-                    'by_rule' => [],
-                    'ignored' => [],
-                ],
-            ];
-        }
 
         $result = [
             'accepted' => [],

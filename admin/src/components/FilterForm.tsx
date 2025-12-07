@@ -101,118 +101,6 @@ const RULES_CONFIG_EXAMPLES = {
   },
 };
 
-const FAVORIS_CONFIG_EXAMPLES = {
-  sports: {
-    title: 'Sports Organization',
-    description: 'Organize sports content by type and region (supports channels, categories, wildcards, case-insensitive)',
-    yaml: `- name: "Live Sports Events"
-  target_group: "Live Sports"
-  match:
-    channels:
-      by_name: ["ESPN*", "Fox*Sports*", "*League*"]
-      by_labels: ["live", "sports"]
-    categories:
-      by_name: ["*Sports*", "*Football*"]
-
-- name: "Regional Sports"
-  target_group: "Regional"
-  match:
-    channels:
-      by_name: ["*Sports*"]
-    categories:
-      by_name: ["*Regional*"]
-
-- name: "Premium Sports"
-  target_group: "Premium"
-  match:
-    channels:
-      by_name: ["DAZN*", "BeIN*"]
-    categories:
-      by_name: ["*Premium*"]`,
-  },
-  entertainment: {
-    title: 'Entertainment Categories',
-    description: 'Organize movies and shows by genre (supports categories and channel matching)',
-    yaml: `- name: "Movies - Action"
-  target_group: "Action"
-  match:
-    channels:
-      by_name: ["*Action*", "*Thriller*"]
-    categories:
-      by_name: ["*Action*", "*Thriller*"]
-
-- name: "Movies - Comedy"
-  target_group: "Comedy"
-  match:
-    channels:
-      by_name: ["*Comedy*"]
-    categories:
-      by_name: ["*Comedy*"]
-
-- name: "TV Series"
-  target_group: "Series"
-  match:
-    channels:
-      by_name: ["*Series*", "*Episode*"]
-    categories:
-      by_name: ["*Series*"]`,
-  },
-  family: {
-    title: 'Family Content',
-    description: 'Organize family-friendly content by age group with categories and channels',
-    yaml: `- name: "Kids Cartoons"
-  target_group: "Cartoons"
-  match:
-    channels:
-      by_name: ["*Cartoon*", "*Anime*"]
-    categories:
-      by_name: ["*Kids*", "*Cartoons*"]
-
-- name: "Family Movies"
-  target_group: "Family"
-  match:
-    channels:
-      by_name: ["*Family*", "*Kids*"]
-    categories:
-      by_name: ["*Family*"]
-
-- name: "Educational"
-  target_group: "Educational"
-  match:
-    channels:
-      by_name: ["PBS*", "*Educational*"]
-    categories:
-      by_name: ["*Educational*", "*Learning*"]`,
-  },
-  regional: {
-    title: 'Regional News',
-    description: 'Organize news channels by region (categories and channels with wildcards)',
-    yaml: `- name: "International News"
-  target_group: "World News"
-  match:
-    channels:
-      by_name: ["BBC*", "France*", "Al Jazeera*", "Reuters*", "Euro*"]
-    categories:
-      by_name: ["*International*", "*World*", "*News*"]
-
-- name: "Local News"
-  target_group: "Local"
-  match:
-    channels:
-      by_name: ["*Local*", "*Regional*"]
-    categories:
-      by_name: ["*Local*", "*Regional*"]
-
-- name: "Breaking News"
-  target_group: "Breaking"
-  match:
-    channels:
-      by_labels: ["breaking", "live"]
-    categories:
-      by_labels: ["breaking"]`,
-  },
-};
-
 const FILTER_TEMPLATES = {
   blockAdult: {
     name: 'Block Adult Content',
@@ -227,14 +115,6 @@ const FILTER_TEMPLATES = {
         by_name: ["Playboy*", "*Adult*"]
         by_labels: ["adult", "xxx"]
 `,
-    favoris: `- name: "Family Friendly"
-  target_group: "Kids & Family"
-  match:
-    channels:
-      by_name: ["Disney*", "*Nickelodeon*", "*Cartoon*", "PBS*"]
-    categories:
-      by_name: ["*Kids*", "*Family*"]
-`,
   },
   sportsOnly: {
     name: 'Sports Only',
@@ -247,20 +127,6 @@ const FILTER_TEMPLATES = {
         by_labels: ["sports"]
       channels:
         by_labels: ["sports", "live"]
-`,
-    favoris: `- name: "Premium Sports"
-  target_group: "Live Sports"
-  match:
-    channels:
-      by_name: ["ESPN*", "Fox*Sports*", "*League*"]
-      by_labels: ["live", "hd"]
-
-- name: "Regional Sports"
-  target_group: "Regional"
-  match:
-    channels:
-      by_name: ["*Sports*"]
-      by_labels: ["sports", "regional"]
 `,
   },
   hdChannels: {
@@ -279,20 +145,6 @@ const FILTER_TEMPLATES = {
       channels:
         by_name: ["*SD*", "*480*"]
         by_labels: ["sd"]
-`,
-    favoris: `- name: "4K Premium"
-  target_group: "4K Ultra HD"
-  match:
-    channels:
-      by_name: ["*4K*", "*Ultra*", "*UHD*"]
-      by_labels: ["4k"]
-
-- name: "Full HD"
-  target_group: "1080p HD"
-  match:
-    channels:
-      by_name: ["*1080*", "*FHD*"]
-      by_labels: ["hd"]
 `,
   },
   kidsChannels: {
@@ -314,22 +166,6 @@ const FILTER_TEMPLATES = {
       channels:
         by_labels: ["adult", "xxx"]
 `,
-    favoris: `- name: "Premium Kids"
-  target_group: "Premium Kids"
-  match:
-    channels:
-      by_name: ["Disney*", "Nickelodeon*", "*PBS*"]
-    categories:
-      by_name: ["*Premium*", "*HD*"]
-
-- name: "All Kids Cartoons"
-  target_group: "Cartoons"
-  match:
-    channels:
-      by_name: ["*Cartoon*", "*Anime*"]
-    categories:
-      by_name: ["*Kids*", "*Cartoons*"]
-`,
   },
 };
 
@@ -337,12 +173,9 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
   const [name, setName] = useState(filter?.name || '');
   const [description, setDescription] = useState(filter?.description || '');
   const [rulesYaml, setRulesYaml] = useState(filter?.filter_config || '');
-  const [favorisYaml, setFavorisYaml] = useState(filter?.favoris || '');
   const [error, setError] = useState<string | null>(null);
   const [showRulesExamples, setShowRulesExamples] = useState(false);
-  const [showFavorisExamples, setShowFavorisExamples] = useState(false);
   const [rulesTabIndex, setRulesTabIndex] = useState(0);
-  const [favorisTabIndex, setFavorisTabIndex] = useState(0);
   const [tabIndex, setTabIndex] = useState(0);
 
   // Sync form state when filter changes
@@ -351,7 +184,6 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
     setName(filter?.name || '');
     setDescription(filter?.description || '');
     setRulesYaml(filter?.filter_config || '');
-    setFavorisYaml(filter?.favoris || '');
     setError(null);
     setTabIndex(0);
   }, [filter]);
@@ -412,7 +244,6 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
     const template = FILTER_TEMPLATES[templateKey];
     setName(filter?.name || template.name);
     setRulesYaml(template.rules);
-    setFavorisYaml(template.favoris);
     setError(null);
   };
 
@@ -430,7 +261,6 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
       name: name.trim(),
       description: description.trim() || null,
       filter_config: rulesYaml,
-      favoris: favorisYaml.trim() ? favorisYaml : null,
     };
 
     if (filter) {
@@ -456,7 +286,6 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
           >
             <Tab label="Basics" />
             <Tab label="Filter" />
-            <Tab label="Favorite" />
           </Tabs>
         </Box>
 
@@ -566,59 +395,6 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
             </Button>
           </Box>
         )}
-
-        {/* Favorite Tab */}
-        {tabIndex === 2 && (
-          <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                Virtual Categories / Favoris (Optional)
-              </Typography>
-              <IconButton
-                size="small"
-                onClick={() => {
-                  setShowFavorisExamples(true);
-                  setFavorisTabIndex(0);
-                }}
-                title="View configuration examples"
-                sx={{ p: 0.5 }}
-              >
-                <HelpOutlineIcon sx={{ fontSize: '1.2rem' }} />
-              </IconButton>
-            </Box>
-            <Box
-              sx={{
-                border: '1px solid #ccc',
-                borderRadius: 1,
-                overflow: 'hidden',
-                height: 350,
-                backgroundColor: '#f5f5f5',
-              }}
-            >
-              <Editor
-                height="100%"
-                defaultLanguage="yaml"
-                value={favorisYaml}
-                onChange={(value) => {
-                  setFavorisYaml(value || '');
-                  setError(null);
-                }}
-                theme="vs"
-                options={{
-                  minimap: { enabled: false },
-                  wordWrap: 'on',
-                  lineNumbers: 'on',
-                  scrollBeyondLastLine: false,
-                  automaticLayout: true,
-                }}
-              />
-            </Box>
-            <Typography variant="caption" sx={{ color: '#999' }}>
-              Array of virtual categories (no "favoris:" wrapper). Each has name, target_group (display name), and match criteria.
-              Generated IDs start at 100000 (first favoris), 100001 (second), etc. Stored separately from rules.
-            </Typography>
-          </Box>
-        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onCancel} disabled={isLoading}>
@@ -697,69 +473,6 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
         </DialogActions>
       </Dialog>
 
-      {/* Favoris Configuration Examples Modal */}
-      <Dialog
-        open={showFavorisExamples}
-        onClose={() => setShowFavorisExamples(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Virtual Categories / Favoris Configuration Examples</DialogTitle>
-        <DialogContent sx={{ minHeight: 600 }}>
-          <Tabs
-            value={favorisTabIndex}
-            onChange={(_, newValue) => setFavorisTabIndex(newValue)}
-            sx={{ mb: 2, borderBottom: '1px solid #ccc' }}
-          >
-            {Object.entries(FAVORIS_CONFIG_EXAMPLES).map(([key]) => (
-              <Tab key={key} label={FAVORIS_CONFIG_EXAMPLES[key as keyof typeof FAVORIS_CONFIG_EXAMPLES].title} />
-            ))}
-          </Tabs>
-
-          {Object.entries(FAVORIS_CONFIG_EXAMPLES).map(([key, example], index) => (
-            favorisTabIndex === index && (
-              <Box key={key}>
-                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                  {example.title}
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 2, color: '#666' }}>
-                  {example.description}
-                </Typography>
-                <Box
-                  sx={{
-                    border: '1px solid #ddd',
-                    borderRadius: 1,
-                    backgroundColor: '#f9f9f9',
-                    p: 2,
-                    mb: 2,
-                    maxHeight: 400,
-                    overflow: 'auto',
-                    fontFamily: 'monospace',
-                    fontSize: '0.85rem',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                  }}
-                >
-                  {example.yaml}
-                </Box>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => {
-                    setFavorisYaml(example.yaml);
-                    setShowFavorisExamples(false);
-                  }}
-                >
-                  Use This Example
-                </Button>
-              </Box>
-            )
-          ))}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowFavorisExamples(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 }

@@ -38,14 +38,16 @@ class Category extends BaseModel
      *
      * @param int $sourceId
      * @param string $type (live, vod, series)
+     * @param int|null $limit
+     * @param int $offset
      * @return array
      */
-    public static function getBySourceAndType(int $sourceId, string $type): array
+    public static function getBySourceAndType(int $sourceId, string $type, ?int $limit = null, int $offset = 0): array
     {
         return static::findAll([
             'source_id' => $sourceId,
             'category_type' => $type,
-        ]);
+        ], [], $limit, $offset);
     }
 
     /**

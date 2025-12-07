@@ -244,23 +244,13 @@ class ClientController
                 return $this->jsonError($response, 'Client not found', 404);
             }
 
-            $categories = [];
             $contentFilterService = new ContentFilterService($client);
 
-            // Add favoris virtual categories if filter assigned
-            $filter = $client->filter_id ? Filter::find($client->filter_id) : null;
-            if ($filter !== null) {
-                $filterServiceBase = new FilterService($filter, (bool) $client->hide_adult_content);
-                $favorisCategories = $filterServiceBase->generateFavorisCategories();
-                $categories = array_merge($categories, $favorisCategories);
-            }
-
-            // Add allowed regular categories (filtered by rules)
-            $allowedCategories = array_map(
+            // Get allowed categories (filtered by rules)
+            $categories = array_map(
                 [ContentFilterService::class, 'formatCategory'],
                 $contentFilterService->getAllowedCategories('live')
             );
-            $categories = array_merge($categories, $allowedCategories);
 
             return $this->jsonResponse($response, [
                 'success' => true,
@@ -284,23 +274,13 @@ class ClientController
                 return $this->jsonError($response, 'Client not found', 404);
             }
 
-            $categories = [];
             $contentFilterService = new ContentFilterService($client);
 
-            // Add favoris virtual categories if filter assigned
-            $filter = $client->filter_id ? Filter::find($client->filter_id) : null;
-            if ($filter !== null) {
-                $filterServiceBase = new FilterService($filter, (bool) $client->hide_adult_content);
-                $favorisCategories = $filterServiceBase->generateFavorisCategories();
-                $categories = array_merge($categories, $favorisCategories);
-            }
-
-            // Add allowed regular categories (filtered by rules)
-            $allowedCategories = array_map(
+            // Get allowed categories (filtered by rules)
+            $categories = array_map(
                 [ContentFilterService::class, 'formatCategory'],
                 $contentFilterService->getAllowedCategories('vod')
             );
-            $categories = array_merge($categories, $allowedCategories);
 
             return $this->jsonResponse($response, [
                 'success' => true,
@@ -324,23 +304,13 @@ class ClientController
                 return $this->jsonError($response, 'Client not found', 404);
             }
 
-            $categories = [];
             $contentFilterService = new ContentFilterService($client);
 
-            // Add favoris virtual categories if filter assigned
-            $filter = $client->filter_id ? Filter::find($client->filter_id) : null;
-            if ($filter !== null) {
-                $filterServiceBase = new FilterService($filter, (bool) $client->hide_adult_content);
-                $favorisCategories = $filterServiceBase->generateFavorisCategories();
-                $categories = array_merge($categories, $favorisCategories);
-            }
-
-            // Add allowed regular categories (filtered by rules)
-            $allowedCategories = array_map(
+            // Get allowed categories (filtered by rules)
+            $categories = array_map(
                 [ContentFilterService::class, 'formatCategory'],
                 $contentFilterService->getAllowedCategories('series')
             );
-            $categories = array_merge($categories, $allowedCategories);
 
             return $this->jsonResponse($response, [
                 'success' => true,

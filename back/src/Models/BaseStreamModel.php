@@ -41,11 +41,13 @@ abstract class BaseStreamModel extends BaseModel
      * Get streams by source
      *
      * @param int $sourceId
+     * @param int|null $limit
+     * @param int $offset
      * @return array
      */
-    public static function getBySource(int $sourceId): array
+    public static function getBySource(int $sourceId, ?int $limit = null, int $offset = 0): array
     {
-        return static::findAll(['source_id' => $sourceId]);
+        return static::findAll(['source_id' => $sourceId], [], $limit, $offset);
     }
 
     /**
@@ -53,14 +55,16 @@ abstract class BaseStreamModel extends BaseModel
      *
      * @param int $sourceId
      * @param int $categoryId
+     * @param int|null $limit
+     * @param int $offset
      * @return array
      */
-    public static function getByCategory(int $sourceId, int $categoryId): array
+    public static function getByCategory(int $sourceId, int $categoryId, ?int $limit = null, int $offset = 0): array
     {
         return static::findAll([
             'source_id' => $sourceId,
             'category_id' => $categoryId,
-        ]);
+        ], [], $limit, $offset);
     }
 
     /**

@@ -63,7 +63,6 @@ export default function Filters() {
         name: `${filter.name} (Copy)`,
         description: filter.description,
         filter_config: filter.filter_config,
-        ...(filter.favoris && { favoris: filter.favoris }),
       };
       await filtersApi.createFilter(cloneData);
       queryClient.invalidateQueries({ queryKey: ['filters'] });

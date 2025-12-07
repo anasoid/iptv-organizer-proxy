@@ -107,7 +107,6 @@ class FilterController
             $filter->name = $body['name'];
             $filter->filter_config = $body['filter_config'];
             $filter->description = $body['description'] ?? null;
-            $filter->favoris = $body['favoris'] ?? null;
 
             if (!$filter->save()) {
                 return $this->jsonError($response, 'Failed to create filter', 500);
@@ -155,12 +154,6 @@ class FilterController
                     return $this->jsonError($response, 'Filter configuration must be a valid YAML string', 400);
                 }
                 $filter->filter_config = $body['filter_config'];
-            }
-            if (array_key_exists('favoris', $body)) {
-                if ($body['favoris'] !== null && !is_string($body['favoris'])) {
-                    return $this->jsonError($response, 'Favoris must be a valid YAML string or null', 400);
-                }
-                $filter->favoris = $body['favoris'];
             }
             if (array_key_exists('description', $body)) {
                 if ($body['description'] !== null && !is_string($body['description'])) {
