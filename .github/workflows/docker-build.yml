@@ -90,7 +90,7 @@ jobs:
           echo "$VFS_TAGS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Build and push flattened image (VFS) for ARM and AMD
+      - name: Build and push VFS image for ARM and AMD
         if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v5
         with:
@@ -100,7 +100,6 @@ jobs:
             linux/amd64
             linux/arm64
           push: true
-          squash: true
           tags: ${{ steps.vfs-tags.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
