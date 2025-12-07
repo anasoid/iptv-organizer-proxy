@@ -90,31 +90,21 @@ jobs:
           echo "$VFS_TAGS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Build and push VFS image for AMD64 (single layer)
+      - name: Build and push VFS image for ARM and AMD (single layer)
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./docker/Dockerfile
-          platforms: linux/amd64
-          push: true
-          squash: true
-          tags: ${{ steps.vfs-tags.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-
-      - name: Build and push VFS image for ARM64 (single layer)
-        if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./docker/Dockerfile
-          platforms: linux/arm64
-          push: true
-          squash: true
-          tags: ${{ steps.vfs-tags.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
+        run: |
+          VFS_TAGS="${{ steps.vfs-tags.outputs.tags }}"
+          TAG_ARGS=""
+          while IFS= read -r tag; do
+            TAG_ARGS="$TAG_ARGS --tag $tag"
+          done <<< "$VFS_TAGS"
+          docker buildx build \
+            --file ./docker/Dockerfile \
+            --platform linux/amd64,linux/arm64 \
+            --squash \
+            --push \
+            $TAG_ARGS \
+            .
 
   test:
     needs: build
