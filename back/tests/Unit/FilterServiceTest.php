@@ -113,8 +113,6 @@ rules:
     match:
       channels:
         by_name: ["Adult", "XXX"]
-
-favoris: []
 YAML;
 
         $filter = $this->createFilterWithYaml($yaml);
@@ -149,8 +147,6 @@ rules:
     match:
       channels:
         by_labels: ["XXX", "18+"]
-
-favoris: []
 YAML;
 
         $filter = $this->createFilterWithYaml($yaml);
@@ -185,8 +181,6 @@ rules:
     match:
       channels:
         by_name: ["Sports"]
-
-favoris: []
 YAML;
 
         $filter = $this->createFilterWithYaml($yaml);
@@ -219,8 +213,6 @@ rules:
     match:
       channels:
         by_labels: ["HD", "FHD"]
-
-favoris: []
 YAML;
 
         $filter = $this->createFilterWithYaml($yaml);
@@ -258,8 +250,6 @@ rules:
     match:
       channels:
         by_labels: ["adult"]
-
-favoris: []
 YAML;
 
         $filter = $this->createFilterWithYaml($yaml);
@@ -293,8 +283,6 @@ rules:
     match:
       categories:
         by_name: ["News", "Politics"]
-
-favoris: []
 YAML;
 
         $filter = $this->createFilterWithYaml($yaml);
@@ -321,7 +309,6 @@ YAML;
     {
         $yaml = <<<'YAML'
 rules: []
-favoris: []
 YAML;
 
         $filter = $this->createFilterWithYaml($yaml);
@@ -339,118 +326,6 @@ YAML;
     }
 
     /**
-     * Test: Generate virtual favoris categories
-     */
-    public function testGenerateFavorisCategories(): void
-    {
-        $yaml = <<<'YAML'
-rules: []
-favoris:
-  - name: "Kids Favorites"
-    target_group: "Kids Corner"
-    match:
-      channels:
-        by_name: ["Disney"]
-  - name: "Sports Favorites"
-    target_group: "My Sports"
-    match:
-      channels:
-        by_name: ["ESPN"]
-YAML;
-
-        $filter = $this->createFilterWithYaml($yaml);
-        $service = new FilterService($filter);
-
-        $categories = $service->generateFavorisCategories();
-
-        // Should generate 2 virtual categories
-        $this->assertCount(2, $categories);
-
-        // First category should have ID 100000
-        $this->assertEquals(100000, $categories[0]['category_id']);
-        $this->assertEquals('Kids Corner', $categories[0]['category_name']);
-        $this->assertEquals(0, $categories[0]['parent_id']);
-
-        // Second category should have ID 100001
-        $this->assertEquals(100001, $categories[1]['category_id']);
-        $this->assertEquals('My Sports', $categories[1]['category_name']);
-        $this->assertEquals(0, $categories[1]['parent_id']);
-    }
-
-    /**
-     * Test: Filter streams by favoris category
-     */
-    public function testFilterByFavorisCategoryId(): void
-    {
-        $yaml = <<<'YAML'
-rules: []
-favoris:
-  - name: "Kids"
-    target_group: "Kids Corner"
-    match:
-      channels:
-        by_name: ["Disney", "Cartoon"]
-YAML;
-
-        $filter = $this->createFilterWithYaml($yaml);
-        $service = new FilterService($filter);
-
-        $streams = [
-            ['id' => 1, 'name' => 'Disney Channel', 'labels' => 'kids', 'category_name' => 'Kids', 'category_labels' => ''],
-            ['id' => 2, 'name' => 'Cartoon Network', 'labels' => 'kids', 'category_name' => 'Kids', 'category_labels' => ''],
-            ['id' => 3, 'name' => 'Sports Channel', 'labels' => 'sports', 'category_name' => 'Sports', 'category_labels' => ''],
-        ];
-
-        // Filter by favoris category ID 100000 (first favoris)
-        $filtered = $service->filterByFavorisCategory($streams, 100000);
-
-        // Only matching streams should be returned
-        $this->assertCount(2, $filtered);
-        $this->assertEquals(1, $filtered[0]['id']);
-        $this->assertEquals(2, $filtered[1]['id']);
-    }
-
-    /**
-     * Test: Invalid favoris category ID returns empty
-     */
-    public function testInvalidFavorisCategoryIdReturnsEmpty(): void
-    {
-        $yaml = <<<'YAML'
-rules: []
-favoris:
-  - name: "Kids"
-    target_group: "Kids Corner"
-    match:
-      channels:
-        by_name: ["Disney"]
-YAML;
-
-        $filter = $this->createFilterWithYaml($yaml);
-        $service = new FilterService($filter);
-
-        $streams = [
-            ['id' => 1, 'name' => 'Disney', 'labels' => '', 'category_name' => 'Kids', 'category_labels' => ''],
-        ];
-
-        // Filter by invalid favoris category ID 100005
-        $filtered = $service->filterByFavorisCategory($streams, 100005);
-
-        // Should return empty for invalid ID
-        $this->assertCount(0, $filtered);
-    }
-
-    /**
-     * Test: No filter returns empty favoris
-     */
-    public function testNoFilterReturnsEmptyFavoris(): void
-    {
-        $service = new FilterService(null);
-        $categories = $service->generateFavorisCategories();
-
-        $this->assertCount(0, $categories);
-    }
-
-    /**
      * Test: Case-insensitive label matching
      */
     public function testCaseInsensitiveLabelMatching(): void
@@ -462,8 +337,6 @@ rules:
     match:
       channels:
         by_labels: ["hd"]
-
-favoris: []
 YAML;
 
         $filter = $this->createFilterWithYaml($yaml);
@@ -493,8 +366,6 @@ rules:
     match:
       channels:
         by_name: ["ESPN"]
-
-favoris: []
 YAML;
 
         $filter = $this->createFilterWithYaml($yaml);
@@ -513,39 +384,6 @@ YAML;
     }
 
     /**
-     * Test: Favoris filtering with applyToStreams
-     */
-    public function testFavorisCategoryFiltering(): void
-    {
-        $yaml = <<<'YAML'
-rules: []
-favoris:
-  - name: "Sports"
-    target_group: "My Sports"
-    match:
-      channels:
-        by_labels: ["sports"]
-YAML;
-
-        $filter = $this->createFilterWithYaml($yaml);
-        $service = new FilterService($filter);
-
-        $streams = [
-            ['id' => 1, 'name' => 'ESPN', 'labels' => 'sports,HD', 'category_name' => 'Sports', 'category_labels' => ''],
-            ['id' => 2, 'name' => 'Movies Channel', 'labels' => 'movies', 'category_name' => 'Movies', 'category_labels' => ''],
-            ['id' => 3, 'name' => 'Soccer Channel', 'labels' => 'sports', 'category_name' => 'Sports', 'category_labels' => ''],
-        ];
-
-        // Apply with favoris category ID 100000
-        $filtered = $service->applyToStreams($streams, 100000);
-
-        // Should return only sports streams
-        $this->assertCount(2, $filtered);
-        $this->assertEquals(1, $filtered[0]['id']);
-        $this->assertEquals(3, $filtered[1]['id']);
-    }
-
-    /**
      * Test: Adult content filtering is applied before rules
      */
     public function testAdultContentPriorityOverRules(): void
@@ -557,8 +395,6 @@ rules:
     match:
       channels:
         by_name: ["Movie"]
-
-favoris: []
 YAML;
 
         $filter = $this->createFilterWithYaml($yaml);
