@@ -1,0 +1,18 @@
+# Stage 1: Use already built image from Dockerfile
+ARG BASE_IMAGE=iptv-organizer-proxy:latest
+
+FROM ${BASE_IMAGE} AS base
+
+# Stage 2: VFS Squash - merge all layers into single layer for VFS storage driver
+FROM php:8.2-fpm-alpine
+
+# Copy entire filesystem from base image to create single layer
+COPY --from=base / /
+
+VOLUME ["/app/data"]
+EXPOSE 9090
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget --quiet --tries=1 --spider http://localhost:9090/health || exit 1
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

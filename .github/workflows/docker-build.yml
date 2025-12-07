@@ -94,14 +94,15 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           VFS_TAGS="${{ steps.vfs-tags.outputs.tags }}"
+          BASE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n 1)
           TAG_ARGS=""
           while IFS= read -r tag; do
             TAG_ARGS="$TAG_ARGS --tag $tag"
           done <<< "$VFS_TAGS"
           docker buildx build \
-            --file ./docker/Dockerfile \
+            --file ./docker/Dockerfile.vfs \
             --platform linux/amd64,linux/arm64 \
-            --squash \
+            --build-arg BASE_IMAGE=$BASE_TAG \
             --push \
             $TAG_ARGS \
             .
