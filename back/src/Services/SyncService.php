@@ -15,6 +15,7 @@ use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
 use Exception;
 use PDO;
+use Generator;
 
 /**
  * Synchronization Service
@@ -219,7 +220,7 @@ class SyncService
             'live_categories',
             'live',
             'live',
-            fn() => $this->client->getLiveCategories()
+            fn() => $this->client->streamLiveCategories()
         );
     }
 
@@ -234,7 +235,7 @@ class SyncService
             'vod_categories',
             'vod',
             'movie',
-            fn() => $this->client->getVodCategories()
+            fn() => $this->client->streamVodCategories()
         );
     }
 
@@ -249,7 +250,7 @@ class SyncService
             'series_categories',
             'series',
             'series',
-            fn() => $this->client->getSeriesCategories()
+            fn() => $this->client->streamSeriesCategories()
         );
     }
 
@@ -272,7 +273,7 @@ class SyncService
         try {
             $this->db->beginTransaction();
 
-            $streams = $this->client->getLiveStreams();
+            $streams = $this->client->streamLiveStreams();
             $fetchedStreamIds = [];
 
             foreach ($streams as $streamData) {
@@ -430,7 +431,7 @@ class SyncService
         try {
             $this->db->beginTransaction();
 
-            $streams = $this->client->getVodStreams();
+            $streams = $this->client->streamVodStreams();
             $fetchedStreamIds = [];
 
             foreach ($streams as $streamData) {
@@ -587,7 +588,7 @@ class SyncService
         try {
             $this->db->beginTransaction();
 
-            $seriesList = $this->client->getSeries();
+            $seriesList = $this->client->streamSeries();
             $fetchedStreamIds = [];
 
             foreach ($seriesList as $streamData) {

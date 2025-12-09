@@ -6,6 +6,7 @@ namespace App\Services\Xtream;
 
 use App\Exceptions\XtreamApiException;
 use GuzzleHttp\Exception\GuzzleException;
+use Generator;
 
 /**
  * Xtream Codes Stream Client
@@ -113,6 +114,57 @@ class XtreamStreamClient
     }
 
     /**
+     * Stream live streams as generator (memory optimized)
+     *
+     * @param int|null $categoryId Optional category filter
+     * @return Generator<int, mixed>
+     * @throws XtreamApiException
+     */
+    public function streamLiveStreams(?int $categoryId = null): Generator
+    {
+        $params = ['action' => 'get_live_streams'];
+        if ($categoryId !== null) {
+            $params['category_id'] = $categoryId;
+        }
+
+        return $this->fetchStreamsAsGenerator($params);
+    }
+
+    /**
+     * Stream VOD streams as generator (memory optimized)
+     *
+     * @param int|null $categoryId Optional category filter
+     * @return Generator<int, mixed>
+     * @throws XtreamApiException
+     */
+    public function streamVodStreams(?int $categoryId = null): Generator
+    {
+        $params = ['action' => 'get_vod_streams'];
+        if ($categoryId !== null) {
+            $params['category_id'] = $categoryId;
+        }
+
+        return $this->fetchStreamsAsGenerator($params);
+    }
+
+    /**
+     * Stream series as generator (memory optimized)
+     *
+     * @param int|null $categoryId Optional category filter
+     * @return Generator<int, mixed>
+     * @throws XtreamApiException
+     */
+    public function streamSeries(?int $categoryId = null): Generator
+    {
+        $params = ['action' => 'get_series'];
+        if ($categoryId !== null) {
+            $params['category_id'] = $categoryId;
+        }
+
+        return $this->fetchStreamsAsGenerator($params);
+    }
+
+    /**
      * Fetch streams from API
      *
      * @param array $params Query parameters
@@ -203,6 +255,107 @@ class XtreamStreamClient
 
         throw XtreamApiException::networkError(
             "Failed to fetch {$action} after {$this->maxRetries} attempts",
+            $lastException
+        );
+    }
+
+    /**
+     * Fetch streams from API as generator (memory optimized)
+     *
+     * Yields items one at a time, allowing garbage collection of processed items.
+     *
+     * @param array $params Query parameters
+     * @return Generator<int, mixed>
+     * @throws XtreamApiException
+     */
+    private function fetchStreamsAsGenerator(array $params): Generator
+    {
+        $credentials = $this->authenticator->getCredentials();
+        $httpClient = $this->authenticator->getHttpClient();
+        $logger = $this->authenticator->getLogger();
+        $baseUrl = $this->authenticator->getBaseUrl();
+        $action = $params['action'] ?? 'unknown';
+
+        $params['username'] = $credentials['username'];
+        $params['password'] = $credentials['password'];
+
+        $attempt = 0;
+        $lastException = null;
+
+        while ($attempt < $this->maxRetries) {
+            try {
+                $logger->debug('Fetching streams (streaming)', [
+                    'action' => $action,
+                    'attempt' => $attempt + 1,
+                    'url' => $baseUrl,
+                ]);
+
+                $response = $httpClient->get($baseUrl, [
+                    'query' => $params,
+                ]);
+
+                $parser = new StreamingJsonParser();
+                $itemCount = 0;
+
+                try {
+                    foreach ($parser->parseArray($response) as $item) {
+                        $itemCount++;
+                        yield $item;
+                    }
+                } finally {
+                    $logger->info('Streams streamed successfully', [
+                        'action' => $action,
+                        'count' => $itemCount,
+                        'http_code' => $response->getStatusCode(),
+                    ]);
+                }
+
+                return;
+            } catch (XtreamApiException $e) {
+                // Parser error - log and retry
+                $attempt++;
+                $lastException = $e;
+
+                $logger->warning('Parser error streaming', [
+                    'action' => $action,
+                    'attempt' => $attempt,
+                    'error' => $e->getMessage(),
+                ]);
+
+                if ($attempt < $this->maxRetries) {
+                    $delay = $this->calculateBackoff($attempt);
+                    $logger->debug("Retrying after {$delay}ms", [
+                        'action' => $action,
+                        'attempt' => $attempt,
+                    ]);
+                    usleep($delay * 1000);
+                }
+            } catch (GuzzleException $e) {
+                $attempt++;
+                $lastException = $e;
+
+                $errorDetails = $this->extractErrorDetails($e, $action, $baseUrl, $attempt);
+                $logger->warning('Network error streaming', $errorDetails);
+
+                if ($attempt < $this->maxRetries) {
+                    $delay = $this->calculateBackoff($attempt);
+                    $logger->debug("Retrying after {$delay}ms", [
+                        'action' => $action,
+                        'attempt' => $attempt,
+                    ]);
+                    usleep($delay * 1000);
+                }
+            }
+        }
+
+        $logger->error('Failed to stream after retries', [
+            'action' => $action,
+            'attempts' => $this->maxRetries,
+            'last_error' => $lastException ? $lastException->getMessage() : 'Unknown error',
+        ]);
+
+        throw XtreamApiException::networkError(
+            "Failed to stream {$action} after {$this->maxRetries} attempts",
             $lastException
         );
     }

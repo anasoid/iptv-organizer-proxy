@@ -8,6 +8,7 @@ use App\Exceptions\XtreamApiException;
 use App\Models\Source;
 use GuzzleHttp\Client;
 use Psr\Http\Message\ResponseInterface;
+use Generator;
 
 /**
  * Xtream Codes API Client (Main Facade)
@@ -186,6 +187,75 @@ class XtreamClient
     public function getXmltv(?int $streamId = null): ResponseInterface
     {
         return $this->epgClient->getXmltv($streamId);
+    }
+
+    /**
+     * Stream live categories as generator (memory optimized)
+     *
+     * @return Generator<int, mixed>
+     * @throws XtreamApiException
+     */
+    public function streamLiveCategories(): Generator
+    {
+        return $this->categoryClient->streamLiveCategories();
+    }
+
+    /**
+     * Stream VOD categories as generator (memory optimized)
+     *
+     * @return Generator<int, mixed>
+     * @throws XtreamApiException
+     */
+    public function streamVodCategories(): Generator
+    {
+        return $this->categoryClient->streamVodCategories();
+    }
+
+    /**
+     * Stream series categories as generator (memory optimized)
+     *
+     * @return Generator<int, mixed>
+     * @throws XtreamApiException
+     */
+    public function streamSeriesCategories(): Generator
+    {
+        return $this->categoryClient->streamSeriesCategories();
+    }
+
+    /**
+     * Stream live streams as generator (memory optimized)
+     *
+     * @param int|null $categoryId Optional category filter
+     * @return Generator<int, mixed>
+     * @throws XtreamApiException
+     */
+    public function streamLiveStreams(?int $categoryId = null): Generator
+    {
+        return $this->streamClient->streamLiveStreams($categoryId);
+    }
+
+    /**
+     * Stream VOD streams as generator (memory optimized)
+     *
+     * @param int|null $categoryId Optional category filter
+     * @return Generator<int, mixed>
+     * @throws XtreamApiException
+     */
+    public function streamVodStreams(?int $categoryId = null): Generator
+    {
+        return $this->streamClient->streamVodStreams($categoryId);
+    }
+
+    /**
+     * Stream series as generator (memory optimized)
+     *
+     * @param int|null $categoryId Optional category filter
+     * @return Generator<int, mixed>
+     * @throws XtreamApiException
+     */
+    public function streamSeries(?int $categoryId = null): Generator
+    {
+        return $this->streamClient->streamSeries($categoryId);
     }
 
     /**
