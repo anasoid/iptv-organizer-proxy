@@ -23,7 +23,7 @@ use Generator;
 class StreamingJsonParser
 {
     private const READ_SIZE = 131072;      // 128KB - high performance mode
-    private const MAX_ITEM_SIZE = 8192;    // 8KB - items are typically <4KB
+    private const MAX_ITEM_SIZE = 32768;   // 32KB - items are typically <4KB, but some have large base64 images
     private const GC_INTERVAL = 1000;      // GC every 1000 items for better performance
 
     /**
@@ -57,6 +57,8 @@ class StreamingJsonParser
         $escapeNext = false;
         $itemDepth = 0;
         $failedParseCount = 0;
+        $skippedCount = 0;  // Track skipped items for diagnostics
+        $skipMode = false;  // Skip oversized item mode
 
         while (!$stream->eof()) {
             // Read 128KB chunk (minimal read operations)
@@ -118,21 +120,48 @@ class StreamingJsonParser
                         }
                     }
                     $arrayEnded = true;
+                    error_log(sprintf(
+                        'StreamingJsonParser: Parsing completed successfully. Items parsed: %d, Items skipped: %d',
+                        $itemCount,
+                        $skippedCount
+                    ));
                     $stream->close();
                     return;
                 }
 
                 // Collect characters for item
                 if ($char === '{') {
-                    $itemBuffer .= $char;
-                    $itemBufferLen++;
-                    $itemDepth++;
+                    if ($skipMode) {
+                        // In skip mode - just track depth
+                        $itemDepth++;
+                    } else {
+                        $itemBuffer .= $char;
+                        $itemBufferLen++;
+                        $itemDepth++;
+                    }
                 } elseif ($char === '}' && $itemDepth > 0) {
+                    if ($skipMode) {
+                        // In skip mode - just track depth
+                        $itemDepth--;
+                        // Exit skip mode when we've closed the oversized item
+                        if ($itemDepth === 0) {
+                            $skipMode = false;
+                            // Clear buffer completely to start fresh for next item
+                            $itemBuffer = '';
+                            $itemBufferLen = 0;
+                            error_log(sprintf(
+                                'StreamingJsonParser: Exited skip mode after oversized item. Resuming parsing. Total skipped: %d',
+                                $skippedCount
+                            ));
+                        }
+                        continue;
+                    }
                     $itemBuffer .= $char;
                     $itemBufferLen++;
                     $itemDepth--;
 
                     // Complete item found at depth 0
+                    /** @phpstan-ignore-next-line - Original logic kept for safety */
                     if ($itemDepth === 0 && $itemBufferLen > 0) {
                         $item = json_decode($itemBuffer, true);
                         if ($item !== null) {
@@ -145,11 +174,25 @@ class StreamingJsonParser
                             $itemBuffer = '';
                             $itemBufferLen = 0;
                         } else {
-                            // Parse failed
+                            // Parse failed - log diagnostic info
                             $failedParseCount++;
+                            $skippedCount++;
+                            $jsonError = json_last_error_msg();
+                            error_log(sprintf(
+                                'StreamingJsonParser: Failed to parse item #%d (failure %d/3): %s. Buffer length: %d bytes. First 100 chars: %s',
+                                $itemCount + 1,
+                                $failedParseCount,
+                                $jsonError,
+                                $itemBufferLen,
+                                substr($itemBuffer, 0, 100)
+                            ));
 
                             // Skip corrupted item after 3 failures
                             if ($failedParseCount > 3) {
+                                error_log(sprintf(
+                                    'StreamingJsonParser: Resetting parser after 3 consecutive failures. Total items skipped: %d',
+                                    $skippedCount
+                                ));
                                 $itemBuffer = '';
                                 $itemBufferLen = 0;
                                 $itemDepth = 0;
@@ -157,18 +200,27 @@ class StreamingJsonParser
                             }
                         }
                     }
-                } elseif ($itemDepth > 0) {
-                    // Accumulate characters only when inside item
+                } elseif ($itemDepth > 0 && !$skipMode) {
+                    // Accumulate characters only when inside item and not in skip mode
                     $itemBuffer .= $char;
                     $itemBufferLen++;
 
                     // Overflow protection (check every 4KB to reduce overhead)
                     if (($itemBufferLen & 0x0FFF) === 0 && $itemBufferLen > self::MAX_ITEM_SIZE) {
-                        // Item too large - skip it
+                        // Item too large - enter skip mode
+                        $skippedCount++;
+                        $skipMode = true;
+                        error_log(sprintf(
+                            'StreamingJsonParser: Item exceeds MAX_ITEM_SIZE (%d bytes). Current size: %d bytes, depth: %d. Entering skip mode. Total skipped: %d',
+                            self::MAX_ITEM_SIZE,
+                            $itemBufferLen,
+                            $itemDepth,
+                            $skippedCount
+                        ));
                         $itemBuffer = '';
                         $itemBufferLen = 0;
-                        $itemDepth = 0;
                         $failedParseCount = 0;
+                        // Keep $itemDepth to properly skip to end of oversized item
                     }
                 }
             }
@@ -190,11 +242,18 @@ class StreamingJsonParser
             }
         }
 
-        // Validate array closure
+        // Validate array closure - if we reach here, array was not properly closed
+        /** @phpstan-ignore-next-line - Condition is always true by design */
         if (!$arrayEnded) {
+            error_log(sprintf(
+                'StreamingJsonParser: Array not properly closed. Items parsed: %d, Items skipped: %d',
+                $itemCount,
+                $skippedCount
+            ));
             throw new \RuntimeException(
                 'Invalid JSON response: Array not properly closed with ]. ' .
-                'Items parsed=' . $itemCount . '. ' .
+                'Items parsed: ' . $itemCount . ', ' .
+                'Items skipped: ' . $skippedCount . '. ' .
                 'Verify the API response is complete and well-formed JSON.'
             );
         }

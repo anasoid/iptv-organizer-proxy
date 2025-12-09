@@ -291,15 +291,15 @@ class SyncService
                 
                 $fetchedStreamIds[$streamId] = true;
 
-                // Check if category_id is provided
-                if (!isset($streamData['category_id'])) {
+                // Check if category_id key exists (allow null values)
+                if (!array_key_exists('category_id', $streamData)) {
                     $missingInfo = [
                         'stream_id' => $streamId,
                         'num' => $streamData['num'] ?? null,
                         'name' => $streamData['name'] ?? 'Unknown',
                     ];
                     $stats['missing_category_id'][] = $missingInfo;
-                    $this->logger->warning('Live stream missing category_id', $missingInfo);
+                    $this->logger->warning('Live stream missing category_id key', $missingInfo);
                     unset($streamData, $missingInfo);
                     continue;
                 }
@@ -449,15 +449,15 @@ class SyncService
                 
                 $fetchedStreamIds[$streamId] = true;
 
-                // Check if category_id is provided
-                if (!isset($streamData['category_id'])) {
+                // Check if category_id key exists (allow null values)
+                if (!array_key_exists('category_id', $streamData)) {
                     $missingInfo = [
                         'stream_id' => $streamId,
                         'num' => $streamData['num'] ?? null,
                         'name' => $streamData['name'] ?? 'Unknown',
                     ];
                     $stats['missing_category_id'][] = $missingInfo;
-                    $this->logger->warning('VOD stream missing category_id', $missingInfo);
+                    $this->logger->warning('VOD stream missing category_id key', $missingInfo);
                     unset($streamData, $missingInfo);
                     continue;
                 }
@@ -606,15 +606,15 @@ class SyncService
                 
                 $fetchedStreamIds[$streamId] = true;
 
-                // Check if category_id is provided
-                if (!isset($streamData['category_id'])) {
+                // Check if category_id key exists (allow null values)
+                if (!array_key_exists('category_id', $streamData)) {
                     $missingInfo = [
                         'stream_id' => $streamId,
                         'num' => $streamData['num'] ?? null,
                         'name' => $streamData['name'] ?? 'Unknown',
                     ];
                     $stats['missing_category_id'][] = $missingInfo;
-                    $this->logger->warning('Series missing category_id', $missingInfo);
+                    $this->logger->warning('Series missing category_id key', $missingInfo);
                     unset($streamData, $missingInfo);
                     continue;
                 }
