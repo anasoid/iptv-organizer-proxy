@@ -181,25 +181,9 @@ export default function StreamDetail() {
       {/* Stream Info Card */}
       <Card sx={{ mb: 3 }}>
         <Grid container spacing={0}>
-          {/* Image Section */}
-          {streamIcon && (
-            <Grid item xs={12} sm={4} md={3}>
-              <CardMedia
-                component="img"
-                image={streamIcon}
-                alt={stream.name}
-                sx={{
-                  height: '100%',
-                  minHeight: 300,
-                  objectFit: 'cover',
-                  backgroundColor: '#f0f0f0',
-                }}
-              />
-            </Grid>
-          )}
-
-          {/* Info Section */}
-          <Grid item xs={12} sm={streamIcon ? 8 : 12} md={streamIcon ? 9 : 12}>
+          {/* Left Section: Detail Info + Metadata */}
+          <Grid item xs={12} sm={streamIcon ? 8 : 12} md={streamIcon ? 10 : 12}>
+            {/* Detail Info */}
             <Box sx={{ p: 3 }}>
               {/* Header with Type Badge and Category */}
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
@@ -350,7 +334,72 @@ export default function StreamDetail() {
                 )}
               </Grid>
             </Box>
+
+            {/* Metadata Table - Below Detail Info */}
+            {stream.data && Object.keys(stream.data).length > 0 && (
+              <Box sx={{ p: 3, pt: 0, backgroundColor: '#fafafa' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                  Metadata
+                </Typography>
+                <TableContainer sx={{ maxHeight: 250 }}>
+                  <Table size="small">
+                    <TableBody>
+                      {Object.entries(stream.data).map(([key, value]) => {
+                        // Skip certain fields we already display
+                        if (['stream_icon', 'url', 'duration', 'episodes', 'seasons'].includes(key)) {
+                          return null;
+                        }
+
+                        let displayValue: string;
+                        if (typeof value === 'object') {
+                          displayValue = JSON.stringify(value, null, 2);
+                        } else {
+                          displayValue = String(value);
+                        }
+
+                        return (
+                          <TableRow key={key}>
+                            <TableCell sx={{ verticalAlign: 'top', fontWeight: 500, fontSize: '0.875rem' }}>
+                              {key}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.875rem' }}>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontFamily: 'monospace',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {displayValue.length > 80 ? displayValue.substring(0, 80) + '...' : displayValue}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            )}
           </Grid>
+
+          {/* Right Section: Image Only */}
+          {streamIcon && (
+            <Grid item xs={12} sm={4} md={2} sx={{ display: 'flex', alignItems: 'stretch' }}>
+              <CardMedia
+                component="img"
+                image={streamIcon}
+                alt={stream.name}
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  minHeight: 150,
+                  objectFit: 'cover',
+                  backgroundColor: '#f0f0f0',
+                }}
+              />
+            </Grid>
+          )}
         </Grid>
       </Card>
 
@@ -395,59 +444,6 @@ export default function StreamDetail() {
         </Card>
       )}
 
-      {/* Additional Data */}
-      {stream.data && Object.keys(stream.data).length > 0 && (
-        <Card sx={{ p: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-            Metadata
-          </Typography>
-
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ backgroundColor: 'action.hover' }}>
-                  <TableCell sx={{ fontWeight: 600 }}>Key</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Value</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {Object.entries(stream.data).map(([key, value]) => {
-                  // Skip certain fields we already display
-                  if (['stream_icon', 'url', 'duration', 'episodes', 'seasons'].includes(key)) {
-                    return null;
-                  }
-
-                  let displayValue: string;
-                  if (typeof value === 'object') {
-                    displayValue = JSON.stringify(value, null, 2);
-                  } else {
-                    displayValue = String(value);
-                  }
-
-                  return (
-                    <TableRow key={key}>
-                      <TableCell sx={{ verticalAlign: 'top', fontWeight: 500 }}>{key}</TableCell>
-                      <TableCell>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontFamily: 'monospace',
-                            fontSize: '0.875rem',
-                            wordBreak: 'break-word',
-                            maxWidth: 600,
-                          }}
-                        >
-                          {displayValue}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Card>
-      )}
 
       {/* Snackbar for copy notification */}
       <Snackbar
