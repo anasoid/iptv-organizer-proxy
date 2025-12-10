@@ -1,7 +1,7 @@
 import api from './api';
 
 export interface StreamData {
-  [key: string]: any;
+  [key: string]: unknown;
   stream_icon?: string;
 }
 

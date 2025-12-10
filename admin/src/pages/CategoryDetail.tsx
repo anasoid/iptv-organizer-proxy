@@ -1,4 +1,4 @@
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -18,7 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import categoriesApi from '../services/categoriesApi';
-import streamsApi, { type Stream } from '../services/streamsApi';
+import streamsApi from '../services/streamsApi';
 
 export default function CategoryDetail() {
   const { id } = useParams<{ id: string }>();

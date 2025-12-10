@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Box, FormControl, InputLabel, Select, MenuItem, CircularProgress, FormHelperText } from '@mui/material';
+import { FormControl, InputLabel, Select, MenuItem, CircularProgress, FormHelperText } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import sourcesApi, { type Source } from '../services/sourcesApi';
 import { useAuthStore } from '../stores/authStore';

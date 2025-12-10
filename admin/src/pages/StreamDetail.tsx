@@ -25,7 +25,7 @@ import {
 import { ArrowBack as ArrowBackIcon, ContentCopy as ContentCopyIcon } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
-import streamsApi, { type Stream } from '../services/streamsApi';
+import streamsApi from '../services/streamsApi';
 import categoriesApi from '../services/categoriesApi';
 
 export default function StreamDetail() {
@@ -63,7 +63,7 @@ export default function StreamDetail() {
         const result = await categoriesApi.getCategory(Number(stream.category_id), sourceId);
         console.log('Category found:', result.data.category_name);
         return result;
-      } catch (err) {
+      } catch {
         console.log('Single category fetch failed, trying to fetch all categories from source...');
         // Fallback: fetch all categories and find the matching one
         if (sourceId) {

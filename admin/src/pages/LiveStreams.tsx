@@ -14,7 +14,7 @@ import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useSourceStore } from '../stores/sourceStore';
-import streamsApi, { type Stream } from '../services/streamsApi';
+import streamsApi from '../services/streamsApi';
 import categoriesApi, { type Category } from '../services/categoriesApi';
 import SourceSelector from '../components/SourceSelector';
 import ViewToggle, { type ViewMode } from '../components/ViewToggle';

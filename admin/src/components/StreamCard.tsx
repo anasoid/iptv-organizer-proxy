@@ -33,7 +33,7 @@ export default function StreamCard({ stream, categoryName, onClick }: StreamCard
     return `${minutes}m ${secs}s`;
   };
 
-  const getTypeColor = (type?: string): 'default' | 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success' => {
+  const getTypeColor = (): 'default' | 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success' => {
     // Try to determine type from stream name labels
     if (stream.labels) {
       const labels = stream.labels.toLowerCase();
