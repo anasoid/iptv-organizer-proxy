@@ -37,6 +37,14 @@ export interface StreamResponse {
 
 type StreamType = 'live' | 'vod' | 'series';
 
+interface StreamsParams {
+  source_id: number;
+  type: StreamType;
+  page: number;
+  limit: number;
+  category_id?: number;
+}
+
 class StreamsApi {
   /**
    * Get all streams by source and type (paginated)
@@ -49,7 +57,7 @@ class StreamsApi {
     page: number = 1,
     limit: number = 20
   ) {
-    const params: any = { source_id: sourceId, type, page, limit };
+    const params: StreamsParams = { source_id: sourceId, type, page, limit };
     if (categoryId) {
       params.category_id = categoryId;
     }
