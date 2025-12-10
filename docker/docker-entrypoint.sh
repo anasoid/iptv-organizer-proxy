@@ -46,6 +46,12 @@ else
     echo ".env file already exists, skipping generation"
 fi
 
+# Create logs directory and fix permissions
+mkdir -p /logs
+echo "Logs directory: /logs"
+chown -R app:app /logs 2>&1 || true
+chmod -R 777 /logs 2>&1 || true
+
 # Create SQLite database directory and fix permissions
 if [ "$DB_TYPE" = "sqlite" ]; then
     mkdir -p /app/data

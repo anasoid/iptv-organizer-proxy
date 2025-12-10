@@ -25,7 +25,7 @@ RUN apk add --no-cache --no-scripts \
     sqlite-libs \
     nginx \
     openssl && \
-    mkdir -p /etc/nginx/conf.d /var/log/nginx && \
+    mkdir -p /etc/nginx/conf.d && \
     addgroup -g 1000 app && \
     adduser -D -u 1000 -G app app && \
     rm -rf /tmp/* /var/tmp/*
@@ -52,9 +52,9 @@ COPY --chown=app:app docker/docker-entrypoint.sh /app/docker-entrypoint.sh
 
 # Configure PHP-FPM, set file permissions, and setup data directory
 RUN chmod +x /app/docker-entrypoint.sh && \
-    mkdir -p /app/data /tmp/nginx_temp && \
-    chown -R app:app /app/data /tmp/nginx_temp && \
-    chmod 777 /app/data /tmp/nginx_temp && \
+    mkdir -p /app/data /logs /tmp/nginx_temp && \
+    chown -R app:app /app/data /logs /tmp/nginx_temp && \
+    chmod 777 /app/data /logs /tmp/nginx_temp && \
     sed -i 's/user = www-data/user = app/' /usr/local/etc/php-fpm.d/www.conf && \
     sed -i 's/group = www-data/group = app/' /usr/local/etc/php-fpm.d/www.conf && \
     sed -i 's/^pm = .*/pm = static/' /usr/local/etc/php-fpm.d/www.conf && \
@@ -69,6 +69,8 @@ RUN chmod +x /app/docker-entrypoint.sh && \
     echo "post_max_size = 25M" >> /usr/local/etc/php.ini-production && \
     echo "upload_max_filesize = 25M" >> /usr/local/etc/php.ini-production && \
     echo "default_socket_timeout = 300" >> /usr/local/etc/php.ini-production && \
+    echo "error_log = /logs/iptv-php-errors.log" >> /usr/local/etc/php.ini-production && \
+    echo "log_errors = On" >> /usr/local/etc/php.ini-production && \
     cp /usr/local/etc/php.ini-production /usr/local/etc/php.ini && \
     chmod -R 755 /app/src /app/config /app/bin /app/migrations /app/public && \
     find /app/src -name "*.php" -exec chmod 644 {} \; && \
@@ -78,8 +80,8 @@ RUN chmod +x /app/docker-entrypoint.sh && \
     find /app/public -name "*.php" -exec chmod 644 {} \; && \
     rm -rf /tmp/* /var/tmp/* ~/.cache
 
-# Declare data directory as volume
-VOLUME ["/app/data"]
+# Declare data and logs directories as volumes
+VOLUME ["/app/data", "/logs"]
 
 # Expose port
 EXPOSE 9090

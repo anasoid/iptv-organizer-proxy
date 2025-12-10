@@ -20,6 +20,7 @@ services:
       - "${APP_PORT:-9090}:9090"
     volumes:
       - app-data:/app/data
+      - app-logs:/logs
     environment:
       - APP_URL=http://192.168.8.1:9090
     restart: unless-stopped
@@ -33,4 +34,6 @@ services:
 
 volumes:
   app-data:
+    driver: local
+  app-logs:
     driver: local
