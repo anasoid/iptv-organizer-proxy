@@ -51,7 +51,7 @@ export default function StreamDetail() {
   const sourceId = stream?.source_id;
 
   // First try to get single category, fallback to fetching all categories
-  const { data: categoryData, isLoading: isLoadingCategory, error: categoryError } = useQuery({
+  const { data: categoryData } = useQuery({
     queryKey: ['category', stream?.category_id],
     queryFn: async () => {
       if (!stream?.category_id) {
@@ -89,20 +89,6 @@ export default function StreamDetail() {
   });
 
   const category = categoryData?.data;
-
-  // Log category loading status
-  if (categoryError) {
-    console.log('Category fetch error:', categoryError);
-  }
-  if (stream?.category_id) {
-    console.log('Stream data:', {
-      id: stream.id,
-      name: stream.name,
-      category_id: stream.category_id,
-      source_id: stream.source_id
-    });
-    console.log('Category loaded:', !!category, 'Category name:', category?.category_name);
-  }
 
   const getTypeColor = (type: string): 'default' | 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success' => {
     switch (type.toLowerCase()) {
@@ -162,7 +148,6 @@ export default function StreamDetail() {
   }
 
   const streamIcon = stream.data?.stream_icon;
-  const streamUrl = stream.data?.url;
   const duration = stream.data?.duration;
   const episodes = stream.data?.episodes;
   const seasons = stream.data?.seasons;
