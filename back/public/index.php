@@ -12,6 +12,8 @@ use App\Controllers\Admin\ClientController;
 use App\Controllers\Admin\FilterController;
 use App\Controllers\Admin\AdminUserController;
 use App\Controllers\Admin\DashboardController;
+use App\Controllers\Admin\CategoryController;
+use App\Controllers\Admin\StreamController;
 use App\Controllers\Xtream\StreamDataController;
 
 // Determine environment based on directory structure
@@ -125,6 +127,16 @@ $app->group('/api', function ($group) {
     $group->get('/clients/{id}/export/blocked-live-streams', [$clientController, 'exportBlockedLiveStreams']);
     $group->get('/clients/{id}/export/blocked-vod-streams', [$clientController, 'exportBlockedVodStreams']);
     $group->get('/clients/{id}/export/blocked-series', [$clientController, 'exportBlockedSeries']);
+
+    // Category management (read-only)
+    $categoryController = new CategoryController();
+    $group->get('/categories', [$categoryController, 'list']);
+    $group->get('/categories/{id}', [$categoryController, 'get']);
+
+    // Stream management (read-only)
+    $streamController = new StreamController();
+    $group->get('/streams', [$streamController, 'list']);
+    $group->get('/streams/{id}', [$streamController, 'get']);
 
     // Filter management
     $filterController = new FilterController();

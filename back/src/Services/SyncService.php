@@ -291,17 +291,20 @@ class SyncService
                 
                 $fetchedStreamIds[$streamId] = true;
 
-                // Check if category_id key exists (allow null values)
-                if (!array_key_exists('category_id', $streamData)) {
-                    $missingInfo = [
+                // Handle category_id - if null, use Unknown category
+                $categoryId = null;
+                if (array_key_exists('category_id', $streamData)) {
+                    $categoryId = $streamData['category_id'];
+                }
+
+                // If category_id is null, get/create Unknown category
+                if ($categoryId === null) {
+                    $unknownCatId = Category::getOrCreateUnknownCategory($this->source->id, 'live');
+                    $categoryId = $unknownCatId;
+                    $this->logger->info('Live stream assigned to Unknown category', [
                         'stream_id' => $streamId,
-                        'num' => $streamData['num'] ?? null,
                         'name' => $streamData['name'] ?? 'Unknown',
-                    ];
-                    $stats['missing_category_id'][] = $missingInfo;
-                    $this->logger->warning('Live stream missing category_id key', $missingInfo);
-                    unset($streamData, $missingInfo);
-                    continue;
+                    ]);
                 }
 
                 $labels = LabelExtractor::extractLabels(
@@ -325,13 +328,13 @@ class SyncService
                     // Update existing - only if values changed
                     $existing = $existingStreams[0];
                     $hasChanges = false;
-                    
+
                     if ($existing->name !== ($streamData['name'] ?? null)) {
                         $existing->name = $streamData['name'] ?? null;
                         $hasChanges = true;
                     }
-                    if ($existing->category_id !== ($streamData['category_id'] ?? null)) {
-                        $existing->category_id = $streamData['category_id'] ?? null;
+                    if ($existing->category_id !== $categoryId) {
+                        $existing->category_id = $categoryId;
                         $hasChanges = true;
                     }
                     if ($existing->category_ids !== $categoryIds) {
@@ -362,7 +365,7 @@ class SyncService
                     $stream->source_id = $this->source->id;
                     $stream->stream_id = $streamId;
                     $stream->name = $streamData['name'] ?? null;
-                    $stream->category_id = $streamData['category_id'] ?? null;
+                    $stream->category_id = $categoryId;
                     $stream->category_ids = $categoryIds;
                     $stream->is_adult = $isAdult ? 1 : 0;
                     $stream->labels = $labels;
@@ -449,17 +452,20 @@ class SyncService
                 
                 $fetchedStreamIds[$streamId] = true;
 
-                // Check if category_id key exists (allow null values)
-                if (!array_key_exists('category_id', $streamData)) {
-                    $missingInfo = [
+                // Handle category_id - if null, use Unknown category
+                $categoryId = null;
+                if (array_key_exists('category_id', $streamData)) {
+                    $categoryId = $streamData['category_id'];
+                }
+
+                // If category_id is null, get/create Unknown category
+                if ($categoryId === null) {
+                    $unknownCatId = Category::getOrCreateUnknownCategory($this->source->id, 'vod');
+                    $categoryId = $unknownCatId;
+                    $this->logger->info('VOD stream assigned to Unknown category', [
                         'stream_id' => $streamId,
-                        'num' => $streamData['num'] ?? null,
                         'name' => $streamData['name'] ?? 'Unknown',
-                    ];
-                    $stats['missing_category_id'][] = $missingInfo;
-                    $this->logger->warning('VOD stream missing category_id key', $missingInfo);
-                    unset($streamData, $missingInfo);
-                    continue;
+                    ]);
                 }
 
                 $labels = LabelExtractor::extractLabels(
@@ -483,13 +489,13 @@ class SyncService
                     // Update existing - only if values changed
                     $existing = $existingStreams[0];
                     $hasChanges = false;
-                    
+
                     if ($existing->name !== ($streamData['name'] ?? null)) {
                         $existing->name = $streamData['name'] ?? null;
                         $hasChanges = true;
                     }
-                    if ($existing->category_id !== ($streamData['category_id'] ?? null)) {
-                        $existing->category_id = $streamData['category_id'] ?? null;
+                    if ($existing->category_id !== $categoryId) {
+                        $existing->category_id = $categoryId;
                         $hasChanges = true;
                     }
                     if ($existing->category_ids !== $categoryIds) {
@@ -519,7 +525,7 @@ class SyncService
                     $stream->source_id = $this->source->id;
                     $stream->stream_id = $streamId;
                     $stream->name = $streamData['name'] ?? null;
-                    $stream->category_id = $streamData['category_id'] ?? null;
+                    $stream->category_id = $categoryId;
                     $stream->category_ids = $categoryIds;
                     $stream->is_adult = $isAdult ? 1 : 0;
                     $stream->labels = $labels;
@@ -528,8 +534,8 @@ class SyncService
                     $stats['added']++;
                     unset($stream);
                 }
-                
-                unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson);
+
+                unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson, $categoryId);
             }
 
             unset($streams);
@@ -606,17 +612,20 @@ class SyncService
                 
                 $fetchedStreamIds[$streamId] = true;
 
-                // Check if category_id key exists (allow null values)
-                if (!array_key_exists('category_id', $streamData)) {
-                    $missingInfo = [
+                // Handle category_id - if null, use Unknown category
+                $categoryId = null;
+                if (array_key_exists('category_id', $streamData)) {
+                    $categoryId = $streamData['category_id'];
+                }
+
+                // If category_id is null, get/create Unknown category
+                if ($categoryId === null) {
+                    $unknownCatId = Category::getOrCreateUnknownCategory($this->source->id, 'series');
+                    $categoryId = $unknownCatId;
+                    $this->logger->info('Series assigned to Unknown category', [
                         'stream_id' => $streamId,
-                        'num' => $streamData['num'] ?? null,
                         'name' => $streamData['name'] ?? 'Unknown',
-                    ];
-                    $stats['missing_category_id'][] = $missingInfo;
-                    $this->logger->warning('Series missing category_id key', $missingInfo);
-                    unset($streamData, $missingInfo);
-                    continue;
+                    ]);
                 }
 
                 $labels = LabelExtractor::extractLabels(
@@ -640,13 +649,13 @@ class SyncService
                     // Update existing - only if values changed
                     $existing = $existingStreams[0];
                     $hasChanges = false;
-                    
+
                     if ($existing->name !== ($streamData['name'] ?? null)) {
                         $existing->name = $streamData['name'] ?? null;
                         $hasChanges = true;
                     }
-                    if ($existing->category_id !== ($streamData['category_id'] ?? null)) {
-                        $existing->category_id = $streamData['category_id'] ?? null;
+                    if ($existing->category_id !== $categoryId) {
+                        $existing->category_id = $categoryId;
                         $hasChanges = true;
                     }
                     if ($existing->category_ids !== $categoryIds) {
@@ -676,7 +685,7 @@ class SyncService
                     $stream->source_id = $this->source->id;
                     $stream->stream_id = $streamId;
                     $stream->name = $streamData['name'] ?? null;
-                    $stream->category_id = $streamData['category_id'] ?? null;
+                    $stream->category_id = $categoryId;
                     $stream->category_ids = $categoryIds;
                     $stream->is_adult = $isAdult ? 1 : 0;
                     $stream->labels = $labels;
@@ -685,8 +694,8 @@ class SyncService
                     $stats['added']++;
                     unset($stream);
                 }
-                
-                unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson);
+
+                unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson, $categoryId);
             }
 
             unset($seriesList);

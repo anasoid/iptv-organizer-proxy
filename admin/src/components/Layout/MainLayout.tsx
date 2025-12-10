@@ -26,6 +26,10 @@ import {
   Brightness4 as Brightness4Icon,
   Brightness7 as Brightness7Icon,
   AccountCircle,
+  Folder as FolderIcon,
+  PlayCircle as PlayCircleIcon,
+  MovieCreation as MovieIcon,
+  VideoLibrary as SeriesIcon,
 } from '@mui/icons-material';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -46,6 +50,10 @@ const navItems: NavItem[] = [
   { title: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
   { title: 'Sources', path: '/sources', icon: <StorageIcon /> },
   { title: 'Clients', path: '/clients', icon: <PeopleIcon /> },
+  { title: 'Categories', path: '/categories', icon: <FolderIcon /> },
+  { title: 'Live Streams', path: '/live-streams', icon: <PlayCircleIcon /> },
+  { title: 'VOD Streams', path: '/vod-streams', icon: <MovieIcon /> },
+  { title: 'Series', path: '/series', icon: <SeriesIcon /> },
   { title: 'Filters', path: '/filters', icon: <FilterListIcon /> },
   { title: 'Admin Users', path: '/admin-users', icon: <SupervisorAccountIcon /> },
 ];

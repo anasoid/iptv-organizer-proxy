@@ -157,11 +157,6 @@ class Category extends BaseModel
             throw new RuntimeException("Source ID is required");
         }
 
-        // Category ID required
-        if (!isset($this->attributes['category_id'])) {
-            throw new RuntimeException("Category ID is required");
-        }
-
         // Category name required
         if (empty($this->attributes['category_name'])) {
             throw new RuntimeException("Category name is required");
@@ -223,5 +218,39 @@ class Category extends BaseModel
         }
 
         return $instance;
+    }
+
+    /**
+     * Get or create "Unknown" category for a source and type
+     * Used when streams have no category assigned
+     *
+     * @param int $sourceId
+     * @param string $type Category type (live, vod, series)
+     * @return int Category ID of the Unknown category
+     */
+    public static function getOrCreateUnknownCategory(int $sourceId, string $type): int
+    {
+        $unknownCategoryId = 0; // Use 0 as special ID for "Unknown"
+
+        $existing = static::findBySourceCategory($sourceId, $unknownCategoryId, $type);
+
+        if ($existing) {
+            return $existing->id;
+        }
+
+        // Create new Unknown category
+        $instance = new static();
+        $instance->source_id = $sourceId;
+        $instance->category_id = $unknownCategoryId;
+        $instance->category_type = $type;
+        $instance->category_name = 'Unknown';
+        $instance->parent_id = null;
+        $instance->labels = 'unknown';
+
+        if (!$instance->save()) {
+            throw new RuntimeException("Failed to create Unknown category");
+        }
+
+        return $instance->id;
     }
 }

@@ -1,0 +1,230 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Card,
+  CircularProgress,
+  Grid,
+  Pagination,
+  Typography,
+  Chip,
+  Alert,
+} from '@mui/material';
+import { DataGrid, type GridColDef } from '@mui/x-data-grid';
+import { useQuery } from '@tanstack/react-query';
+import { useAuthStore } from '../stores/authStore';
+import { useSourceStore } from '../stores/sourceStore';
+import streamsApi, { type Stream } from '../services/streamsApi';
+import categoriesApi, { type Category } from '../services/categoriesApi';
+import SourceSelector from '../components/SourceSelector';
+import ViewToggle, { type ViewMode } from '../components/ViewToggle';
+import StreamCard from '../components/StreamCard';
+
+export default function SeriesStreams() {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuthStore();
+  const sourceId = useSourceStore((state) => state.selectedSourceId);
+  const setSourceId = useSourceStore((state) => state.setSelectedSourceId);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
+  const [view, setView] = useState<ViewMode>('list');
+
+  // Fetch series
+  const { data: streamsData, isLoading: isLoadingStreams, error: streamsError } = useQuery({
+    queryKey: ['streams-series', sourceId, page, limit],
+    queryFn: () =>
+      sourceId ? streamsApi.getSeriesStreams(sourceId, undefined, page, limit) : Promise.resolve(null),
+    enabled: isAuthenticated && sourceId !== null,
+  });
+
+  // Fetch categories for name mapping
+  const { data: categoriesData } = useQuery({
+    queryKey: ['categories-all', sourceId],
+    queryFn: () => (sourceId ? categoriesApi.getCategories(sourceId, 1, 100) : Promise.resolve(null)),
+    enabled: isAuthenticated && sourceId !== null,
+  });
+
+  const streams = streamsData?.data || [];
+  const pagination = streamsData?.pagination;
+  const categories: Record<string, string> = {};
+
+  if (categoriesData?.data) {
+    categoriesData.data.forEach((cat: Category) => {
+      categories[cat.id] = cat.category_name;
+    });
+  }
+
+  const getCategoryName = (categoryId: string | number | null): string => {
+    if (!categoryId) return 'Unknown';
+    return categories[categoryId] || `Category ${categoryId}`;
+  };
+
+  const getSeasons = (stream: Stream): number => {
+    if (!stream.data?.seasons) return 0;
+    const seasons = stream.data.seasons;
+    return typeof seasons === 'number' ? seasons : Object.keys(seasons).length;
+  };
+
+  const columns: GridColDef[] = [
+    { field: 'id', headerName: 'ID', width: 70 },
+    { field: 'name', headerName: 'Name', width: 200, flex: 1 },
+    {
+      field: 'category_id',
+      headerName: 'Category',
+      width: 150,
+      renderCell: (params) => getCategoryName(params.value),
+    },
+    {
+      field: 'data',
+      headerName: 'Seasons',
+      width: 100,
+      renderCell: (params) => {
+        const stream = streams.find((s) => s.data === params.value);
+        const seasons = getSeasons(stream!);
+        return seasons > 0 ? `${seasons} seasons` : '—';
+      },
+    },
+    {
+      field: 'icon',
+      headerName: 'Icon',
+      width: 100,
+      renderCell: (params) => {
+        const stream = streams.find((s) => s.id === params.row.id);
+        const iconUrl = stream?.data?.stream_icon;
+        return iconUrl ? (
+          <Box
+            component="img"
+            src={iconUrl}
+            sx={{ width: 30, height: 30, borderRadius: 1, objectFit: 'cover' }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            N/A
+          </Typography>
+        );
+      },
+    },
+    {
+      field: 'is_adult',
+      headerName: 'Adult',
+      width: 80,
+      renderCell: (params) => (params.value ? <Chip label="Adult" color="error" size="small" /> : '—'),
+    },
+  ];
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" sx={{ mb: 3 }}>
+        Series
+      </Typography>
+
+      {/* Source Selector */}
+      <Card sx={{ mb: 3, p: 2 }}>
+        <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+          Filter by Source
+        </Typography>
+        <Box sx={{ maxWidth: 300 }}>
+          <SourceSelector
+            sourceId={sourceId}
+            onChange={(id) => {
+              setSourceId(id);
+              setPage(1);
+            }}
+            required
+          />
+        </Box>
+      </Card>
+
+      {/* View Controls */}
+      {sourceId && (
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            {pagination?.total || 0} series
+          </Typography>
+          <ViewToggle view={view} onChange={setView} />
+        </Box>
+      )}
+
+      {/* Error State */}
+      {streamsError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Failed to load series. Please try again.
+        </Alert>
+      )}
+
+      {/* Loading State */}
+      {isLoadingStreams && sourceId && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {/* Empty State */}
+      {!isLoadingStreams && sourceId && streams.length === 0 && (
+        <Alert severity="info">No series found for the selected source.</Alert>
+      )}
+
+      {/* List View */}
+      {!isLoadingStreams && sourceId && view === 'list' && streams.length > 0 && (
+        <>
+          <Box sx={{ height: 500, width: '100%' }}>
+            <DataGrid
+              rows={streams}
+              columns={columns}
+              pageSizeOptions={[10, 20, 50]}
+              disableSelectionOnClick
+              onRowClick={(params) => navigate(`/streams/${params.row.id}/series`)}
+              sx={{
+                '& .MuiDataGrid-cell': { py: 1 },
+                '& .MuiDataGrid-row': { cursor: 'pointer' },
+              }}
+              initialState={{
+                pagination: { paginationModel: { pageSize: limit } },
+              }}
+            />
+          </Box>
+          {pagination && pagination.pages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <Pagination
+                count={pagination.pages}
+                page={page}
+                onChange={(_, value) => setPage(value)}
+                color="primary"
+              />
+            </Box>
+          )}
+        </>
+      )}
+
+      {/* Grid View */}
+      {!isLoadingStreams && sourceId && view === 'grid' && streams.length > 0 && (
+        <>
+          <Grid container spacing={2}>
+            {streams.map((stream) => (
+              <Grid item xs={12} sm={6} md={4} lg={3} key={stream.id}>
+                <StreamCard
+                  stream={stream}
+                  categoryName={getCategoryName(stream.category_id)}
+                  onClick={() => navigate(`/streams/${stream.id}/series`)}
+                />
+              </Grid>
+            ))}
+          </Grid>
+          {pagination && pagination.pages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+              <Pagination
+                count={pagination.pages}
+                page={page}
+                onChange={(_, value) => setPage(value)}
+                color="primary"
+              />
+            </Box>
+          )}
+        </>
+      )}
+    </Box>
+  );
+}

@@ -14,6 +14,12 @@ import Clients from './pages/Clients';
 import ClientDetail from './pages/ClientDetail';
 import Filters from './pages/Filters';
 import AdminUsers from './pages/AdminUsers';
+import Categories from './pages/Categories';
+import CategoryDetail from './pages/CategoryDetail';
+import StreamDetail from './pages/StreamDetail';
+import LiveStreams from './pages/LiveStreams';
+import VodStreams from './pages/VodStreams';
+import SeriesStreams from './pages/SeriesStreams';
 import NotFound from './pages/NotFound';
 
 // Create React Query client
@@ -74,6 +80,12 @@ function App() {
                 <Route path="/clients/:id" element={<ClientDetail />} />
                 <Route path="/filters" element={<Filters />} />
                 <Route path="/admin-users" element={<AdminUsers />} />
+                <Route path="/categories" element={<Categories />} />
+                <Route path="/categories/:id" element={<CategoryDetail />} />
+                <Route path="/streams/:id/:type" element={<StreamDetail />} />
+                <Route path="/live-streams" element={<LiveStreams />} />
+                <Route path="/vod-streams" element={<VodStreams />} />
+                <Route path="/series" element={<SeriesStreams />} />
               </Route>
 
               {/* 404 */}

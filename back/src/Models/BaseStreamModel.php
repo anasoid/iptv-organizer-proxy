@@ -133,10 +133,6 @@ abstract class BaseStreamModel extends BaseModel
             throw new RuntimeException("Stream name is required");
         }
 
-        if (!isset($this->attributes['category_id'])) {
-            throw new RuntimeException("Category ID is required");
-        }
-
         return true;
     }
 
