@@ -9,6 +9,7 @@ import {
   Typography,
   Chip,
   Alert,
+  TextField,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { useQuery } from '@tanstack/react-query';
@@ -28,6 +29,7 @@ export default function VodStreams() {
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
   const [view, setView] = useState<ViewMode>('list');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Initialize selected category from sessionStorage if available
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(() => {
@@ -39,13 +41,13 @@ export default function VodStreams() {
     return null;
   });
 
-  // Fetch VOD streams with optional category filter
+  // Fetch VOD streams with optional category filter and search
   const { data: streamsData, isLoading: isLoadingStreams, error: streamsError } = useQuery({
-    queryKey: ['streams-vod', sourceId, selectedCategoryId, page, limit],
+    queryKey: ['streams-vod', sourceId, selectedCategoryId, page, limit, searchQuery],
     queryFn: () => {
       if (!sourceId) return Promise.resolve(null);
-      console.log('Fetching VOD with:', { sourceId, selectedCategoryId, page, limit });
-      return streamsApi.getVodStreams(sourceId, selectedCategoryId || undefined, page, limit);
+      console.log('Fetching VOD with:', { sourceId, selectedCategoryId, page, limit, searchQuery });
+      return streamsApi.getVodStreams(sourceId, selectedCategoryId || undefined, page, limit, searchQuery || undefined);
     },
     enabled: isAuthenticated && sourceId !== null,
   });
@@ -151,21 +153,37 @@ export default function VodStreams() {
         VOD Streams
       </Typography>
 
-      {/* Source Selector */}
+      {/* Source Selector and Search Bar */}
       <Card sx={{ mb: 3, p: 2 }}>
-        <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-          Filter by Source
-        </Typography>
-        <Box sx={{ maxWidth: 300 }}>
-          <SourceSelector
-            sourceId={sourceId}
-            onChange={(id) => {
-              setSourceId(id);
-              setPage(1);
-              setSelectedCategoryId(null);
-            }}
-            required
-          />
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
+          <Box sx={{ flex: '0 0 auto', minWidth: 300 }}>
+            <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+              Filter by Source
+            </Typography>
+            <SourceSelector
+              sourceId={sourceId}
+              onChange={(id) => {
+                setSourceId(id);
+                setPage(1);
+                setSelectedCategoryId(null);
+              }}
+              required
+            />
+          </Box>
+
+          {sourceId && (
+            <TextField
+              placeholder="Search by stream name..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
+              size="small"
+              variant="outlined"
+              sx={{ flex: '1 1 auto', minWidth: 200 }}
+            />
+          )}
         </Box>
       </Card>
 
@@ -201,9 +219,11 @@ export default function VodStreams() {
           {/* Empty State */}
           {!isLoadingStreams && sourceId && streams.length === 0 && (
             <Alert severity="info">
-              {selectedCategoryId
-                ? 'No VOD streams found in this category.'
-                : 'No VOD streams found for the selected source.'}
+              {searchQuery
+                ? 'No VOD streams match your search.'
+                : selectedCategoryId
+                  ? 'No VOD streams found in this category.'
+                  : 'No VOD streams found for the selected source.'}
             </Alert>
           )}
 
@@ -342,7 +362,9 @@ export default function VodStreams() {
 
           {/* Empty State */}
           {!isLoadingStreams && sourceId && streams.length === 0 && (
-            <Alert severity="info">No VOD streams found for the selected source.</Alert>
+            <Alert severity="info">
+              {searchQuery ? 'No VOD streams match your search.' : 'No VOD streams found for the selected source.'}
+            </Alert>
           )}
 
           {/* List View */}

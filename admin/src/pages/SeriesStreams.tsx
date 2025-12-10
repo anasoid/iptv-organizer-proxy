@@ -9,6 +9,7 @@ import {
   Typography,
   Chip,
   Alert,
+  TextField,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { useQuery } from '@tanstack/react-query';
@@ -28,6 +29,7 @@ export default function SeriesStreams() {
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
   const [view, setView] = useState<ViewMode>('list');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Initialize selected category from sessionStorage if available
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(() => {
@@ -39,13 +41,13 @@ export default function SeriesStreams() {
     return null;
   });
 
-  // Fetch series with optional category filter
+  // Fetch series with optional category filter and search
   const { data: streamsData, isLoading: isLoadingStreams, error: streamsError } = useQuery({
-    queryKey: ['streams-series', sourceId, selectedCategoryId, page, limit],
+    queryKey: ['streams-series', sourceId, selectedCategoryId, page, limit, searchQuery],
     queryFn: () => {
       if (!sourceId) return Promise.resolve(null);
-      console.log('Fetching series with:', { sourceId, selectedCategoryId, page, limit });
-      return streamsApi.getSeriesStreams(sourceId, selectedCategoryId || undefined, page, limit);
+      console.log('Fetching series with:', { sourceId, selectedCategoryId, page, limit, searchQuery });
+      return streamsApi.getSeriesStreams(sourceId, selectedCategoryId || undefined, page, limit, searchQuery || undefined);
     },
     enabled: isAuthenticated && sourceId !== null,
   });
@@ -149,21 +151,37 @@ export default function SeriesStreams() {
         Series
       </Typography>
 
-      {/* Source Selector */}
+      {/* Source Selector and Search Bar */}
       <Card sx={{ mb: 3, p: 2 }}>
-        <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-          Filter by Source
-        </Typography>
-        <Box sx={{ maxWidth: 300 }}>
-          <SourceSelector
-            sourceId={sourceId}
-            onChange={(id) => {
-              setSourceId(id);
-              setPage(1);
-              setSelectedCategoryId(null);
-            }}
-            required
-          />
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
+          <Box sx={{ flex: '0 0 auto', minWidth: 300 }}>
+            <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+              Filter by Source
+            </Typography>
+            <SourceSelector
+              sourceId={sourceId}
+              onChange={(id) => {
+                setSourceId(id);
+                setPage(1);
+                setSelectedCategoryId(null);
+              }}
+              required
+            />
+          </Box>
+
+          {sourceId && (
+            <TextField
+              placeholder="Search by series name..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
+              size="small"
+              variant="outlined"
+              sx={{ flex: '1 1 auto', minWidth: 200 }}
+            />
+          )}
         </Box>
       </Card>
 
@@ -199,9 +217,11 @@ export default function SeriesStreams() {
           {/* Empty State */}
           {!isLoadingStreams && sourceId && streams.length === 0 && (
             <Alert severity="info">
-              {selectedCategoryId
-                ? 'No series found in this category.'
-                : 'No series found for the selected source.'}
+              {searchQuery
+                ? 'No series match your search.'
+                : selectedCategoryId
+                  ? 'No series found in this category.'
+                  : 'No series found for the selected source.'}
             </Alert>
           )}
 
@@ -340,7 +360,9 @@ export default function SeriesStreams() {
 
           {/* Empty State */}
           {!isLoadingStreams && sourceId && streams.length === 0 && (
-            <Alert severity="info">No series found for the selected source.</Alert>
+            <Alert severity="info">
+              {searchQuery ? 'No series match your search.' : 'No series found for the selected source.'}
+            </Alert>
           )}
 
           {/* List View */}

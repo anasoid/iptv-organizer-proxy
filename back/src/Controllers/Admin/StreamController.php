@@ -27,11 +27,26 @@ class StreamController
     }
 
     /**
+     * Remove accents from string for case-insensitive and accent-insensitive comparison
+     */
+    private function normalizeString(string $string): string
+    {
+        // Convert to lowercase and remove accents
+        $string = strtolower($string);
+
+        // Use iconv to remove accents (é -> e, ñ -> n, etc.)
+        $string = iconv('UTF-8', 'ASCII//TRANSLIT', $string);
+
+        return $string;
+    }
+
+    /**
      * List streams by source and type (paginated, read-only)
      * Query params:
      *   - source_id (required)
      *   - type (required): live, vod, series
      *   - category_id (optional): filter by category
+     *   - search (optional): search by stream name (case-insensitive)
      *   - page (optional): default 1
      *   - limit (optional): default 20
      */
@@ -42,6 +57,7 @@ class StreamController
             $sourceId = (int) ($queryParams['source_id'] ?? 0);
             $type = $queryParams['type'] ?? null;
             $categoryId = isset($queryParams['category_id']) ? (int) $queryParams['category_id'] : null;
+            $search = $queryParams['search'] ?? null;
             $page = (int) ($queryParams['page'] ?? 1);
             $limit = (int) ($queryParams['limit'] ?? 20);
 
@@ -69,6 +85,16 @@ class StreamController
 
             // Get all streams matching conditions
             $allStreams = $modelClass::findAll($conditions);
+
+            // Filter by search query (case-insensitive and accent-insensitive)
+            if ($search) {
+                $searchNormalized = $this->normalizeString($search);
+                $allStreams = array_filter($allStreams, function($stream) use ($searchNormalized) {
+                    return strpos($this->normalizeString($stream->name), $searchNormalized) !== false;
+                });
+                // Re-index array after filtering
+                $allStreams = array_values($allStreams);
+            }
 
             $total = count($allStreams);
             $paginatedStreams = array_slice($allStreams, $offset, $limit);

@@ -30,11 +30,14 @@ export interface CategoryResponse {
 class CategoriesApi {
   /**
    * Get all categories by source (paginated)
+   * Optional search by name
    */
-  async getCategories(sourceId: number, page: number = 1, limit: number = 20) {
-    const response = await api.get('/categories', {
-      params: { source_id: sourceId, page, limit },
-    });
+  async getCategories(sourceId: number, page: number = 1, limit: number = 20, search?: string) {
+    const params: { source_id: number; page: number; limit: number; search?: string } = { source_id: sourceId, page, limit };
+    if (search) {
+      params.search = search;
+    }
+    const response = await api.get('/categories', { params });
     return response.data as CategoriesListResponse;
   }
 

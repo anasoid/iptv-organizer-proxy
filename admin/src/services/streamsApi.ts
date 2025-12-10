@@ -43,23 +43,28 @@ interface StreamsParams {
   page: number;
   limit: number;
   category_id?: number;
+  search?: string;
 }
 
 class StreamsApi {
   /**
    * Get all streams by source and type (paginated)
-   * Optional filter by category_id
+   * Optional filter by category_id and search by name
    */
   async getStreams(
     sourceId: number,
     type: StreamType,
     categoryId?: number,
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
+    search?: string
   ) {
     const params: StreamsParams = { source_id: sourceId, type, page, limit };
     if (categoryId) {
       params.category_id = categoryId;
+    }
+    if (search) {
+      params.search = search;
     }
 
     const response = await api.get('/streams', { params });
@@ -77,22 +82,22 @@ class StreamsApi {
   /**
    * Get live streams
    */
-  async getLiveStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20) {
-    return this.getStreams(sourceId, 'live', categoryId, page, limit);
+  async getLiveStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20, search?: string) {
+    return this.getStreams(sourceId, 'live', categoryId, page, limit, search);
   }
 
   /**
    * Get VOD streams
    */
-  async getVodStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20) {
-    return this.getStreams(sourceId, 'vod', categoryId, page, limit);
+  async getVodStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20, search?: string) {
+    return this.getStreams(sourceId, 'vod', categoryId, page, limit, search);
   }
 
   /**
    * Get series streams
    */
-  async getSeriesStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20) {
-    return this.getStreams(sourceId, 'series', categoryId, page, limit);
+  async getSeriesStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20, search?: string) {
+    return this.getStreams(sourceId, 'series', categoryId, page, limit, search);
   }
 }
 

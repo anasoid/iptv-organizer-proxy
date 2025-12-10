@@ -11,13 +11,33 @@ use App\Models\Category;
 class CategoryController
 {
     /**
+     * Remove accents from string for case-insensitive and accent-insensitive comparison
+     */
+    private function normalizeString(string $string): string
+    {
+        // Convert to lowercase and remove accents
+        $string = strtolower($string);
+
+        // Use iconv to remove accents (é -> e, ñ -> n, etc.)
+        $string = iconv('UTF-8', 'ASCII//TRANSLIT', $string);
+
+        return $string;
+    }
+
+    /**
      * List all categories by source (paginated, read-only)
+     * Query params:
+     *   - source_id (required)
+     *   - search (optional): search by category name (case-insensitive and accent-insensitive)
+     *   - page (optional): default 1
+     *   - limit (optional): default 20
      */
     public function list(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try {
             $queryParams = $request->getQueryParams();
             $sourceId = (int) ($queryParams['source_id'] ?? 0);
+            $search = $queryParams['search'] ?? null;
             $page = (int) ($queryParams['page'] ?? 1);
             $limit = (int) ($queryParams['limit'] ?? 20);
 
@@ -29,6 +49,16 @@ class CategoryController
 
             // Get all categories for source
             $allCategories = Category::findAll(['source_id' => $sourceId]);
+
+            // Filter by search query (case-insensitive and accent-insensitive)
+            if ($search) {
+                $searchNormalized = $this->normalizeString($search);
+                $allCategories = array_filter($allCategories, function($category) use ($searchNormalized) {
+                    return strpos($this->normalizeString($category->category_name), $searchNormalized) !== false;
+                });
+                // Re-index array after filtering
+                $allCategories = array_values($allCategories);
+            }
 
             $total = count($allCategories);
             $paginatedCategories = array_slice($allCategories, $offset, $limit);
