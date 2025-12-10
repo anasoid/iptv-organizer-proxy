@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { FormControl, InputLabel, Select, MenuItem, CircularProgress, FormHelperText } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import sourcesApi, { type Source } from '../services/sourcesApi';
@@ -16,11 +15,9 @@ export default function SourceSelector({
   required = true,
 }: SourceSelectorProps) {
   const { isAuthenticated } = useAuthStore();
-  const [sources, setSources] = useState<Source[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
 
   // Fetch all sources (no pagination for dropdown)
-  const { data, isLoading: isFetching } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['sources-all'],
     queryFn: async () => {
       const result = await sourcesApi.getSources(1, 100);
@@ -30,14 +27,7 @@ export default function SourceSelector({
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  useEffect(() => {
-    if (data) {
-      setSources(data);
-      setIsLoading(false);
-    } else if (isFetching) {
-      setIsLoading(true);
-    }
-  }, [data, isFetching]);
+  const sources: Source[] = data || [];
 
   return (
     <FormControl fullWidth required={required} size="small">
@@ -46,7 +36,7 @@ export default function SourceSelector({
         value={sourceId ?? ''}
         onChange={(e) => onChange(Number(e.target.value))}
         label="Source"
-        disabled={isLoading || isFetching}
+        disabled={isLoading}
         startAdornment={isLoading ? <CircularProgress size={20} style={{ marginRight: 8 }} /> : undefined}
       >
         <MenuItem value="">
