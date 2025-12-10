@@ -50,7 +50,10 @@ class CategoryController
     }
 
     /**
-     * Get category by ID
+     * Get category by ID or by source_id + category_id
+     * Query params:
+     *   - source_id (optional): if provided, searches by source_id + category_id (functional lookup)
+     *                           if not provided, searches by database id
      */
     public function get(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
@@ -60,16 +63,40 @@ class CategoryController
                 return $this->jsonError($response, 'Invalid category ID', 400);
             }
 
-            $category = Category::find($id);
+            $queryParams = $request->getQueryParams();
+            $sourceId = isset($queryParams['source_id']) ? (int) $queryParams['source_id'] : null;
+
+            error_log("CategoryController::get() - Fetching: ID=$id, SourceID=$sourceId");
+
+            $category = null;
+
+            // If source_id is provided, search by source_id + category_id (functional lookup)
+            if ($sourceId) {
+                error_log("CategoryController::get() - Searching by source_id ($sourceId) + category_id ($id)");
+                $category = Category::findAll([
+                    'source_id' => $sourceId,
+                    'category_id' => $id
+                ]);
+                $category = !empty($category) ? $category[0] : null;
+            } else {
+                // Search by database id
+                error_log("CategoryController::get() - Searching by database id ($id)");
+                $category = Category::find($id);
+            }
+
             if (!$category) {
+                error_log("CategoryController::get() - Category NOT FOUND (ID=$id, SourceID=$sourceId)");
                 return $this->jsonError($response, 'Category not found', 404);
             }
+
+            error_log("CategoryController::get() - Category FOUND: " . $category->category_name);
 
             return $this->jsonResponse($response, [
                 'success' => true,
                 'data' => $category->toArray(),
             ]);
         } catch (\Throwable $e) {
+            error_log("CategoryController::get() - Exception: " . $e->getMessage());
             return $this->jsonError($response, 'Failed to get category: ' . $e->getMessage(), 500);
         }
     }

@@ -40,9 +40,12 @@ class CategoriesApi {
 
   /**
    * Get single category by ID
+   * @param id - category ID (can be database id or functional category_id depending on lookup)
+   * @param sourceId - if provided, searches by source_id + category_id (functional lookup)
    */
-  async getCategory(id: number) {
-    const response = await api.get(`/categories/${id}`);
+  async getCategory(id: number, sourceId?: number) {
+    const params = sourceId ? { source_id: sourceId } : {};
+    const response = await api.get(`/categories/${id}`, { params });
     return response.data as CategoryResponse;
   }
 }

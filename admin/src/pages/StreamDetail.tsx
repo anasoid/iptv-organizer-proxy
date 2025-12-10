@@ -47,15 +47,62 @@ export default function StreamDetail() {
 
   const stream = streamData?.data;
 
-  // Fetch category name if available
-  const { data: categoryData } = useQuery({
+  // Fetch source ID from stream to get all categories as fallback
+  const sourceId = stream?.source_id;
+
+  // First try to get single category, fallback to fetching all categories
+  const { data: categoryData, isLoading: isLoadingCategory, error: categoryError } = useQuery({
     queryKey: ['category', stream?.category_id],
-    queryFn: () =>
-      stream?.category_id ? categoriesApi.getCategory(stream.category_id as number) : Promise.resolve(null),
+    queryFn: async () => {
+      if (!stream?.category_id) {
+        console.log('No category_id on stream');
+        return Promise.resolve(null);
+      }
+      console.log('Fetching category:', { category_id: stream.category_id, source_id: sourceId });
+      try {
+        const result = await categoriesApi.getCategory(Number(stream.category_id), sourceId);
+        console.log('Category found:', result.data.category_name);
+        return result;
+      } catch (err) {
+        console.log('Single category fetch failed, trying to fetch all categories from source...');
+        // Fallback: fetch all categories and find the matching one
+        if (sourceId) {
+          try {
+            const allCats = await categoriesApi.getCategories(sourceId, 1, 100);
+            const found = allCats.data.find((cat) => cat.id === Number(stream.category_id));
+            if (found) {
+              console.log('Category found in source categories:', found.category_name);
+              return { success: true, data: found };
+            } else {
+              console.log('Category not found in source categories either');
+              return null;
+            }
+          } catch (fallbackErr) {
+            console.log('Fallback category fetch error:', fallbackErr);
+            return null;
+          }
+        }
+        return null;
+      }
+    },
     enabled: isAuthenticated && !!stream?.category_id,
   });
 
   const category = categoryData?.data;
+
+  // Log category loading status
+  if (categoryError) {
+    console.log('Category fetch error:', categoryError);
+  }
+  if (stream?.category_id) {
+    console.log('Stream data:', {
+      id: stream.id,
+      name: stream.name,
+      category_id: stream.category_id,
+      source_id: stream.source_id
+    });
+    console.log('Category loaded:', !!category, 'Category name:', category?.category_name);
+  }
 
   const getTypeColor = (type: string): 'default' | 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success' => {
     switch (type.toLowerCase()) {
@@ -169,11 +216,31 @@ export default function StreamDetail() {
           {/* Info Section */}
           <Grid item xs={12} sm={streamIcon ? 8 : 12} md={streamIcon ? 9 : 12}>
             <Box sx={{ p: 3 }}>
-              {/* Header with Type Badge */}
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
-                <Typography variant="h4" sx={{ flex: 1 }}>
+              {/* Header with Type Badge and Category */}
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
+                <Typography variant="h4" sx={{ flex: '1 1 auto' }}>
                   {stream.name}
                 </Typography>
+                {stream.category_id && (
+                  <Chip
+                    label={category?.category_name || `Category ${stream.category_id}`}
+                    variant="outlined"
+                    color={category ? 'default' : 'warning'}
+                    size="medium"
+                    onClick={() => {
+                      // Store the selected category and navigate to stream listing
+                      sessionStorage.setItem('streamDetailReferrer', window.location.pathname);
+                      sessionStorage.setItem('filterByCategoryId', String(stream.category_id));
+                      const streamPageMap: Record<string, string> = {
+                        live: '/live-streams',
+                        vod: '/vod-streams',
+                        series: '/series',
+                      };
+                      navigate(streamPageMap[streamType] || '/live-streams');
+                    }}
+                    sx={{ cursor: 'pointer' }}
+                  />
+                )}
                 <Chip
                   label={streamType.toUpperCase()}
                   color={getTypeColor(streamType)}
