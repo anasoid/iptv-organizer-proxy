@@ -24,7 +24,10 @@ SESSION_SECRET=your-session-secret-change-this
 # Sync Configuration
 SYNC_ENABLED=true
 DEFAULT_SYNC_INTERVAL=3600
-SYNC_CHECK_INTERVAL=300
+SYNC_CHECK_INTERVAL=10800
+SYNC_LOCK_TIMEOUT=600
+# Note: PHP max_execution_time is set to 180s (3 min) in Docker
+# Individual sync tasks will timeout after this duration
 
 # Logging
 LOG_LEVEL=info

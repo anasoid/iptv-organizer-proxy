@@ -17,6 +17,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../bootstrap.php';
 
 use App\Models\Source;
+use App\Models\SyncSchedule;
 use App\Services\Xtream\XtreamClient;
 use App\Services\SyncService;
 
@@ -74,7 +75,8 @@ function colorize(string $text, string $color): string
 
 function logInfo(string $message, bool $verbose = false): void
 {
-    global $verbose as $isVerbose;
+    global $options;
+    $isVerbose = isset($options['verbose']);
     if ($verbose && !$isVerbose) {
         return;
     }
@@ -116,10 +118,22 @@ try {
     logInfo("Source: {$source->name} ({$source->url})");
 
     // Check sync interval (unless forced)
-    if (!$force && !$source->isSyncDue()) {
-        logWarning("Sync not due yet. Next sync: {$source->getNextSyncTime()}");
-        logInfo("Use --force to bypass sync interval");
-        exit(0);
+    if (!$force) {
+        // If specific task type is provided, check task-level schedule
+        if ($taskType !== 'all' && !empty($taskType)) {
+            $schedule = SyncSchedule::findBySourceAndTask($sourceId, $taskType);
+            if ($schedule && !$schedule->isSyncDue()) {
+                logInfo("Task '{$taskType}' not due yet. Next sync: {$schedule->next_sync}");
+                exit(0);
+            }
+        } else {
+            // Check source-level sync for 'all' tasks
+            if (!$source->isSyncDue()) {
+                logWarning("Sync not due yet. Next sync: {$source->getNextSyncTime()}");
+                logInfo("Use --force to bypass sync interval");
+                exit(0);
+            }
+        }
     }
 
     // Create XtreamClient
@@ -192,8 +206,17 @@ try {
         }
     }
 
-    // Update source sync time
-    $source->updateNextSyncTime();
+    // Update sync schedule
+    if ($taskType !== 'all' && !empty($taskType) && count($tasksToRun) === 1) {
+        // Update task-level schedule for individual task
+        $schedule = SyncSchedule::findBySourceAndTask($sourceId, $taskType);
+        if ($schedule) {
+            $schedule->updateNextSync();
+        }
+    } else {
+        // Update source-level sync time for 'all' tasks
+        $source->updateNextSyncTime();
+    }
     $source->updateSyncStatus('idle');
 
     // Summary

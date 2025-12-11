@@ -102,8 +102,12 @@ See `.env.example.app` for all available configuration options.
 - `DB_TYPE`: Database type (`mysql` or `sqlite`)
 - `APP_ENV`: Environment (`development` or `production`)
 - `JWT_SECRET`: Secret key for JWT tokens
-- `SYNC_ENABLED`: Enable/disable automatic sync
-- `DEFAULT_SYNC_INTERVAL`: Sync interval in seconds
+- `SYNC_ENABLED`: Enable/disable automatic sync daemon (default: `true`)
+- `SYNC_CHECK_INTERVAL`: Daemon check interval in seconds (default: `300`)
+- `SYNC_LOCK_TIMEOUT`: Lock timeout for concurrent sync prevention (default: `1800`)
+- `DEFAULT_SYNC_INTERVAL`: Default sync interval for new sources in seconds
+
+For detailed sync daemon configuration, see [SYNC-DAEMON.md](SYNC-DAEMON.md)
 
 ## Development
 

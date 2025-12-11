@@ -15,6 +15,9 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:-changeme-default-key}
       - CORS_ALLOWED_ORIGINS=*
       - APP_DEBUG=${APP_DEBUG:-false}
+      - SYNC_ENABLED=${SYNC_ENABLED:-true}
+      - SYNC_CHECK_INTERVAL=${SYNC_CHECK_INTERVAL:-10800}
+      - SYNC_LOCK_TIMEOUT=${SYNC_LOCK_TIMEOUT:-600}
     volumes:
       - app-data:/app/data
       - app-logs:/logs

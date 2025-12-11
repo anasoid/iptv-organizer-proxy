@@ -52,7 +52,8 @@ COPY --chown=app:app docker/docker-entrypoint.sh /app/docker-entrypoint.sh
 
 # Configure PHP-FPM, set file permissions, and setup data directory
 RUN chmod +x /app/docker-entrypoint.sh && \
-    mkdir -p /app/data /logs /tmp/nginx_temp && \
+    chmod +x /app/bin/sync-daemon.sh && \
+    mkdir -p /app/data /logs /logs/sync-daemon /tmp/nginx_temp && \
     chown -R app:app /app/data /logs /tmp/nginx_temp && \
     chmod 777 /app/data /logs /tmp/nginx_temp && \
     sed -i 's/user = www-data/user = app/' /usr/local/etc/php-fpm.d/www.conf && \
@@ -68,6 +69,7 @@ RUN chmod +x /app/docker-entrypoint.sh && \
     echo "memory_limit = 32M" >> /usr/local/etc/php.ini-production && \
     echo "post_max_size = 25M" >> /usr/local/etc/php.ini-production && \
     echo "upload_max_filesize = 25M" >> /usr/local/etc/php.ini-production && \
+    echo "max_execution_time = 180" >> /usr/local/etc/php.ini-production && \
     echo "default_socket_timeout = 300" >> /usr/local/etc/php.ini-production && \
     echo "error_log = /logs/iptv-php-errors.log" >> /usr/local/etc/php.ini-production && \
     echo "log_errors = On" >> /usr/local/etc/php.ini-production && \

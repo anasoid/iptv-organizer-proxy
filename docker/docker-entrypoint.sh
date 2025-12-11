@@ -82,6 +82,17 @@ fi
 echo "Starting PHP-FPM..."
 php-fpm &
 
+# Start sync daemon in background (if enabled)
+if [ "${SYNC_ENABLED:-true}" = "true" ]; then
+    echo "Starting sync daemon..."
+    # Run sync daemon as app user in background
+    su -s /bin/sh app -c "/app/bin/sync-daemon.sh" >> /logs/sync-daemon.log 2>&1 &
+    SYNC_DAEMON_PID=$!
+    echo "Sync daemon started with PID $SYNC_DAEMON_PID (logs: /logs/sync-daemon.log)"
+else
+    echo "Sync daemon disabled (SYNC_ENABLED=false)"
+fi
+
 # Start Nginx in foreground (main process)
 echo "Starting Nginx..."
 exec nginx -g "daemon off;"
