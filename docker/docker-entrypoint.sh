@@ -47,10 +47,25 @@ else
 fi
 
 # Create logs directory and fix permissions
-mkdir -p /logs/iptv
-chown -R app:app /logs/iptv 2>&1 || true
-chmod -R 777 /logs/iptv 2>&1 || true
-echo "Logs directory: /logs/iptv (writable by app user)"
+# Note: /logs is a Docker volume mount, so we need to ensure /logs/iptv exists inside it
+mkdir -p /logs/iptv || {
+    echo "ERROR: Cannot create /logs/iptv directory"
+    exit 1
+}
+
+# Set ownership to app user
+chown -R app:app /logs/iptv || {
+    echo "ERROR: Cannot set ownership of /logs/iptv to app:app"
+    exit 1
+}
+
+# Make it world-writable to ensure app user can write
+chmod -R 777 /logs/iptv || {
+    echo "ERROR: Cannot set permissions on /logs/iptv"
+    exit 1
+}
+
+echo "Logs directory: /logs/iptv (owner: $(stat -c '%U:%G' /logs/iptv), mode: $(stat -c '%a' /logs/iptv))"
 
 # Create SQLite database directory and fix permissions
 if [ "$DB_TYPE" = "sqlite" ]; then
@@ -85,14 +100,19 @@ php-fpm &
 # Start sync daemon in background (if enabled)
 if [ "${SYNC_ENABLED:-true}" = "true" ]; then
     echo "Starting sync daemon..."
-    # Ensure log file exists with proper permissions for app user
-    touch /logs/iptv/sync-daemon.log 2>/dev/null || true
-    chown app:app /logs/iptv/sync-daemon.log 2>/dev/null || true
-    chmod 666 /logs/iptv/sync-daemon.log 2>/dev/null || true
-    # Run sync daemon as app user in background (no redirection, daemon handles its own logging)
+
+    # Pre-create log file with proper ownership
+    # This ensures tee doesn't get permission denied on first write
+    touch /logs/iptv/sync-daemon.log
+    chown app:app /logs/iptv/sync-daemon.log
+    chmod 666 /logs/iptv/sync-daemon.log
+
+    echo "Sync daemon log file: /logs/iptv/sync-daemon.log (owner: $(stat -c '%U:%G' /logs/iptv/sync-daemon.log), mode: $(stat -c '%a' /logs/iptv/sync-daemon.log))"
+
+    # Run sync daemon as app user in background (no redirection, daemon handles its own logging via tee)
     su -s /bin/sh app -c "/app/bin/sync-daemon.sh" &
     SYNC_DAEMON_PID=$!
-    echo "Sync daemon started with PID $SYNC_DAEMON_PID (logs: /logs/iptv/sync-daemon.log)"
+    echo "Sync daemon started with PID $SYNC_DAEMON_PID"
 else
     echo "Sync daemon disabled (SYNC_ENABLED=false)"
 fi

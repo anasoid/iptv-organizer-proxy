@@ -13,8 +13,15 @@ LOG_DIR="${LOG_DIR:-/logs/iptv}"
 LOG_FILE="${LOG_DIR}/sync-daemon.log"
 HEARTBEAT_FILE="/tmp/sync-daemon-heartbeat"
 
-# Ensure log directory exists
-mkdir -p "$LOG_DIR"
+# Ensure log directory exists and is writable
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+touch "$LOG_FILE" 2>/dev/null || true
+
+# Check if we can write to log file
+if [ ! -w "$LOG_FILE" ]; then
+    echo "WARNING: Cannot write to $LOG_FILE, logging to stdout only"
+    LOG_FILE="/dev/null"
+fi
 
 # Logging functions
 log_info() {
