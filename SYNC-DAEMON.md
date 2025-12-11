@@ -27,7 +27,7 @@ The sync daemon is configured through environment variables:
 | `SYNC_ENABLED` | `true` | Enable/disable the sync daemon |
 | `SYNC_CHECK_INTERVAL` | `10800` (3 hours) | Interval between sync checks (seconds) |
 | `SYNC_LOCK_TIMEOUT` | `600` (10 min) | Lock timeout to prevent stuck syncs (seconds) |
-| `LOG_DIR` | `/logs/sync-daemon` | Directory for daemon logs |
+| `LOG_DIR` | `/logs/iptv` | Directory for daemon logs |
 | `VERBOSE` | `0` | Enable verbose logging (1 = enabled) |
 
 ### PHP Execution Timeouts
@@ -187,15 +187,15 @@ This ensures:
 
 | File | Description |
 |------|-------------|
-| `/logs/sync-daemon.log` | Main daemon log (startup, shutdown, iterations) |
-| `/logs/sync-daemon/sync-daemon.log` | Detailed sync operations |
-| `/logs/sync-daemon/sync-{source_id}-{task_type}.log` | Per-task sync logs |
+| `/logs/iptv.log` | Main daemon log (startup, shutdown, iterations) |
+| `/logs/iptv/sync-daemon.log` | Detailed sync operations |
+| `/logs/iptv/sync-{source_id}-{task_type}.log` | Per-task sync logs |
 
 Example log files:
 ```
-/logs/sync-daemon/sync-1-live_categories.log
-/logs/sync-daemon/sync-1-live_streams.log
-/logs/sync-daemon/sync-1-vod_streams.log
+/logs/iptv/sync-1-live_categories.log
+/logs/iptv/sync-1-live_streams.log
+/logs/iptv/sync-1-vod_streams.log
 ```
 
 Benefits:
@@ -213,13 +213,13 @@ Benefits:
 
 ```bash
 # Main daemon log
-docker exec iptv-organizer-proxy tail -f /logs/sync-daemon.log
+docker exec iptv-organizer-proxy tail -f /logs/iptv.log
 
 # Specific task log
-docker exec iptv-organizer-proxy tail -f /logs/sync-daemon/sync-1-live_streams.log
+docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-1-live_streams.log
 
 # All task logs for a source
-docker exec iptv-organizer-proxy tail -f /logs/sync-daemon/sync-1-*.log
+docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-1-*.log
 
 # Container logs
 docker logs -f iptv-organizer-proxy
@@ -246,7 +246,7 @@ docker exec iptv-organizer-proxy sh -c 'watch cat /tmp/sync-daemon-heartbeat'
 docker exec iptv-organizer-proxy ps aux | grep sync-daemon
 
 # View daemon logs
-docker exec iptv-organizer-proxy tail -f /logs/sync-daemon.log
+docker exec iptv-organizer-proxy tail -f /logs/iptv.log
 ```
 
 ## Troubleshooting
@@ -317,7 +317,7 @@ The sync daemon is automatically integrated into the Docker container via the en
 2. Nginx and PHP-FPM start
 3. If `SYNC_ENABLED=true`, sync daemon starts as background process
 4. Daemon runs under `app:app` user
-5. Logs to `/logs/sync-daemon.log`
+5. Logs to `/logs/iptv.log`
 
 This ensures the daemon:
 - Starts automatically with container

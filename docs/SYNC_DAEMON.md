@@ -171,7 +171,7 @@ sync-daemon:
     - SYNC_LOCK_TIMEOUT=1800
     - SYNC_MEMORY_LIMIT=256
   volumes:
-    - ./logs/sync-daemon:/app/logs/sync-daemon
+    - ./logs/iptv:/app/logs/iptv
   depends_on:
     - mysql
   healthcheck:

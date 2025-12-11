@@ -108,13 +108,13 @@ environment:
 
 ```bash
 # View sync daemon logs
-docker exec iptv-organizer-proxy tail -f /logs/sync-daemon.log
+docker exec iptv-organizer-proxy tail -f /logs/iptv.log
 
 # Check for timeout errors
-docker exec iptv-organizer-proxy grep -i "timeout\|exceeded" /logs/sync-daemon/*.log
+docker exec iptv-organizer-proxy grep -i "timeout\|exceeded" /logs/iptv/*.log
 
 # View PHP errors
-docker exec iptv-organizer-proxy tail -f /logs/iptv-php-errors.log
+docker exec iptv-organizer-proxy tail -f /logs/iptv/php-errors.log
 ```
 
 ### Symptoms of Insufficient Timeout

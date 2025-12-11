@@ -200,7 +200,7 @@ docker exec iptv-organizer-proxy php -i | grep -E "max_execution_time|memory_lim
 
 2. **Check Sync Success Rate**: Review sync logs
    ```bash
-   docker exec iptv-organizer-proxy tail -f /logs/sync-daemon.log
+   docker exec iptv-organizer-proxy tail -f /logs/iptv.log
    ```
 
 3. **Watch Memory Usage**: Ensure 32M is sufficient

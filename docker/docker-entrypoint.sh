@@ -47,10 +47,10 @@ else
 fi
 
 # Create logs directory and fix permissions
-mkdir -p /logs
-echo "Logs directory: /logs"
-chown -R app:app /logs 2>&1 || true
-chmod -R 777 /logs 2>&1 || true
+mkdir -p /logs/iptv
+echo "Logs directory: /logs/iptv"
+chown -R app:app /logs/iptv 2>&1 || true
+chmod -R 777 /logs/iptv 2>&1 || true
 
 # Create SQLite database directory and fix permissions
 if [ "$DB_TYPE" = "sqlite" ]; then
@@ -86,9 +86,9 @@ php-fpm &
 if [ "${SYNC_ENABLED:-true}" = "true" ]; then
     echo "Starting sync daemon..."
     # Run sync daemon as app user in background
-    su -s /bin/sh app -c "/app/bin/sync-daemon.sh" >> /logs/sync-daemon.log 2>&1 &
+    su -s /bin/sh app -c "/app/bin/sync-daemon.sh" >> /logs/iptv/sync-daemon.log 2>&1 &
     SYNC_DAEMON_PID=$!
-    echo "Sync daemon started with PID $SYNC_DAEMON_PID (logs: /logs/sync-daemon.log)"
+    echo "Sync daemon started with PID $SYNC_DAEMON_PID (logs: /logs/iptv/sync-daemon.log)"
 else
     echo "Sync daemon disabled (SYNC_ENABLED=false)"
 fi

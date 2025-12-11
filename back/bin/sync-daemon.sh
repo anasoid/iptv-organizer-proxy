@@ -9,7 +9,7 @@ set -e
 # Configuration from environment or defaults
 SYNC_CHECK_INTERVAL="${SYNC_CHECK_INTERVAL:-10800}"  # 3 hours
 SYNC_LOCK_TIMEOUT="${SYNC_LOCK_TIMEOUT:-600}"       # 10 minutes
-LOG_DIR="${LOG_DIR:-/logs/sync-daemon}"
+LOG_DIR="${LOG_DIR:-/logs/iptv}"
 LOG_FILE="${LOG_DIR}/sync-daemon.log"
 HEARTBEAT_FILE="/tmp/sync-daemon-heartbeat"
 

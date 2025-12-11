@@ -26,7 +26,7 @@ Implemented a lightweight shell-based sync daemon to replace the PHP-based daemo
 - `SYNC_ENABLED`: Enable/disable daemon (default: `true`)
 - `SYNC_CHECK_INTERVAL`: Check interval in seconds (default: `10800` - 3 hours)
 - `SYNC_LOCK_TIMEOUT`: Lock timeout in seconds (default: `600` - 10 minutes)
-- `LOG_DIR`: Log directory (default: `/logs/sync-daemon`)
+- `LOG_DIR`: Log directory (default: `/logs/iptv`)
 - `VERBOSE`: Enable verbose logging (default: `0`)
 - `max_execution_time`: PHP execution limit (default: `180` - 3 minutes)
 - `memory_limit`: PHP memory limit (default: `32M`)
@@ -39,12 +39,12 @@ Implemented a lightweight shell-based sync daemon to replace the PHP-based daemo
 - Added sync daemon startup in background
 - Runs as `app` user for security
 - Respects `SYNC_ENABLED` environment variable
-- Logs to `/logs/sync-daemon.log`
+- Logs to `/logs/iptv.log`
 - Displays PID on startup
 
 #### `docker/Dockerfile`
 - Added execution permissions for `sync-daemon.sh`
-- Created `/logs/sync-daemon` directory
+- Created `/logs/iptv` directory
 - Set proper ownership for log directories
 - **Set `max_execution_time = 180` (3 minutes)** to prevent infinite sync tasks
 - **Set `memory_limit = 32M`** for efficient resource usage

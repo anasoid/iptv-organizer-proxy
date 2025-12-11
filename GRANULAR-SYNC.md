@@ -148,13 +148,13 @@ Benefits:
 Each task type has its **own log file** for easier debugging:
 
 ```bash
-# Log file format: /logs/sync-daemon/sync-{source_id}-{task_type}.log
-/logs/sync-daemon/sync-1-live_categories.log
-/logs/sync-daemon/sync-1-live_streams.log
-/logs/sync-daemon/sync-1-vod_categories.log
-/logs/sync-daemon/sync-1-vod_streams.log
-/logs/sync-daemon/sync-1-series_categories.log
-/logs/sync-daemon/sync-1-series.log
+# Log file format: /logs/iptv/sync-{source_id}-{task_type}.log
+/logs/iptv/sync-1-live_categories.log
+/logs/iptv/sync-1-live_streams.log
+/logs/iptv/sync-1-vod_categories.log
+/logs/iptv/sync-1-vod_streams.log
+/logs/iptv/sync-1-series_categories.log
+/logs/iptv/sync-1-series.log
 ```
 
 Benefits:
@@ -263,7 +263,7 @@ Each task has its own schedule, so:
 docker logs -f iptv-organizer-proxy | grep -i sync
 
 # View specific task log
-docker exec iptv-organizer-proxy tail -f /logs/sync-daemon/sync-1-live_streams.log
+docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-1-live_streams.log
 
 # Check active locks
 docker exec iptv-organizer-proxy ls -la /tmp/sync-*.lock
@@ -283,7 +283,7 @@ foreach (\$schedules as \$s) {
 
 ```bash
 # Check task duration from logs
-docker exec iptv-organizer-proxy grep "Completed:" /logs/sync-daemon.log | tail -20
+docker exec iptv-organizer-proxy grep "Completed:" /logs/iptv.log | tail -20
 
 # Example output:
 # Completed sync: Provider A/live_streams (46s)
@@ -299,10 +299,10 @@ If a task consistently times out:
 
 ```bash
 # Check which task is timing out
-docker exec iptv-organizer-proxy grep "Timeout:" /logs/sync-daemon.log
+docker exec iptv-organizer-proxy grep "Timeout:" /logs/iptv.log
 
 # View the specific task log
-docker exec iptv-organizer-proxy tail -100 /logs/sync-daemon/sync-1-vod_streams.log
+docker exec iptv-organizer-proxy tail -100 /logs/iptv/sync-1-vod_streams.log
 
 # Solution: Increase timeout in Dockerfile
 # Edit docker/Dockerfile:
@@ -314,10 +314,10 @@ echo "max_execution_time = 300" >> /usr/local/etc/php.ini-production
 
 ```bash
 # Check error logs
-docker exec iptv-organizer-proxy grep "Failed:" /logs/sync-daemon.log
+docker exec iptv-organizer-proxy grep "Failed:" /logs/iptv.log
 
 # View specific task errors
-docker exec iptv-organizer-proxy tail -50 /logs/sync-daemon/sync-1-live_streams.log
+docker exec iptv-organizer-proxy tail -50 /logs/iptv/sync-1-live_streams.log
 ```
 
 ### Manual Task Retry

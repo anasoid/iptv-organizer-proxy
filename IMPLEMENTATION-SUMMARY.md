@@ -83,7 +83,7 @@ php sync.php --source-id=1 --task-type=series             # 60s, 25MB or exits i
 
 **What Changed:**
 - Log files are now per-task instead of per-source
-- Format: `/logs/sync-daemon/sync-{source_id}-{task_type}.log`
+- Format: `/logs/iptv/sync-{source_id}-{task_type}.log`
 
 **Benefits:**
 - ✅ Easier debugging (don't have to search through mixed logs)
@@ -93,12 +93,12 @@ php sync.php --source-id=1 --task-type=series             # 60s, 25MB or exits i
 **Example:**
 ```bash
 # OLD: Mixed logs
-/logs/sync-daemon/sync-1.log
+/logs/iptv/sync-1.log
 
 # NEW: Separate logs
-/logs/sync-daemon/sync-1-live_categories.log
-/logs/sync-daemon/sync-1-live_streams.log
-/logs/sync-daemon/sync-1-vod_categories.log
+/logs/iptv/sync-1-live_categories.log
+/logs/iptv/sync-1-live_streams.log
+/logs/iptv/sync-1-vod_categories.log
 ...
 ```
 
@@ -174,10 +174,10 @@ docker exec iptv-organizer-proxy php /app/bin/sync.php \
 docker logs -f iptv-organizer-proxy | grep -i sync
 
 # Check specific task log
-docker exec iptv-organizer-proxy tail -f /logs/sync-daemon/sync-1-live_streams.log
+docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-1-live_streams.log
 
 # View all tasks for a source
-docker exec iptv-organizer-proxy tail -f /logs/sync-daemon/sync-1-*.log
+docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-1-*.log
 
 # Check active locks
 docker exec iptv-organizer-proxy ls -la /tmp/sync-*.lock
@@ -285,10 +285,10 @@ docker exec iptv-organizer-proxy php /app/bin/sync.php \
 
 ```bash
 # Check which task is timing out
-docker exec iptv-organizer-proxy grep "Timeout:" /logs/sync-daemon.log
+docker exec iptv-organizer-proxy grep "Timeout:" /logs/iptv.log
 
 # View specific task log
-docker exec iptv-organizer-proxy tail -100 /logs/sync-daemon/sync-1-vod_streams.log
+docker exec iptv-organizer-proxy tail -100 /logs/iptv/sync-1-vod_streams.log
 
 # If needed, increase timeout in docker/Dockerfile:
 # echo "max_execution_time = 300" >> /usr/local/etc/php.ini-production
