@@ -48,9 +48,9 @@ fi
 
 # Create logs directory and fix permissions
 mkdir -p /logs/iptv
-echo "Logs directory: /logs/iptv"
 chown -R app:app /logs/iptv 2>&1 || true
 chmod -R 777 /logs/iptv 2>&1 || true
+echo "Logs directory: /logs/iptv (writable by app user)"
 
 # Create SQLite database directory and fix permissions
 if [ "$DB_TYPE" = "sqlite" ]; then
@@ -85,8 +85,12 @@ php-fpm &
 # Start sync daemon in background (if enabled)
 if [ "${SYNC_ENABLED:-true}" = "true" ]; then
     echo "Starting sync daemon..."
-    # Run sync daemon as app user in background
-    su -s /bin/sh app -c "/app/bin/sync-daemon.sh" >> /logs/iptv/sync-daemon.log 2>&1 &
+    # Ensure log file exists with proper permissions for app user
+    touch /logs/iptv/sync-daemon.log 2>/dev/null || true
+    chown app:app /logs/iptv/sync-daemon.log 2>/dev/null || true
+    chmod 666 /logs/iptv/sync-daemon.log 2>/dev/null || true
+    # Run sync daemon as app user in background (no redirection, daemon handles its own logging)
+    su -s /bin/sh app -c "/app/bin/sync-daemon.sh" &
     SYNC_DAEMON_PID=$!
     echo "Sync daemon started with PID $SYNC_DAEMON_PID (logs: /logs/iptv/sync-daemon.log)"
 else
