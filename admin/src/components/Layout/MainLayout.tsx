@@ -30,6 +30,7 @@ import {
   PlayCircle as PlayCircleIcon,
   MovieCreation as MovieIcon,
   VideoLibrary as SeriesIcon,
+  History as HistoryIcon,
 } from '@mui/icons-material';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -54,6 +55,7 @@ const navItems: NavItem[] = [
   { title: 'Live Streams', path: '/live-streams', icon: <PlayCircleIcon /> },
   { title: 'VOD Streams', path: '/vod-streams', icon: <MovieIcon /> },
   { title: 'Series', path: '/series', icon: <SeriesIcon /> },
+  { title: 'Sync Logs', path: '/sync-logs', icon: <HistoryIcon /> },
   { title: 'Filters', path: '/filters', icon: <FilterListIcon /> },
   { title: 'Admin Users', path: '/admin-users', icon: <SupervisorAccountIcon /> },
 ];

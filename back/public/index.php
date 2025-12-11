@@ -14,6 +14,7 @@ use App\Controllers\Admin\AdminUserController;
 use App\Controllers\Admin\DashboardController;
 use App\Controllers\Admin\CategoryController;
 use App\Controllers\Admin\StreamController;
+use App\Controllers\Admin\SyncLogController;
 use App\Controllers\Xtream\StreamDataController;
 
 // Determine environment based on directory structure
@@ -160,6 +161,13 @@ $app->group('/api', function ($group) {
     $group->get('/dashboard/stats', [$dashboardController, 'stats']);
     $group->get('/dashboard/activity', [$dashboardController, 'activity']);
     $group->get('/sync/status', [$dashboardController, 'syncStatus']);
+
+    // Sync log management (read-only with delete)
+    $syncLogController = new SyncLogController();
+    $group->get('/sync-logs', [$syncLogController, 'list']);
+    $group->get('/sync-logs/stats', [$syncLogController, 'stats']);
+    $group->get('/sync-logs/{id}', [$syncLogController, 'get']);
+    $group->delete('/sync-logs/{id}', [$syncLogController, 'delete']);
 })->add(new AdminAuthMiddleware());
 
 // Stream routing - /{type}/{username}/{password}/{stream_id}.{ext}
