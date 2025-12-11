@@ -38,17 +38,18 @@ All references updated in:
 ```
 /logs/
 └── iptv/                                    # All application logs
-    ├── sync-daemon.log                      # Main daemon log
-    ├── sync-1-live_categories.log           # Source 1, live categories
-    ├── sync-1-live_streams.log              # Source 1, live streams
-    ├── sync-1-vod_categories.log            # Source 1, VOD categories
-    ├── sync-1-vod_streams.log               # Source 1, VOD streams
-    ├── sync-1-series_categories.log         # Source 1, series categories
-    ├── sync-1-series.log                    # Source 1, series
-    ├── sync-2-live_categories.log           # Source 2, live categories
-    ├── ...                                  # Additional sources
+    ├── sync-daemon.log                      # All sync operations (consolidated)
     ├── php-errors.log                       # PHP error log
     └── nginx-error.log                      # Nginx error log
+```
+
+All sync operations for all sources and task types are logged to a single unified file: `/logs/iptv/sync-daemon.log`
+
+Each log entry includes the source name and task type for easy filtering:
+```
+[2025-01-15 10:30:00] INFO: Starting sync: MySource/live_streams
+[2025-01-15 10:30:00] [MySource/live_streams] Syncing live streams...
+[2025-01-15 10:30:05] INFO: Completed sync: MySource/live_streams (5s)
 ```
 
 ## Usage Examples
@@ -63,33 +64,36 @@ docker exec iptv-organizer-proxy tail -f /logs/sync-daemon.log
 docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-daemon.log
 ```
 
-### View Specific Task Log
+### View Specific Task Type Logs
 
 ```bash
-# Old
-docker exec iptv-organizer-proxy tail -f /logs/sync-daemon/sync-1-live_streams.log
+# Filter by source and task type
+docker exec iptv-organizer-proxy grep "MySource/live_streams" /logs/iptv/sync-daemon.log
 
-# New
-docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-1-live_streams.log
+# Follow live updates for a specific task
+docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-daemon.log | grep "MySource/live_streams"
 ```
 
 ### View All Logs for a Source
 
 ```bash
-# Old
-docker exec iptv-organizer-proxy tail -f /logs/sync-daemon/sync-1-*.log
+# Filter by source name
+docker exec iptv-organizer-proxy grep "MySource" /logs/iptv/sync-daemon.log
 
-# New
-docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-1-*.log
+# Follow live updates for all tasks of a source
+docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-daemon.log | grep "MySource"
 ```
 
-### Grep for Errors
+### Search for Errors
 
 ```bash
-# Old
-docker exec iptv-organizer-proxy grep -i error /logs/sync-daemon/*.log
+# Search all errors in sync log
+docker exec iptv-organizer-proxy grep -i error /logs/iptv/sync-daemon.log
 
-# New
+# Search errors for specific source
+docker exec iptv-organizer-proxy grep -i error /logs/iptv/sync-daemon.log | grep "MySource"
+
+# Search all errors in all logs
 docker exec iptv-organizer-proxy grep -i error /logs/iptv/*.log
 ```
 
@@ -160,8 +164,9 @@ environment:
 | Aspect | Old | New |
 |--------|-----|-----|
 | Main log path | `/logs/sync-daemon.log` | `/logs/iptv/sync-daemon.log` |
-| Task log path | `/logs/sync-daemon/sync-{id}-{type}.log` | `/logs/iptv/sync-{id}-{type}.log` |
+| Task log path | `/logs/sync-daemon/sync-{id}-{type}.log` | **Consolidated into main log** |
 | Directory | `/logs/sync-daemon/` | `/logs/iptv/` |
+| Log structure | Separate file per task | **Single unified log file** |
 | Env variable | `LOG_DIR` (default: `/logs/sync-daemon`) | `LOG_DIR` (default: `/logs/iptv`) |
 | Files changed | 10 files | - |
 | Migration needed | ❌ No | - |

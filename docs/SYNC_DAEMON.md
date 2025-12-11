@@ -131,7 +131,7 @@ The daemon creates/updates `/tmp/sync-daemon-heartbeat` with the current timesta
 
 Logs are stored in two locations:
 
-**File Logs** (`logs/sync-daemon/sync-daemon.log`):
+**File Logs** (`logs/iptv/sync-daemon.log`):
 - Daily rotation (keeps 7 days of history)
 - Contains INFO, WARNING, and ERROR level messages
 - Includes execution timing and statistics
@@ -197,7 +197,7 @@ HEALTHCHECK --interval=60s --timeout=10s --retries=3 --start-period=10s \
 
 Check logs:
 ```bash
-tail -f logs/sync-daemon/sync-daemon.log
+tail -f logs/iptv/sync-daemon.log
 ```
 
 Verify process:

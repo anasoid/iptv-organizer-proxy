@@ -187,21 +187,23 @@ This ensures:
 
 | File | Description |
 |------|-------------|
-| `/logs/iptv.log` | Main daemon log (startup, shutdown, iterations) |
-| `/logs/iptv/sync-daemon.log` | Detailed sync operations |
-| `/logs/iptv/sync-{source_id}-{task_type}.log` | Per-task sync logs |
+| `/logs/iptv/sync-daemon.log` | All sync operations (unified log) |
+| `/logs/iptv/php-errors.log` | PHP errors |
+| `/logs/iptv/nginx-error.log` | Nginx errors |
 
-Example log files:
+All sync operations are logged to a single unified file with source and task type prefixes for easy filtering:
+
 ```
-/logs/iptv/sync-1-live_categories.log
-/logs/iptv/sync-1-live_streams.log
-/logs/iptv/sync-1-vod_streams.log
+[2025-01-15 10:30:00] INFO: Starting sync: Source1/live_streams
+[2025-01-15 10:30:00] [Source1/live_streams] Syncing 150 channels...
+[2025-01-15 10:30:05] INFO: Completed sync: Source1/live_streams (5s)
 ```
 
 Benefits:
-- Easier to debug specific task failures
-- Logs don't get mixed between task types
-- Can monitor individual task performance
+- Single file for all sync operations
+- Easy to monitor overall sync activity
+- Filter by source name or task type using grep
+- Chronological view of all operations
 
 ### Log Levels
 
@@ -212,14 +214,17 @@ Benefits:
 ### Viewing Logs
 
 ```bash
-# Main daemon log
-docker exec iptv-organizer-proxy tail -f /logs/iptv.log
+# All sync operations
+docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-daemon.log
 
-# Specific task log
-docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-1-live_streams.log
+# Filter by specific source
+docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-daemon.log | grep "Source1"
 
-# All task logs for a source
-docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-1-*.log
+# Filter by specific task type
+docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-daemon.log | grep "live_streams"
+
+# Filter by specific source and task
+docker exec iptv-organizer-proxy tail -f /logs/iptv/sync-daemon.log | grep "Source1/live_streams"
 
 # Container logs
 docker logs -f iptv-organizer-proxy
