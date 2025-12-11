@@ -132,10 +132,11 @@ sync_task() {
     log_info "Starting sync: $source_name/$task_type"
 
     local sync_start=$(date +%s)
-    local task_log="$LOG_DIR/sync-${source_id}-${task_type}.log"
 
-    # Run individual task sync with timeout protection
-    if timeout 180 php /app/bin/sync.php --source-id="$source_id" --task-type="$task_type" >> "$task_log" 2>&1; then
+    # Run individual task sync with timeout protection - log to main file
+    if timeout 180 php /app/bin/sync.php --source-id="$source_id" --task-type="$task_type" 2>&1 | while IFS= read -r line; do
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$source_name/$task_type] $line" | tee -a "$LOG_FILE"
+    done; then
         local sync_end=$(date +%s)
         local duration=$((sync_end - sync_start))
         log_info "Completed sync: $source_name/$task_type (${duration}s)"
