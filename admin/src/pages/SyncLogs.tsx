@@ -25,6 +25,7 @@ import { Delete as DeleteIcon, Visibility as ViewIcon, Refresh as RefreshIcon } 
 import syncLogsApi, { SYNC_TYPES } from '../services/syncLogsApi';
 import type { SyncLog } from '../services/syncLogsApi';
 import sourcesApi from '../services/sourcesApi';
+import type { Source } from '../services/sourcesApi';
 import { useAuthStore } from '../stores/authStore';
 
 export default function SyncLogs() {
@@ -220,7 +221,7 @@ export default function SyncLogs() {
       {/* Statistics Cards */}
       {stats && (
         <Grid container spacing={2} sx={{ mb: 2 }}>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={4}>
             <Card>
               <CardContent>
                 <Typography color="textSecondary" gutterBottom variant="body2">
@@ -232,7 +233,7 @@ export default function SyncLogs() {
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={4}>
             <Card>
               <CardContent>
                 <Typography color="textSecondary" gutterBottom variant="body2">
@@ -244,7 +245,7 @@ export default function SyncLogs() {
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={4}>
             <Card>
               <CardContent>
                 <Typography color="textSecondary" gutterBottom variant="body2">
@@ -252,18 +253,6 @@ export default function SyncLogs() {
                 </Typography>
                 <Typography variant="h5" color="error.main">
                   {stats.failed_syncs || 0}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom variant="body2">
-                  Items Processed
-                </Typography>
-                <Typography variant="h5">
-                  {(stats.total_added || 0) + (stats.total_updated || 0) + (stats.total_deleted || 0)}
                 </Typography>
               </CardContent>
             </Card>
@@ -281,7 +270,7 @@ export default function SyncLogs() {
             onChange={(e) => setSourceIdFilter(e.target.value as number | '')}
           >
             <MenuItem value="">All Sources</MenuItem>
-            {sourcesData?.data?.map((source: any) => (
+            {sourcesData?.data?.map((source: Source) => (
               <MenuItem key={source.id} value={source.id}>
                 {source.name}
               </MenuItem>
@@ -331,6 +320,8 @@ export default function SyncLogs() {
           rows={data?.data || []}
           columns={columns}
           pagination
+          paginationMode="server"
+          rowCount={data?.pagination?.total || 0}
           paginationModel={{ pageSize: limit, page: page - 1 }}
           onPaginationModelChange={(model) => setPage(model.page + 1)}
           pageSizeOptions={[10]}

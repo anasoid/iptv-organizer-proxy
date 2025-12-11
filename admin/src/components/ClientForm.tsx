@@ -51,7 +51,9 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
     },
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const sourceId = watch('source_id');
+  // eslint-disable-next-line react-hooks/incompatible-library
   const filterId = watch('filter_id');
 
   // Fetch sources for dropdown
