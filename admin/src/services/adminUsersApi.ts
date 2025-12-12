@@ -49,6 +49,7 @@ const adminUsersApi = {
       username?: string;
       email?: string;
       is_active?: number;
+      password?: string;
     }
   ): Promise<AdminUserResponse> {
     const response = await api.put(`/admin-users/${id}`, data);

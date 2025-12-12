@@ -24,6 +24,7 @@ export default function AdminUserForm({ user, onSuccess, onCancel }: AdminUserFo
   const [username, setUsername] = useState(user?.username || '');
   const [email, setEmail] = useState(user?.email || '');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [isActive, setIsActive] = useState(user?.is_active === 1 || !user);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,25 +57,52 @@ export default function AdminUserForm({ user, onSuccess, onCancel }: AdminUserFo
       return;
     }
 
-    if (!user && !password.trim()) {
-      setError('Password is required for new admin users');
-      return;
-    }
-
     if (email && !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
       setError('Invalid email format');
       return;
+    }
+
+    // Password validation for create mode
+    if (!user) {
+      if (!password.trim()) {
+        setError('Password is required for new admin users');
+        return;
+      }
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters long');
+        return;
+      }
+      if (password !== passwordConfirm) {
+        setError('Passwords do not match');
+        return;
+      }
+    }
+
+    // Password validation for update mode (if password is being changed)
+    if (user && password.trim()) {
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters long');
+        return;
+      }
+      if (password !== passwordConfirm) {
+        setError('Passwords do not match');
+        return;
+      }
     }
 
     setError(null);
 
     if (user) {
       // Update mode
-      updateMutation.mutate({
+      const updateData: any = {
         username: username.trim(),
         email: email.trim() || undefined,
         is_active: isActive ? 1 : 0,
-      });
+      };
+      if (password.trim()) {
+        updateData.password = password.trim();
+      }
+      updateMutation.mutate(updateData);
     } else {
       // Create mode
       createMutation.mutate({
@@ -102,18 +130,27 @@ export default function AdminUserForm({ user, onSuccess, onCancel }: AdminUserFo
           required
         />
 
-        {!user && (
-          <TextField
-            label="Password"
-            fullWidth
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={isLoading}
-            required
-            helperText="Password is required for new admin users"
-          />
-        )}
+        <TextField
+          label="Password"
+          fullWidth
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={isLoading}
+          required={!user}
+          helperText={user ? 'Leave blank to keep current password' : 'Password is required for new admin users'}
+        />
+
+        <TextField
+          label="Confirm Password"
+          fullWidth
+          type="password"
+          value={passwordConfirm}
+          onChange={(e) => setPasswordConfirm(e.target.value)}
+          disabled={isLoading}
+          required={!user || !!password}
+          helperText="Passwords must match"
+        />
 
         <TextField
           label="Email"

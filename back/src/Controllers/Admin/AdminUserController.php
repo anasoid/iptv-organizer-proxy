@@ -150,11 +150,17 @@ class AdminUserController
             $body = json_decode($request->getBody()->getContents(), true);
 
             // Update fields
+            if (isset($body['username'])) {
+                $user->username = $body['username'];
+            }
             if (isset($body['email'])) {
                 $user->email = $body['email'];
             }
             if (isset($body['is_active'])) {
                 $user->is_active = (int) $body['is_active'];
+            }
+            if (isset($body['password']) && !empty($body['password'])) {
+                $user->updatePassword($body['password']);
             }
 
             if (!$user->save()) {
