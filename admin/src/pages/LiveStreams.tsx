@@ -55,12 +55,12 @@ export default function LiveStreams() {
   // Fetch live categories for filtering
   const { data: categoriesData, isLoading: isLoadingCategories } = useQuery({
     queryKey: ['categories-live', sourceId],
-    queryFn: () => (sourceId ? categoriesApi.getCategories(sourceId, 1, 100) : Promise.resolve(null)),
+    queryFn: () => (sourceId ? categoriesApi.getCategories(sourceId, 1, 1000, undefined, 'live') : Promise.resolve(null)),
     enabled: isAuthenticated && sourceId !== null,
   });
 
-  // Filter only live categories for display
-  const liveCategories = categoriesData?.data?.filter((cat: Category) => cat.category_type === 'live') || [];
+  // Categories are already filtered by type on backend
+  const liveCategories = categoriesData?.data || [];
 
   const streams = streamsData?.data || [];
   const pagination = streamsData?.pagination;

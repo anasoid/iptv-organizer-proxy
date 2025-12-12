@@ -55,12 +55,12 @@ export default function VodStreams() {
   // Fetch VOD categories for filtering
   const { data: categoriesData, isLoading: isLoadingCategories } = useQuery({
     queryKey: ['categories-vod', sourceId],
-    queryFn: () => (sourceId ? categoriesApi.getCategories(sourceId, 1, 100) : Promise.resolve(null)),
+    queryFn: () => (sourceId ? categoriesApi.getCategories(sourceId, 1, 1000, undefined, 'vod') : Promise.resolve(null)),
     enabled: isAuthenticated && sourceId !== null,
   });
 
-  // Filter only VOD categories for display
-  const vodCategories = categoriesData?.data?.filter((cat: Category) => cat.category_type === 'vod') || [];
+  // Categories are already filtered by type on backend
+  const vodCategories = categoriesData?.data || [];
 
   const streams = streamsData?.data || [];
   const pagination = streamsData?.pagination;
