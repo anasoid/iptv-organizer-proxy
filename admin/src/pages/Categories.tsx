@@ -11,6 +11,10 @@ import {
   Chip,
   Alert,
   TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { useQuery } from '@tanstack/react-query';
@@ -29,11 +33,12 @@ export default function Categories() {
   const [limit] = useState(20);
   const [view, setView] = useState<ViewMode>('list');
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoryType, setCategoryType] = useState<'live' | 'vod' | 'series' | ''>('');
 
-  // Fetch categories with optional search
+  // Fetch categories with optional search and type filter
   const { data, isLoading, error } = useQuery({
-    queryKey: ['categories', sourceId, page, limit, searchQuery],
-    queryFn: () => (sourceId ? categoriesApi.getCategories(sourceId, page, limit, searchQuery || undefined) : Promise.resolve(null)),
+    queryKey: ['categories', sourceId, page, limit, searchQuery, categoryType],
+    queryFn: () => (sourceId ? categoriesApi.getCategories(sourceId, page, limit, searchQuery || undefined, (categoryType as 'live' | 'vod' | 'series') || undefined) : Promise.resolve(null)),
     enabled: isAuthenticated && sourceId !== null,
   });
 
@@ -122,7 +127,7 @@ export default function Categories() {
 
       {/* Source Selector and Search Bar */}
       <Card sx={{ mb: 3, p: 2 }}>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <Box sx={{ flex: '0 0 auto', minWidth: 300 }}>
             <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
               Filter by Source
@@ -149,6 +154,26 @@ export default function Categories() {
               variant="outlined"
               sx={{ flex: '1 1 auto', minWidth: 200 }}
             />
+          )}
+
+          {sourceId && (
+            <FormControl sx={{ flex: '0 0 auto', minWidth: 150 }}>
+              <InputLabel>Filter by Type</InputLabel>
+              <Select
+                value={categoryType}
+                label="Filter by Type"
+                onChange={(e) => {
+                  setCategoryType(e.target.value as 'live' | 'vod' | 'series' | '');
+                  setPage(1);
+                }}
+                size="small"
+              >
+                <MenuItem value="">All Types</MenuItem>
+                <MenuItem value="live">Live</MenuItem>
+                <MenuItem value="vod">VOD</MenuItem>
+                <MenuItem value="series">Series</MenuItem>
+              </Select>
+            </FormControl>
           )}
         </Box>
       </Card>

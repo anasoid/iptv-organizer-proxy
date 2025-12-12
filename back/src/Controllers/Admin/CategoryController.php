@@ -29,6 +29,7 @@ class CategoryController
      * Query params:
      *   - source_id (required)
      *   - search (optional): search by category name (case-insensitive and accent-insensitive)
+     *   - category_type (optional): filter by category type ('live', 'vod', 'series')
      *   - page (optional): default 1
      *   - limit (optional): default 20
      */
@@ -38,6 +39,7 @@ class CategoryController
             $queryParams = $request->getQueryParams();
             $sourceId = (int) ($queryParams['source_id'] ?? 0);
             $search = $queryParams['search'] ?? null;
+            $categoryType = $queryParams['category_type'] ?? null;
             $page = (int) ($queryParams['page'] ?? 1);
             $limit = (int) ($queryParams['limit'] ?? 20);
 
@@ -55,6 +57,19 @@ class CategoryController
                 $searchNormalized = $this->normalizeString($search);
                 $allCategories = array_filter($allCategories, function($category) use ($searchNormalized) {
                     return strpos($this->normalizeString($category->category_name), $searchNormalized) !== false;
+                });
+                // Re-index array after filtering
+                $allCategories = array_values($allCategories);
+            }
+
+            // Filter by category type
+            if ($categoryType) {
+                $validTypes = ['live', 'vod', 'series'];
+                if (!in_array($categoryType, $validTypes)) {
+                    return $this->jsonError($response, 'Invalid category_type. Must be one of: live, vod, series', 400);
+                }
+                $allCategories = array_filter($allCategories, function($category) use ($categoryType) {
+                    return $category->category_type === $categoryType;
                 });
                 // Re-index array after filtering
                 $allCategories = array_values($allCategories);
