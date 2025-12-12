@@ -94,7 +94,12 @@ export default function AdminUserForm({ user, onSuccess, onCancel }: AdminUserFo
 
     if (user) {
       // Update mode
-      const updateData: any = {
+      const updateData: {
+        username: string;
+        email?: string;
+        is_active: number;
+        password?: string;
+      } = {
         username: username.trim(),
         email: email.trim() || undefined,
         is_active: isActive ? 1 : 0,
