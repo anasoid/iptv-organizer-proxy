@@ -8,6 +8,27 @@ import { UIHelper } from '../utils/ui-helper';
 import { APIHelper } from '../utils/api-helper';
 import { TEST_SOURCE, TEST_CLIENT, TEST_FILTER, ADMIN_PANEL_URL } from '../fixtures/test-data';
 
+interface Source {
+  id: string | number;
+  name: string;
+  url: string;
+  username: string;
+  password: string;
+}
+
+interface Client {
+  id: string | number;
+  username: string;
+  password: string;
+  sourceId: string | number;
+}
+
+interface Filter {
+  id: string | number;
+  name: string;
+  filterConfig: string;
+}
+
 test.describe('Full User Workflows', () => {
   let uiHelper: UIHelper;
   let apiHelper: APIHelper;
@@ -76,7 +97,7 @@ test.describe('Full User Workflows', () => {
     await apiHelper.login();
     const sourcesResponse = await apiHelper.getSources();
     const sourceId = sourcesResponse.data.find(
-      (s: any) => s.name === sourceData.name
+      (s: Source) => s.name === sourceData.name
     )?.id;
 
     expect(sourceId).toBeDefined();
@@ -147,17 +168,17 @@ test.describe('Full User Workflows', () => {
     // 9. Verify all created items exist in API
     const filters = await apiHelper.getFilters();
     expect(
-      filters.data.some((f: any) => f.name === filterData.name)
+      filters.data.some((f: Filter) => f.name === filterData.name)
     ).toBeTruthy();
 
     const sources = await apiHelper.getSources();
     expect(
-      sources.data.some((s: any) => s.name === sourceData.name)
+      sources.data.some((s: Source) => s.name === sourceData.name)
     ).toBeTruthy();
 
     const clients = await apiHelper.getClients();
     expect(
-      clients.data.some((c: any) => c.username === clientData.username)
+      clients.data.some((c: Client) => c.username === clientData.username)
     ).toBeTruthy();
   });
 
@@ -241,7 +262,7 @@ test.describe('Full User Workflows', () => {
     // 6. Verify deletion
     const afterDelete = await apiHelper.getClients();
     expect(
-      afterDelete.data.some((c: any) => c.id === clients[0].id)
+      afterDelete.data.some((c: Client) => c.id === clients[0].id)
     ).toBeFalsy();
   });
 

@@ -13,11 +13,13 @@ type TestFixtures = {
 };
 
 export const test = base.extend<TestFixtures>({
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   apiHelper: async ({ request }, use) => {
     const apiHelper = new APIHelper(request);
     await use(apiHelper);
   },
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   uiHelper: async ({ page }, use) => {
     const uiHelper = new UIHelper(page);
     await use(uiHelper);

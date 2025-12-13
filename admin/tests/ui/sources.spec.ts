@@ -6,7 +6,7 @@
 import { test, expect } from '@playwright/test';
 import { UIHelper } from '../utils/ui-helper';
 import { APIHelper } from '../utils/api-helper';
-import { TEST_SOURCE, TEST_ADMIN_USER, ADMIN_PANEL_URL } from '../fixtures/test-data';
+import { TEST_SOURCE } from '../fixtures/test-data';
 
 test.describe('Sources Management UI', () => {
   let uiHelper: UIHelper;

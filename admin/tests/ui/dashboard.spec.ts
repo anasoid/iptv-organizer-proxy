@@ -6,7 +6,6 @@
 import { test, expect } from '@playwright/test';
 import { UIHelper } from '../utils/ui-helper';
 import { APIHelper } from '../utils/api-helper';
-import { ADMIN_PANEL_URL } from '../fixtures/test-data';
 
 test.describe('Dashboard UI', () => {
   let uiHelper: UIHelper;
@@ -85,7 +84,7 @@ test.describe('Dashboard UI', () => {
       await sourcesLink.click();
       await page.waitForLoadState('networkidle');
 
-      await expect(page).toHaveURL(`${ADMIN_PANEL_URL}/sources`);
+      await expect(page).toHaveURL(/\/sources$/);
     }
   });
 
@@ -98,7 +97,7 @@ test.describe('Dashboard UI', () => {
       await clientsLink.click();
       await page.waitForLoadState('networkidle');
 
-      await expect(page).toHaveURL(`${ADMIN_PANEL_URL}/clients`);
+      await expect(page).toHaveURL(/\/clients$/);
     }
   });
 
@@ -123,9 +122,6 @@ test.describe('Dashboard UI', () => {
     );
 
     if (await refreshBtn.isVisible()) {
-      // Get initial stat value
-      const initialValue = await page.locator('[data-testid="sources-count"]').textContent();
-
       // Click refresh
       await refreshBtn.click();
 
