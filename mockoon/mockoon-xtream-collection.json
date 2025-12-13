@@ -1,0 +1,75 @@
+{
+  "uuid": "xtream-codes-mock",
+  "lastMigration": 29,
+  "name": "Xtream Codes API Mock",
+  "endpointsOrder": [],
+  "rootChildren": [
+    {
+      "type": "folder",
+      "uuid": "folder-player-api",
+      "name": "player_api.php",
+      "children": [
+        {
+          "type": "route",
+          "uuid": "route-auth",
+          "documentation": "Authentication - Get server and user info",
+          "method": "get",
+          "endpoint": "player_api.php",
+          "responses": [
+            {
+              "uuid": "response-auth-success",
+              "name": "Auth Success",
+              "statusCode": 200,
+              "label": "",
+              "headers": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"user_info\": {\n    \"username\": \"testuser\",\n    \"password\": \"testpass\",\n    \"message\": \"\",\n    \"auth\": 1,\n    \"status\": \"Active\",\n    \"exp_date\": 1893456000,\n    \"is_trial\": \"0\",\n    \"active_cons\": \"1\",\n    \"created_at\": 1609459200,\n    \"max_connections\": \"5\",\n    \"allowed_output_formats\": [\n      \"m3u8\",\n      \"ts\",\n      \"rtmp\"\n    ]\n  },\n  \"server_info\": {\n    \"url\": \"localhost:8080\",\n    \"port\": \"8080\",\n    \"https_port\": \"443\",\n    \"server_protocol\": \"http\",\n    \"rtmp_port\": \"1935\",\n    \"timestamp_now\": 1735689600,\n    \"time_now\": \"2024-01-01 12:00:00\"\n  }\n}",
+              "latency": 50,
+              "isDefault": true
+            },
+            {
+              "uuid": "response-auth-fail",
+              "name": "Auth Failed",
+              "statusCode": 401,
+              "label": "Invalid credentials",
+              "headers": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"user_info\": {\n    \"username\": \"\",\n    \"password\": \"\",\n    \"message\": \"Invalid username or password\",\n    \"auth\": 0,\n    \"status\": \"Disabled\"\n  }\n}",
+              "latency": 50,
+              "isDefault": false
+            }
+          ]
+        },
+        {
+          "type": "route",
+          "uuid": "route-get-live-categories",
+          "documentation": "Get Live TV Categories",
+          "method": "get",
+          "endpoint": "player_api.php",
+          "responses": [
+            {
+              "uuid": "response-categories-success",
+              "name": "Categories Success",
+              "statusCode": 200,
+              "label": "",
+              "headers": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"category_id\": \"1\",\n    \"category_name\": \"News\",\n    \"parent_id\": 0\n  },\n  {\n    \"category_id\": \"2\",\n    \"category_name\": \"Sports\",\n    \"parent_id\": 0\n  },\n  {\n    \"category_id\": \"3\",\n    \"category_name\": \"Entertainment\",\n    \"parent_id\": 0\n  },\n  {\n    \"category_id\": \"4\",\n    \"category_name\": \"Documentary\",\n    \"parent_id\": 0\n  },\n  {\n    \"category_id\": \"5\",\n    \"category_name\": \"Kids\",\n    \"parent_id\": 0\n  }\n]",
+              "latency": 100,
+              "isDefault": true
+            },
+            {
+              "uuid": "response-categories-empty",
+              "name": "No Categories\",\n              "statusCode\": 200,\n              \"label\": \"Empty result\",\n              \"headers\": [\n                {\n                  \"key\": \"Content-Type\",\n                  \"value\": \"application/json\"\n                }\n              ],\n              \"body\": \"[]\",\n              \"latency\": 50,\n              \"isDefault\": false\n            }\n          ]\n        },\n        {\n          \"type\": \"route\",\n          \"uuid\": \"route-get-live-streams\",\n          \"documentation\": \"Get Live TV Streams (optionally filtered by category)\",\n          \"method\": \"get\",\n          \"endpoint\": \"player_api.php\",\n          \"responses\": [\n            {\n              \"uuid\": \"response-streams-success\",\n              \"name\": \"Streams Success\",\n              \"statusCode\": 200,\n              \"label\": \"\",\n              \"headers\": [\n                {\n                  \"key\": \"Content-Type\",\n                  \"value\": \"application/json\"\n                }\n              ],\n              \"body\": \"[\n  {\n    \\\"num\\\": 1,\n    \\\"name\\\": \\\"BBC News\\\",\n    \\\"stream_id\\\": \\\"1001\\\",\n    \\\"stream_type\\\": \\\"live\\\",\n    \\\"category_id\\\": \\\"1\\\",\n    \\\"category_ids\\\": [\\\"1\\\"],\n    \\\"is_adult\\\": 0,\n    \\\"icon\\\": \\\"https://example.com/bbc-news.png\\\",\n    \\\"added\\\": 1609459200,\n    \\\"is_protected\\\": 0,\n    \\\"rating\\\": \\\"8.5\\\",\n    \\\"rating_5based\\\": \\\"4.2\\\",\n    \\\"genre\\\": \\\"News\\\",\n    \\\"direct_source\\\": \\\"\\\",\n    \\\"tv_archive\\\": \\\"1\\\",\n    \\\"duration_mins\\\": \\\"0\\\"\n  },\n  {\n    \\\"num\\\": 2,\n    \\\"name\\\": \\\"CNN International\\\",\n    \\\"stream_id\\\": \\\"1002\\\",\n    \\\"stream_type\\\": \\\"live\\\",\n    \\\"category_id\\\": \\\"1\\\",\n    \\\"category_ids\\\": [\\\"1\\\"],\n    \\\"is_adult\\\": 0,\n    \\\"icon\\\": \\\"https://example.com/cnn.png\\\",\n    \\\"added\\\": 1609459200,\n    \\\"is_protected\\\": 0,\n    \\\"rating\\\": \\\"8.0\\\",\n    \\\"rating_5based\\\": \\\"4.0\\\",\n    \\\"genre\\\": \\\"News\\\",\n    \\\"direct_source\\\": \\\"\\\",\n    \\\"tv_archive\\\": \\\"1\\\",\n    \\\"duration_mins\\\": \\\"0\\\"\n  },\n  {\n    \\\"num\\\": 3,\n    \\\"name\\\": \\\"Sky Sports 1\\\",\n    \\\"stream_id\\\": \\\"2001\\\",\n    \\\"stream_type\\\": \\\"live\\\",\n    \\\"category_id\\\": \\\"2\\\",\n    \\\"category_ids\\\": [\\\"2\\\"],\n    \\\"is_adult\\\": 0,\n    \\\"icon\\\": \\\"https://example.com/sky-sports.png\\\",\n    \\\"added\\\": 1609459200,\n    \\\"is_protected\\\": 1,\n    \\\"rating\\\": \\\"9.0\\\",\n    \\\"rating_5based\\\": \\\"4.5\\\",\n    \\\"genre\\\": \\\"Sports\\\",\n    \\\"direct_source\\\": \\\"\\\",\n    \\\"tv_archive\\\": \\\"0\\\",\n    \\\"duration_mins\\\": \\\"0\\\"\n  },\n  {\n    \\\"num\\\": 4,\n    \\\"name\\\": \\\"ESPN\\\",\n    \\\"stream_id\\\": \\\"2002\\\",\n    \\\"stream_type\\\": \\\"live\\\",\n    \\\"category_id\\\": \\\"2\\\",\n    \\\"category_ids\\\": [\\\"2\\\"],\n    \\\"is_adult\\\": 0,\n    \\\"icon\\\": \\\"https://example.com/espn.png\\\",\n    \\\"added\\\": 1609459200,\n    \\\"is_protected\\\": 0,\n    \\\"rating\\\": \\\"8.8\\\",\n    \\\"rating_5based\\\": \\\"4.4\\\",\n    \\\"genre\\\": \\\"Sports\\\",\n    \\\"direct_source\\\": \\\"\\\",\n    \\\"tv_archive\\\": \\\"1\\\",\n    \\\"duration_mins\\\": \\\"0\\\"\n  }\n]\",\n              \"latency\": 150,\n              \"isDefault\": true\n            },\n            {\n              \"uuid\": \"response-streams-category-1\",\n              \"name\": \"News Category Streams\",\n              \"statusCode\": 200,\n              \"label\": \"When category_id=1\",\n              \"headers\": [\n                {\n                  \"key\": \"Content-Type\",\n                  \"value\": \"application/json\"\n                }\n              ],\n              \"body\": \"[\n  {\n    \\\"num\\\": 1,\n    \\\"name\\\": \\\"BBC News\\\",\n    \\\"stream_id\\\": \\\"1001\\\",\n    \\\"stream_type\\\": \\\"live\\\",\n    \\\"category_id\\\": \\\"1\\\",\n    \\\"category_ids\\\": [\\\"1\\\"],\n    \\\"is_adult\\\": 0,\n    \\\"icon\\\": \\\"https://example.com/bbc-news.png\\\",\n    \\\"added\\\": 1609459200,\n    \\\"is_protected\\\": 0,\n    \\\"rating\\\": \\\"8.5\\\",\n    \\\"rating_5based\\\": \\\"4.2\\\",\n    \\\"genre\\\": \\\"News\\\",\n    \\\"direct_source\\\": \\\"\\\",\n    \\\"tv_archive\\\": \\\"1\\\",\n    \\\"duration_mins\\\": \\\"0\\\"\n  },\n  {\n    \\\"num\\\": 2,\n    \\\"name\\\": \\\"CNN International\\\",\n    \\\"stream_id\\\": \\\"1002\\\",\n    \\\"stream_type\\\": \\\"live\\\",\n    \\\"category_id\\\": \\\"1\\\",\n    \\\"category_ids\\\": [\\\"1\\\"],\n    \\\"is_adult\\\": 0,\n    \\\"icon\\\": \\\"https://example.com/cnn.png\\\",\n    \\\"added\\\": 1609459200,\n    \\\"is_protected\\\": 0,\n    \\\"rating\\\": \\\"8.0\\\",\n    \\\"rating_5based\\\": \\\"4.0\\\",\n    \\\"genre\\\": \\\"News\\\",\n    \\\"direct_source\\\": \\\"\\\",\n    \\\"tv_archive\\\": \\\"1\\\",\n    \\\"duration_mins\\\": \\\"0\\\"\n  }\n]\",\n              \"latency\": 100,\n              \"isDefault\": false\n            },\n            {\n              \"uuid\": \"response-streams-empty\",\n              \"name\": \"No Streams\",\n              \"statusCode\": 200,\n              \"label\": \"Empty result\",\n              \"headers\": [\n                {\n                  \"key\": \"Content-Type\",\n                  \"value\": \"application/json\"\n                }\n              ],\n              \"body\": \"[]\",\n              \"latency\": 50,\n              \"isDefault\": false\n            }\n          ]\n        }\n      ]\n    }\n  ],\n  "globals": {\n    "id": "globals-xtream\",\n    "name": \"Xtream Codes Global\",\n    "headers": [],\n    "routes\": [],\n    "proxyMode\": false,\n    \"proxyReqHeaders\": [],\n    \"proxyResHeaders\": [],\n    \"proxyReqHeadersBlacklist\": [\"host\"],\n    \"proxyResHeadersBlacklist\": [],\n    \"proxyBypassroutes\": [],\n    \"logRequests\": true,\n    \"logResponses\": true,\n    \"cors\": {\n      \"enabled\": true,\n      \"origin\": \"*\",\n      \"methods\": [\"get\", \"post\", \"put\", \"patch\", \"delete\"],\n      \"allowedHeaders\": [\"*\"],\n      \"exposedHeaders\": [\"*\"],\n      \"credentials\": false,\n      \"optionsSuccessStatus\": 200\n    }\n  }\n}

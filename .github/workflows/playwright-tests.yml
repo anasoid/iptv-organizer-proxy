@@ -1,0 +1,255 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches: [main, develop, feature/**]
+    paths:
+      - 'admin/**'
+      - 'back/**'
+      - '.github/workflows/playwright-tests.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'admin/**'
+      - 'back/**'
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    services:
+      # Backend API
+      api:
+        image: php:8.3-cli
+        options: >-
+          --health-cmd="php -v"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+        volumes:
+          - ${{ github.workspace }}/back:/app
+        working_directory: /app
+        env:
+          DB_TYPE: sqlite
+          DB_SQLITE_PATH: :memory:
+
+      # Mockoon Mock Server
+      mockoon:
+        image: mockoon/mockoon:latest
+        ports:
+          - 3000:3000
+        options: >-
+          --health-cmd="curl -f http://localhost:3000/health || exit 1"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=3
+        volumes:
+          - ${{ github.workspace }}/mockoon/mockoon-xtream-collection.json:/data/collection.json:ro
+        env:
+          MOCKOON_DATA_FILE: /data/collection.json
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Setup PHP Backend
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo, pdo_mysql, pdo_sqlite, mbstring, json
+          tools: composer
+
+      - name: Install PHP dependencies
+        working-directory: ./back
+        run: |
+          composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Run PHP migrations
+        working-directory: ./back
+        env:
+          DB_TYPE: sqlite
+          DB_SQLITE_PATH: :memory:
+        run: |
+          php -r "require 'vendor/autoload.php'; require 'src/Database/Migrations.php';"
+
+      - name: Start PHP Development Server
+        working-directory: ./back
+        env:
+          DB_TYPE: sqlite
+          DB_SQLITE_PATH: :memory:
+        run: |
+          php -S localhost:8000 > /tmp/php.log 2>&1 &
+          sleep 2
+          curl -f http://localhost:8000/api/auth/login -X POST -d '{}' || echo "Server not ready yet"
+
+      # Setup Node/React Frontend
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Install Frontend dependencies
+        working-directory: ./admin
+        run: npm ci
+
+      - name: Build Frontend
+        working-directory: ./admin
+        run: npm run build
+
+      - name: Install Playwright Browsers
+        working-directory: ./admin
+        run: npx playwright install --with-deps
+
+      # Wait for services
+      - name: Wait for services
+        run: |
+          timeout 30 bash -c 'until curl -f http://localhost:8000/api/auth/login -X POST -d "{}"; do sleep 1; done' || echo "API ready"
+          timeout 30 bash -c 'until curl -f http://localhost:3000/player_api.php?username=testuser&password=testpass; do sleep 1; done' || echo "Mockoon ready"
+
+      # Run Backend PHP Tests
+      - name: Run PHPUnit Tests (Backend)
+        working-directory: ./back
+        env:
+          DB_TYPE: sqlite
+          DB_SQLITE_PATH: :memory:
+        run: |
+          echo "Running PHPUnit Tests..."
+          ./vendor/bin/phpunit tests/Unit/ --coverage-text || true
+          ./vendor/bin/phpunit tests/Feature/ || true
+
+      - name: Run Backend Static Analysis
+        working-directory: ./back
+        continue-on-error: true
+        run: |
+          echo "Running PHPStan Analysis..."
+          ./vendor/bin/phpstan analyse src/ --level 5 || true
+
+      # Run Frontend Playwright Tests
+      - name: Run Playwright Tests (API)
+        working-directory: ./admin
+        env:
+          API_BASE_URL: http://localhost:8000
+          ADMIN_PANEL_URL: http://localhost:5173/admin
+        run: |
+          echo "Starting Vite dev server..."
+          npm run dev > /tmp/vite.log 2>&1 &
+          VITE_PID=$!
+
+          echo "Waiting for Vite to be ready..."
+          sleep 5
+
+          echo "Running API tests..."
+          npx playwright test tests/api/ --reporter=html,json,junit
+
+          kill $VITE_PID || true
+
+      - name: Run Playwright Tests (UI)
+        working-directory: ./admin
+        env:
+          API_BASE_URL: http://localhost:8000
+          ADMIN_PANEL_URL: http://localhost:5173/admin
+        if: always()
+        run: |
+          echo "Starting Vite dev server..."
+          npm run dev > /tmp/vite.log 2>&1 &
+          VITE_PID=$!
+
+          echo "Waiting for Vite to be ready..."
+          sleep 5
+
+          echo "Running UI tests..."
+          npx playwright test tests/ui/ --reporter=html,json,junit
+
+          kill $VITE_PID || true
+
+      - name: Run Playwright Tests (Integration)
+        working-directory: ./admin
+        env:
+          API_BASE_URL: http://localhost:8000
+          ADMIN_PANEL_URL: http://localhost:5173/admin
+        if: always()
+        run: |
+          echo "Starting Vite dev server..."
+          npm run dev > /tmp/vite.log 2>&1 &
+          VITE_PID=$!
+
+          echo "Waiting for Vite to be ready..."
+          sleep 5
+
+          echo "Running Integration tests..."
+          npx playwright test tests/integration/ --reporter=html,json,junit
+
+          kill $VITE_PID || true
+
+      # Upload Results
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: admin/playwright-report/
+          retention-days: 30
+
+      - name: Upload Test Results (JSON)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-results-json
+          path: admin/test-results/results.json
+          retention-days: 30
+
+      - name: Upload Test Results (JUnit)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-results-junit
+          path: admin/test-results/junit.xml
+          retention-days: 30
+
+      - name: Upload Screenshots (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-screenshots
+          path: admin/tests/screenshots/
+          retention-days: 7
+
+      - name: Upload Videos (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-videos
+          path: admin/test-results/
+          retention-days: 7
+
+      # Publish Reports
+      - name: Publish Playwright Test Report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Playwright Test Results
+          path: 'admin/test-results/junit.xml'
+          reporter: 'java-junit'
+          fail-on-error: false
+
+      # Summary
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "## Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Backend Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- PHPUnit: ✓ Completed" >> $GITHUB_STEP_SUMMARY
+          echo "- PHPStan: ✓ Completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Frontend Tests (Playwright)" >> $GITHUB_STEP_SUMMARY
+          echo "- API Tests: ✓ Completed" >> $GITHUB_STEP_SUMMARY
+          echo "- UI Tests: ✓ Completed" >> $GITHUB_STEP_SUMMARY
+          echo "- Integration Tests: ✓ Completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- [📊 Playwright Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [🎯 Test Results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY

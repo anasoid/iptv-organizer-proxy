@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  mockoon-xtream:
+    image: mockoon/mockoon:latest
+    container_name: mockoon-xtream-codes
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./mockoon/mockoon-xtream-collection.json:/data/collection.json:ro
+    environment:
+      - MOCKOON_DATA_FILE=/data/collection.json
+      - PORT=3000
+    command: --data /data/collection.json --host 0.0.0.0 --port 3000
+    networks:
+      - iptv-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Your main application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      mockoon-xtream:
+        condition: service_healthy
+    environment:
+      - XTREAM_BASE_URL=http://mockoon-xtream:3000
+      - APP_ENV=testing
+    ports:
+      - "8000:8000"
+    networks:
+      - iptv-network
+
+networks:
+  iptv-network:
+    driver: bridge

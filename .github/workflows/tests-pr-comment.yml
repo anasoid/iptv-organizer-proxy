@@ -1,0 +1,56 @@
+name: Test Results PR Comment
+
+on:
+  workflow_run:
+    workflows: [Playwright Tests]
+    types: [completed]
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.event == 'pull_request'
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Find PR number
+        id: pr
+        run: |
+          PR_NUMBER=$(ls -la | grep "pr_" | head -1 | sed 's/.*pr_//' | sed 's/_.*//')
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            try {
+              const results = JSON.parse(fs.readFileSync('playwright-test-results-json/results.json', 'utf8'));
+
+              const passed = results.stats?.expected || 0;
+              const failed = results.stats?.unexpected || 0;
+              const skipped = results.stats?.skipped || 0;
+              const duration = (results.stats?.duration || 0) / 1000;
+
+              const comment = `## 🧪 Test Results
+
+- **Passed**: ✅ ${passed}
+- **Failed**: ${failed > 0 ? '❌ ' + failed : '✅ 0'}
+- **Skipped**: ⏭️ ${skipped}
+- **Duration**: ⏱️ ${duration.toFixed(2)}s
+
+[📊 View Full Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }})`;
+
+              github.rest.issues.createComment({
+                issue_number: ${{ steps.pr.outputs.pr_number }},
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.log('Could not create comment:', error);
+            }
