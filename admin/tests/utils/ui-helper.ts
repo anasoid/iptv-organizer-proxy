@@ -4,7 +4,7 @@
  */
 
 import { Page } from '@playwright/test';
-import { ADMIN_PANEL_URL, TEST_ADMIN_USER, DELAYS } from '../fixtures/test-data';
+import { ADMIN_PANEL_URL, TEST_ADMIN_USER } from '../fixtures/test-data';
 
 export class UIHelper {
   constructor(private page: Page) {}

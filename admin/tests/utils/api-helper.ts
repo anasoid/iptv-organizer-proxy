@@ -6,13 +6,6 @@
 import { APIRequestContext } from '@playwright/test';
 import { API_BASE_URL, TEST_ADMIN_USER } from '../fixtures/test-data';
 
-type ApiResponse<T = Record<string, unknown>> = {
-  success?: boolean;
-  data?: T;
-  token?: string;
-  error?: string;
-};
-
 export class APIHelper {
   private baseUrl = API_BASE_URL;
   private request: APIRequestContext;
