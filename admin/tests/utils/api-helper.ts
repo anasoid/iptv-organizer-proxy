@@ -6,6 +6,13 @@
 import { APIRequestContext } from '@playwright/test';
 import { API_BASE_URL, TEST_ADMIN_USER } from '../fixtures/test-data';
 
+type ApiResponse<T = Record<string, unknown>> = {
+  success?: boolean;
+  data?: T;
+  token?: string;
+  error?: string;
+};
+
 export class APIHelper {
   private baseUrl = API_BASE_URL;
   private request: APIRequestContext;
@@ -52,7 +59,7 @@ export class APIHelper {
   /**
    * GET request with auth
    */
-  async get<T = any>(endpoint: string): Promise<T> {
+  async get<T extends Record<string, unknown> = Record<string, unknown>>(endpoint: string): Promise<T> {
     const response = await this.request.get(`${this.baseUrl}${endpoint}`, {
       headers: this.getAuthHeaders(),
     });
@@ -67,7 +74,10 @@ export class APIHelper {
   /**
    * POST request with auth
    */
-  async post<T = any>(endpoint: string, data: any): Promise<T> {
+  async post<T extends Record<string, unknown> = Record<string, unknown>>(
+    endpoint: string,
+    data: Record<string, unknown>
+  ): Promise<T> {
     const response = await this.request.post(`${this.baseUrl}${endpoint}`, {
       headers: this.getAuthHeaders(),
       data,
@@ -83,7 +93,10 @@ export class APIHelper {
   /**
    * PUT request with auth
    */
-  async put<T = any>(endpoint: string, data: any): Promise<T> {
+  async put<T extends Record<string, unknown> = Record<string, unknown>>(
+    endpoint: string,
+    data: Record<string, unknown>
+  ): Promise<T> {
     const response = await this.request.put(`${this.baseUrl}${endpoint}`, {
       headers: this.getAuthHeaders(),
       data,
@@ -99,7 +112,7 @@ export class APIHelper {
   /**
    * DELETE request with auth
    */
-  async delete<T = any>(endpoint: string): Promise<T> {
+  async delete<T extends Record<string, unknown> = Record<string, unknown>>(endpoint: string): Promise<T> {
     const response = await this.request.delete(`${this.baseUrl}${endpoint}`, {
       headers: this.getAuthHeaders(),
     });
@@ -114,7 +127,7 @@ export class APIHelper {
   /**
    * Create a source
    */
-  async createSource(sourceData: any) {
+  async createSource(sourceData: Record<string, unknown>) {
     return this.post('/api/sources', sourceData);
   }
 
@@ -135,7 +148,7 @@ export class APIHelper {
   /**
    * Update source
    */
-  async updateSource(id: number, data: any) {
+  async updateSource(id: number, data: Record<string, unknown>) {
     return this.put(`/api/sources/${id}`, data);
   }
 
@@ -173,7 +186,7 @@ export class APIHelper {
   /**
    * Create a client
    */
-  async createClient(clientData: any) {
+  async createClient(clientData: Record<string, unknown>) {
     return this.post('/api/clients', clientData);
   }
 
@@ -194,7 +207,7 @@ export class APIHelper {
   /**
    * Update client
    */
-  async updateClient(id: number, data: any) {
+  async updateClient(id: number, data: Record<string, unknown>) {
     return this.put(`/api/clients/${id}`, data);
   }
 
@@ -208,7 +221,7 @@ export class APIHelper {
   /**
    * Create a filter
    */
-  async createFilter(filterData: any) {
+  async createFilter(filterData: Record<string, unknown>) {
     return this.post('/api/filters', filterData);
   }
 
@@ -229,7 +242,7 @@ export class APIHelper {
   /**
    * Update filter
    */
-  async updateFilter(id: number, data: any) {
+  async updateFilter(id: number, data: Record<string, unknown>) {
     return this.put(`/api/filters/${id}`, data);
   }
 

@@ -64,8 +64,7 @@ test.describe('Sources Management UI', () => {
 
   test('should edit a source', async ({ page }) => {
     // Create a source via API
-    const created = await apiHelper.createSource(TEST_SOURCE);
-    const sourceId = created.data.id;
+    await apiHelper.createSource(TEST_SOURCE);
 
     // Refresh page
     await page.reload();
@@ -96,7 +95,7 @@ test.describe('Sources Management UI', () => {
 
   test('should delete a source', async ({ page }) => {
     // Create a source via API
-    const created = await apiHelper.createSource(TEST_SOURCE);
+    await apiHelper.createSource(TEST_SOURCE);
 
     // Refresh page
     await page.reload();
@@ -126,7 +125,7 @@ test.describe('Sources Management UI', () => {
 
   test('should test source connection', async ({ page }) => {
     // Create a source via API
-    const created = await apiHelper.createSource(TEST_SOURCE);
+    await apiHelper.createSource(TEST_SOURCE);
 
     // Refresh page
     await page.reload();
@@ -149,7 +148,7 @@ test.describe('Sources Management UI', () => {
 
   test('should trigger sync', async ({ page }) => {
     // Create a source via API
-    const created = await apiHelper.createSource(TEST_SOURCE);
+    await apiHelper.createSource(TEST_SOURCE);
 
     // Refresh page
     await page.reload();
