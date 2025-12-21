@@ -47,6 +47,7 @@ class StreamController
      *   - type (required): live, vod, series
      *   - category_id (optional): filter by category
      *   - search (optional): search by stream name (case-insensitive)
+     *   - stream_id (optional): filter by stream_id
      *   - page (optional): default 1
      *   - limit (optional): default 20
      */
@@ -58,6 +59,7 @@ class StreamController
             $type = $queryParams['type'] ?? null;
             $categoryId = isset($queryParams['category_id']) ? (int) $queryParams['category_id'] : null;
             $search = $queryParams['search'] ?? null;
+            $streamId = $queryParams['stream_id'] ?? null;
             $page = (int) ($queryParams['page'] ?? 1);
             $limit = (int) ($queryParams['limit'] ?? 20);
 
@@ -85,6 +87,15 @@ class StreamController
 
             // Get all streams matching conditions
             $allStreams = $modelClass::findAll($conditions);
+
+            // Filter by stream_id if provided
+            if ($streamId !== null && $streamId !== '') {
+                $allStreams = array_filter($allStreams, function($stream) use ($streamId) {
+                    return (string) $stream->stream_id === (string) $streamId;
+                });
+                // Re-index array after filtering
+                $allStreams = array_values($allStreams);
+            }
 
             // Filter by search query (case-insensitive and accent-insensitive)
             if ($search) {
@@ -116,20 +127,34 @@ class StreamController
     }
 
     /**
-     * Get stream by ID
+     * Get stream by ID and optional type
+     * Query params:
+     *   - type (optional): live, vod, series (if not provided, searches all types)
      */
     public function get(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         try {
             $id = (int) ($args['id'] ?? 0);
+            $type = $request->getQueryParams()['type'] ?? null;
+
             if (!$id) {
                 return $this->jsonError($response, 'Invalid stream ID', 400);
             }
 
-            // Try to find in all stream types
-            $stream = LiveStream::find($id)
-                   ?? VodStream::find($id)
-                   ?? Series::find($id);
+            // If type is specified, search only that type
+            if ($type) {
+                if (!in_array($type, ['live', 'vod', 'series'])) {
+                    return $this->jsonError($response, 'Invalid type. Must be live, vod, or series', 400);
+                }
+
+                $modelClass = $this->getModelClass($type);
+                $stream = $modelClass::find($id);
+            } else {
+                // Try to find in all stream types
+                $stream = LiveStream::find($id)
+                       ?? VodStream::find($id)
+                       ?? Series::find($id);
+            }
 
             if (!$stream) {
                 return $this->jsonError($response, 'Stream not found', 404);

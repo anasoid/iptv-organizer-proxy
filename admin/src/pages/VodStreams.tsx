@@ -30,6 +30,7 @@ export default function VodStreams() {
   const [limit] = useState(20);
   const [view, setView] = useState<ViewMode>('list');
   const [searchQuery, setSearchQuery] = useState('');
+  const [streamId, setStreamId] = useState('');
 
   // Initialize selected category from sessionStorage if available
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(() => {
@@ -41,13 +42,13 @@ export default function VodStreams() {
     return null;
   });
 
-  // Fetch VOD streams with optional category filter and search
+  // Fetch VOD streams with optional category filter, search, and stream_id
   const { data: streamsData, isLoading: isLoadingStreams, error: streamsError } = useQuery({
-    queryKey: ['streams-vod', sourceId, selectedCategoryId, page, limit, searchQuery],
+    queryKey: ['streams-vod', sourceId, selectedCategoryId, page, limit, searchQuery, streamId],
     queryFn: () => {
       if (!sourceId) return Promise.resolve(null);
-      console.log('Fetching VOD with:', { sourceId, selectedCategoryId, page, limit, searchQuery });
-      return streamsApi.getVodStreams(sourceId, selectedCategoryId || undefined, page, limit, searchQuery || undefined);
+      console.log('Fetching VOD with:', { sourceId, selectedCategoryId, page, limit, searchQuery, streamId });
+      return streamsApi.getVodStreams(sourceId, selectedCategoryId || undefined, page, limit, searchQuery || undefined, streamId || undefined);
     },
     enabled: isAuthenticated && sourceId !== null,
   });
@@ -94,6 +95,7 @@ export default function VodStreams() {
 
   const columns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 70 },
+    { field: 'stream_id', headerName: 'Stream ID', width: 100 },
     { field: 'name', headerName: 'Name', width: 200, flex: 1 },
     {
       field: 'category_id',
@@ -155,7 +157,7 @@ export default function VodStreams() {
 
       {/* Source Selector and Search Bar */}
       <Card sx={{ mb: 3, p: 2 }}>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <Box sx={{ flex: '0 0 auto', minWidth: 300 }}>
             <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
               Filter by Source
@@ -172,17 +174,30 @@ export default function VodStreams() {
           </Box>
 
           {sourceId && (
-            <TextField
-              placeholder="Search by stream name..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setPage(1);
-              }}
-              size="small"
-              variant="outlined"
-              sx={{ flex: '1 1 auto', minWidth: 200 }}
-            />
+            <>
+              <TextField
+                placeholder="Search by stream name..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(1);
+                }}
+                size="small"
+                variant="outlined"
+                sx={{ flex: '1 1 auto', minWidth: 200 }}
+              />
+              <TextField
+                placeholder="Filter by stream ID..."
+                value={streamId}
+                onChange={(e) => {
+                  setStreamId(e.target.value);
+                  setPage(1);
+                }}
+                size="small"
+                variant="outlined"
+                sx={{ flex: '1 1 auto', minWidth: 200 }}
+              />
+            </>
           )}
         </Box>
       </Card>

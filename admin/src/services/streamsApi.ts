@@ -44,12 +44,13 @@ interface StreamsParams {
   limit: number;
   category_id?: number;
   search?: string;
+  stream_id?: number | string;
 }
 
 class StreamsApi {
   /**
    * Get all streams by source and type (paginated)
-   * Optional filter by category_id and search by name
+   * Optional filter by category_id, search by name, and stream_id
    */
   async getStreams(
     sourceId: number,
@@ -57,7 +58,8 @@ class StreamsApi {
     categoryId?: number,
     page: number = 1,
     limit: number = 20,
-    search?: string
+    search?: string,
+    streamId?: number | string
   ) {
     const params: StreamsParams = { source_id: sourceId, type, page, limit };
     if (categoryId) {
@@ -66,38 +68,45 @@ class StreamsApi {
     if (search) {
       params.search = search;
     }
+    if (streamId !== undefined && streamId !== '') {
+      params.stream_id = streamId;
+    }
 
     const response = await api.get('/streams', { params });
     return response.data as StreamsListResponse;
   }
 
   /**
-   * Get single stream by ID
+   * Get single stream by ID and type
    */
-  async getStream(id: number) {
-    const response = await api.get(`/streams/${id}`);
+  async getStream(id: number, type?: StreamType) {
+    const params: Record<string, string> = {};
+    if (type) {
+      params.type = type;
+    }
+    const response = await api.get(`/streams/${id}`, { params });
     return response.data as StreamResponse;
   }
 
   /**
    * Get live streams
    */
-  async getLiveStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20, search?: string) {
-    return this.getStreams(sourceId, 'live', categoryId, page, limit, search);
+  async getLiveStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20, search?: string, streamId?: number | string) {
+    return this.getStreams(sourceId, 'live', categoryId, page, limit, search, streamId);
   }
 
   /**
    * Get VOD streams
    */
-  async getVodStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20, search?: string) {
-    return this.getStreams(sourceId, 'vod', categoryId, page, limit, search);
+  async getVodStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20, search?: string, streamId?: number | string) {
+    return this.getStreams(sourceId, 'vod', categoryId, page, limit, search, streamId);
   }
 
   /**
    * Get series streams
    */
-  async getSeriesStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20, search?: string) {
-    return this.getStreams(sourceId, 'series', categoryId, page, limit, search);
+  async getSeriesStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20, search?: string, streamId?: number | string) {
+    return this.getStreams(sourceId, 'series', categoryId, page, limit, search, streamId);
   }
 }
 

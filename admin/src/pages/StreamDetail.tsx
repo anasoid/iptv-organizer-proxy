@@ -39,8 +39,8 @@ export default function StreamDetail() {
 
   // Fetch stream details
   const { data: streamData, isLoading: isLoadingStream, error: streamError } = useQuery({
-    queryKey: ['stream', streamId],
-    queryFn: () => (streamId ? streamsApi.getStream(streamId) : Promise.resolve(null)),
+    queryKey: ['stream', streamId, streamType],
+    queryFn: () => (streamId ? streamsApi.getStream(streamId, streamType) : Promise.resolve(null)),
     enabled: isAuthenticated && streamId !== null,
   });
 
