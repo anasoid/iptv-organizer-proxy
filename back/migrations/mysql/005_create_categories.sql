@@ -13,8 +13,6 @@ CREATE TABLE IF NOT EXISTS categories (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     UNIQUE KEY uk_source_category (source_id, category_id, category_type),
-    INDEX idx_source_id (source_id),
-    INDEX idx_category_type (category_type),
     INDEX idx_source_category_num (source_id, category_type, num),
     INDEX idx_parent_id (parent_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

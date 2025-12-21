@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS sources (
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_is_active (is_active),
-    INDEX idx_sync_status (sync_status),
+    INDEX idx_is_active_status (is_active, sync_status),
     INDEX idx_next_sync (next_sync)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

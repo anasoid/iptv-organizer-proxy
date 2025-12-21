@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS live_streams (
     UNIQUE(source_id, stream_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_live_streams_source_category ON live_streams(source_id, category_id);
+CREATE INDEX IF NOT EXISTS idx_live_streams_source_category_num ON live_streams(source_id, category_id, num);
 CREATE INDEX IF NOT EXISTS idx_live_streams_source_num ON live_streams(source_id, num);
 
 -- Trigger to update updated_at timestamp

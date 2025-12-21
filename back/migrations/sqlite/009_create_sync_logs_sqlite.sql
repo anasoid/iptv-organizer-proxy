@@ -16,7 +16,5 @@ CREATE TABLE IF NOT EXISTS sync_logs (
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_sync_logs_source_id ON sync_logs(source_id);
-CREATE INDEX IF NOT EXISTS idx_sync_logs_sync_type ON sync_logs(sync_type);
-CREATE INDEX IF NOT EXISTS idx_sync_logs_status ON sync_logs(status);
-CREATE INDEX IF NOT EXISTS idx_sync_logs_started_at ON sync_logs(started_at);
+CREATE INDEX IF NOT EXISTS idx_sync_logs_source_status_started ON sync_logs(source_id, status, started_at);
+CREATE INDEX IF NOT EXISTS idx_sync_logs_status_started ON sync_logs(status, started_at);

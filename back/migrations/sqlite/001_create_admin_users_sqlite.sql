@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
     last_login TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_admin_username ON admin_users(username);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_admin_username ON admin_users(username);
 CREATE INDEX IF NOT EXISTS idx_admin_is_active ON admin_users(is_active);
 
 -- Trigger to update updated_at timestamp

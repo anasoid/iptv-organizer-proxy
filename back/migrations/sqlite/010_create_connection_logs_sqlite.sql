@@ -11,7 +11,5 @@ CREATE TABLE IF NOT EXISTS connection_logs (
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_connection_logs_client_id ON connection_logs(client_id);
-CREATE INDEX IF NOT EXISTS idx_connection_logs_action ON connection_logs(action);
-CREATE INDEX IF NOT EXISTS idx_connection_logs_created_at ON connection_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_connection_logs_client_created ON connection_logs(client_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_connection_logs_ip_address ON connection_logs(ip_address);

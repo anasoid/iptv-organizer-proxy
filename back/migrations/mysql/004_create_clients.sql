@@ -19,9 +19,8 @@ CREATE TABLE IF NOT EXISTS clients (
     last_login DATETIME NULL,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     FOREIGN KEY (filter_id) REFERENCES filters(id) ON DELETE SET NULL,
-    INDEX idx_username (username),
-    INDEX idx_source_id (source_id),
+    UNIQUE KEY uk_username (username),
+    INDEX idx_source_active (source_id, is_active),
     INDEX idx_filter_id (filter_id),
-    INDEX idx_is_active (is_active),
     INDEX idx_expiry_date (expiry_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

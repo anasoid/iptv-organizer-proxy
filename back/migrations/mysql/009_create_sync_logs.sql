@@ -14,8 +14,6 @@ CREATE TABLE IF NOT EXISTS sync_logs (
     error_message TEXT NULL,
     duration_seconds INTEGER DEFAULT 0,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
-    INDEX idx_source_id (source_id),
-    INDEX idx_sync_type (sync_type),
-    INDEX idx_status (status),
-    INDEX idx_started_at (started_at)
+    INDEX idx_source_status_started (source_id, status, started_at),
+    INDEX idx_status_started (status, started_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

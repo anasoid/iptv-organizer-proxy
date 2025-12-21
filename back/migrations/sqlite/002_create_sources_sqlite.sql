@@ -16,8 +16,7 @@ CREATE TABLE IF NOT EXISTS sources (
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_sources_is_active ON sources(is_active);
-CREATE INDEX IF NOT EXISTS idx_sources_sync_status ON sources(sync_status);
+CREATE INDEX IF NOT EXISTS idx_sources_is_active_status ON sources(is_active, sync_status);
 CREATE INDEX IF NOT EXISTS idx_sources_next_sync ON sources(next_sync);
 
 -- Trigger to update updated_at timestamp

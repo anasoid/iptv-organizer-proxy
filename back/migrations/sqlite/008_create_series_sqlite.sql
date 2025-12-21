@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS series (
     UNIQUE(source_id, stream_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_series_source_category ON series(source_id, category_id);
+CREATE INDEX IF NOT EXISTS idx_series_source_category_num ON series(source_id, category_id, num);
 CREATE INDEX IF NOT EXISTS idx_series_source_num ON series(source_id, num);
 
 -- Trigger to update updated_at timestamp

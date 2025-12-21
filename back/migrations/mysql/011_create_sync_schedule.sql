@@ -12,7 +12,5 @@ CREATE TABLE IF NOT EXISTS sync_schedule (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     UNIQUE KEY unique_source_task (source_id, task_type),
-    INDEX idx_source_id (source_id),
-    INDEX idx_task_type (task_type),
     INDEX idx_next_sync (next_sync)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

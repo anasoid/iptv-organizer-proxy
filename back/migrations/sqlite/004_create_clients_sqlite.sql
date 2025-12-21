@@ -21,10 +21,9 @@ CREATE TABLE IF NOT EXISTS clients (
     FOREIGN KEY (filter_id) REFERENCES filters(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_clients_username ON clients(username);
-CREATE INDEX IF NOT EXISTS idx_clients_source_id ON clients(source_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_clients_username ON clients(username);
+CREATE INDEX IF NOT EXISTS idx_clients_source_active ON clients(source_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_clients_filter_id ON clients(filter_id);
-CREATE INDEX IF NOT EXISTS idx_clients_is_active ON clients(is_active);
 CREATE INDEX IF NOT EXISTS idx_clients_expiry_date ON clients(expiry_date);
 
 -- Trigger to update updated_at timestamp

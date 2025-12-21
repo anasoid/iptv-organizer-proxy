@@ -9,8 +9,6 @@ CREATE TABLE IF NOT EXISTS connection_logs (
     user_agent TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
-    INDEX idx_client_id (client_id),
-    INDEX idx_action (action),
-    INDEX idx_created_at (created_at),
+    INDEX idx_client_created (client_id, created_at),
     INDEX idx_ip_address (ip_address)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

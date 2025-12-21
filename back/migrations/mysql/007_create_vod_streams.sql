@@ -16,6 +16,6 @@ CREATE TABLE IF NOT EXISTS vod_streams (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     UNIQUE KEY uk_source_stream (source_id, stream_id),
-    INDEX idx_source_category (source_id, category_id),
+    INDEX idx_source_category_num (source_id, category_id, num),
     INDEX idx_source_num (source_id, num)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

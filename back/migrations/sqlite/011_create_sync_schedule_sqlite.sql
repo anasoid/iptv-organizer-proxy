@@ -14,8 +14,6 @@ CREATE TABLE IF NOT EXISTS sync_schedule (
     UNIQUE(source_id, task_type)
 );
 
-CREATE INDEX IF NOT EXISTS idx_sync_schedule_source_id ON sync_schedule(source_id);
-CREATE INDEX IF NOT EXISTS idx_sync_schedule_task_type ON sync_schedule(task_type);
 CREATE INDEX IF NOT EXISTS idx_sync_schedule_next_sync ON sync_schedule(next_sync);
 
 -- Trigger to auto-update updated_at

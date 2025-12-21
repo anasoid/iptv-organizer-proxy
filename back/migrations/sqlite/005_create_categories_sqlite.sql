@@ -15,7 +15,5 @@ CREATE TABLE IF NOT EXISTS categories (
     UNIQUE(source_id, category_id, category_type)
 );
 
-CREATE INDEX IF NOT EXISTS idx_categories_source_id ON categories(source_id);
-CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
 CREATE INDEX IF NOT EXISTS idx_categories_source_category_num ON categories(source_id, category_type, num);
 CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);
