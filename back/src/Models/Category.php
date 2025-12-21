@@ -49,7 +49,7 @@ class Category extends BaseModel
         return static::findAll([
             'source_id' => $sourceId,
             'category_type' => $type,
-        ], [], $limit, $offset);
+        ], ['num' => 'ASC'], $limit, $offset);
     }
 
     /**

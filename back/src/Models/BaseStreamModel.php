@@ -49,7 +49,7 @@ abstract class BaseStreamModel extends BaseModel
      */
     public static function getBySource(int $sourceId, ?int $limit = null, int $offset = 0): array
     {
-        return static::findAll(['source_id' => $sourceId], [], $limit, $offset);
+        return static::findAll(['source_id' => $sourceId], ['num' => 'ASC'], $limit, $offset);
     }
 
     /**
@@ -66,7 +66,7 @@ abstract class BaseStreamModel extends BaseModel
         return static::findAll([
             'source_id' => $sourceId,
             'category_id' => $categoryId,
-        ], [], $limit, $offset);
+        ], ['num' => 'ASC'], $limit, $offset);
     }
 
     /**
