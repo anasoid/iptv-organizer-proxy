@@ -9,13 +9,10 @@ import {
   Alert,
   Button,
   Divider,
-  Tab,
-  Tabs,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import categoriesApi from '../services/categoriesApi';
 import streamsApi from '../services/streamsApi';
@@ -24,7 +21,6 @@ export default function CategoryDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
-  const [tabValue, setTabValue] = useState(0);
 
   const categoryId = id ? parseInt(id, 10) : null;
 
@@ -37,37 +33,27 @@ export default function CategoryDetail() {
 
   const category = categoryData?.data;
 
-  // Fetch related streams (all types)
-  const { data: liveStreamsData } = useQuery({
-    queryKey: ['category-live-streams', category?.source_id, category?.id],
-    queryFn: () =>
-      category
-        ? streamsApi.getLiveStreams(category.source_id, category.id)
-        : Promise.resolve(null),
-    enabled: isAuthenticated && !!category && tabValue === 0,
+  // Fetch streams only for the same type as the category
+  const { data: streamsData, isLoading: isLoadingStreams } = useQuery({
+    queryKey: ['category-streams', category?.source_id, category?.category_id, category?.category_type],
+    queryFn: () => {
+      if (!category) return Promise.resolve(null);
+      const categoryId = typeof category.category_id === 'string' ? parseInt(category.category_id, 10) : category.category_id;
+      switch (category.category_type) {
+        case 'live':
+          return streamsApi.getLiveStreams(category.source_id, categoryId);
+        case 'vod':
+          return streamsApi.getVodStreams(category.source_id, categoryId);
+        case 'series':
+          return streamsApi.getSeriesStreams(category.source_id, categoryId);
+        default:
+          return Promise.resolve(null);
+      }
+    },
+    enabled: isAuthenticated && !!category,
   });
 
-  const { data: vodStreamsData } = useQuery({
-    queryKey: ['category-vod-streams', category?.source_id, category?.id],
-    queryFn: () =>
-      category
-        ? streamsApi.getVodStreams(category.source_id, category.id)
-        : Promise.resolve(null),
-    enabled: isAuthenticated && !!category && tabValue === 1,
-  });
-
-  const { data: seriesStreamsData } = useQuery({
-    queryKey: ['category-series-streams', category?.source_id, category?.id],
-    queryFn: () =>
-      category
-        ? streamsApi.getSeriesStreams(category.source_id, category.id)
-        : Promise.resolve(null),
-    enabled: isAuthenticated && !!category && tabValue === 2,
-  });
-
-  const liveStreams = liveStreamsData?.data || [];
-  const vodStreams = vodStreamsData?.data || [];
-  const seriesStreams = seriesStreamsData?.data || [];
+  const streams = streamsData?.data || [];
 
   const getCategoryTypeColor = (
     type: string
@@ -211,102 +197,50 @@ export default function CategoryDetail() {
         </Grid>
       </Card>
 
-      {/* Streams by Type */}
+      {/* Streams for this category type */}
       <Card>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={(_, value) => setTabValue(value)}>
-            <Tab label={`Live Streams (${liveStreamsData?.pagination?.total || 0})`} />
-            <Tab label={`VOD Streams (${vodStreamsData?.pagination?.total || 0})`} />
-            <Tab label={`Series (${seriesStreamsData?.pagination?.total || 0})`} />
-          </Tabs>
-        </Box>
+        <Box sx={{ p: 3 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            {category.category_type === 'live'
+              ? 'Live Streams'
+              : category.category_type === 'vod'
+                ? 'VOD Streams'
+                : 'Series'}{' '}
+            ({streamsData?.pagination?.total || 0})
+          </Typography>
 
-        <Box sx={{ p: 2 }}>
-          {/* Live Streams Tab */}
-          {tabValue === 0 && (
-            <>
-              {liveStreams.length === 0 ? (
-                <Alert severity="info">No live streams in this category.</Alert>
-              ) : (
-                <Box sx={{ height: 400, width: '100%' }}>
-                  <DataGrid
-                    rows={liveStreams}
-                    columns={streamColumns}
-                    pageSizeOptions={[10, 20, 50]}
-                    disableSelectionOnClick
-                    onRowClick={(params) => {
-                      sessionStorage.setItem('streamDetailReferrer', window.location.pathname);
-                      navigate(`/streams/${params.row.id}/live`);
-                    }}
-                    sx={{
-                      '& .MuiDataGrid-cell': { py: 1 },
-                      '& .MuiDataGrid-row': { cursor: 'pointer' },
-                    }}
-                    initialState={{
-                      pagination: { paginationModel: { pageSize: 10 } },
-                    }}
-                  />
-                </Box>
-              )}
-            </>
+          {isLoadingStreams && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+              <CircularProgress />
+            </Box>
           )}
 
-          {/* VOD Streams Tab */}
-          {tabValue === 1 && (
-            <>
-              {vodStreams.length === 0 ? (
-                <Alert severity="info">No VOD streams in this category.</Alert>
-              ) : (
-                <Box sx={{ height: 400, width: '100%' }}>
-                  <DataGrid
-                    rows={vodStreams}
-                    columns={streamColumns}
-                    pageSizeOptions={[10, 20, 50]}
-                    disableSelectionOnClick
-                    onRowClick={(params) => {
-                      sessionStorage.setItem('streamDetailReferrer', window.location.pathname);
-                      navigate(`/streams/${params.row.id}/vod`);
-                    }}
-                    sx={{
-                      '& .MuiDataGrid-cell': { py: 1 },
-                      '& .MuiDataGrid-row': { cursor: 'pointer' },
-                    }}
-                    initialState={{
-                      pagination: { paginationModel: { pageSize: 10 } },
-                    }}
-                  />
-                </Box>
-              )}
-            </>
+          {!isLoadingStreams && streams.length === 0 && (
+            <Alert severity="info">
+              No {category.category_type === 'live' ? 'live streams' : category.category_type === 'vod' ? 'VOD streams' : 'series'} in this category.
+            </Alert>
           )}
 
-          {/* Series Tab */}
-          {tabValue === 2 && (
-            <>
-              {seriesStreams.length === 0 ? (
-                <Alert severity="info">No series in this category.</Alert>
-              ) : (
-                <Box sx={{ height: 400, width: '100%' }}>
-                  <DataGrid
-                    rows={seriesStreams}
-                    columns={streamColumns}
-                    pageSizeOptions={[10, 20, 50]}
-                    disableSelectionOnClick
-                    onRowClick={(params) => {
-                      sessionStorage.setItem('streamDetailReferrer', window.location.pathname);
-                      navigate(`/streams/${params.row.id}/series`);
-                    }}
-                    sx={{
-                      '& .MuiDataGrid-cell': { py: 1 },
-                      '& .MuiDataGrid-row': { cursor: 'pointer' },
-                    }}
-                    initialState={{
-                      pagination: { paginationModel: { pageSize: 10 } },
-                    }}
-                  />
-                </Box>
-              )}
-            </>
+          {!isLoadingStreams && streams.length > 0 && (
+            <Box sx={{ height: 500, width: '100%' }}>
+              <DataGrid
+                rows={streams}
+                columns={streamColumns}
+                pageSizeOptions={[10, 20, 50]}
+                disableSelectionOnClick
+                onRowClick={(params) => {
+                  sessionStorage.setItem('streamDetailReferrer', window.location.pathname);
+                  navigate(`/streams/${params.row.id}/${category.category_type}`);
+                }}
+                sx={{
+                  '& .MuiDataGrid-cell': { py: 1 },
+                  '& .MuiDataGrid-row': { cursor: 'pointer' },
+                }}
+                initialState={{
+                  pagination: { paginationModel: { pageSize: 10 } },
+                }}
+              />
+            </Box>
           )}
         </Box>
       </Card>
