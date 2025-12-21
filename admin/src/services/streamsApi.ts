@@ -9,6 +9,7 @@ export interface Stream {
   id: number;
   source_id: number;
   stream_id: string | number;
+  num: number;
   name: string;
   category_id: string | number | null;
   category_ids?: string | number[] | null;

@@ -33,7 +33,7 @@ export default function SourceDetail() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
   const [syncingTask, setSyncingTask] = useState<string | null>(null);
-  const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error' | 'warning'; message: string } | null>(null);
 
   const { data: source, isLoading, error } = useQuery({
     queryKey: ['source', id],
@@ -48,11 +48,20 @@ export default function SourceDetail() {
       setSyncingTask(taskType);
       setSyncMessage(null);
     },
-    onSuccess: () => {
-      setSyncMessage({
-        type: 'success',
-        message: 'Synchronization completed successfully!',
-      });
+    onSuccess: (data: any) => {
+      // Check if the response indicates success or an error
+      if (data?.success === false) {
+        // Sync is already running or other conflict
+        setSyncMessage({
+          type: 'warning',
+          message: data?.message || 'Synchronization could not complete',
+        });
+      } else {
+        setSyncMessage({
+          type: 'success',
+          message: 'Synchronization completed successfully!',
+        });
+      }
       setSyncingTask(null);
     },
     onError: (error: ApiErrorResponse) => {
@@ -70,11 +79,20 @@ export default function SourceDetail() {
       setSyncingTask('all');
       setSyncMessage(null);
     },
-    onSuccess: () => {
-      setSyncMessage({
-        type: 'success',
-        message: 'Full synchronization completed successfully!',
-      });
+    onSuccess: (data: any) => {
+      // Check if the response indicates success or an error
+      if (data?.success === false) {
+        // One or more sync tasks are already running
+        setSyncMessage({
+          type: 'warning',
+          message: data?.message || 'Full synchronization could not complete',
+        });
+      } else {
+        setSyncMessage({
+          type: 'success',
+          message: 'Full synchronization completed successfully!',
+        });
+      }
       setSyncingTask(null);
     },
     onError: (error: ApiErrorResponse) => {

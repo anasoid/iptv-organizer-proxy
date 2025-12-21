@@ -86,6 +86,7 @@ export default function CategoryDetail() {
 
   const streamColumns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 70 },
+    { field: 'stream_id', headerName: 'Stream ID', width: 100 },
     { field: 'name', headerName: 'Name', width: 200, flex: 1 },
     {
       field: 'is_adult',
@@ -162,6 +163,13 @@ export default function CategoryDetail() {
             <Typography variant="body1" sx={{ textTransform: 'capitalize' }}>
               {category.category_type}
             </Typography>
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+              Order Number
+            </Typography>
+            <Chip label={`#${category.num}`} color="primary" variant="outlined" />
           </Grid>
 
           {category.parent_id && (

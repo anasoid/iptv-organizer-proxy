@@ -60,6 +60,7 @@ export default function Categories() {
 
   const columns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 70 },
+    { field: 'num', headerName: 'Order', width: 80 },
     { field: 'category_name', headerName: 'Name', width: 200, flex: 1 },
     {
       field: 'category_type',
@@ -93,9 +94,12 @@ export default function Categories() {
       }}
     >
       <CardContent sx={{ flexGrow: 1 }}>
-        <Typography variant="subtitle2" component="div" sx={{ fontWeight: 600, mb: 1, minHeight: '2.4em' }}>
-          {category.category_name}
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+          <Typography variant="subtitle2" component="div" sx={{ fontWeight: 600, flex: 1, minHeight: '2.4em' }}>
+            {category.category_name}
+          </Typography>
+          <Chip label={`#${category.num}`} size="small" color="primary" variant="outlined" sx={{ ml: 1 }} />
+        </Box>
 
         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
           ID: {category.category_id}

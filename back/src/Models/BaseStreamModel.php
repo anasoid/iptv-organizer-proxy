@@ -15,6 +15,7 @@ use RuntimeException;
  * @property int $id
  * @property int $source_id
  * @property int|string $stream_id
+ * @property int $num Order number assigned during synchronization (starting from 1)
  * @property string $name
  * @property string|null $category_id
  * @property string|null $category_ids
@@ -29,6 +30,7 @@ abstract class BaseStreamModel extends BaseModel
     protected array $fillable = [
         'source_id',
         'stream_id',
+        'num',
         'name',
         'category_id',
         'category_ids',

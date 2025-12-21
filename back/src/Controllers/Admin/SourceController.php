@@ -380,6 +380,18 @@ class SourceController
             $method = $methodMap[$taskType];
             $result = $syncService->$method();
 
+            // Check if sync returned an error (e.g., already running)
+            if (isset($result['error'])) {
+                return $this->jsonResponse($response, [
+                    'success' => false,
+                    'message' => $result['error'],
+                    'data' => $result,
+                ], 409); // 409 Conflict status code
+            }
+
+            // Sync completed successfully - update status to idle
+            $source->updateSyncStatus('idle');
+
             return $this->jsonResponse($response, [
                 'success' => true,
                 'message' => "Sync completed for {$taskType}",
@@ -387,6 +399,8 @@ class SourceController
             ]);
 
         } catch (\Throwable $e) {
+            // Sync failed - update status to error
+            $source->updateSyncStatus('error');
             return $this->jsonError($response, 'Sync failed: ' . $e->getMessage(), 500);
         }
     }
@@ -453,15 +467,34 @@ class SourceController
 
             // Check if any task had an error
             $hasErrors = false;
-            foreach ($results as $result) {
+            $errorMessage = '';
+            foreach ($results as $taskType => $result) {
                 if (isset($result['error'])) {
                     $hasErrors = true;
-                    break;
+                    if (empty($errorMessage)) {
+                        $errorMessage = "{$taskType}: {$result['error']}";
+                    }
                 }
             }
 
+            // If there are errors, update status to error and return
+            if ($hasErrors) {
+                $source->updateSyncStatus('error');
+                return $this->jsonResponse($response, [
+                    'success' => false,
+                    'message' => $errorMessage,
+                    'data' => [
+                        'results' => $results,
+                        'summary' => $totalStats,
+                    ],
+                ], 409); // 409 Conflict status code
+            }
+
+            // All syncs completed successfully - update status to idle
+            $source->updateSyncStatus('idle');
+
             return $this->jsonResponse($response, [
-                'success' => !$hasErrors,
+                'success' => true,
                 'message' => 'Sync all completed',
                 'data' => [
                     'results' => $results,
@@ -470,6 +503,8 @@ class SourceController
             ]);
 
         } catch (\Throwable $e) {
+            // Sync failed - update status to error
+            $source->updateSyncStatus('error');
             return $this->jsonError($response, 'Sync all failed: ' . $e->getMessage(), 500);
         }
     }

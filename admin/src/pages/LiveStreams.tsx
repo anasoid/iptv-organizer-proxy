@@ -86,6 +86,7 @@ export default function LiveStreams() {
 
   const columns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 70 },
+    { field: 'num', headerName: 'Order', width: 80 },
     { field: 'stream_id', headerName: 'Stream ID', width: 100 },
     { field: 'name', headerName: 'Name', width: 200, flex: 1 },
     {

@@ -16,6 +16,7 @@ use RuntimeException;
  * @property int|string $category_id
  * @property string $category_name
  * @property string $category_type
+ * @property int $num Order number assigned during synchronization (starting from 1)
  * @property int|null $parent_id
  * @property string|null $labels
  * @property string $created_at
@@ -28,6 +29,7 @@ class Category extends BaseModel
         'category_id',
         'category_name',
         'category_type',
+        'num',
         'parent_id',
         'labels',
     ];

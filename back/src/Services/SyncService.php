@@ -57,28 +57,65 @@ class SyncService
     }
 
     /**
-     * Check if sync is already running for this source and type
+     * Check if any sync is currently running for this source
+     * Also handles expired syncs (running for more than 5 minutes)
+     * Optimized: Loads only the first (oldest) sync from database per check
      *
-     * @param string $syncType
-     * @return bool
+     * @param string $syncType The current sync type being checked
+     * @return bool True if an active sync is running, false otherwise
      */
     private function isSyncRunning(string $syncType): bool
     {
-        $runningSyncs = SyncLog::findAll([
-            'source_id' => $this->source->id,
-            'sync_type' => $syncType,
-            'status' => 'running',
-        ]);
+        $currentTime = time();
+        $fiveMinutesAgo = $currentTime - 300;
 
-        if (!empty($runningSyncs)) {
-            $this->logger->warning('Sync already running', [
-                'source_id' => $this->source->id,
-                'sync_type' => $syncType,
-            ]);
-            return true;
+        // Loop to check syncs one at a time (oldest first)
+        while (true) {
+            // Get only the first (oldest) running sync - minimal memory usage
+            $runningSyncs = SyncLog::findAll(
+                [
+                    'source_id' => $this->source->id,
+                    'status' => 'running',
+                ],
+                ['started_at' => 'ASC'], // Order by oldest first
+                1 // Limit to 1 result
+            );
+
+            // No running syncs found
+            if (empty($runningSyncs)) {
+                return false;
+            }
+
+            $syncLog = $runningSyncs[0];
+            $startedAt = strtotime($syncLog->started_at);
+
+            // Check if sync has expired (running for more than 5 minutes)
+            if ($startedAt < $fiveMinutesAgo) {
+                // Mark expired sync as failed and continue loop
+                $syncLog->status = 'failed';
+                $syncLog->error_message = 'Sync expired: running for more than 5 minutes';
+                $syncLog->save();
+
+                $this->logger->warning('Marking expired sync as failed', [
+                    'source_id' => $this->source->id,
+                    'sync_type' => $syncLog->sync_type,
+                    'elapsed_seconds' => $currentTime - $startedAt,
+                ]);
+
+                unset($syncLog, $runningSyncs);
+                // Loop continues to check next sync
+            } else {
+                // Found active non-expired sync - return true to block
+                $this->logger->warning('Sync already running', [
+                    'source_id' => $this->source->id,
+                    'sync_type' => $syncLog->sync_type,
+                    'current_type' => $syncType,
+                ]);
+
+                unset($syncLog, $runningSyncs);
+                return true;
+            }
         }
-
-        return false;
     }
 
     /**
@@ -119,6 +156,7 @@ class SyncService
 
             $categories = $getFn();
             $fetchedCategoryIds = [];
+            $categoryNum = 1; // Counter for ordering, starts from 1
 
             foreach ($categories as $categoryData) {
                 $categoryId = $categoryData['category_id'];
@@ -137,7 +175,7 @@ class SyncService
 
                 if (!empty($existingCategories)) {
                     $existing = $existingCategories[0];
-                    
+
                     // Only update if values changed
                     $hasChanges = false;
                     if ($existing->category_name !== $categoryData['category_name']) {
@@ -152,7 +190,12 @@ class SyncService
                         $existing->labels = $labels;
                         $hasChanges = true;
                     }
-                    
+                    // Always update the num field to maintain order
+                    if ($existing->num !== $categoryNum) {
+                        $existing->num = $categoryNum;
+                        $hasChanges = true;
+                    }
+
                     if ($hasChanges) {
                         $existing->save();
                         $stats['updated']++;
@@ -163,12 +206,14 @@ class SyncService
                     $category->category_id = $categoryId;
                     $category->category_name = $categoryData['category_name'];
                     $category->category_type = $categoryType;
+                    $category->num = $categoryNum;
                     $category->parent_id = $categoryData['parent_id'] ?? null;
                     $category->labels = $labels;
                     $category->save();
                     $stats['added']++;
                 }
-                
+
+                $categoryNum++; // Increment counter for next category
                 unset($categoryData, $existingCategories, $labels);
             }
 
@@ -275,6 +320,7 @@ class SyncService
 
             $streams = $this->client->streamLiveStreams();
             $fetchedStreamIds = [];
+            $streamNum = 1; // Counter for ordering, starts from 1
 
             foreach ($streams as $streamData) {
                 $streamId = $streamData['stream_id'] ?? $streamData['num'] ?? null;
@@ -353,7 +399,12 @@ class SyncService
                         $existing->data = $streamDataJson;
                         $hasChanges = true;
                     }
-                    
+                    // Always update the num field to maintain order
+                    if ($existing->num !== $streamNum) {
+                        $existing->num = $streamNum;
+                        $hasChanges = true;
+                    }
+
                     if ($hasChanges) {
                         $existing->save();
                         $stats['updated']++;
@@ -364,6 +415,7 @@ class SyncService
                     $stream = new LiveStream();
                     $stream->source_id = $this->source->id;
                     $stream->stream_id = $streamId;
+                    $stream->num = $streamNum;
                     $stream->name = $streamData['name'] ?? null;
                     $stream->category_id = $categoryId;
                     $stream->category_ids = $categoryIds;
@@ -374,7 +426,8 @@ class SyncService
                     $stats['added']++;
                     unset($stream);
                 }
-                
+
+                $streamNum++; // Increment counter for next stream
                 unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson);
             }
 
@@ -436,6 +489,7 @@ class SyncService
 
             $streams = $this->client->streamVodStreams();
             $fetchedStreamIds = [];
+            $streamNum = 1; // Counter for ordering, starts from 1
 
             foreach ($streams as $streamData) {
                 $streamId = $streamData['stream_id'] ?? $streamData['num'] ?? null;
@@ -514,7 +568,12 @@ class SyncService
                         $existing->data = $streamDataJson;
                         $hasChanges = true;
                     }
-                    
+                    // Always update the num field to maintain order
+                    if ($existing->num !== $streamNum) {
+                        $existing->num = $streamNum;
+                        $hasChanges = true;
+                    }
+
                     if ($hasChanges) {
                         $existing->save();
                         $stats['updated']++;
@@ -524,6 +583,7 @@ class SyncService
                     $stream = new VodStream();
                     $stream->source_id = $this->source->id;
                     $stream->stream_id = $streamId;
+                    $stream->num = $streamNum;
                     $stream->name = $streamData['name'] ?? null;
                     $stream->category_id = $categoryId;
                     $stream->category_ids = $categoryIds;
@@ -535,6 +595,7 @@ class SyncService
                     unset($stream);
                 }
 
+                $streamNum++; // Increment counter for next stream
                 unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson, $categoryId);
             }
 
@@ -596,6 +657,7 @@ class SyncService
 
             $seriesList = $this->client->streamSeries();
             $fetchedStreamIds = [];
+            $streamNum = 1; // Counter for ordering, starts from 1
 
             foreach ($seriesList as $streamData) {
                 $streamId = $streamData['series_id'] ?? $streamData['num'] ?? null;
@@ -674,7 +736,12 @@ class SyncService
                         $existing->data = $streamDataJson;
                         $hasChanges = true;
                     }
-                    
+                    // Always update the num field to maintain order
+                    if ($existing->num !== $streamNum) {
+                        $existing->num = $streamNum;
+                        $hasChanges = true;
+                    }
+
                     if ($hasChanges) {
                         $existing->save();
                         $stats['updated']++;
@@ -684,6 +751,7 @@ class SyncService
                     $stream = new Series();
                     $stream->source_id = $this->source->id;
                     $stream->stream_id = $streamId;
+                    $stream->num = $streamNum;
                     $stream->name = $streamData['name'] ?? null;
                     $stream->category_id = $categoryId;
                     $stream->category_ids = $categoryIds;
@@ -695,6 +763,7 @@ class SyncService
                     unset($stream);
                 }
 
+                $streamNum++; // Increment counter for next stream
                 unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson, $categoryId);
             }
 
