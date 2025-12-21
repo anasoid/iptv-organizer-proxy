@@ -45,7 +45,7 @@ class XtreamAuthenticator
         $this->password = $password;
 
         $this->httpClient = $httpClient ?? new Client([
-            'timeout' => 120,           // 2 minutes for request completion
+            'timeout' => 180,           // 2 minutes for request completion
             'connect_timeout' => 30,    // 30 seconds for initial connection
         ]);
 
