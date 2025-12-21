@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS series (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_id INTEGER NOT NULL,
     stream_id INTEGER NOT NULL, -- Functional series ID from source
+    num INTEGER DEFAULT 0, -- Order number assigned during synchronization (starting from 1)
     name TEXT NOT NULL,
     category_id INTEGER NOT NULL, -- Primary category ID
     category_ids TEXT, -- JSON array of all category IDs
@@ -18,6 +19,7 @@ CREATE TABLE IF NOT EXISTS series (
 );
 
 CREATE INDEX IF NOT EXISTS idx_series_source_category ON series(source_id, category_id);
+CREATE INDEX IF NOT EXISTS idx_series_source_num ON series(source_id, num);
 
 -- Trigger to update updated_at timestamp
 CREATE TRIGGER IF NOT EXISTS trg_series_updated_at

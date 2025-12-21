@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS live_streams (
     id INT AUTO_INCREMENT PRIMARY KEY,
     source_id INT NOT NULL,
     stream_id INT NOT NULL COMMENT 'Functional stream ID from source',
+    num INT DEFAULT 0 COMMENT 'Order number assigned during synchronization (starting from 1)',
     name VARCHAR(500) NOT NULL,
     category_id INT NOT NULL COMMENT 'Primary category ID',
     category_ids TEXT COMMENT 'JSON array of all category IDs',
@@ -15,5 +16,6 @@ CREATE TABLE IF NOT EXISTS live_streams (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     UNIQUE KEY uk_source_stream (source_id, stream_id),
-    INDEX idx_source_category (source_id, category_id)
+    INDEX idx_source_category (source_id, category_id),
+    INDEX idx_source_num (source_id, num)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

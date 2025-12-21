@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS live_streams (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_id INTEGER NOT NULL,
     stream_id INTEGER NOT NULL, -- Functional stream ID from source
+    num INTEGER DEFAULT 0, -- Order number assigned during synchronization (starting from 1)
     name TEXT NOT NULL,
     category_id INTEGER NOT NULL, -- Primary category ID
     category_ids TEXT, -- JSON array of all category IDs
@@ -18,6 +19,7 @@ CREATE TABLE IF NOT EXISTS live_streams (
 );
 
 CREATE INDEX IF NOT EXISTS idx_live_streams_source_category ON live_streams(source_id, category_id);
+CREATE INDEX IF NOT EXISTS idx_live_streams_source_num ON live_streams(source_id, num);
 
 -- Trigger to update updated_at timestamp
 CREATE TRIGGER IF NOT EXISTS trg_live_streams_updated_at
