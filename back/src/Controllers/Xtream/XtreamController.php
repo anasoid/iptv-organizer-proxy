@@ -204,9 +204,8 @@ class XtreamController
                 if (!$isFirst) {
                     $body->write(',');
                 }
-                // Include num field for proper ordering (categories returned already ordered by num from database)
+                // Categories are returned already ordered by num from database
                 $categoryData = [
-                    'num' => (int) ($category->getAttribute('num') ?? 0),
                     'category_id' => (string) $category->getAttribute('category_id'),
                     'category_name' => $category->getAttribute('category_name'),
                     'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
@@ -318,9 +317,8 @@ class XtreamController
                 if (!$isFirst) {
                     $body->write(',');
                 }
-                // Include num field for proper ordering (categories returned already ordered by num from database)
+                // Categories are returned already ordered by num from database
                 $categoryData = [
-                    'num' => (int) ($category->getAttribute('num') ?? 0),
                     'category_id' => (string) $category->getAttribute('category_id'),
                     'category_name' => $category->getAttribute('category_name'),
                     'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
@@ -396,9 +394,8 @@ class XtreamController
                 if (!$isFirst) {
                     $body->write(',');
                 }
-                // Include num field for proper ordering (categories returned already ordered by num from database)
+                // Categories are returned already ordered by num from database
                 $categoryData = [
-                    'num' => (int) ($category->getAttribute('num') ?? 0),
                     'category_id' => (string) $category->getAttribute('category_id'),
                     'category_name' => $category->getAttribute('category_name'),
                     'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
