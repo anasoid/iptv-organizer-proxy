@@ -204,7 +204,9 @@ class XtreamController
                 if (!$isFirst) {
                     $body->write(',');
                 }
+                // Include num field for proper ordering (categories returned already ordered by num from database)
                 $categoryData = [
+                    'num' => (int) ($category->getAttribute('num') ?? 0),
                     'category_id' => (string) $category->getAttribute('category_id'),
                     'category_name' => $category->getAttribute('category_name'),
                     'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
@@ -213,8 +215,14 @@ class XtreamController
                 $isFirst = false;
             }
 
+            // Check if this was the last page before releasing memory
+            $categoryCount = count($allowedCategories);
+
+            // Memory optimization: Release objects from current batch before loading next batch
+            unset($allowedCategories);
+
             // If we got fewer items than page size, we're done
-            if (count($allowedCategories) < $pageSize) {
+            if ($categoryCount < $pageSize) {
                 break;
             }
 
@@ -310,7 +318,9 @@ class XtreamController
                 if (!$isFirst) {
                     $body->write(',');
                 }
+                // Include num field for proper ordering (categories returned already ordered by num from database)
                 $categoryData = [
+                    'num' => (int) ($category->getAttribute('num') ?? 0),
                     'category_id' => (string) $category->getAttribute('category_id'),
                     'category_name' => $category->getAttribute('category_name'),
                     'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
@@ -319,8 +329,14 @@ class XtreamController
                 $isFirst = false;
             }
 
+            // Check if this was the last page before releasing memory
+            $categoryCount = count($allowedCategories);
+
+            // Memory optimization: Release objects from current batch before loading next batch
+            unset($allowedCategories);
+
             // If we got fewer items than page size, we're done
-            if (count($allowedCategories) < $pageSize) {
+            if ($categoryCount < $pageSize) {
                 break;
             }
 
@@ -380,7 +396,9 @@ class XtreamController
                 if (!$isFirst) {
                     $body->write(',');
                 }
+                // Include num field for proper ordering (categories returned already ordered by num from database)
                 $categoryData = [
+                    'num' => (int) ($category->getAttribute('num') ?? 0),
                     'category_id' => (string) $category->getAttribute('category_id'),
                     'category_name' => $category->getAttribute('category_name'),
                     'parent_id' => (int) ($category->getAttribute('parent_id') ?? 0),
@@ -389,8 +407,14 @@ class XtreamController
                 $isFirst = false;
             }
 
+            // Check if this was the last page before releasing memory
+            $categoryCount = count($allowedCategories);
+
+            // Memory optimization: Release objects from current batch before loading next batch
+            unset($allowedCategories);
+
             // If we got fewer items than page size, we're done
-            if (count($allowedCategories) < $pageSize) {
+            if ($categoryCount < $pageSize) {
                 break;
             }
 
@@ -692,11 +716,10 @@ class XtreamController
         $filterService = new FilterService($filter, (bool) $client->getAttribute('hide_adult_content'));
 
         $isFirst = true;
-        $num = 1;
 
-        // Load streams with pagination and stream them
+        // Load streams with pagination and stream them (maintains num ordering from database)
         while (true) {
-            // Query streams from database with pagination
+            // Query streams from database with pagination (already ordered by num ASC)
             if ($categoryId !== null && $categoryId < 100000) {
                 // Regular category filter
                 $streams = $modelClass::getByCategory($sourceId, $categoryId, $pageSize, $offset);
@@ -709,41 +732,51 @@ class XtreamController
                 break;
             }
 
-            // Apply filtering to this batch (FilterService needs objects to lookup category info, returns arrays)
+            // Apply filtering to this batch (FilterService returns arrays, maintains num ordering)
             $filteredArrays = $filterService->applyToStreams($streams, $categoryId);
 
-            // Build a map of stream_id to original stream object for data extraction
-            $streamMap = [];
+            // Memory optimization: Build minimal map for current batch only (for data field extraction)
+            $streamDataMap = [];
             foreach ($streams as $stream) {
-                $streamMap[$stream->getAttribute('stream_id')] = $stream;
+                $streamDataMap[$stream->getAttribute('stream_id')] = [
+                    'data' => $stream->getAttribute('data') ?? '{}',
+                    'source_id' => $stream->getAttribute('source_id'),
+                ];
             }
 
             // Convert filtered result arrays to complete Xtream format and stream
+            // Streams maintain their 'num' ordering from database through FilterService
             foreach ($filteredArrays as $streamArray) {
                 if (!$isFirst) {
                     $body->write(',');
                 }
 
                 $streamId = (int) ($streamArray['stream_id'] ?? 0);
-                $originalStream = $streamMap[$streamId] ?? null;
+                $streamData = $streamDataMap[$streamId] ?? null;
 
-                // Parse the JSON data field from database
+                // Parse the JSON data field once per stream
                 $dataJson = [];
-                if ($originalStream && !empty($originalStream->getAttribute('data'))) {
-                    $dataJson = json_decode($originalStream->getAttribute('data'), true) ?? [];
+                if ($streamData && !empty($streamData['data'])) {
+                    $dataJson = json_decode($streamData['data'], true) ?? [];
+                }
+
+                // Pre-decode category_ids if needed (may be JSON string from database)
+                $categoryIds = [];
+                if (!empty($streamArray['category_ids'])) {
+                    $categoryIds = is_array($streamArray['category_ids'])
+                        ? $streamArray['category_ids']
+                        : (json_decode($streamArray['category_ids'], true) ?? []);
                 }
 
                 // Build complete Xtream response with all fields
-                // Database fields (direct from model):
+                // Use 'num' from stream array to maintain database ordering
                 $xtreamData = [
-                    'num' => $num,
-                    'source_id' => $originalStream->getAttribute('source_id') ?? null,
-                    'stream_id' => (int) $streamId,
+                    'num' => (int) $streamArray['num'],
+                    'source_id' => $streamData['source_id'] ?? null,
+                    'stream_id' => $streamId,
                     'name' => $streamArray['name'] ?? '',
                     'category_id' => (int) ($streamArray['category_id'] ?? 0),
-                    'category_ids' => !empty($streamArray['category_ids'])
-                        ? json_decode($streamArray['category_ids'], true)
-                        : [],
+                    'category_ids' => $categoryIds,
                     'is_adult' => (int) ($streamArray['is_adult'] ?? 0),
                     'stream_type' => $defaultStreamType,
                 ];
@@ -757,11 +790,17 @@ class XtreamController
                 // Write this stream to response
                 $body->write(json_encode($xtreamData, JSON_UNESCAPED_SLASHES));
                 $isFirst = false;
-                $num++;
             }
 
-            // If we got fewer items than page size, we're done
-            if (count($streams) < $pageSize) {
+            // Check if this was the last page before releasing memory
+            // (compare database query result, not filtered result, to handle cases where filtering removes items)
+            $isLastPage = count($streams) < $pageSize;
+
+            // Memory optimization: Release objects from current batch before loading next batch
+            unset($streams, $filteredArrays, $streamDataMap);
+
+            // If the database returned fewer items than page size, we've reached the end
+            if ($isLastPage) {
                 break;
             }
 
