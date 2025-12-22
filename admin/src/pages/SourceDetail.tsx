@@ -15,9 +15,10 @@ import {
   Divider,
 } from '@mui/material';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ArrowBack, Sync as SyncIcon, PlayArrow } from '@mui/icons-material';
+import { ArrowBack, Sync as SyncIcon, PlayArrow, Download as DownloadIcon } from '@mui/icons-material';
 import sourcesApi, { SYNC_TASK_TYPES } from '../services/sourcesApi';
 import { useAuthStore } from '../stores/authStore';
+import AccessControlModal from '../components/AccessControlModal';
 
 // Type definitions for error handling
 interface ApiErrorResponse {
@@ -39,6 +40,7 @@ export default function SourceDetail() {
   const { isAuthenticated } = useAuthStore();
   const [syncingTask, setSyncingTask] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error' | 'warning'; message: string } | null>(null);
+  const [accessControlModalOpen, setAccessControlModalOpen] = useState(false);
 
   const { data: source, isLoading, error } = useQuery({
     queryKey: ['source', id],
@@ -151,16 +153,25 @@ export default function SourceDetail() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', flex: 1, p: 2 }}>
-      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Button startIcon={<ArrowBack />} onClick={() => navigate('/sources')}>
-          Back to Sources
+      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Button startIcon={<ArrowBack />} onClick={() => navigate('/sources')}>
+            Back to Sources
+          </Button>
+          <Typography variant="h5">{sourceData.name}</Typography>
+          <Chip
+            label={sourceData.sync_status}
+            color={sourceData.sync_status === 'idle' ? 'success' : sourceData.sync_status === 'syncing' ? 'info' : 'error'}
+            size="small"
+          />
+        </Box>
+        <Button
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          onClick={() => setAccessControlModalOpen(true)}
+        >
+          Access Control
         </Button>
-        <Typography variant="h5">{sourceData.name}</Typography>
-        <Chip
-          label={sourceData.sync_status}
-          color={sourceData.sync_status === 'idle' ? 'success' : sourceData.sync_status === 'syncing' ? 'info' : 'error'}
-          size="small"
-        />
       </Box>
 
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -249,6 +260,13 @@ export default function SourceDetail() {
           </Alert>
         )}
       </Box>
+
+      {/* Access Control Modal */}
+      <AccessControlModal
+        open={accessControlModalOpen}
+        onClose={() => setAccessControlModalOpen(false)}
+        sourceId={Number(id)}
+      />
     </Box>
   );
 }

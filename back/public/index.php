@@ -15,6 +15,7 @@ use App\Controllers\Admin\DashboardController;
 use App\Controllers\Admin\CategoryController;
 use App\Controllers\Admin\StreamController;
 use App\Controllers\Admin\SyncLogController;
+use App\Controllers\Admin\AccessControlController;
 use App\Controllers\Xtream\StreamDataController;
 
 // Determine environment based on directory structure
@@ -171,6 +172,11 @@ $app->group('/api', function ($group) {
     $group->get('/sync-logs/stats', [$syncLogController, 'stats']);
     $group->get('/sync-logs/{id}', [$syncLogController, 'get']);
     $group->delete('/sync-logs/{id}', [$syncLogController, 'delete']);
+
+    // Access control export/import
+    $accessControlController = new AccessControlController();
+    $group->get('/access-control/export', [$accessControlController, 'export']);
+    $group->post('/access-control/import', [$accessControlController, 'import']);
 })->add(new AdminAuthMiddleware());
 
 // Stream routing - /{type}/{username}/{password}/{stream_id}.{ext}
