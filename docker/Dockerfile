@@ -11,7 +11,8 @@ FROM php:8.2-fpm-alpine AS builder-stage
 
 RUN apk add --no-cache --no-scripts --force \
     $PHPIZE_DEPS \
-    sqlite-dev && \
+    sqlite-dev \
+    libc6-compat && \
     docker-php-ext-install pdo_sqlite && \
     docker-php-ext-enable pdo_sqlite && \
     rm -rf /tmp/* /var/tmp/*
@@ -24,7 +25,8 @@ RUN apk add --no-cache --no-scripts \
     sqlite \
     sqlite-libs \
     nginx \
-    openssl && \
+    openssl \
+    libc6-compat && \
     mkdir -p /etc/nginx/conf.d && \
     addgroup -g 1000 app && \
     adduser -D -u 1000 -G app app && \
@@ -80,7 +82,8 @@ RUN chmod +x /app/docker-entrypoint.sh && \
     find /app/bin -name "*.php" -exec chmod 644 {} \; && \
     find /app/migrations -name "*.php" -exec chmod 644 {} \; && \
     find /app/public -name "*.php" -exec chmod 644 {} \; && \
-    rm -rf /tmp/* /var/tmp/* ~/.cache
+    rm -rf /tmp/* /var/tmp/* ~/.cache && \
+    php -m | grep -i iconv || echo "iconv not available, will use fallback"
 
 # Declare data and logs directories as volumes
 VOLUME ["/app/data", "/logs/iptv"]

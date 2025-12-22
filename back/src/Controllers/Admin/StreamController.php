@@ -31,13 +31,27 @@ class StreamController
      */
     private function normalizeString(string $string): string
     {
-        // Convert to lowercase and remove accents
+        // Convert to lowercase
         $string = strtolower($string);
 
-        // Use iconv to remove accents (é -> e, ñ -> n, etc.)
-        $string = iconv('UTF-8', 'ASCII//TRANSLIT', $string);
+        // Try to remove accents using iconv if available
+        if (extension_loaded('iconv')) {
+            $iconvResult = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $string);
+            if ($iconvResult !== false) {
+                return $iconvResult;
+            }
+        }
 
-        return $string;
+        // Fallback: Use regex to remove common accents
+        $replacements = [
+            'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a', 'å' => 'a',
+            'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
+            'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o',
+            'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'ü' => 'u',
+            'ñ' => 'n', 'ç' => 'c',
+        ];
+        return strtr($string, $replacements);
     }
 
     /**
