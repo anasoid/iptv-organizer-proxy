@@ -107,6 +107,7 @@ class FilterController
             $filter->name = $body['name'];
             $filter->filter_config = $body['filter_config'];
             $filter->description = $body['description'] ?? null;
+            $filter->use_source_filter = isset($body['use_source_filter']) ? (int) $body['use_source_filter'] : 1;
 
             if (!$filter->save()) {
                 return $this->jsonError($response, 'Failed to create filter', 500);
@@ -160,6 +161,13 @@ class FilterController
                     return $this->jsonError($response, 'Description must be a valid string or null', 400);
                 }
                 $filter->description = $body['description'];
+            }
+            if (array_key_exists('use_source_filter', $body)) {
+                $useSourceFilter = $body['use_source_filter'];
+                if (!is_bool($useSourceFilter) && $useSourceFilter !== 0 && $useSourceFilter !== 1) {
+                    return $this->jsonError($response, 'use_source_filter must be a boolean or 0/1', 400);
+                }
+                $filter->use_source_filter = $useSourceFilter ? 1 : 0;
             }
 
             if (!$filter->save()) {
@@ -224,6 +232,55 @@ class FilterController
         return $response
             ->withHeader('Content-Type', 'application/json')
             ->withStatus($statusCode);
+    }
+
+    /**
+     * Update filter use_source_filter flag
+     *
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface $response
+     * @param array $args
+     * @return ResponseInterface
+     */
+    public function updateUseSourceFilter(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        try {
+            $id = (int) ($args['id'] ?? 0);
+            if (!$id) {
+                return $this->jsonError($response, 'Invalid filter ID', 400);
+            }
+
+            $filter = Filter::find($id);
+            if (!$filter) {
+                return $this->jsonError($response, 'Filter not found', 404);
+            }
+
+            $body = json_decode($request->getBody()->getContents(), true);
+
+            // Validate use_source_filter value
+            if (!array_key_exists('use_source_filter', $body)) {
+                return $this->jsonError($response, 'use_source_filter field is required', 400);
+            }
+
+            $useSourceFilter = $body['use_source_filter'];
+            if (!is_bool($useSourceFilter) && $useSourceFilter !== 0 && $useSourceFilter !== 1) {
+                return $this->jsonError($response, 'use_source_filter must be a boolean or 0/1', 400);
+            }
+
+            // Update filter
+            $filter->use_source_filter = $useSourceFilter ? 1 : 0;
+            if (!$filter->save()) {
+                return $this->jsonError($response, 'Failed to update filter', 500);
+            }
+
+            return $this->jsonResponse($response, [
+                'success' => true,
+                'message' => 'Filter use_source_filter updated successfully',
+                'data' => $filter->toArray(),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->jsonError($response, 'Failed to update filter: ' . $e->getMessage(), 400);
+        }
     }
 
     /**

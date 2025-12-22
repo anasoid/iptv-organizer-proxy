@@ -129,15 +129,17 @@ $app->group('/api', function ($group) {
     $group->get('/clients/{id}/export/blocked-vod-streams', [$clientController, 'exportBlockedVodStreams']);
     $group->get('/clients/{id}/export/blocked-series', [$clientController, 'exportBlockedSeries']);
 
-    // Category management (read-only)
+    // Category management
     $categoryController = new CategoryController();
     $group->get('/categories', [$categoryController, 'list']);
     $group->get('/categories/{id}', [$categoryController, 'get']);
+    $group->patch('/categories/{id}/allow-deny', [$categoryController, 'updateAllowDeny']);
 
-    // Stream management (read-only)
+    // Stream management
     $streamController = new StreamController();
     $group->get('/streams', [$streamController, 'list']);
     $group->get('/streams/{id}', [$streamController, 'get']);
+    $group->patch('/streams/{id}/allow-deny', [$streamController, 'updateAllowDeny']);
 
     // Filter management
     $filterController = new FilterController();
@@ -146,6 +148,7 @@ $app->group('/api', function ($group) {
     $group->get('/filters/{id}', [$filterController, 'get']);
     $group->put('/filters/{id}', [$filterController, 'update']);
     $group->delete('/filters/{id}', [$filterController, 'delete']);
+    $group->patch('/filters/{id}/use-source-filter', [$filterController, 'updateUseSourceFilter']);
 
     // Admin user management
     $adminUserController = new AdminUserController();

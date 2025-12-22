@@ -20,6 +20,7 @@ use RuntimeException;
  * @property string|null $category_id
  * @property string|null $category_ids
  * @property int $is_adult
+ * @property string|null $allow_deny Explicit allow/deny override ('allow', 'deny', or null for no override)
  * @property string|null $labels
  * @property string|null $data
  * @property string $created_at
@@ -35,6 +36,7 @@ abstract class BaseStreamModel extends BaseModel
         'category_id',
         'category_ids',
         'is_adult',
+        'allow_deny',
         'labels',
         'data',
     ];

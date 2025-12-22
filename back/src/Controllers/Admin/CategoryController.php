@@ -158,6 +158,52 @@ class CategoryController
     }
 
     /**
+     * Update category allow_deny field
+     * Body params:
+     *   - allow_deny: 'allow', 'deny', or null to remove override
+     */
+    public function updateAllowDeny(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        try {
+            $id = (int) ($args['id'] ?? 0);
+            if (!$id) {
+                return $this->jsonError($response, 'Invalid category ID', 400);
+            }
+
+            $category = Category::find($id);
+            if (!$category) {
+                return $this->jsonError($response, 'Category not found', 404);
+            }
+
+            $body = json_decode($request->getBody()->getContents(), true);
+
+            // Validate allow_deny value
+            if (!array_key_exists('allow_deny', $body)) {
+                return $this->jsonError($response, 'allow_deny field is required', 400);
+            }
+
+            $allowDeny = $body['allow_deny'];
+            if ($allowDeny !== null && !in_array($allowDeny, ['allow', 'deny'])) {
+                return $this->jsonError($response, 'allow_deny must be "allow", "deny", or null', 400);
+            }
+
+            // Update category
+            $category->allow_deny = $allowDeny;
+            if (!$category->save()) {
+                return $this->jsonError($response, 'Failed to update category', 500);
+            }
+
+            return $this->jsonResponse($response, [
+                'success' => true,
+                'message' => 'Category allow_deny updated successfully',
+                'data' => $category->toArray(),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->jsonError($response, 'Failed to update category: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * Return JSON error response
      */
     protected function jsonError(ResponseInterface $response, string $message, int $statusCode = 400): ResponseInterface

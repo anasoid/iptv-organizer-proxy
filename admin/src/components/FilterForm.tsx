@@ -13,6 +13,8 @@ import {
   Tabs,
   Tab,
   Typography,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import Editor from '@monaco-editor/react';
@@ -173,6 +175,7 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
   const [name, setName] = useState(filter?.name || '');
   const [description, setDescription] = useState(filter?.description || '');
   const [rulesYaml, setRulesYaml] = useState(filter?.filter_config || '');
+  const [useSourceFilter, setUseSourceFilter] = useState(filter?.use_source_filter ? true : true);
   const [error, setError] = useState<string | null>(null);
   const [showRulesExamples, setShowRulesExamples] = useState(false);
   const [rulesTabIndex, setRulesTabIndex] = useState(0);
@@ -184,6 +187,7 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
     setName(filter?.name || '');
     setDescription(filter?.description || '');
     setRulesYaml(filter?.filter_config || '');
+    setUseSourceFilter(filter?.use_source_filter ? true : true);
     setError(null);
     setTabIndex(0);
   }, [filter]);
@@ -261,6 +265,7 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
       name: name.trim(),
       description: description.trim() || null,
       filter_config: rulesYaml,
+      use_source_filter: useSourceFilter ? 1 : 0,
     };
 
     if (filter) {
@@ -310,6 +315,21 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
               multiline
               rows={4}
             />
+
+            <Box sx={{ mt: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={useSourceFilter}
+                    onChange={(e) => setUseSourceFilter(e.target.checked)}
+                  />
+                }
+                label="Enable Filter Rules"
+              />
+              <Typography variant="caption" sx={{ display: 'block', color: '#666', mt: 1 }}>
+                When enabled, filter rules will be applied to clients using this filter. When disabled, filter rules are skipped and only allow/deny overrides are checked.
+              </Typography>
+            </Box>
 
             {/* Template Buttons */}
             {!filter && (

@@ -42,6 +42,11 @@ class ContentFilterService
 
     /**
      * Get allowed categories by type
+     *
+     * Applies filtering in this order:
+     * 1. Items with allow_deny='allow' are always included (bypass filters)
+     * 2. Items with allow_deny='deny' are always excluded
+     * 3. Items with allow_deny=null are processed through filter rules
      */
     public function getAllowedCategories(string $type, ?int $limit = null, int $offset = 0): array
     {
@@ -51,11 +56,22 @@ class ContentFilterService
 
         $allCategories = Category::getBySourceAndType($this->client->source_id, $type, $limit, $offset);
 
-        if (!$this->filterService) {
-            return $allCategories;
+        // Separate items by allow_deny field
+        $separated = $this->separateByAllowDeny($allCategories);
+
+        // Always excluded items are removed
+        $allowed = $separated['allowed'];
+        $toFilter = $separated['filtered'];
+
+        // Apply filter rules to items without override
+        if (!$this->filterService || empty($toFilter)) {
+            $filtered = [];
+        } else {
+            $filtered = $this->filterService->filterCategories($toFilter, $type);
         }
 
-        return $this->filterService->filterCategories($allCategories, $type);
+        // Combine: explicitly allowed items + filter-passed items
+        return array_merge($allowed, $filtered);
     }
 
     /**
@@ -81,6 +97,11 @@ class ContentFilterService
 
     /**
      * Get allowed streams by type (live, vod)
+     *
+     * Applies filtering in this order:
+     * 1. Items with allow_deny='allow' are always included (bypass filters)
+     * 2. Items with allow_deny='deny' are always excluded
+     * 3. Items with allow_deny=null are processed through filter rules
      */
     public function getAllowedStreams(string $type): array
     {
@@ -94,17 +115,28 @@ class ContentFilterService
             default => [],
         };
 
-        if (!$this->filterService) {
-            return $allStreams;
+        // Separate items by allow_deny field
+        $separated = $this->separateByAllowDeny($allStreams);
+
+        // Always included items
+        $allowed = $separated['allowed'];
+        $toFilter = $separated['filtered'];
+
+        // Apply filter rules to items without override
+        if (!$this->filterService || empty($toFilter)) {
+            $filtered = [];
+        } else {
+            $filterResult = $this->filterService->applyToStreams($toFilter);
+
+            // Convert to IDs for comparison
+            $filteredIds = array_map(fn($s) => is_array($s) ? $s['id'] : $s->id, $filterResult);
+
+            // Keep only the filtered items
+            $filtered = array_filter($toFilter, fn($s) => in_array($s->id, $filteredIds));
         }
 
-        $filtered = $this->filterService->applyToStreams($allStreams);
-
-        // Convert to IDs for comparison
-        $filteredIds = array_map(fn($s) => is_array($s) ? $s['id'] : $s->id, $filtered);
-
-        // Return model objects that are in the filtered list
-        return array_filter($allStreams, fn($s) => in_array($s->id, $filteredIds));
+        // Combine: explicitly allowed items + filter-passed items
+        return array_merge($allowed, $filtered);
     }
 
     /**
@@ -137,6 +169,11 @@ class ContentFilterService
 
     /**
      * Get allowed series
+     *
+     * Applies filtering in this order:
+     * 1. Items with allow_deny='allow' are always included (bypass filters)
+     * 2. Items with allow_deny='deny' are always excluded
+     * 3. Items with allow_deny=null are processed through filter rules
      */
     public function getAllowedSeries(): array
     {
@@ -146,17 +183,28 @@ class ContentFilterService
 
         $allSeries = Series::getBySource($this->client->source_id);
 
-        if (!$this->filterService) {
-            return $allSeries;
+        // Separate items by allow_deny field
+        $separated = $this->separateByAllowDeny($allSeries);
+
+        // Always included items
+        $allowed = $separated['allowed'];
+        $toFilter = $separated['filtered'];
+
+        // Apply filter rules to items without override
+        if (!$this->filterService || empty($toFilter)) {
+            $filtered = [];
+        } else {
+            $filterResult = $this->filterService->applyToStreams($toFilter);
+
+            // Convert to IDs for comparison
+            $filteredIds = array_map(fn($s) => is_array($s) ? $s['id'] : $s->id, $filterResult);
+
+            // Keep only the filtered items
+            $filtered = array_filter($toFilter, fn($s) => in_array($s->id, $filteredIds));
         }
 
-        $filtered = $this->filterService->applyToStreams($allSeries);
-
-        // Convert to IDs for comparison
-        $filteredIds = array_map(fn($s) => is_array($s) ? $s['id'] : $s->id, $filtered);
-
-        // Return model objects that are in the filtered list
-        return array_filter($allSeries, fn($s) => in_array($s->id, $filteredIds));
+        // Combine: explicitly allowed items + filter-passed items
+        return array_merge($allowed, $filtered);
     }
 
     /**
@@ -200,6 +248,51 @@ class ContentFilterService
             return null;
         }
         return Filter::find($this->client->filter_id);
+    }
+
+    /**
+     * Separate items by allow_deny field for proper filtering
+     *
+     * Returns array with three keys:
+     * - allowed: Items with allow_deny='allow' (bypass all filters)
+     * - filtered: Items with allow_deny=null (go through filter rules)
+     * - denied: Items with allow_deny='deny' (always excluded)
+     *
+     * @param array $items Items to filter (categories or streams)
+     * @return array Separated items with keys: allowed, filtered, denied
+     */
+    private function separateByAllowDeny(array $items): array
+    {
+        $result = [
+            'allowed' => [],
+            'filtered' => [],
+            'denied' => [],
+        ];
+
+        if (empty($items)) {
+            return $result;
+        }
+
+        foreach ($items as $item) {
+            // Get allow_deny field value
+            $allowDeny = null;
+            if (is_array($item)) {
+                $allowDeny = $item['allow_deny'] ?? null;
+            } elseif (is_object($item)) {
+                $allowDeny = $item->getAttribute('allow_deny') ?? $item->allow_deny ?? null;
+            }
+
+            // Categorize by allow_deny value
+            if ($allowDeny === 'allow') {
+                $result['allowed'][] = $item;
+            } elseif ($allowDeny === 'deny') {
+                $result['denied'][] = $item;
+            } else {
+                $result['filtered'][] = $item;
+            }
+        }
+
+        return $result;
     }
 
     /**

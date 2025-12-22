@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS series (
     source_id INT NOT NULL,
     stream_id INT NOT NULL COMMENT 'Functional series ID from source',
     num INT DEFAULT 0 COMMENT 'Order number assigned during synchronization (starting from 1)',
+    allow_deny ENUM('allow', 'deny') COMMENT 'Explicit allow/deny override for this series',
     name VARCHAR(500) NOT NULL,
     category_id INT NOT NULL COMMENT 'Primary category ID',
     category_ids TEXT COMMENT 'JSON array of all category IDs',
@@ -17,5 +18,6 @@ CREATE TABLE IF NOT EXISTS series (
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     UNIQUE KEY uk_source_stream (source_id, stream_id),
     INDEX idx_source_category_num (source_id, category_id, num),
-    INDEX idx_source_num (source_id, num)
+    INDEX idx_source_num (source_id, num),
+    INDEX idx_series_allow_deny (source_id, allow_deny)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

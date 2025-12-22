@@ -10,9 +10,14 @@ import {
   Chip,
   Alert,
   TextField,
+  Snackbar,
+  FormControl,
+  Select,
+  MenuItem,
+  InputLabel,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useSourceStore } from '../stores/sourceStore';
 import streamsApi, { type Stream } from '../services/streamsApi';
@@ -23,6 +28,7 @@ import StreamCard from '../components/StreamCard';
 
 export default function SeriesStreams() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
   const sourceId = useSourceStore((state) => state.selectedSourceId);
   const setSourceId = useSourceStore((state) => state.setSelectedSourceId);
@@ -31,6 +37,9 @@ export default function SeriesStreams() {
   const [view, setView] = useState<ViewMode>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [streamId, setStreamId] = useState('');
+  const [allowDenyFilter, setAllowDenyFilter] = useState<'allow' | 'deny' | 'default' | 'all'>('all');
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   // Initialize selected category from sessionStorage if available
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(() => {
@@ -40,6 +49,21 @@ export default function SeriesStreams() {
       return parseInt(stored, 10);
     }
     return null;
+  });
+
+  // Mutation for updating allow_deny
+  const updateAllowDenyMutation = useMutation({
+    mutationFn: ({ id, allowDeny }: { id: number; allowDeny: string | null }) =>
+      streamsApi.updateAllowDeny(id, allowDeny, 'series'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streams-series'] });
+      setSnackbarMessage('Access control updated successfully');
+      setSnackbarOpen(true);
+    },
+    onError: () => {
+      setSnackbarMessage('Failed to update access control');
+      setSnackbarOpen(true);
+    },
   });
 
   // Fetch series with optional category filter, search, and stream_id
@@ -63,8 +87,18 @@ export default function SeriesStreams() {
   // Categories are already filtered by type on backend
   const seriesCategories = categoriesData?.data || [];
 
-  const streams = streamsData?.data || [];
+  let streams = streamsData?.data || [];
   const pagination = streamsData?.pagination;
+
+  // Apply access control filter
+  if (allowDenyFilter !== 'all') {
+    streams = streams.filter((stream) => {
+      if (allowDenyFilter === 'default') {
+        return stream.allow_deny === null;
+      }
+      return stream.allow_deny === allowDenyFilter;
+    });
+  }
 
   // Debug logging
   if (selectedCategoryId !== null) {
@@ -140,6 +174,38 @@ export default function SeriesStreams() {
       width: 80,
       renderCell: (params) => (params.value ? <Chip label="Adult" color="error" size="small" /> : '—'),
     },
+    {
+      field: 'allow_deny',
+      headerName: 'Access Control',
+      width: 120,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => {
+        const stream = params.row as Stream;
+        const isLoading = updateAllowDenyMutation.isPending;
+
+        return (
+          <FormControl size="small" sx={{ width: '100%' }} disabled={isLoading}>
+            <Select
+              value={stream.allow_deny ?? 'default'}
+              onChange={(e) => {
+                e.stopPropagation();
+                const value = e.target.value;
+                updateAllowDenyMutation.mutate({
+                  id: stream.id,
+                  allowDeny: value === 'default' ? null : (value as 'allow' | 'deny')
+                });
+              }}
+              sx={{ height: 32, fontSize: '0.875rem' }}
+            >
+              <MenuItem value="allow">Allow</MenuItem>
+              <MenuItem value="deny">Deny</MenuItem>
+              <MenuItem value="default">Default</MenuItem>
+            </Select>
+          </FormControl>
+        );
+      },
+    },
   ];
 
   const handleCategorySelect = (categoryId: number | null) => {
@@ -196,6 +262,23 @@ export default function SeriesStreams() {
                 variant="outlined"
                 sx={{ flex: '1 1 auto', minWidth: 200 }}
               />
+              <FormControl sx={{ flex: '0 0 auto', minWidth: 160 }}>
+                <InputLabel>Filter by Access Control</InputLabel>
+                <Select
+                  value={allowDenyFilter}
+                  label="Filter by Access Control"
+                  onChange={(e) => {
+                    setAllowDenyFilter(e.target.value as 'allow' | 'deny' | 'default' | 'all');
+                    setPage(1);
+                  }}
+                  size="small"
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="allow">Allow</MenuItem>
+                  <MenuItem value="deny">Deny</MenuItem>
+                  <MenuItem value="default">Default</MenuItem>
+                </Select>
+              </FormControl>
             </>
           )}
         </Box>
@@ -441,6 +524,15 @@ export default function SeriesStreams() {
           )}
         </>
       )}
+
+      {/* Snackbar for feedback */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={() => setSnackbarOpen(false)}
+        message={snackbarMessage}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      />
     </Box>
   );
 }

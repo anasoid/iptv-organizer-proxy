@@ -7,6 +7,7 @@ export interface Category {
   category_name: string;
   category_type: 'live' | 'vod' | 'series';
   num: number;
+  allow_deny?: 'allow' | 'deny' | null;
   parent_id?: number | null;
   labels?: string | null;
   created_at: string;
@@ -53,6 +54,16 @@ class CategoriesApi {
   async getCategory(id: number, sourceId?: number) {
     const params = sourceId ? { source_id: sourceId } : {};
     const response = await api.get(`/categories/${id}`, { params });
+    return response.data as CategoryResponse;
+  }
+
+  /**
+   * Update category allow_deny field
+   * @param id - category database ID
+   * @param allowDeny - 'allow', 'deny', or null to remove override
+   */
+  async updateAllowDeny(id: number, allowDeny: 'allow' | 'deny' | null) {
+    const response = await api.patch(`/categories/${id}/allow-deny`, { allow_deny: allowDeny });
     return response.data as CategoryResponse;
   }
 }

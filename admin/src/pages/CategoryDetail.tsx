@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import {
   Box,
   Card,
@@ -9,10 +10,13 @@ import {
   Alert,
   Button,
   Divider,
+  ButtonGroup,
+  Snackbar,
+  SvgIcon,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
-import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
+import { ArrowBack as ArrowBackIcon, CheckCircle as CheckCircleIcon, Block as BlockIcon } from '@mui/icons-material';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import categoriesApi from '../services/categoriesApi';
 import streamsApi from '../services/streamsApi';
@@ -21,17 +25,34 @@ export default function CategoryDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   const categoryId = id ? parseInt(id, 10) : null;
 
   // Fetch category details
-  const { data: categoryData, isLoading: isLoadingCategory, error: categoryError } = useQuery({
+  const { data: categoryData, isLoading: isLoadingCategory, error: categoryError, refetch: refetchCategory } = useQuery({
     queryKey: ['category', categoryId],
     queryFn: () => (categoryId ? categoriesApi.getCategory(categoryId) : Promise.resolve(null)),
     enabled: isAuthenticated && categoryId !== null,
   });
 
   const category = categoryData?.data;
+
+  // Mutation for updating allow_deny
+  const updateAllowDenyMutation = useMutation({
+    mutationFn: (allowDeny: string | null) =>
+      categoriesApi.updateAllowDeny(categoryId!, allowDeny),
+    onSuccess: () => {
+      setSnackbarMessage('Allow/Deny status updated successfully');
+      setSnackbarOpen(true);
+      refetchCategory();
+    },
+    onError: () => {
+      setSnackbarMessage('Failed to update Allow/Deny status');
+      setSnackbarOpen(true);
+    },
+  });
 
   // Fetch streams only for the same type as the category
   const { data: streamsData, isLoading: isLoadingStreams } = useQuery({
@@ -158,6 +179,39 @@ export default function CategoryDetail() {
             <Chip label={`#${category.num}`} color="primary" variant="outlined" />
           </Grid>
 
+          <Grid item xs={12} sm={6}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary', mb: 1 }}>
+              Access Control
+            </Typography>
+            <ButtonGroup variant="outlined" size="small">
+              <Button
+                startIcon={<CheckCircleIcon />}
+                variant={category.allow_deny === 'allow' ? 'contained' : 'outlined'}
+                color={category.allow_deny === 'allow' ? 'success' : 'inherit'}
+                onClick={() => updateAllowDenyMutation.mutate('allow')}
+                disabled={updateAllowDenyMutation.isPending}
+              >
+                Allow
+              </Button>
+              <Button
+                startIcon={<BlockIcon />}
+                variant={category.allow_deny === 'deny' ? 'contained' : 'outlined'}
+                color={category.allow_deny === 'deny' ? 'error' : 'inherit'}
+                onClick={() => updateAllowDenyMutation.mutate('deny')}
+                disabled={updateAllowDenyMutation.isPending}
+              >
+                Deny
+              </Button>
+              <Button
+                variant={category.allow_deny === null ? 'contained' : 'outlined'}
+                onClick={() => updateAllowDenyMutation.mutate(null)}
+                disabled={updateAllowDenyMutation.isPending}
+              >
+                Default
+              </Button>
+            </ButtonGroup>
+          </Grid>
+
           {category.parent_id && (
             <Grid item xs={12} sm={6}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
@@ -244,6 +298,15 @@ export default function CategoryDetail() {
           )}
         </Box>
       </Card>
+
+      {/* Snackbar for feedback */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={() => setSnackbarOpen(false)}
+        message={snackbarMessage}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      />
     </Box>
   );
 }

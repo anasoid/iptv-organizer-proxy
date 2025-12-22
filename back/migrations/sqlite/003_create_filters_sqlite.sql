@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS filters (
     name TEXT NOT NULL,
     description TEXT,
     filter_config TEXT NOT NULL, -- YAML configuration for filter rules
+    use_source_filter INTEGER NOT NULL DEFAULT 1 CHECK(use_source_filter IN (0, 1)), -- Enable/disable filter rules
+    favoris TEXT, -- Favorites/watchlist items
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );

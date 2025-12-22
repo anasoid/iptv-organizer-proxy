@@ -15,6 +15,8 @@ use RuntimeException;
  * @property string $name
  * @property string|null $description
  * @property string $filter_config YAML rules section (include/exclude rules)
+ * @property bool $use_source_filter Enable/disable filter rule checking (default: 1/true)
+ * @property string|null $favoris Favorites/watchlist items
  * @property string $created_at
  * @property string $updated_at
  */
@@ -25,6 +27,8 @@ class Filter extends BaseModel
         'name',
         'description',
         'filter_config',
+        'use_source_filter',
+        'favoris',
     ];
 
     private ?array $parsedConfig = null;

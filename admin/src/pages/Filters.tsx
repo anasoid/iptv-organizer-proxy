@@ -8,6 +8,8 @@ import {
   DialogActions,
   CircularProgress,
   Alert,
+  Chip,
+  Snackbar,
 } from '@mui/material';
 import { DataGrid, GridActionsCellItem } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
@@ -30,6 +32,9 @@ export default function Filters() {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
 
   // Fetch filters (only when authenticated)
   const { data, isLoading, error } = useQuery({
@@ -44,6 +49,33 @@ export default function Filters() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['filters'] });
       setDeleteConfirm(null);
+      setSnackbarMessage('Filter deleted successfully');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    },
+    onError: (err) => {
+      console.error('Delete failed:', err);
+      setSnackbarMessage('Failed to delete filter');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    },
+  });
+
+  // Update use_source_filter mutation
+  const updateUseSourceFilterMutation = useMutation({
+    mutationFn: ({ id, useSourceFilter }: { id: number; useSourceFilter: boolean }) =>
+      filtersApi.updateUseSourceFilter(id, useSourceFilter),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['filters'] });
+      setSnackbarMessage('Filter updated successfully');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    },
+    onError: (err) => {
+      console.error('Update failed:', err);
+      setSnackbarMessage('Failed to update filter');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
     },
   });
 
@@ -85,6 +117,36 @@ export default function Filters() {
     { field: 'id', headerName: 'ID', width: 70 },
     { field: 'name', headerName: 'Name', width: 200, flex: 1 },
     { field: 'description', headerName: 'Description', width: 250, flex: 1 },
+    {
+      field: 'use_source_filter',
+      headerName: 'Source Filter',
+      width: 140,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => {
+        const filter = params.row as Filter;
+        const isEnabled = filter.use_source_filter ? true : false;
+        const isLoading = updateUseSourceFilterMutation.isPending;
+
+        return (
+          <Chip
+            label={isEnabled ? 'Enabled' : 'Disabled'}
+            color={isEnabled ? 'success' : 'default'}
+            size="small"
+            variant="outlined"
+            disabled={isLoading}
+            onClick={(e) => {
+              e.stopPropagation();
+              updateUseSourceFilterMutation.mutate({
+                id: filter.id,
+                useSourceFilter: !isEnabled,
+              });
+            }}
+            sx={{ cursor: isLoading ? 'not-allowed' : 'pointer', opacity: isLoading ? 0.6 : 1 }}
+          />
+        );
+      },
+    },
     {
       field: 'created_at',
       headerName: 'Created',
@@ -177,6 +239,18 @@ export default function Filters() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Snackbar for feedback */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Alert severity={snackbarSeverity} onClose={() => setSnackbarOpen(false)}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

@@ -5,6 +5,8 @@ export interface Filter {
   name: string;
   description?: string;
   filter_config: string;
+  use_source_filter?: boolean | number;
+  favoris?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -38,6 +40,7 @@ const filtersApi = {
     name: string;
     description?: string;
     filter_config: string;
+    use_source_filter?: boolean | number;
   }): Promise<FilterResponse> {
     const response = await api.post('/filters', data);
     return response.data;
@@ -49,6 +52,7 @@ const filtersApi = {
       name?: string;
       description?: string;
       filter_config?: string;
+      use_source_filter?: boolean | number;
     }
   ): Promise<FilterResponse> {
     const response = await api.put(`/filters/${id}`, data);
@@ -57,6 +61,11 @@ const filtersApi = {
 
   async deleteFilter(id: number): Promise<FilterResponse> {
     const response = await api.delete(`/filters/${id}`);
+    return response.data;
+  },
+
+  async updateUseSourceFilter(id: number, useSourceFilter: boolean): Promise<FilterResponse> {
+    const response = await api.patch(`/filters/${id}/use-source-filter`, { use_source_filter: useSourceFilter });
     return response.data;
   },
 };

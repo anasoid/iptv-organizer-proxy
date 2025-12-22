@@ -14,6 +14,7 @@ export interface Stream {
   category_id: string | number | null;
   category_ids?: string | number[] | null;
   is_adult: number;
+  allow_deny?: 'allow' | 'deny' | null;
   labels?: string | null;
   data?: StreamData | null;
   created_at: string;
@@ -108,6 +109,21 @@ class StreamsApi {
    */
   async getSeriesStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20, search?: string, streamId?: number | string) {
     return this.getStreams(sourceId, 'series', categoryId, page, limit, search, streamId);
+  }
+
+  /**
+   * Update stream allow_deny field
+   * @param id - stream database ID
+   * @param allowDeny - 'allow', 'deny', or null to remove override
+   * @param type - stream type (live, vod, series)
+   */
+  async updateAllowDeny(id: number, allowDeny: 'allow' | 'deny' | null, type?: StreamType) {
+    const params: Record<string, string> = {};
+    if (type) {
+      params.type = type;
+    }
+    const response = await api.patch(`/streams/${id}/allow-deny`, { allow_deny: allowDeny }, { params });
+    return response.data as StreamResponse;
   }
 }
 

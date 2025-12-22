@@ -17,6 +17,7 @@ use RuntimeException;
  * @property string $category_name
  * @property string $category_type
  * @property int $num Order number assigned during synchronization (starting from 1)
+ * @property string|null $allow_deny Explicit allow/deny override ('allow', 'deny', or null for no override)
  * @property int|null $parent_id
  * @property string|null $labels
  * @property string $created_at
@@ -30,6 +31,7 @@ class Category extends BaseModel
         'category_name',
         'category_type',
         'num',
+        'allow_deny',
         'parent_id',
         'labels',
     ];

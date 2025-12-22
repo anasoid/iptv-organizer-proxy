@@ -20,9 +20,10 @@ import {
   IconButton,
   Tooltip,
   Snackbar,
+  ButtonGroup,
 } from '@mui/material';
-import { ArrowBack as ArrowBackIcon, ContentCopy as ContentCopyIcon } from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
+import { ArrowBack as ArrowBackIcon, ContentCopy as ContentCopyIcon, CheckCircle as CheckCircleIcon, Block as BlockIcon } from '@mui/icons-material';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import streamsApi from '../services/streamsApi';
 import categoriesApi from '../services/categoriesApi';
@@ -31,20 +32,35 @@ export default function StreamDetail() {
   const { id, type } = useParams<{ id: string; type: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   const streamId = id ? parseInt(id, 10) : null;
   const streamType = (type || 'live') as 'live' | 'vod' | 'series';
 
   // Fetch stream details
-  const { data: streamData, isLoading: isLoadingStream, error: streamError } = useQuery({
+  const { data: streamData, isLoading: isLoadingStream, error: streamError, refetch: refetchStream } = useQuery({
     queryKey: ['stream', streamId, streamType],
     queryFn: () => (streamId ? streamsApi.getStream(streamId, streamType) : Promise.resolve(null)),
     enabled: isAuthenticated && streamId !== null,
   });
 
   const stream = streamData?.data;
+
+  // Mutation for updating allow_deny
+  const updateAllowDenyMutation = useMutation({
+    mutationFn: (allowDeny: string | null) =>
+      streamsApi.updateAllowDeny(streamId!, allowDeny, streamType),
+    onSuccess: () => {
+      setSnackbarMessage('Allow/Deny status updated successfully');
+      setSnackbarOpen(true);
+      refetchStream();
+    },
+    onError: () => {
+      setSnackbarMessage('Failed to update Allow/Deny status');
+      setSnackbarOpen(true);
+    },
+  });
 
   // Fetch source ID from stream to get all categories as fallback
   const sourceId = stream?.source_id;
@@ -257,6 +273,39 @@ export default function StreamDetail() {
                     <Chip label="Adult Content" color="error" />
                   </Grid>
                 )}
+
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary', mb: 1 }}>
+                    Access Control
+                  </Typography>
+                  <ButtonGroup variant="outlined" size="small">
+                    <Button
+                      startIcon={<CheckCircleIcon />}
+                      variant={stream.allow_deny === 'allow' ? 'contained' : 'outlined'}
+                      color={stream.allow_deny === 'allow' ? 'success' : 'inherit'}
+                      onClick={() => updateAllowDenyMutation.mutate('allow')}
+                      disabled={updateAllowDenyMutation.isPending}
+                    >
+                      Allow
+                    </Button>
+                    <Button
+                      startIcon={<BlockIcon />}
+                      variant={stream.allow_deny === 'deny' ? 'contained' : 'outlined'}
+                      color={stream.allow_deny === 'deny' ? 'error' : 'inherit'}
+                      onClick={() => updateAllowDenyMutation.mutate('deny')}
+                      disabled={updateAllowDenyMutation.isPending}
+                    >
+                      Deny
+                    </Button>
+                    <Button
+                      variant={stream.allow_deny === null ? 'contained' : 'outlined'}
+                      onClick={() => updateAllowDenyMutation.mutate(null)}
+                      disabled={updateAllowDenyMutation.isPending}
+                    >
+                      Default
+                    </Button>
+                  </ButtonGroup>
+                </Grid>
 
                 {duration && (
                   <Grid item xs={12} sm={6}>

@@ -207,6 +207,68 @@ class StreamController
     }
 
     /**
+     * Update stream allow_deny field
+     * Body params:
+     *   - allow_deny: 'allow', 'deny', or null to remove override
+     */
+    public function updateAllowDeny(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        try {
+            $id = (int) ($args['id'] ?? 0);
+            $type = $request->getQueryParams()['type'] ?? null;
+
+            if (!$id) {
+                return $this->jsonError($response, 'Invalid stream ID', 400);
+            }
+
+            // Find stream
+            $stream = null;
+            if ($type) {
+                if (!in_array($type, ['live', 'vod', 'series'])) {
+                    return $this->jsonError($response, 'Invalid type. Must be live, vod, or series', 400);
+                }
+                $modelClass = $this->getModelClass($type);
+                $stream = $modelClass::find($id);
+            } else {
+                // Try to find in all stream types
+                $stream = LiveStream::find($id)
+                       ?? VodStream::find($id)
+                       ?? Series::find($id);
+            }
+
+            if (!$stream) {
+                return $this->jsonError($response, 'Stream not found', 404);
+            }
+
+            $body = json_decode($request->getBody()->getContents(), true);
+
+            // Validate allow_deny value
+            if (!array_key_exists('allow_deny', $body)) {
+                return $this->jsonError($response, 'allow_deny field is required', 400);
+            }
+
+            $allowDeny = $body['allow_deny'];
+            if ($allowDeny !== null && !in_array($allowDeny, ['allow', 'deny'])) {
+                return $this->jsonError($response, 'allow_deny must be "allow", "deny", or null', 400);
+            }
+
+            // Update stream
+            $stream->allow_deny = $allowDeny;
+            if (!$stream->save()) {
+                return $this->jsonError($response, 'Failed to update stream', 500);
+            }
+
+            return $this->jsonResponse($response, [
+                'success' => true,
+                'message' => 'Stream allow_deny updated successfully',
+                'data' => $this->formatStreamData($stream),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->jsonError($response, 'Failed to update stream: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * Return JSON error response
      */
     protected function jsonError(ResponseInterface $response, string $message, int $statusCode = 400): ResponseInterface

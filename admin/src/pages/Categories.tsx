@@ -15,9 +15,10 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Snackbar,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useSourceStore } from '../stores/sourceStore';
 import categoriesApi, { type Category } from '../services/categoriesApi';
@@ -26,6 +27,7 @@ import ViewToggle, { type ViewMode } from '../components/ViewToggle';
 
 export default function Categories() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
   const sourceId = useSourceStore((state) => state.selectedSourceId);
   const setSourceId = useSourceStore((state) => state.setSelectedSourceId);
@@ -34,6 +36,9 @@ export default function Categories() {
   const [view, setView] = useState<ViewMode>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryType, setCategoryType] = useState<'live' | 'vod' | 'series' | ''>('');
+  const [allowDenyFilter, setAllowDenyFilter] = useState<'allow' | 'deny' | 'default' | 'all'>('all');
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   // Fetch categories with optional search and type filter
   const { data, isLoading, error } = useQuery({
@@ -42,8 +47,33 @@ export default function Categories() {
     enabled: isAuthenticated && sourceId !== null,
   });
 
-  const categories = data?.data || [];
+  // Mutation for updating allow_deny
+  const updateAllowDenyMutation = useMutation({
+    mutationFn: ({ id, allowDeny }: { id: number; allowDeny: string | null }) =>
+      categoriesApi.updateAllowDeny(id, allowDeny),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      setSnackbarMessage('Access control updated successfully');
+      setSnackbarOpen(true);
+    },
+    onError: () => {
+      setSnackbarMessage('Failed to update access control');
+      setSnackbarOpen(true);
+    },
+  });
+
+  let categories = data?.data || [];
   const pagination = data?.pagination;
+
+  // Apply access control filter
+  if (allowDenyFilter !== 'all') {
+    categories = categories.filter((cat) => {
+      if (allowDenyFilter === 'default') {
+        return cat.allow_deny === null;
+      }
+      return cat.allow_deny === allowDenyFilter;
+    });
+  }
 
   const getCategoryTypeColor = (type: string): 'default' | 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success' => {
     switch (type) {
@@ -76,6 +106,74 @@ export default function Categories() {
     },
     { field: 'category_id', headerName: 'Category ID', width: 120 },
     { field: 'labels', headerName: 'Labels', width: 200, flex: 1 },
+    {
+      field: 'allow_deny',
+      headerName: 'Access Control',
+      width: 120,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => {
+        const category = params.row as Category;
+        const isLoading = updateAllowDenyMutation.isPending;
+        const value = category.allow_deny ?? 'default';
+
+        const getColor = (val: string) => {
+          switch (val) {
+            case 'allow':
+              return 'success';
+            case 'deny':
+              return 'error';
+            default:
+              return 'default';
+          }
+        };
+
+        const getBgColor = (val: string) => {
+          switch (val) {
+            case 'allow':
+              return '#c8e6c9';
+            case 'deny':
+              return '#ffcdd2';
+            default:
+              return '#f5f5f5';
+          }
+        };
+
+        return (
+          <FormControl size="small" sx={{ width: '100%' }} disabled={isLoading}>
+            <Select
+              value={value}
+              onChange={(e) => {
+                e.stopPropagation();
+                const newValue = e.target.value;
+                updateAllowDenyMutation.mutate({
+                  id: category.id,
+                  allowDeny: newValue === 'default' ? null : (newValue as 'allow' | 'deny')
+                });
+              }}
+              sx={{
+                height: 32,
+                fontSize: '0.875rem',
+                backgroundColor: getBgColor(value),
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: getColor(value) === 'success' ? '#4caf50' : getColor(value) === 'error' ? '#f44336' : '#bdbdbd',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: getColor(value) === 'success' ? '#4caf50' : getColor(value) === 'error' ? '#f44336' : '#bdbdbd',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: getColor(value) === 'success' ? '#4caf50' : getColor(value) === 'error' ? '#f44336' : '#bdbdbd',
+                },
+              }}
+            >
+              <MenuItem value="allow">Allow</MenuItem>
+              <MenuItem value="deny">Deny</MenuItem>
+              <MenuItem value="default">Default</MenuItem>
+            </Select>
+          </FormControl>
+        );
+      },
+    },
   ];
 
   const CategoryGridCard = ({ category }: { category: Category }) => (
@@ -111,6 +209,13 @@ export default function Categories() {
             color={getCategoryTypeColor(category.category_type)}
             size="small"
           />
+          {category.allow_deny && (
+            <Chip
+              label={category.allow_deny.charAt(0).toUpperCase() + category.allow_deny.slice(1)}
+              color={category.allow_deny === 'allow' ? 'success' : 'error'}
+              size="small"
+            />
+          )}
           {category.labels && (
             <Chip
               label={`${category.labels.split(',').length} labels`}
@@ -176,6 +281,26 @@ export default function Categories() {
                 <MenuItem value="live">Live</MenuItem>
                 <MenuItem value="vod">VOD</MenuItem>
                 <MenuItem value="series">Series</MenuItem>
+              </Select>
+            </FormControl>
+          )}
+
+          {sourceId && (
+            <FormControl sx={{ flex: '0 0 auto', minWidth: 160 }}>
+              <InputLabel>Filter by Access Control</InputLabel>
+              <Select
+                value={allowDenyFilter}
+                label="Filter by Access Control"
+                onChange={(e) => {
+                  setAllowDenyFilter(e.target.value as 'allow' | 'deny' | 'default' | 'all');
+                  setPage(1);
+                }}
+                size="small"
+              >
+                <MenuItem value="all">All</MenuItem>
+                <MenuItem value="allow">Allow</MenuItem>
+                <MenuItem value="deny">Deny</MenuItem>
+                <MenuItem value="default">Default</MenuItem>
               </Select>
             </FormControl>
           )}
@@ -267,6 +392,15 @@ export default function Categories() {
           )}
         </>
       )}
+
+      {/* Snackbar for feedback */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={() => setSnackbarOpen(false)}
+        message={snackbarMessage}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      />
     </Box>
   );
 }

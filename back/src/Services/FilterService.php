@@ -348,18 +348,45 @@ class FilterService
                 'category_labels' => $categoryLabels,
                 'is_adult' => (int) ($stream->getAttribute('is_adult') ?? 0),
                 'num' => $stream->getAttribute('num'),
+                'allow_deny' => $stream->getAttribute('allow_deny'),
             ];
         }, $streams);
 
-        // Apply adult content filter first (highest priority)
-        $filtered = $this->filterAdultContent($streamArrays);
+        // FIRST: Check allow_deny field (highest priority)
+        // Streams with allow_deny='allow' are ALWAYS included (bypass all filters)
+        // Streams with allow_deny='deny' are ALWAYS excluded
+        // Streams with allow_deny=null proceed through normal filtering
+        $allowed = [];
+        $toFilter = [];
 
-        // Apply include/exclude rules if filter is assigned
-        if ($this->filter !== null) {
+        foreach ($streamArrays as $stream) {
+            $allowDeny = $stream['allow_deny'] ?? null;
+
+            if ($allowDeny === 'allow') {
+                // Always include streams marked as 'allow'
+                $allowed[] = $stream;
+            } elseif ($allowDeny === 'deny') {
+                // Always exclude streams marked as 'deny'
+                // (don't add to either array, effectively filtering them out)
+            } else {
+                // For streams with no explicit allow_deny, apply normal filtering
+                $toFilter[] = $stream;
+            }
+        }
+
+        // Apply normal filtering to streams without explicit allow_deny
+        $filtered = $toFilter;
+
+        // Apply adult content filter
+        $filtered = $this->filterAdultContent($filtered);
+
+        // Apply include/exclude rules if filter is assigned AND use_source_filter is enabled
+        if ($this->filter !== null && $this->isFilterEnabled()) {
             $filtered = $this->applyFilterRules($filtered);
         }
 
-        return $filtered;
+        // Combine explicitly allowed streams with filtered results
+        return array_merge($allowed, $filtered);
     }
 
     /**
@@ -467,7 +494,7 @@ class FilterService
      */
     public function filterCategories(array $categories, ?string $type = null): array
     {
-        if ($this->filter === null) {
+        if ($this->filter === null || !$this->isFilterEnabled()) {
             return $categories;
         }
 
@@ -562,6 +589,28 @@ class FilterService
     }
 
     /**
+     * Check if filter is enabled (use_source_filter flag is true)
+     *
+     * @return bool
+     */
+    private function isFilterEnabled(): bool
+    {
+        if ($this->filter === null) {
+            return false;
+        }
+
+        // Check use_source_filter flag - default to true if not set
+        $useSourceFilter = $this->filter->use_source_filter ?? true;
+
+        // Handle both integer (1/0 for MySQL) and boolean values
+        if (is_int($useSourceFilter)) {
+            return (bool) $useSourceFilter;
+        }
+
+        return (bool) $useSourceFilter;
+    }
+
+    /**
      * Apply filters to streams and track rejection reasons
      *
      * Returns array with:
@@ -591,7 +640,10 @@ class FilterService
             ],
         ];
 
-        $config = $this->parseFilter();
+        // If filter is not enabled, accept all streams (after adult content filtering)
+        $filterEnabled = $this->filter !== null && $this->isFilterEnabled();
+
+        $config = $filterEnabled ? $this->parseFilter() : ['rules' => []];
         $rules = $config['rules'] ?? [];
 
         // Check if there are any include rules
@@ -607,7 +659,25 @@ class FilterService
         foreach ($streams as $stream) {
             $streamId = $stream['id'] ?? null;
 
-            // Check adult content first
+            // Check allow_deny field first (highest priority)
+            $allowDeny = $stream['allow_deny'] ?? null;
+            if ($allowDeny === 'allow') {
+                // Always include streams marked as 'allow'
+                $result['accepted'][] = $stream;
+                continue;
+            }
+            if ($allowDeny === 'deny') {
+                // Always exclude streams marked as 'deny'
+                if ($streamId) {
+                    if (!isset($result['rejected']['by_rule']['allow_deny=deny'])) {
+                        $result['rejected']['by_rule']['allow_deny=deny'] = [];
+                    }
+                    $result['rejected']['by_rule']['allow_deny=deny'][] = $streamId;
+                }
+                continue;
+            }
+
+            // Check adult content
             if ($this->hideAdultContent && ($stream['is_adult'] ?? false)) {
                 if ($streamId) {
                     $result['rejected']['by_adult_content'][] = $streamId;

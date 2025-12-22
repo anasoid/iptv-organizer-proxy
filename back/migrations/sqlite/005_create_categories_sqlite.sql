@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS categories (
     category_name TEXT NOT NULL,
     category_type TEXT NOT NULL CHECK(category_type IN ('live', 'vod', 'series')),
     num INTEGER DEFAULT 0, -- Order number assigned during synchronization (starting from 1)
+    allow_deny TEXT CHECK(allow_deny IN ('allow', 'deny')), -- Explicit allow/deny override
     parent_id INTEGER,
     labels TEXT, -- Comma-separated extracted labels
     created_at TEXT DEFAULT (datetime('now')),
@@ -16,4 +17,5 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 CREATE INDEX IF NOT EXISTS idx_categories_source_category_num ON categories(source_id, category_type, num);
+CREATE INDEX IF NOT EXISTS idx_categories_allow_deny ON categories(source_id, allow_deny);
 CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);
