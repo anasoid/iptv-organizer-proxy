@@ -51,7 +51,6 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
     },
   });
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const sourceId = watch('source_id');
   const filterId = watch('filter_id');
 

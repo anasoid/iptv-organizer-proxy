@@ -28,6 +28,11 @@ interface ApiErrorResponse {
   };
 }
 
+interface SyncResponse {
+  success?: boolean;
+  message?: string;
+}
+
 export default function SourceDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -48,7 +53,7 @@ export default function SourceDetail() {
       setSyncingTask(taskType);
       setSyncMessage(null);
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: SyncResponse) => {
       // Check if the response indicates success or an error
       if (data?.success === false) {
         // Sync is already running or other conflict
@@ -79,7 +84,7 @@ export default function SourceDetail() {
       setSyncingTask('all');
       setSyncMessage(null);
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: SyncResponse) => {
       // Check if the response indicates success or an error
       if (data?.success === false) {
         // One or more sync tasks are already running
