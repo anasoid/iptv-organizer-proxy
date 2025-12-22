@@ -341,6 +341,7 @@ class SourceController
      */
     public function syncTaskType(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
+        $source = null;
         try {
             $id = (int) ($args['id'] ?? 0);
             $taskType = $args['taskType'] ?? '';
@@ -400,7 +401,9 @@ class SourceController
 
         } catch (\Throwable $e) {
             // Sync failed - update status to error
-            $source->updateSyncStatus('error');
+            if ($source) {
+                $source->updateSyncStatus('error');
+            }
             return $this->jsonError($response, 'Sync failed: ' . $e->getMessage(), 500);
         }
     }
@@ -415,6 +418,7 @@ class SourceController
      */
     public function syncAll(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
+        $source = null;
         try {
             $id = (int) ($args['id'] ?? 0);
 
@@ -504,7 +508,9 @@ class SourceController
 
         } catch (\Throwable $e) {
             // Sync failed - update status to error
-            $source->updateSyncStatus('error');
+            if ($source) {
+                $source->updateSyncStatus('error');
+            }
             return $this->jsonError($response, 'Sync all failed: ' . $e->getMessage(), 500);
         }
     }

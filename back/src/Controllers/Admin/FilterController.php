@@ -107,7 +107,7 @@ class FilterController
             $filter->name = $body['name'];
             $filter->filter_config = $body['filter_config'];
             $filter->description = $body['description'] ?? null;
-            $filter->use_source_filter = isset($body['use_source_filter']) ? (int) $body['use_source_filter'] : 1;
+            $filter->use_source_filter = isset($body['use_source_filter']) ? (bool) $body['use_source_filter'] : true;
 
             if (!$filter->save()) {
                 return $this->jsonError($response, 'Failed to create filter', 500);
@@ -167,7 +167,7 @@ class FilterController
                 if (!is_bool($useSourceFilter) && $useSourceFilter !== 0 && $useSourceFilter !== 1) {
                     return $this->jsonError($response, 'use_source_filter must be a boolean or 0/1', 400);
                 }
-                $filter->use_source_filter = $useSourceFilter ? 1 : 0;
+                $filter->use_source_filter = (bool) $useSourceFilter;
             }
 
             if (!$filter->save()) {
@@ -268,7 +268,7 @@ class FilterController
             }
 
             // Update filter
-            $filter->use_source_filter = $useSourceFilter ? 1 : 0;
+            $filter->use_source_filter = (bool) $useSourceFilter;
             if (!$filter->save()) {
                 return $this->jsonError($response, 'Failed to update filter', 500);
             }
