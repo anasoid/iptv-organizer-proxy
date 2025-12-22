@@ -43,10 +43,16 @@ class ContentFilterService
     /**
      * Get allowed categories by type
      *
-     * Applies filtering in this order:
-     * 1. Items with allow_deny='allow' are always included (bypass filters)
-     * 2. Items with allow_deny='deny' are always excluded
-     * 3. Items with allow_deny=null are processed through filter rules
+     * Categories are filtered based on access control and their content (channels/streams):
+     * 1. Categories with allow_deny='allow' are always included (shown with all accessible streams)
+     * 2. Categories with allow_deny='deny' are always excluded (hidden completely)
+     * 3. For categories with allow_deny=null:
+     *    - Include only if category has at least 1 stream/channel that passes filters
+     *    - Exclude if all streams in the category are filtered out
+     *
+     * This ensures:
+     * - Categories are shown only if they have content accessible to the client
+     * - Category allow_deny overrides filter rules but respects stream allow_deny
      */
     public function getAllowedCategories(string $type, ?int $limit = null, int $offset = 0): array
     {
@@ -56,26 +62,70 @@ class ContentFilterService
 
         $allCategories = Category::getBySourceAndType($this->client->source_id, $type, $limit, $offset);
 
-        // Separate items by allow_deny field
+        // Separate categories by allow_deny field
         $separated = $this->separateByAllowDeny($allCategories);
 
-        // Always excluded items are removed
+        // Categories with allow_deny='allow' are always included (bypass stream content check)
         $allowed = $separated['allowed'];
+
+        // Categories with allow_deny='deny' are excluded
+        // (don't process them further)
+
+        // Categories that need stream-based filtering (allow_deny=null)
         $toFilter = $separated['filtered'];
 
-        // Apply filter rules to items without override
-        if (!$this->filterService || empty($toFilter)) {
-            $filtered = [];
-        } else {
-            $filtered = $this->filterService->filterCategories($toFilter, $type);
+        // For categories without explicit override, check if they have any allowed streams
+        $filtered = [];
+        if (!empty($toFilter)) {
+            // Get the model class for this stream type
+            $modelClass = match ($type) {
+                'live' => LiveStream::class,
+                'vod' => VodStream::class,
+                'series' => Series::class,
+                default => null,
+            };
+
+            if ($modelClass !== null) {
+                // Check each category for allowed streams
+                foreach ($toFilter as $category) {
+                    $categoryId = $category->getAttribute('category_id') ?? $category->category_id;
+
+                    // Get all streams in this category
+                    $categoryStreams = $modelClass::getByCategory(
+                        $this->client->source_id,
+                        $categoryId
+                    );
+
+                    if (!empty($categoryStreams)) {
+                        // Apply filters to streams in this category
+                        // FilterService will check: stream allow_deny → category allow_deny → filter rules
+                        if ($this->filterService) {
+                            $filteredStreams = $this->filterService->applyToStreams($categoryStreams);
+                        } else {
+                            // No filter assigned, all streams without explicit deny are allowed
+                            $filteredStreams = $categoryStreams;
+                        }
+
+                        // If at least one stream passes the filter, include the category
+                        if (!empty($filteredStreams)) {
+                            $filtered[] = $category;
+                        }
+                    }
+                    // If category has no streams or all are filtered out, it's not included
+                }
+            }
         }
 
-        // Combine: explicitly allowed items + filter-passed items
+        // Combine: explicitly allowed categories + categories with at least one allowed stream
         return array_merge($allowed, $filtered);
     }
 
     /**
      * Get blocked categories by type
+     *
+     * Categories are blocked if:
+     * 1. They have allow_deny='deny', OR
+     * 2. They have allow_deny=null AND have NO streams that pass the filter
      */
     public function getBlockedCategories(string $type): array
     {
@@ -85,14 +135,15 @@ class ContentFilterService
 
         $allCategories = Category::getBySourceAndType($this->client->source_id, $type);
 
-        if (!$this->filterService) {
-            return [];
-        }
+        // Get allowed categories using the same logic as getAllowedCategories
+        $allowedCategories = $this->getAllowedCategories($type);
+        $allowedIds = array_map(fn($c) => $c->getAttribute('category_id') ?? $c->category_id, $allowedCategories);
 
-        $allowedCategories = $this->filterService->filterCategories($allCategories, $type);
-        $allowedIds = array_map(fn($c) => $c->category_id, $allowedCategories);
-
-        return array_filter($allCategories, fn($c) => !in_array($c->category_id, $allowedIds));
+        // Return categories that are NOT in the allowed list
+        return array_filter(
+            $allCategories,
+            fn($c) => !in_array($c->getAttribute('category_id') ?? $c->category_id, $allowedIds)
+        );
     }
 
     /**

@@ -337,6 +337,11 @@ class FilterService
             }
 
             // Convert model object to array
+            $categoryAllowDeny = null;
+            if ($categoryId && isset($categoryCache[$key])) {
+                $categoryAllowDeny = $categoryCache[$key]->getAttribute('allow_deny');
+            }
+
             return [
                 'id' => $stream->getAttribute('id'),
                 'stream_id' => $stream->getAttribute('stream_id'),
@@ -349,32 +354,55 @@ class FilterService
                 'is_adult' => (int) ($stream->getAttribute('is_adult') ?? 0),
                 'num' => $stream->getAttribute('num'),
                 'allow_deny' => $stream->getAttribute('allow_deny'),
+                'category_allow_deny' => $categoryAllowDeny,
             ];
         }, $streams);
 
-        // FIRST: Check allow_deny field (highest priority)
-        // Streams with allow_deny='allow' are ALWAYS included (bypass all filters)
-        // Streams with allow_deny='deny' are ALWAYS excluded
-        // Streams with allow_deny=null proceed through normal filtering
+        // Filtering priority order (highest to lowest):
+        // 1. Stream allow_deny='allow' → ALWAYS INCLUDE (bypass all other checks)
+        // 2. Stream allow_deny='deny' → ALWAYS EXCLUDE (bypass all other checks)
+        // 3. Category allow_deny='allow' → INCLUDE STREAM (bypass filter rules, but not stream allow_deny='deny')
+        // 4. Category allow_deny='deny' → EXCLUDE STREAM (unless stream has allow_deny='allow')
+        // 5. Filter rules → Apply include/exclude rules
+        // 6. Adult content filter → Remove if hidden
+
         $allowed = [];
+        $denied = [];
         $toFilter = [];
 
         foreach ($streamArrays as $stream) {
-            $allowDeny = $stream['allow_deny'] ?? null;
+            $streamAllowDeny = $stream['allow_deny'] ?? null;
+            $categoryAllowDeny = $stream['category_allow_deny'] ?? null;
 
-            if ($allowDeny === 'allow') {
-                // Always include streams marked as 'allow'
+            // Priority 1: Stream allow_deny='allow' - ALWAYS INCLUDE
+            if ($streamAllowDeny === 'allow') {
                 $allowed[] = $stream;
-            } elseif ($allowDeny === 'deny') {
-                // Always exclude streams marked as 'deny'
-                // (don't add to either array, effectively filtering them out)
-            } else {
-                // For streams with no explicit allow_deny, apply normal filtering
-                $toFilter[] = $stream;
+                continue;
             }
+
+            // Priority 2: Stream allow_deny='deny' - ALWAYS EXCLUDE
+            if ($streamAllowDeny === 'deny') {
+                $denied[] = $stream;
+                continue;
+            }
+
+            // Priority 3: Category allow_deny='allow' - INCLUDE STREAM
+            if ($categoryAllowDeny === 'allow') {
+                $allowed[] = $stream;
+                continue;
+            }
+
+            // Priority 4: Category allow_deny='deny' - EXCLUDE STREAM
+            if ($categoryAllowDeny === 'deny') {
+                $denied[] = $stream;
+                continue;
+            }
+
+            // Priority 5&6: Filter rules and adult content filter
+            $toFilter[] = $stream;
         }
 
-        // Apply normal filtering to streams without explicit allow_deny
+        // Apply normal filtering (adult content + rules) to streams without explicit overrides
         $filtered = $toFilter;
 
         // Apply adult content filter
@@ -385,7 +413,7 @@ class FilterService
             $filtered = $this->applyFilterRules($filtered);
         }
 
-        // Combine explicitly allowed streams with filtered results
+        // Combine: explicitly allowed streams + filter-passed streams
         return array_merge($allowed, $filtered);
     }
 
@@ -659,20 +687,39 @@ class FilterService
         foreach ($streams as $stream) {
             $streamId = $stream['id'] ?? null;
 
-            // Check allow_deny field first (highest priority)
-            $allowDeny = $stream['allow_deny'] ?? null;
-            if ($allowDeny === 'allow') {
-                // Always include streams marked as 'allow'
+            // Check allow_deny field priority order:
+            // 1. Stream allow_deny='allow' - ALWAYS INCLUDE
+            $streamAllowDeny = $stream['allow_deny'] ?? null;
+            if ($streamAllowDeny === 'allow') {
                 $result['accepted'][] = $stream;
                 continue;
             }
-            if ($allowDeny === 'deny') {
-                // Always exclude streams marked as 'deny'
+
+            // 2. Stream allow_deny='deny' - ALWAYS EXCLUDE
+            if ($streamAllowDeny === 'deny') {
                 if ($streamId) {
-                    if (!isset($result['rejected']['by_rule']['allow_deny=deny'])) {
-                        $result['rejected']['by_rule']['allow_deny=deny'] = [];
+                    if (!isset($result['rejected']['by_rule']['stream:allow_deny=deny'])) {
+                        $result['rejected']['by_rule']['stream:allow_deny=deny'] = [];
                     }
-                    $result['rejected']['by_rule']['allow_deny=deny'][] = $streamId;
+                    $result['rejected']['by_rule']['stream:allow_deny=deny'][] = $streamId;
+                }
+                continue;
+            }
+
+            // 3. Category allow_deny='allow' - INCLUDE STREAM
+            $categoryAllowDeny = $stream['category_allow_deny'] ?? null;
+            if ($categoryAllowDeny === 'allow') {
+                $result['accepted'][] = $stream;
+                continue;
+            }
+
+            // 4. Category allow_deny='deny' - EXCLUDE STREAM
+            if ($categoryAllowDeny === 'deny') {
+                if ($streamId) {
+                    if (!isset($result['rejected']['by_rule']['category:allow_deny=deny'])) {
+                        $result['rejected']['by_rule']['category:allow_deny=deny'] = [];
+                    }
+                    $result['rejected']['by_rule']['category:allow_deny=deny'][] = $streamId;
                 }
                 continue;
             }
