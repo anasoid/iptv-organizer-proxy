@@ -7,6 +7,7 @@ namespace App\Controllers\Xtream;
 use Psr\Http\Message\ResponseInterface;
 use App\Models\Client;
 use App\Models\Source;
+use App\Services\HttpClient;
 
 class StreamDataController
 {
@@ -69,7 +70,7 @@ class StreamDataController
     }
 
     /**
-     * Proxy stream request to source
+     * Proxy stream request to source (true streaming without buffering)
      */
     private function proxyStreamRequest(
         ResponseInterface $response,
@@ -77,43 +78,59 @@ class StreamDataController
         string $ext
     ): ResponseInterface {
         try {
-            $ch = curl_init();
-            curl_setopt_array($ch, [
-                CURLOPT_URL => $proxyUrl,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_BINARYTRANSFER => true,
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_SSL_VERIFYHOST => false,
-                CURLOPT_FOLLOWLOCATION => false,
-                CURLOPT_TIMEOUT => 300,
-                CURLOPT_CONNECTTIMEOUT => 10,
-                CURLOPT_HEADER => true,
-            ]);
+            $httpClient = HttpClient::getInstance();
+            $httpCode = 200;
+            $responseStarted = false;
 
-            $response_data = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-            $headers = substr($response_data, 0, $header_size);
-            $body = substr($response_data, $header_size);
-            curl_close($ch);
+            // Stream directly from upstream to client without buffering
+            $result = $httpClient->streamDirectToClient(
+                $proxyUrl,
+                // Callback for data chunks (optional - can be used for logging/monitoring)
+                onData: function(string $chunk) {
+                    // Data is already sent to client via echo in streamDirectToClient
+                    // This callback is optional for monitoring/logging
+                },
+                // Callback for headers (optional - can be used for response processing)
+                onHeader: function(string $headerLine) use (&$response, &$httpCode, &$responseStarted) {
+                    // Parse and forward headers
+                    if (stripos($headerLine, 'HTTP/') === 0) {
+                        // Extract HTTP status code
+                        if (preg_match('/HTTP\/\d\.\d\s+(\d+)/', $headerLine, $matches)) {
+                            $httpCode = (int) $matches[1];
+                        }
+                    } else if (strpos($headerLine, ':') !== false) {
+                        // Forward response headers to client
+                        [$name, $value] = explode(':', $headerLine, 2);
+                        $name = trim($name);
+                        $value = trim($value);
 
-            // Parse headers from response
-            $headerLines = explode("\r\n", $headers);
-            foreach ($headerLines as $line) {
-                if (empty(trim($line))) continue;
-                if (stripos($line, 'HTTP/') === 0) continue;
-                
-                if (strpos($line, ':') !== false) {
-                    [$name, $value] = explode(':', $line, 2);
-                    $response = $response->withHeader(trim($name), trim($value));
+                        // Skip certain headers that shouldn't be proxied
+                        $skipHeaders = ['transfer-encoding', 'content-encoding'];
+                        if (!in_array(strtolower($name), $skipHeaders)) {
+                            header("$name: $value");
+                        }
+                    }
                 }
+            );
+
+            // Check for cURL errors
+            if ($result['errno'] !== 0) {
+                $errorMsg = $result['error'] ?? 'Unknown cURL error';
+                error_log("Stream proxy error: $errorMsg (errno: {$result['errno']})");
+                http_response_code(500);
+                echo 'Stream error: ' . htmlspecialchars($errorMsg);
+                return $response->withStatus(500);
             }
 
-            $response->getBody()->write($body);
-            return $response->withStatus($httpCode);
+            // Set HTTP status code from upstream response
+            http_response_code($result['http_code']);
+
+            return $response->withStatus($result['http_code']);
 
         } catch (\Exception $e) {
-            $response->getBody()->write('Stream error: ' . htmlspecialchars($e->getMessage()));
+            error_log("Stream proxy exception: " . $e->getMessage());
+            http_response_code(500);
+            echo 'Stream error: ' . htmlspecialchars($e->getMessage());
             return $response->withStatus(500);
         }
     }
