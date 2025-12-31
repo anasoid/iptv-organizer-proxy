@@ -120,7 +120,7 @@ class XtreamCategoryClient
                     'username' => $credentials['username'],
                 ]);
 
-                $response = $httpClient->get($baseUrl, [
+                $response = $httpClient->getJson($baseUrl, [
                     'query' => [
                         'username' => $credentials['username'],
                         'password' => $credentials['password'],
@@ -216,7 +216,7 @@ class XtreamCategoryClient
                     'url' => $baseUrl,
                 ]);
 
-                $response = $httpClient->get($baseUrl, [
+                $response = $httpClient->getJson($baseUrl, [
                     'query' => [
                         'username' => $credentials['username'],
                         'password' => $credentials['password'],

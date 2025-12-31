@@ -79,34 +79,38 @@ class HttpClient
         return new Client($config);
     }
 
+    // =====================================================================
+    // JSON API Methods (Guzzle-based) - For JSON APIs
+    // =====================================================================
+
     /**
-     * Perform GET request
+     * Perform GET request for JSON APIs
      *
      * @param string $url Request URL
      * @param array $options Request options
      * @return ResponseInterface
      * @throws GuzzleException
      */
-    public function get(string $url, array $options = []): ResponseInterface
+    public function getJson(string $url, array $options = []): ResponseInterface
     {
-        return $this->request('GET', $url, $options);
+        return $this->requestJson('GET', $url, $options);
     }
 
     /**
-     * Perform POST request
+     * Perform POST request for JSON APIs
      *
      * @param string $url Request URL
      * @param array $options Request options
      * @return ResponseInterface
      * @throws GuzzleException
      */
-    public function post(string $url, array $options = []): ResponseInterface
+    public function postJson(string $url, array $options = []): ResponseInterface
     {
-        return $this->request('POST', $url, $options);
+        return $this->requestJson('POST', $url, $options);
     }
 
     /**
-     * Perform generic HTTP request
+     * Perform generic HTTP request for JSON APIs (Guzzle-based)
      *
      * @param string $method HTTP method
      * @param string $url Request URL
@@ -114,12 +118,12 @@ class HttpClient
      * @return ResponseInterface
      * @throws GuzzleException
      */
-    public function request(string $method, string $url, array $options = []): ResponseInterface
+    public function requestJson(string $method, string $url, array $options = []): ResponseInterface
     {
         try {
             return $this->guzzleClient->request($method, $url, $options);
         } catch (GuzzleException $e) {
-            $this->logger->error('HTTP request failed', [
+            $this->logger->error('JSON API request failed', [
                 'method' => $method,
                 'url' => $url,
                 'error' => $e->getMessage(),
@@ -130,6 +134,49 @@ class HttpClient
     }
 
     /**
+     * Backwards compatibility: alias for requestJson()
+     *
+     * @deprecated Use requestJson() instead
+     * @param string $method HTTP method
+     * @param string $url Request URL
+     * @param array $options Request options
+     * @return ResponseInterface
+     * @throws GuzzleException
+     */
+    public function request(string $method, string $url, array $options = []): ResponseInterface
+    {
+        return $this->requestJson($method, $url, $options);
+    }
+
+    /**
+     * Backwards compatibility: alias for getJson()
+     *
+     * @deprecated Use getJson() instead
+     * @param string $url Request URL
+     * @param array $options Request options
+     * @return ResponseInterface
+     * @throws GuzzleException
+     */
+    public function get(string $url, array $options = []): ResponseInterface
+    {
+        return $this->getJson($url, $options);
+    }
+
+    /**
+     * Backwards compatibility: alias for postJson()
+     *
+     * @deprecated Use postJson() instead
+     * @param string $url Request URL
+     * @param array $options Request options
+     * @return ResponseInterface
+     * @throws GuzzleException
+     */
+    public function post(string $url, array $options = []): ResponseInterface
+    {
+        return $this->postJson($url, $options);
+    }
+
+    /**
      * Get underlying Guzzle client (for direct access if needed)
      *
      * @return Client
@@ -137,6 +184,76 @@ class HttpClient
     public function getGuzzleClient(): Client
     {
         return $this->guzzleClient;
+    }
+
+    // =====================================================================
+    // Binary/Stream Methods (cURL-based) - For Streaming & Binary Data
+    // =====================================================================
+
+    /**
+     * Resolve HTTP redirects to get final URL
+     *
+     * @param string $url Original URL
+     * @param array $curlOptions cURL options to use
+     * @return string Final URL after following redirects
+     */
+    private function resolveRedirects(string $url, array $curlOptions = []): string
+    {
+        try {
+            $ch = curl_init();
+
+            // Merge with default options
+            $options = $curlOptions + $this->defaultCurlOptions;
+
+            // Enable redirect following
+            // NOTE: CURLOPT_FOLLOWLOCATION works with RETURNTRANSFER=false
+            $options[CURLOPT_FOLLOWLOCATION] = true;
+            $options[CURLOPT_MAXREDIRS] = 10;
+            $options[CURLOPT_URL] = $url;
+            $options[CURLOPT_RETURNTRANSFER] = false;  // Required for FOLLOWLOCATION to work
+            $options[CURLOPT_HEADER] = false;
+            $options[CURLOPT_TIMEOUT] = 5;  // Short timeout for redirect check
+            $options[CURLOPT_CONNECTTIMEOUT] = 5;
+
+            // Discard output using write function
+            $options[CURLOPT_WRITEFUNCTION] = function($ch, $data) {
+                return strlen($data);  // Discard all data, just track redirects
+            };
+
+            // Remove BINARYTRANSFER as it might conflict
+            unset($options[CURLOPT_BINARYTRANSFER]);
+
+            // Add proxy if enabled
+            if ($this->proxyConfig->isEnabled()) {
+                $proxyOptions = $this->proxyConfig->getCurlOptions();
+                $options = $options + $proxyOptions;
+            }
+
+            // Set curl options
+            foreach ($options as $option => $value) {
+                if (is_int($option) && $option !== CURLOPT_WRITEFUNCTION) {
+                    curl_setopt($ch, $option, $value);
+                }
+            }
+
+            // Set write function callback separately
+            if (isset($options[CURLOPT_WRITEFUNCTION])) {
+                curl_setopt($ch, CURLOPT_WRITEFUNCTION, $options[CURLOPT_WRITEFUNCTION]);
+            }
+
+            // Execute and get final URL
+            curl_exec($ch);
+            $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+            curl_close($ch);
+
+            return $finalUrl ?: $url;
+        } catch (\Throwable $e) {
+            $this->logger->error('Error resolving redirects', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+            return $url;
+        }
     }
 
     /**
@@ -186,14 +303,24 @@ class HttpClient
         array $curlOptions = [],
         bool $followLocation = false
     ): array {
+        // If followLocation is true, we need to resolve redirects first
+        // because CURLOPT_FOLLOWLOCATION doesn't work properly with RETURNTRANSFER=false (streaming mode)
+        if ($followLocation) {
+            $finalUrl = $this->resolveRedirects($url, $curlOptions);
+            if ($finalUrl !== $url) {
+                $url = $finalUrl;
+            }
+        }
+
         $ch = curl_init();
 
         // Merge with default cURL options (user options take precedence)
         // Use + operator instead of array_merge() to preserve numeric (constant) keys
         $curlOptions = $curlOptions + $this->defaultCurlOptions;
 
-        // Set follow location based on parameter
-        $curlOptions[CURLOPT_FOLLOWLOCATION] = $followLocation;
+        // Don't set FOLLOWLOCATION for streaming (it doesn't work with RETURNTRANSFER=false)
+        // We've already resolved redirects above if needed
+        $curlOptions[CURLOPT_FOLLOWLOCATION] = false;
 
         // Configure for streaming without buffering
         $curlOptions[CURLOPT_URL] = $url;
@@ -232,6 +359,11 @@ class HttpClient
 
         // Header callback - called for each header line as it arrives
         curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($curl, $headerLine) use ($onHeader) {
+            // Check if client connection is still active
+            if (connection_aborted()) {
+                return 0;  // Return 0 to abort transfer
+            }
+
             $trimmed = trim($headerLine);
 
             // Skip empty lines
@@ -255,6 +387,12 @@ class HttpClient
 
         // Data callback - called for each chunk of response body as it arrives
         curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($curl, $chunk) use ($onData) {
+            // Check if client connection is still active
+            // If client disconnected, return 0 to abort cURL transfer immediately
+            if (connection_aborted()) {
+                return 0;  // Signal cURL to stop downloading
+            }
+
             $chunkSize = strlen($chunk);
 
             // Send chunk directly to client immediately (no buffering)

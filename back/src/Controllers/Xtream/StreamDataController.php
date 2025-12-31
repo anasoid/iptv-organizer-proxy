@@ -22,15 +22,19 @@ class StreamDataController
         int $streamId,
         string $ext
     ): ResponseInterface {
+        error_log("StreamDataController: handleStreamRequest called with $type/$username/$password/$streamId.$ext");
         $ext = strtolower($ext);
 
         if (!$streamId) {
+            error_log("StreamDataController: Invalid stream_id");
             $response->getBody()->write('Invalid stream_id');
             return $response->withStatus(400);
         }
 
         try {
+            error_log("StreamDataController: Looking up client credentials");
             $clients = Client::findAll(['username' => $username, 'password' => $password]);
+            error_log("StreamDataController: Found " . count($clients) . " clients");
             if (empty($clients)) {
                 $response->getBody()->write('Invalid credentials');
                 return $response->withStatus(401);
@@ -61,9 +65,11 @@ class StreamDataController
             }
 
             // Proxy the stream
+            error_log("StreamDataController: Calling proxyStreamRequest with URL: $streamUrl");
             return $this->proxyStreamRequest($response, $streamUrl, $ext);
 
         } catch (\Exception $e) {
+            error_log("StreamDataController: Exception - " . $e->getMessage());
             $response->getBody()->write('Error: ' . htmlspecialchars($e->getMessage()));
             return $response->withStatus(500);
         }
@@ -82,7 +88,11 @@ class StreamDataController
             $httpCode = 200;
             $responseStarted = false;
 
+            // Check if we should follow redirects when proxying
+            $followLocation = filter_var($_ENV['STREAM_FOLLOW_LOCATION'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
             // Stream directly from upstream to client without buffering
+            // NOTE: Headers forwarding will be added in next iteration
             $result = $httpClient->streamDirectToClient(
                 $proxyUrl,
                 // Callback for data chunks (optional - can be used for logging/monitoring)
@@ -110,7 +120,9 @@ class StreamDataController
                             header("$name: $value");
                         }
                     }
-                }
+                },
+                curlOptions: [],
+                followLocation: $followLocation
             );
 
             // Check for cURL errors
@@ -133,5 +145,47 @@ class StreamDataController
             echo 'Stream error: ' . htmlspecialchars($e->getMessage());
             return $response->withStatus(500);
         }
+    }
+
+    /**
+     * Extract forwardable headers from client request to pass to upstream server
+     *
+     * @param ServerRequestInterface $request Client request
+     * @return array Array of headers in format ['Header: value', 'Another-Header: value']
+     */
+    private function extractForwardableHeaders(ServerRequestInterface $request): array
+    {
+        $headers = [];
+
+        // Headers to skip when forwarding to upstream server
+        $skipHeaders = [
+            'host',                  // Will be set by upstream server
+            'connection',            // Proxy needs to manage this
+            'content-length',        // cURL will set this
+            'transfer-encoding',     // cURL will handle
+            'upgrade',               // Streaming proxy doesn't support upgrades
+            'expect',               // Not needed for stream
+            'proxy-connection',     // Not applicable
+            'proxy-authenticate',   // Not applicable
+            'te',                   // Transfer encoding
+        ];
+
+        // Get all headers from request
+        foreach ($request->getHeaders() as $name => $values) {
+            $lowerName = strtolower($name);
+
+            // Skip headers that shouldn't be forwarded
+            if (in_array($lowerName, $skipHeaders)) {
+                continue;
+            }
+
+            // Join multiple header values with commas (standard HTTP behavior)
+            $value = implode(',', $values);
+
+            // Add to curl headers array in format required by CURLOPT_HTTPHEADER
+            $headers[] = "$name: $value";
+        }
+
+        return $headers;
     }
 }

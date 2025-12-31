@@ -59,7 +59,7 @@ class XtreamAuthenticator
     public function authenticate(): array
     {
         try {
-            $response = $this->httpClient->getGuzzleClient()->get($this->baseUrl, [
+            $response = $this->httpClient->getJson($this->baseUrl, [
                 'query' => [
                     'username' => $this->username,
                     'password' => $this->password,
