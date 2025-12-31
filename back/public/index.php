@@ -184,7 +184,7 @@ $app->group('/api', function ($group) {
 // Note: /streaming/timeshift.php is handled by public/streaming/timeshift.php (nginx routes .php files directly)
 $app->any('/{type:live|movie|series}/{username:[^/]+}/{password:[^/]+}/{streamId:\d+}.{ext:[a-zA-Z0-9]+}', function ($request, $response, $args) {
     $controller = new StreamDataController();
-    return $controller->handleStreamRequest($response, $args['type'], $args['username'], $args['password'], (int)$args['streamId'], $args['ext']);
+    return $controller->handleStreamRequest($request, $response, $args['type'], $args['username'], $args['password'], (int)$args['streamId'], $args['ext']);
 });
 
 // Run application
