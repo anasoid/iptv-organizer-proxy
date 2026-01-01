@@ -58,10 +58,9 @@ jobs:
           flavor: |
             latest=false
           tags: |
-            # For branch pushes: branch name + optional commit SHA
+            # For branch pushes: use branch name (e.g., main, develop)
             type=ref,event=branch
-            type=sha,prefix={{branch}}-,event=branch
-            # For tag pushes: semver versions
+            # For tag pushes: use semantic version (e.g., 1.2.3, 1.2)
             type=semver,pattern={{version}},event=tag
             type=semver,pattern={{major}}.{{minor}},event=tag
             # Main branch: also tag as latest
