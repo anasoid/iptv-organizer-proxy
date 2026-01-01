@@ -136,6 +136,38 @@ export default function SeriesStreams() {
       renderCell: (params) => getCategoryName(params.value),
     },
     {
+      field: 'added',
+      headerName: 'Added Date',
+      width: 140,
+      renderCell: (params) => {
+        const addedDate = params.row.added_date;
+        if (!addedDate) return '—';
+        const date = new Date(addedDate);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      },
+    },
+    {
+      field: 'rating',
+      headerName: 'Rating',
+      width: 90,
+      renderCell: (params) => {
+        const stream = streams.find((s) => s.id === params.row.id);
+        const rating = stream?.data?.rating;
+        if (!rating) return '—';
+        return typeof rating === 'number' ? rating.toFixed(1) : rating;
+      },
+    },
+    {
+      field: 'releasedate',
+      headerName: 'Release Date',
+      width: 120,
+      renderCell: (params) => {
+        const releaseDate = params.row.release_date;
+        if (!releaseDate) return '—';
+        return releaseDate;
+      },
+    },
+    {
       field: 'data',
       headerName: 'Seasons',
       width: 100,

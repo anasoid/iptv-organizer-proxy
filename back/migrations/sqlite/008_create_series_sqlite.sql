@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS series (
     is_adult INTEGER NOT NULL DEFAULT 0 CHECK(is_adult IN (0, 1)),
     labels TEXT, -- Comma-separated extracted labels
     data TEXT, -- Complete API response data (JSON)
+    added_date TEXT, -- Date when series was added (extracted from data.added)
+    release_date TEXT, -- Release date (extracted from data.releaseDate/release_date)
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
@@ -22,6 +24,8 @@ CREATE TABLE IF NOT EXISTS series (
 CREATE INDEX IF NOT EXISTS idx_series_source_category_num ON series(source_id, category_id, num);
 CREATE INDEX IF NOT EXISTS idx_series_source_num ON series(source_id, num);
 CREATE INDEX IF NOT EXISTS idx_series_allow_deny ON series(source_id, allow_deny);
+CREATE INDEX IF NOT EXISTS idx_series_added_date ON series(source_id, added_date);
+CREATE INDEX IF NOT EXISTS idx_series_release_date ON series(source_id, release_date);
 
 -- Trigger to update updated_at timestamp
 CREATE TRIGGER IF NOT EXISTS trg_series_updated_at

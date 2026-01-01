@@ -13,11 +13,15 @@ CREATE TABLE IF NOT EXISTS live_streams (
     is_adult TINYINT(1) NOT NULL DEFAULT 0,
     labels TEXT COMMENT 'Comma-separated extracted labels',
     data JSON COMMENT 'Complete API response data',
+    added_date DATE NULL COMMENT 'Date when stream was added (extracted from data.added)',
+    release_date DATE NULL COMMENT 'Release date (extracted from data.releaseDate/release_date)',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     UNIQUE KEY uk_source_stream (source_id, stream_id),
     INDEX idx_source_category_num (source_id, category_id, num),
     INDEX idx_source_num (source_id, num),
-    INDEX idx_live_streams_allow_deny (source_id, allow_deny)
+    INDEX idx_live_streams_allow_deny (source_id, allow_deny),
+    INDEX idx_live_streams_added_date (source_id, added_date),
+    INDEX idx_live_streams_release_date (source_id, release_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -39,6 +39,8 @@ abstract class BaseStreamModel extends BaseModel
         'allow_deny',
         'labels',
         'data',
+        'added_date',
+        'release_date',
     ];
 
     /**

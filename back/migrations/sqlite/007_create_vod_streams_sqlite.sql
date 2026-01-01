@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS vod_streams (
     is_adult INTEGER NOT NULL DEFAULT 0 CHECK(is_adult IN (0, 1)),
     labels TEXT, -- Comma-separated extracted labels
     data TEXT, -- Complete API response data (JSON)
+    added_date TEXT, -- Date when stream was added (extracted from data.added)
+    release_date TEXT, -- Release date (extracted from data.releaseDate/release_date)
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
@@ -22,6 +24,8 @@ CREATE TABLE IF NOT EXISTS vod_streams (
 CREATE INDEX IF NOT EXISTS idx_vod_streams_source_category_num ON vod_streams(source_id, category_id, num);
 CREATE INDEX IF NOT EXISTS idx_vod_streams_source_num ON vod_streams(source_id, num);
 CREATE INDEX IF NOT EXISTS idx_vod_streams_allow_deny ON vod_streams(source_id, allow_deny);
+CREATE INDEX IF NOT EXISTS idx_vod_streams_added_date ON vod_streams(source_id, added_date);
+CREATE INDEX IF NOT EXISTS idx_vod_streams_release_date ON vod_streams(source_id, release_date);
 
 -- Trigger to update updated_at timestamp
 CREATE TRIGGER IF NOT EXISTS trg_vod_streams_updated_at
