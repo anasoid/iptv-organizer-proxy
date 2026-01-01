@@ -4,13 +4,14 @@ on:
   push:
     branches:
       - main
-      - devlop
+      - develop
+      - release/*
     tags:
-      - 'v*'
+      - "v*"
   pull_request:
     branches:
       - main
-      - devlop
+      - develop
 
 env:
   REGISTRY: ghcr.io
@@ -30,7 +31,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Build admin UI
         working-directory: ./admin
@@ -138,15 +139,15 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
         continue-on-error: true
 
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v2
         if: always()
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: "trivy-results.sarif"
         continue-on-error: true
