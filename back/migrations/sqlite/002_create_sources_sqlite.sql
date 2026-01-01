@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS sources (
     next_sync TEXT,
     sync_status TEXT NOT NULL DEFAULT 'idle' CHECK(sync_status IN ('idle', 'syncing', 'error')),
     is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
+    enableproxy INTEGER NOT NULL DEFAULT 0 CHECK(enableproxy IN (0, 1)), -- Enable HTTP proxy for upstream requests
+    disablestreamproxy INTEGER NOT NULL DEFAULT 0 CHECK(disablestreamproxy IN (0, 1)), -- Disable /proxy endpoint for redirects
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
