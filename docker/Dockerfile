@@ -71,10 +71,15 @@ RUN chmod +x /app/docker-entrypoint.sh && \
     echo "memory_limit = 32M" >> /usr/local/etc/php.ini-production && \
     echo "post_max_size = 25M" >> /usr/local/etc/php.ini-production && \
     echo "upload_max_filesize = 25M" >> /usr/local/etc/php.ini-production && \
-    echo "max_execution_time = 180" >> /usr/local/etc/php.ini-production && \
-    echo "default_socket_timeout = 300" >> /usr/local/etc/php.ini-production && \
+    echo "max_execution_time = 1800" >> /usr/local/etc/php.ini-production && \
+    echo "default_socket_timeout = 1800" >> /usr/local/etc/php.ini-production && \
     echo "error_log = /logs/iptv/php-errors.log" >> /usr/local/etc/php.ini-production && \
     echo "log_errors = On" >> /usr/local/etc/php.ini-production && \
+    echo "" >> /usr/local/etc/php.ini-production && \
+    echo "; Proxy configuration for outgoing requests" >> /usr/local/etc/php.ini-production && \
+    echo "allow_url_fopen = On" >> /usr/local/etc/php.ini-production && \
+    echo "allow_url_include = Off" >> /usr/local/etc/php.ini-production && \
+    echo "default_socket_timeout = 1800" >> /usr/local/etc/php.ini-production && \
     cp /usr/local/etc/php.ini-production /usr/local/etc/php.ini && \
     chmod -R 755 /app/src /app/config /app/bin /app/migrations /app/public && \
     find /app/src -name "*.php" -exec chmod 644 {} \; && \
