@@ -158,6 +158,15 @@ export default function LiveStreams() {
       renderCell: (params) => (params.value ? <Chip label="Adult" color="error" size="small" /> : '—'),
     },
     {
+      field: 'created_at',
+      headerName: 'Created',
+      width: 140,
+      renderCell: (params) => {
+        const date = new Date(params.value);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      },
+    },
+    {
       field: 'allow_deny',
       headerName: 'Access Control',
       width: 120,
