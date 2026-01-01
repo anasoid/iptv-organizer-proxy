@@ -316,24 +316,18 @@ class HttpClient
         array $curlOptions = [],
         bool $followLocation = false
     ): array {
-        // If followLocation is true, we need to resolve redirects first
-        // because CURLOPT_FOLLOWLOCATION doesn't work properly with RETURNTRANSFER=false (streaming mode)
-        if ($followLocation) {
-            $finalUrl = $this->resolveRedirects($url, $curlOptions);
-            if ($finalUrl !== $url) {
-                $url = $finalUrl;
-            }
-        }
-
         $ch = curl_init();
 
         // Merge with default cURL options (user options take precedence)
         // Use + operator instead of array_merge() to preserve numeric (constant) keys
         $curlOptions = $curlOptions + $this->defaultCurlOptions;
 
-        // Don't set FOLLOWLOCATION for streaming (it doesn't work with RETURNTRANSFER=false)
-        // We've already resolved redirects above if needed
-        $curlOptions[CURLOPT_FOLLOWLOCATION] = false;
+        // Enable FOLLOWLOCATION if requested
+        // cURL can follow redirects even with RETURNTRANSFER=false when using callbacks
+        $curlOptions[CURLOPT_FOLLOWLOCATION] = $followLocation;
+        if ($followLocation) {
+            $curlOptions[CURLOPT_MAXREDIRS] = 10;
+        }
 
         // Configure for streaming without buffering
         $curlOptions[CURLOPT_URL] = $url;
