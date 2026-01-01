@@ -149,7 +149,7 @@ class StreamDataController
             error_log("StreamDataController: No redirect, streaming data normally");
 
             // Proxy the stream normally
-            return $this->proxyStreamRequest($request, $response, $streamUrl, $ext, (bool) $source->enableproxy);
+            return $this->proxyStreamRequest($request, $response, $streamUrl, $ext, (bool) $source->enableproxy, (bool) $source->stream_follow_location);
 
         } catch (\Exception $e) {
             error_log("StreamDataController: Exception - " . $e->getMessage());
@@ -167,7 +167,8 @@ class StreamDataController
         ResponseInterface $response,
         string $proxyUrl,
         string $ext,
-        ?bool $sourceEnableProxy = null
+        ?bool $sourceEnableProxy = null,
+        bool $streamFollowLocation = true
     ): ResponseInterface {
         try {
             // Log streaming start
@@ -179,8 +180,8 @@ class StreamDataController
             $responseStarted = false;
             $responseHeaders = [];
 
-            // Check if we should follow redirects when proxying
-            $followLocation = filter_var($_ENV['STREAM_FOLLOW_LOCATION'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            // Use source-level configuration for following redirects
+            $followLocation = $streamFollowLocation;
 
             // Extract and format request headers for logging and forwarding
             $requestHeaders = [];

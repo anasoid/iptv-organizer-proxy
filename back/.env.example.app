@@ -46,12 +46,9 @@ CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
 #   Default: false
 STREAM_USE_REDIRECT=false
 
-# STREAM_FOLLOW_LOCATION: Automatically follow HTTP redirects when proxying streams
-#   When true: Follows 302/301 redirects and returns final stream data to client
-#   When false: Returns upstream response (302/301) directly to client, client must follow redirect
-#   Note: Only used when STREAM_USE_REDIRECT=false (proxying mode)
-#   Default: false
-STREAM_FOLLOW_LOCATION=false
+# STREAM_FOLLOW_LOCATION is now configured per-source in the admin panel
+# See source configuration for 'Follow HTTP Redirects When Streaming' option
+
 
 # XMLTV_USE_REDIRECT: Use 302 redirect for XMLTV/EPG requests instead of proxying
 #   When true: Returns immediate 302 redirect to upstream EPG URL

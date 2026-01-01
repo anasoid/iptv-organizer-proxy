@@ -24,6 +24,7 @@ use RuntimeException;
  * @property int $is_active
  * @property int $enableproxy
  * @property int $disablestreamproxy
+ * @property int $stream_follow_location
  * @property string $created_at
  * @property string $updated_at
  */
@@ -42,6 +43,7 @@ class Source extends BaseModel
         'is_active',
         'enableproxy',
         'disablestreamproxy',
+        'stream_follow_location',
     ];
 
     /**

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect } from "react";
 import {
   DialogTitle,
   DialogContent,
@@ -11,11 +11,11 @@ import {
   Checkbox,
   Box,
   Typography,
-} from '@mui/material';
-import { useForm, Controller } from 'react-hook-form';
-import { useMutation } from '@tanstack/react-query';
-import type { Source } from '../services/sourcesApi';
-import sourcesApi from '../services/sourcesApi';
+} from "@mui/material";
+import { useForm, Controller } from "react-hook-form";
+import { useMutation } from "@tanstack/react-query";
+import type { Source } from "../services/sourcesApi";
+import sourcesApi from "../services/sourcesApi";
 
 interface SourceFormProps {
   source?: Source | null;
@@ -23,7 +23,11 @@ interface SourceFormProps {
   onCancel: () => void;
 }
 
-export default function SourceForm({ source, onSuccess, onCancel }: SourceFormProps) {
+export default function SourceForm({
+  source,
+  onSuccess,
+  onCancel,
+}: SourceFormProps) {
   const {
     register,
     handleSubmit,
@@ -33,24 +37,25 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
     control,
   } = useForm<Source>({
     defaultValues: source || {
-      name: '',
-      url: '',
-      username: '',
-      password: '',
+      name: "",
+      url: "",
+      username: "",
+      password: "",
       sync_interval: 1,
       is_active: 1,
-      sync_status: 'idle',
+      sync_status: "idle",
       enableproxy: 0,
       disablestreamproxy: 0,
+      stream_follow_location: 1,
     },
   });
 
   // eslint-disable-next-line react-hooks/incompatible-library
-  const urlValue = watch('url');
+  const urlValue = watch("url");
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: Omit<Source, 'id' | 'created_at' | 'updated_at'>) =>
+    mutationFn: (data: Omit<Source, "id" | "created_at" | "updated_at">) =>
       sourcesApi.createSource(data),
     onSuccess,
   });
@@ -95,23 +100,27 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
 
   return (
     <>
-      <DialogTitle>{source ? 'Edit Source' : 'Add Source'}</DialogTitle>
-      <DialogContent sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <DialogTitle>{source ? "Edit Source" : "Add Source"}</DialogTitle>
+      <DialogContent
+        sx={{ pt: 2, display: "flex", flexDirection: "column", gap: 2 }}
+      >
         {error && (
           <Alert severity="error">
-            {error instanceof Error ? error.message : 'An error occurred'}
+            {error instanceof Error ? error.message : "An error occurred"}
           </Alert>
         )}
         {testMutation.data && (
           <Alert severity="success">
-            {testMutation.data.connected ? 'Connection successful!' : 'Connection failed'}
+            {testMutation.data.connected
+              ? "Connection successful!"
+              : "Connection failed"}
           </Alert>
         )}
 
         <TextField
           label="Name"
           fullWidth
-          {...register('name', { required: 'Name is required' })}
+          {...register("name", { required: "Name is required" })}
           error={!!errors.name}
           helperText={errors.name?.message}
         />
@@ -120,11 +129,11 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
           label="URL"
           fullWidth
           type="url"
-          {...register('url', {
-            required: 'URL is required',
+          {...register("url", {
+            required: "URL is required",
             pattern: {
               value: /^https?:\/\/.+/,
-              message: 'Please enter a valid URL',
+              message: "Please enter a valid URL",
             },
           })}
           error={!!errors.url}
@@ -134,7 +143,7 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
         <TextField
           label="Username"
           fullWidth
-          {...register('username', { required: 'Username is required' })}
+          {...register("username", { required: "Username is required" })}
           error={!!errors.username}
           helperText={errors.username?.message}
         />
@@ -143,7 +152,7 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
           label="Password"
           fullWidth
           type="password"
-          {...register('password', { required: 'Password is required' })}
+          {...register("password", { required: "Password is required" })}
           error={!!errors.password}
           helperText={errors.password?.message}
         />
@@ -153,15 +162,15 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
           fullWidth
           type="number"
           inputProps={{ min: 1 }}
-          {...register('sync_interval', {
-            required: 'Sync interval is required',
-            min: { value: 1, message: 'Minimum is 1 day' },
+          {...register("sync_interval", {
+            required: "Sync interval is required",
+            min: { value: 1, message: "Minimum is 1 day" },
           })}
           error={!!errors.sync_interval}
           helperText={errors.sync_interval?.message}
         />
 
-        <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2 }}>
+        <Box sx={{ borderTop: 1, borderColor: "divider", pt: 2, mt: 2 }}>
           <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
             Proxy Configuration
           </Typography>
@@ -181,8 +190,12 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
               />
             )}
           />
-          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4, mb: 1 }}>
-            When enabled, all upstream requests from this source go through the configured HTTP proxy server
+          <Typography
+            variant="caption"
+            sx={{ display: "block", color: "text.secondary", ml: 4, mb: 1 }}
+          >
+            When enabled, all upstream requests from this source go through the
+            configured HTTP proxy server
           </Typography>
 
           <Controller
@@ -196,12 +209,39 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
                     onChange={(e) => field.onChange(e.target.checked ? 1 : 0)}
                   />
                 }
-                label="Disable Stream Proxy Endpoint (Direct Redirects)"
+                label="Disable binary Stream Proxy Endpoint (Direct Redirects)"
               />
             )}
           />
-          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4 }}>
-            When enabled, stream redirects are sent directly to client instead of routing through /proxy endpoint
+          <Typography
+            variant="caption"
+            sx={{ display: "block", color: "text.secondary", ml: 4, mb: 1 }}
+          >
+            When enabled, stream redirects are sent directly to client instead
+            of routing through /proxy endpoint
+          </Typography>
+
+          <Controller
+            name="stream_follow_location"
+            control={control}
+            render={({ field }) => (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={Boolean(field.value)}
+                    onChange={(e) => field.onChange(e.target.checked ? 1 : 0)}
+                  />
+                }
+                label="Follow HTTP Redirects When Streaming"
+              />
+            )}
+          />
+          <Typography
+            variant="caption"
+            sx={{ display: "block", color: "text.secondary", ml: 4 }}
+          >
+            When enabled, the proxy will automatically follow HTTP redirects
+            (301/302) from the upstream source when streaming content
           </Typography>
         </Box>
       </DialogContent>
@@ -213,7 +253,7 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
             disabled={testMutation.isPending}
             variant="outlined"
           >
-            {testMutation.isPending ? 'Testing...' : 'Test Connection'}
+            {testMutation.isPending ? "Testing..." : "Test Connection"}
           </Button>
         )}
         <Button
@@ -222,7 +262,7 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
           disabled={isLoading}
         >
           {isLoading && <CircularProgress size={20} sx={{ mr: 1 }} />}
-          {source ? 'Update' : 'Create'}
+          {source ? "Update" : "Create"}
         </Button>
       </DialogActions>
     </>

@@ -13,6 +13,7 @@ export interface Source {
   is_active: number;
   enableproxy?: number;
   disablestreamproxy?: number;
+  stream_follow_location?: number;
   created_at?: string;
   updated_at?: string;
 }

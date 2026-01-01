@@ -175,7 +175,7 @@ class ProxyController
                 header('Connection: close');
             }
 
-            // Stream directly from upstream to client, ALWAYS following redirects
+            // Stream directly from upstream to client, following redirects based on source configuration
             $result = $httpClient->streamDirectToClient(
                 $url,
                 // Callback for data chunks
@@ -224,7 +224,7 @@ class ProxyController
                     }
                 },
                 curlOptions: [CURLOPT_HTTPHEADER => $curlHeaders],
-                followLocation: true,  // ALWAYS follow redirects in proxy endpoint
+                followLocation: $source ? (bool) $source->stream_follow_location : true,  // Use source-level configuration
                 sourceEnableProxy: $source ? (bool) $source->enableproxy : null
             );
 
