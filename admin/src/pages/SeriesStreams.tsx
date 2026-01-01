@@ -109,7 +109,7 @@ export default function SeriesStreams() {
 
   if (categoriesData?.data) {
     categoriesData.data.forEach((cat: Category) => {
-      categories[cat.id] = cat.category_name;
+      categories[cat.category_id] = cat.category_name;
     });
   }
 
