@@ -320,6 +320,19 @@ class HttpClient
         bool $followLocation = false,
         ?bool $sourceEnableProxy = null
     ): array {
+        // Track client connection status
+        $clientConnected = true;
+
+        // Stop execution if client disconnects (don't keep running)
+        ignore_user_abort(false);
+
+        // Register shutdown function to detect client disconnect
+        register_shutdown_function(function() use (&$clientConnected) {
+            if (connection_aborted()) {
+                $clientConnected = false;
+            }
+        });
+
         $ch = curl_init();
 
         // Merge with default cURL options (user options take precedence)
@@ -336,6 +349,11 @@ class HttpClient
         // Configure for streaming without buffering
         $curlOptions[CURLOPT_URL] = $url;
         $curlOptions[CURLOPT_RETURNTRANSFER] = false;  // Don't buffer response
+
+        // Add low-speed timeout to detect stalled connections quickly
+        // If less than 1 byte is transferred in 5 seconds, abort
+        $curlOptions[CURLOPT_LOW_SPEED_LIMIT] = 1;
+        $curlOptions[CURLOPT_LOW_SPEED_TIME] = 5;
 
         // Add proxy configuration if enabled (with source-level override)
         if ($this->proxyConfig->shouldUseProxy($sourceEnableProxy)) {
@@ -370,9 +388,10 @@ class HttpClient
         // Set callbacks separately
 
         // Header callback - called for each header line as it arrives
-        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($curl, $headerLine) use ($onHeader) {
+        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($curl, $headerLine) use ($onHeader, &$clientConnected) {
             // Check if client connection is still active
-            if (connection_aborted()) {
+            if (connection_aborted() || !$clientConnected) {
+                error_log("HttpClient: Client disconnected during header processing, aborting upstream download");
                 return 0;  // Return 0 to abort transfer
             }
 
@@ -398,10 +417,11 @@ class HttpClient
         });
 
         // Data callback - called for each chunk of response body as it arrives
-        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($curl, $chunk) use ($onData) {
+        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($curl, $chunk) use ($onData, &$clientConnected) {
             // Check if client connection is still active
             // If client disconnected, return 0 to abort cURL transfer immediately
-            if (connection_aborted()) {
+            if (connection_aborted() || !$clientConnected) {
+                error_log("HttpClient: Client disconnected during streaming, aborting upstream download");
                 return 0;  // Signal cURL to stop downloading
             }
 

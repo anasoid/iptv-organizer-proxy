@@ -155,6 +155,9 @@ class ProxyController
             $upstreamHeadersStr = !empty($curlHeaders) ? implode(" | ", $curlHeaders) : "No headers";
             error_log("ProxyController: Request headers to forward - {$upstreamHeadersStr}");
 
+            // Stop execution immediately if client disconnects (don't keep uploading)
+            ignore_user_abort(false);
+
             // Disable output buffering and compression for streaming
             if (function_exists('ini_set')) {
                 ini_set('output_buffering', '0');
@@ -164,6 +167,12 @@ class ProxyController
             // Clear any existing output buffers
             while (ob_get_level()) {
                 ob_end_clean();
+            }
+
+            // Send Connection: close header to prevent keep-alive
+            // This ensures the connection closes immediately when client disconnects
+            if (!headers_sent()) {
+                header('Connection: close');
             }
 
             // Stream directly from upstream to client, ALWAYS following redirects
