@@ -26,7 +26,20 @@ class StreamDataController
     ): ResponseInterface {
         $ext = strtolower($ext);
 
+        // Log initial stream request
+        error_log("========== STREAM REQUEST ==========");
+        error_log("StreamDataController: Client request URL - " . $request->getRequestTarget());
+        error_log("StreamDataController: Stream request - Type: {$type}, StreamID: {$streamId}, Ext: {$ext}");
+
+        // Log client request headers
+        $clientHeaders = [];
+        foreach ($request->getHeaders() as $name => $values) {
+            $clientHeaders[] = "{$name}: " . implode(",", $values);
+        }
+        error_log("StreamDataController: Client request headers - " . implode(" | ", $clientHeaders));
+
         if (!$streamId) {
+            error_log("StreamDataController: Final status code - 400");
             $response->getBody()->write('Invalid stream_id');
             return $response->withStatus(400);
         }
@@ -34,6 +47,7 @@ class StreamDataController
         try {
             $clients = Client::findAll(['username' => $username, 'password' => $password]);
             if (empty($clients)) {
+                error_log("StreamDataController: Final status code - 401");
                 $response->getBody()->write('Invalid credentials');
                 return $response->withStatus(401);
             }
@@ -41,12 +55,14 @@ class StreamDataController
             $client = $clients[0];
 
             if (!$client->source_id) {
+                error_log("StreamDataController: Final status code - 400");
                 $response->getBody()->write('No source configured');
                 return $response->withStatus(400);
             }
 
             $source = Source::find($client->source_id);
             if (!$source) {
+                error_log("StreamDataController: Final status code - 404");
                 $response->getBody()->write('Source not found');
                 return $response->withStatus(404);
             }
@@ -56,17 +72,73 @@ class StreamDataController
             $sourcePassword = $source->password;
             $streamUrl = rtrim($source->url, '/') . '/' . $type . '/' . $sourceUsername . '/' . $sourcePassword . '/' . $streamId . '.' . $ext;
 
+            // Log the upstream URL
+            error_log("StreamDataController: Upstream stream URL - {$streamUrl}");
+
             // Check if we should redirect instead of proxy
             $useRedirect = filter_var($_ENV['STREAM_USE_REDIRECT'] ?? false, FILTER_VALIDATE_BOOLEAN);
             if ($useRedirect) {
                 return $response->withStatus(302)->withHeader('Location', $streamUrl);
             }
 
-            // Proxy the stream
+            // Extract request headers for status check
+            $requestHeaders = [];
+            $curlHeaders = [];
+            foreach ($request->getHeaders() as $name => $values) {
+                $headerValue = implode(",", $values);
+                $requestHeaders[] = "{$name}: {$headerValue}";
+
+                // Determine if this header should be forwarded to upstream
+                $skipHeaders = [
+                    'host',                  // Will be set by upstream server
+                    'connection',            // Proxy needs to manage this
+                    'content-length',        // cURL will set this
+                    'transfer-encoding',     // cURL will handle
+                    'upgrade',               // Streaming proxy doesn't support upgrades
+                    'expect',               // Not needed for stream
+                    'proxy-connection',     // Not applicable
+                    'proxy-authenticate',   // Not applicable
+                    'te',                   // Transfer encoding
+                ];
+
+                if (!in_array(strtolower($name), $skipHeaders)) {
+                    $curlHeaders[] = "{$name}: {$headerValue}";
+                }
+            }
+
+            // Check upstream status for 302 redirects
+            $upstreamStatus = $this->checkUpstreamStatus($streamUrl, $curlHeaders);
+
+            // Log upstream response status
+            error_log("StreamDataController: Upstream response status - {$upstreamStatus['status']}");
+            if (!empty($upstreamStatus['location'])) {
+                error_log("StreamDataController: Upstream Location header - {$upstreamStatus['location']}");
+            }
+
+            // If 302 redirect, encode the redirect URL and return proxy URL instead
+            if ($upstreamStatus['status'] === 302 && !empty($upstreamStatus['location'])) {
+                $encodedUrl = base64_encode($upstreamStatus['location']);
+                $proxyUrl = "/proxy/{$username}/{$password}?url={$encodedUrl}";
+
+                error_log("StreamDataController: 302 redirect detected, returning client redirect to proxy endpoint");
+                error_log("StreamDataController: Client redirect URL - {$proxyUrl}");
+                error_log("StreamDataController: Final status code - 302");
+                error_log("=================================");
+
+                return $response
+                    ->withStatus(302)
+                    ->withHeader('Location', $proxyUrl);
+            }
+
+            // Log that we're streaming normally
+            error_log("StreamDataController: No redirect, streaming data normally");
+
+            // Proxy the stream normally
             return $this->proxyStreamRequest($request, $response, $streamUrl, $ext);
 
         } catch (\Exception $e) {
             error_log("StreamDataController: Exception - " . $e->getMessage());
+            error_log("StreamDataController: Final status code - 500");
             $response->getBody()->write('Error: ' . htmlspecialchars($e->getMessage()));
             return $response->withStatus(500);
         }
@@ -82,6 +154,10 @@ class StreamDataController
         string $ext
     ): ResponseInterface {
         try {
+            // Log streaming start
+            error_log("========== STREAMING DATA ==========");
+            error_log("StreamDataController: Starting stream from - {$proxyUrl}");
+
             $httpClient = HttpClient::getInstance();
             $httpCode = 200;
             $responseStarted = false;
@@ -115,6 +191,10 @@ class StreamDataController
                 }
             }
             $requestHeadersStr = !empty($requestHeaders) ? implode(" | ", $requestHeaders) : "No headers";
+
+            // Log request headers that will be forwarded upstream
+            $upstreamHeadersStr = !empty($curlHeaders) ? implode(" | ", $curlHeaders) : "No headers";
+            error_log("StreamDataController: Request headers to forward - {$upstreamHeadersStr}");
 
             // Disable output buffering and compression for streaming
             if (function_exists('ini_set')) {
@@ -182,6 +262,7 @@ class StreamDataController
             if ($result['errno'] !== 0) {
                 $errorMsg = $result['error'] ?? 'Unknown cURL error';
                 error_log("StreamDataController: cURL error - $errorMsg (errno: {$result['errno']})");
+                error_log("StreamDataController: Final status code - 500");
                 if (!headers_sent()) {
                     http_response_code(500);
                 }
@@ -189,13 +270,82 @@ class StreamDataController
                 return $response->withStatus(500);
             }
 
+            // Log response status and headers
+            error_log("StreamDataController: Response status - {$httpCode}");
+            if (!empty($responseHeaders)) {
+                error_log("StreamDataController: Response headers - " . implode(" | ", $responseHeaders));
+            }
+            error_log("StreamDataController: Final status code - {$httpCode}");
+            error_log("StreamDataController: Stream completed successfully");
+            error_log("=================================");
+
             return $response->withStatus($httpCode);
 
         } catch (\Exception $e) {
             error_log("StreamDataController: Exception - " . $e->getMessage());
+            error_log("StreamDataController: Final status code - 500");
             http_response_code(500);
             echo 'Stream error: ' . htmlspecialchars($e->getMessage());
             return $response->withStatus(500);
+        }
+    }
+
+    /**
+     * Check upstream status without streaming body
+     *
+     * Makes a HEAD or GET request to check the upstream response status and location header.
+     * Used to detect 302 redirects before attempting to stream.
+     *
+     * @param string $url The URL to check
+     * @param array $curlHeaders Headers to forward to upstream
+     * @return array Array with keys: ['status' => int, 'location' => string|null]
+     */
+    private function checkUpstreamStatus(string $url, array $curlHeaders = []): array
+    {
+        try {
+            $httpClient = HttpClient::getInstance();
+
+            // Use GET request with RETURNTRANSFER to check status and headers without buffering
+            // (Some servers don't handle HEAD requests correctly and won't return redirects)
+            $curlOptions = [
+                CURLOPT_HTTPHEADER => $curlHeaders,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HEADER => true,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_CONNECTTIMEOUT => 5,
+            ];
+
+            // Make request to get headers
+            $result = $httpClient->curlRequest($url, $curlOptions, followLocation: false);
+
+            $httpCode = $result['status'];
+            $location = null;
+
+            // Parse headers to find Location header
+            if (!empty($result['headers'])) {
+                $headerLines = explode("\r\n", $result['headers']);
+                foreach ($headerLines as $headerLine) {
+                    $headerLine = trim($headerLine);
+                    if (stripos($headerLine, 'location:') === 0) {
+                        $location = trim(substr($headerLine, 9));  // strlen('location:') = 9
+                        break;
+                    }
+                }
+            }
+
+            return [
+                'status' => $httpCode,
+                'location' => $location,
+                'errno' => $result['errno'],
+            ];
+
+        } catch (\Exception $e) {
+            error_log("StreamDataController: Error checking upstream status - " . $e->getMessage());
+            return [
+                'status' => 0,
+                'location' => null,
+                'errno' => 1,
+            ];
         }
     }
 
