@@ -213,8 +213,20 @@ class ProxyController
             // Check for cURL errors
             if ($result['errno'] !== 0) {
                 $errorMsg = $result['error'] ?? 'Unknown cURL error';
+
+                // CURLE_WRITE_ERROR (errno 23) often means client disconnected
+                // This is NORMAL for IPTV streams (clients test, seek, or drop connections)
+                if ($result['errno'] === 23) {
+                    error_log("ProxyController: Client disconnected (normal for IPTV playback)");
+                    error_log("ProxyController: Final status code - " . ($httpCode ?: 200));
+                    error_log("=================================");
+                    return $response->withStatus($httpCode ?: 200);
+                }
+
+                // Real streaming errors - return 500
                 error_log("ProxyController: cURL error - $errorMsg (errno: {$result['errno']})");
                 error_log("ProxyController: Final status code - 500");
+                error_log("=================================");
                 if (!headers_sent()) {
                     http_response_code(500);
                 }

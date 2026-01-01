@@ -201,6 +201,7 @@ class HttpClient
     {
         try {
             $ch = curl_init();
+            $headersComplete = false;  // Track when headers finish
 
             // Merge with default options
             $options = $curlOptions + $this->defaultCurlOptions;
@@ -212,13 +213,8 @@ class HttpClient
             $options[CURLOPT_URL] = $url;
             $options[CURLOPT_RETURNTRANSFER] = false;  // Required for FOLLOWLOCATION to work
             $options[CURLOPT_HEADER] = false;
-            $options[CURLOPT_TIMEOUT] = 5;  // Short timeout for redirect check
+            $options[CURLOPT_TIMEOUT] = 10;  // Increased from 5 for better reliability
             $options[CURLOPT_CONNECTTIMEOUT] = 5;
-
-            // Discard output using write function
-            $options[CURLOPT_WRITEFUNCTION] = function($ch, $data) {
-                return strlen($data);  // Discard all data, just track redirects
-            };
 
             // Remove BINARYTRANSFER as it might conflict
             unset($options[CURLOPT_BINARYTRANSFER]);
@@ -231,15 +227,32 @@ class HttpClient
 
             // Set curl options
             foreach ($options as $option => $value) {
-                if (is_int($option) && $option !== CURLOPT_WRITEFUNCTION) {
+                if (is_int($option)) {
                     curl_setopt($ch, $option, $value);
                 }
             }
 
-            // Set write function callback separately
-            if (isset($options[CURLOPT_WRITEFUNCTION])) {
-                curl_setopt($ch, CURLOPT_WRITEFUNCTION, $options[CURLOPT_WRITEFUNCTION]);
-            }
+            // Add header callback to detect when headers complete
+            // This allows us to abort transfer before body download starts
+            curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($curl, $headerLine) use (&$headersComplete) {
+                // Empty line signals end of headers
+                if (trim($headerLine) === '') {
+                    $headersComplete = true;
+                }
+                return strlen($headerLine);
+            });
+
+            // Write function aborts transfer after headers to prevent body download
+            // This is the key optimization - we only need headers to follow redirects
+            curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($curl, $data) use (&$headersComplete) {
+                if ($headersComplete) {
+                    // Headers complete, abort transfer - don't need body
+                    // Returning 0 signals cURL to stop downloading
+                    return 0;
+                }
+                // Continue until headers complete (shouldn't have body data before headers end)
+                return strlen($data);
+            });
 
             // Execute and get final URL
             curl_exec($ch);
