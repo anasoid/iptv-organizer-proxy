@@ -225,22 +225,6 @@ class AccessControlController
     }
 
     /**
-     * Determine stream type based on model class
-     */
-    private function getStreamType($stream): string
-    {
-        $class = get_class($stream);
-        if (strpos($class, 'LiveStream') !== false) {
-            return 'live';
-        } elseif (strpos($class, 'VodStream') !== false) {
-            return 'vod';
-        } elseif (strpos($class, 'Series') !== false) {
-            return 'series';
-        }
-        return 'unknown';
-    }
-
-    /**
      * Return JSON response
      */
     private function jsonResponse(ResponseInterface $response, array $data, int $statusCode = 200): ResponseInterface

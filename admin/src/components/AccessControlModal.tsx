@@ -10,7 +10,6 @@ import {
   Alert,
   Tabs,
   Tab,
-  TextField,
   FormControl,
   InputLabel,
   Select,
@@ -83,7 +82,7 @@ export default function AccessControlModal({ open, onClose, sourceId }: AccessCo
             const content = e.target?.result as string;
             const data = JSON.parse(content);
             resolve(data);
-          } catch (err) {
+          } catch {
             reject(new Error('Invalid file format. Please provide a valid JSON file.'));
           }
         };

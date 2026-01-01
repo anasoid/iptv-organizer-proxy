@@ -231,7 +231,7 @@ class StreamDataController
                     // Data is already sent to client via echo in streamDirectToClient
                 },
                 // Callback for headers (optional - can be used for response processing)
-                onHeader: function(string $headerLine) use (&$response, &$httpCode, &$responseStarted, &$responseHeaders) {
+                onHeader: function(string $headerLine) use (&$httpCode, &$responseHeaders) {
                     try {
                         // Parse and forward headers
                         if (stripos($headerLine, 'HTTP/') === 0) {
