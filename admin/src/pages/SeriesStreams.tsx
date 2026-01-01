@@ -125,10 +125,10 @@ export default function SeriesStreams() {
   };
 
   const columns: GridColDef[] = [
-    { field: 'id', headerName: 'ID', width: 70 },
-    { field: 'num', headerName: 'Order', width: 80 },
+    { field: 'id', headerName: 'ID', width: 50 },
+    { field: 'num', headerName: 'Order', width: 60 },
     { field: 'stream_id', headerName: 'Stream ID', width: 100 },
-    { field: 'name', headerName: 'Name', width: 200, flex: 1 },
+    { field: 'name', headerName: 'Name', width: 350, flex: 1 },
     {
       field: 'category_id',
       headerName: 'Category',
@@ -183,7 +183,7 @@ export default function SeriesStreams() {
       width: 100,
       renderCell: (params) => {
         const stream = streams.find((s) => s.id === params.row.id);
-        const iconUrl = stream?.data?.stream_icon;
+        const iconUrl = stream?.data?.stream_icon || stream?.data?.cover;
         return iconUrl ? (
           <Box
             component="img"
@@ -381,6 +381,7 @@ export default function SeriesStreams() {
                   }}
                   initialState={{
                     pagination: { paginationModel: { pageSize: limit } },
+                    columns: { columnVisibilityModel: { num: false, is_adult: false } },
                   }}
                 />
               </Box>
@@ -521,6 +522,7 @@ export default function SeriesStreams() {
                   }}
                   initialState={{
                     pagination: { paginationModel: { pageSize: limit } },
+                    columns: { columnVisibilityModel: { num: false, is_adult: false } },
                   }}
                 />
               </Box>
