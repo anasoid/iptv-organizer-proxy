@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Xtream;
 
 use App\Exceptions\XtreamApiException;
-use GuzzleHttp\Client;
+use App\Services\HttpClient;
 use GuzzleHttp\Exception\GuzzleException;
 use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
@@ -17,7 +17,7 @@ use Monolog\Handler\StreamHandler;
  */
 class XtreamAuthenticator
 {
-    private Client $httpClient;
+    private HttpClient $httpClient;
     private string $baseUrl;
     private string $username;
     private string $password;
@@ -32,22 +32,19 @@ class XtreamAuthenticator
      * @param string $url Source server URL
      * @param string $username Xtream username
      * @param string $password Xtream password
-     * @param Client|null $httpClient Optional Guzzle client (for testing)
+     * @param HttpClient|null $httpClient Optional HTTP client (for testing)
      */
     public function __construct(
         string $url,
         string $username,
         string $password,
-        ?Client $httpClient = null
+        ?HttpClient $httpClient = null
     ) {
         $this->baseUrl = rtrim($url, '/') . '/player_api.php';
         $this->username = $username;
         $this->password = $password;
 
-        $this->httpClient = $httpClient ?? new Client([
-            'timeout' => 180,           // 2 minutes for request completion
-            'connect_timeout' => 30,    // 30 seconds for initial connection
-        ]);
+        $this->httpClient = $httpClient ?? HttpClient::getInstance();
 
         $this->logger = new Logger('XtreamAuthenticator');
         $this->logger->pushHandler(new StreamHandler('php://stderr', Logger::WARNING));
@@ -62,7 +59,7 @@ class XtreamAuthenticator
     public function authenticate(): array
     {
         try {
-            $response = $this->httpClient->get($this->baseUrl, [
+            $response = $this->httpClient->getJson($this->baseUrl, [
                 'query' => [
                     'username' => $this->username,
                     'password' => $this->password,
@@ -142,9 +139,9 @@ class XtreamAuthenticator
     /**
      * Get HTTP client instance
      *
-     * @return Client
+     * @return HttpClient
      */
-    public function getHttpClient(): Client
+    public function getHttpClient(): HttpClient
     {
         return $this->httpClient;
     }

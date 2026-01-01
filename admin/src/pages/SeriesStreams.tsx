@@ -109,7 +109,7 @@ export default function SeriesStreams() {
 
   if (categoriesData?.data) {
     categoriesData.data.forEach((cat: Category) => {
-      categories[cat.id] = cat.category_name;
+      categories[cat.category_id] = cat.category_name;
     });
   }
 
@@ -125,15 +125,47 @@ export default function SeriesStreams() {
   };
 
   const columns: GridColDef[] = [
-    { field: 'id', headerName: 'ID', width: 70 },
-    { field: 'num', headerName: 'Order', width: 80 },
+    { field: 'id', headerName: 'ID', width: 50 },
+    { field: 'num', headerName: 'Order', width: 60 },
     { field: 'stream_id', headerName: 'Stream ID', width: 100 },
-    { field: 'name', headerName: 'Name', width: 200, flex: 1 },
+    { field: 'name', headerName: 'Name', width: 350, flex: 1 },
     {
       field: 'category_id',
       headerName: 'Category',
       width: 150,
       renderCell: (params) => getCategoryName(params.value),
+    },
+    {
+      field: 'added',
+      headerName: 'Added Date',
+      width: 140,
+      renderCell: (params) => {
+        const addedDate = params.row.added_date;
+        if (!addedDate) return '—';
+        const date = new Date(addedDate);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      },
+    },
+    {
+      field: 'rating',
+      headerName: 'Rating',
+      width: 90,
+      renderCell: (params) => {
+        const stream = streams.find((s) => s.id === params.row.id);
+        const rating = stream?.data?.rating;
+        if (!rating) return '—';
+        return typeof rating === 'number' ? rating.toFixed(1) : rating;
+      },
+    },
+    {
+      field: 'releasedate',
+      headerName: 'Release Date',
+      width: 120,
+      renderCell: (params) => {
+        const releaseDate = params.row.release_date;
+        if (!releaseDate) return '—';
+        return releaseDate;
+      },
     },
     {
       field: 'data',
@@ -151,7 +183,7 @@ export default function SeriesStreams() {
       width: 100,
       renderCell: (params) => {
         const stream = streams.find((s) => s.id === params.row.id);
-        const iconUrl = stream?.data?.stream_icon;
+        const iconUrl = stream?.data?.stream_icon || stream?.data?.cover;
         return iconUrl ? (
           <Box
             component="img"
@@ -173,6 +205,15 @@ export default function SeriesStreams() {
       headerName: 'Adult',
       width: 80,
       renderCell: (params) => (params.value ? <Chip label="Adult" color="error" size="small" /> : '—'),
+    },
+    {
+      field: 'created_at',
+      headerName: 'Created',
+      width: 140,
+      renderCell: (params) => {
+        const date = new Date(params.value);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      },
     },
     {
       field: 'allow_deny',
@@ -340,6 +381,7 @@ export default function SeriesStreams() {
                   }}
                   initialState={{
                     pagination: { paginationModel: { pageSize: limit } },
+                    columns: { columnVisibilityModel: { num: false, is_adult: false } },
                   }}
                 />
               </Box>
@@ -480,6 +522,7 @@ export default function SeriesStreams() {
                   }}
                   initialState={{
                     pagination: { paginationModel: { pageSize: limit } },
+                    columns: { columnVisibilityModel: { num: false, is_adult: false } },
                   }}
                 />
               </Box>

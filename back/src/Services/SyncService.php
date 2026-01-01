@@ -57,6 +57,87 @@ class SyncService
     }
 
     /**
+     * Extract and convert added date from Unix timestamp
+     *
+     * @param array $streamData Stream data from API
+     * @return string|null Date in YYYY-MM-DD format or null
+     */
+    private function extractAddedDate(array $streamData): ?string
+    {
+        if (!isset($streamData['added']) || empty($streamData['added'])) {
+            return null;
+        }
+
+        $added = $streamData['added'];
+
+        // Handle Unix timestamp (string or integer)
+        if (is_numeric($added)) {
+            $timestamp = (int)$added;
+            // Validate timestamp is reasonable (after 2000-01-01 and before 2100-01-01)
+            if ($timestamp > 946684800 && $timestamp < 4102444800) {
+                return date('Y-m-d', $timestamp);
+            }
+        }
+
+        // Handle already formatted date string
+        if (is_string($added)) {
+            try {
+                $date = new \DateTime($added);
+                return $date->format('Y-m-d');
+            } catch (\Exception $e) {
+                $this->logger->warning('Invalid added date format', [
+                    'added' => $added,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract and convert release date
+     *
+     * @param array $streamData Stream data from API
+     * @return string|null Date in YYYY-MM-DD format or null
+     */
+    private function extractReleaseDate(array $streamData): ?string
+    {
+        // Series uses 'releaseDate' (camelCase) or 'release_date' (snake_case)
+        // VOD may also have release_date
+        $releaseDate = $streamData['releaseDate']
+            ?? $streamData['release_date']
+            ?? null;
+
+        if (empty($releaseDate)) {
+            return null;
+        }
+
+        // Handle date string (e.g., "2024-03-22" or "2024/03/22")
+        if (is_string($releaseDate)) {
+            try {
+                $date = new \DateTime($releaseDate);
+                return $date->format('Y-m-d');
+            } catch (\Exception $e) {
+                $this->logger->warning('Invalid release date format', [
+                    'releaseDate' => $releaseDate,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Handle Unix timestamp (less common for release dates)
+        if (is_numeric($releaseDate)) {
+            $timestamp = (int)$releaseDate;
+            if ($timestamp > 946684800 && $timestamp < 4102444800) {
+                return date('Y-m-d', $timestamp);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Check if any sync is currently running for this source
      * Also handles expired syncs (running for more than 5 minutes)
      * Optimized: Loads only the first (oldest) sync from database per check
@@ -369,6 +450,8 @@ class SyncService
                     ? json_encode($streamData['category_ids'])
                     : null;
                 $streamDataJson = json_encode($streamData);
+                $addedDate = $this->extractAddedDate($streamData);
+                $releaseDate = $this->extractReleaseDate($streamData);
 
                 if (!empty($existingStreams)) {
                     // Update existing - only if values changed
@@ -399,6 +482,14 @@ class SyncService
                         $existing->data = $streamDataJson;
                         $hasChanges = true;
                     }
+                    if ($existing->added_date !== $addedDate) {
+                        $existing->added_date = $addedDate;
+                        $hasChanges = true;
+                    }
+                    if ($existing->release_date !== $releaseDate) {
+                        $existing->release_date = $releaseDate;
+                        $hasChanges = true;
+                    }
                     // Always update the num field to maintain order
                     if ($existing->num !== $streamNum) {
                         $existing->num = $streamNum;
@@ -422,13 +513,15 @@ class SyncService
                     $stream->is_adult = $isAdult ? 1 : 0;
                     $stream->labels = $labels;
                     $stream->data = $streamDataJson;
+                    $stream->added_date = $addedDate;
+                    $stream->release_date = $releaseDate;
                     $stream->save();
                     $stats['added']++;
                     unset($stream);
                 }
 
                 $streamNum++; // Increment counter for next stream
-                unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson);
+                unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson, $addedDate, $releaseDate);
             }
 
             unset($streams);
@@ -538,6 +631,8 @@ class SyncService
                     ? json_encode($streamData['category_ids'])
                     : null;
                 $streamDataJson = json_encode($streamData);
+                $addedDate = $this->extractAddedDate($streamData);
+                $releaseDate = $this->extractReleaseDate($streamData);
 
                 if (!empty($existingStreams)) {
                     // Update existing - only if values changed
@@ -568,6 +663,14 @@ class SyncService
                         $existing->data = $streamDataJson;
                         $hasChanges = true;
                     }
+                    if ($existing->added_date !== $addedDate) {
+                        $existing->added_date = $addedDate;
+                        $hasChanges = true;
+                    }
+                    if ($existing->release_date !== $releaseDate) {
+                        $existing->release_date = $releaseDate;
+                        $hasChanges = true;
+                    }
                     // Always update the num field to maintain order
                     if ($existing->num !== $streamNum) {
                         $existing->num = $streamNum;
@@ -590,13 +693,15 @@ class SyncService
                     $stream->is_adult = $isAdult ? 1 : 0;
                     $stream->labels = $labels;
                     $stream->data = $streamDataJson;
+                    $stream->added_date = $addedDate;
+                    $stream->release_date = $releaseDate;
                     $stream->save();
                     $stats['added']++;
                     unset($stream);
                 }
 
                 $streamNum++; // Increment counter for next stream
-                unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson, $categoryId);
+                unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson, $categoryId, $addedDate, $releaseDate);
             }
 
             unset($streams);
@@ -706,6 +811,8 @@ class SyncService
                     ? json_encode($streamData['category_ids'])
                     : null;
                 $streamDataJson = json_encode($streamData);
+                $addedDate = $this->extractAddedDate($streamData);
+                $releaseDate = $this->extractReleaseDate($streamData);
 
                 if (!empty($existingStreams)) {
                     // Update existing - only if values changed
@@ -736,6 +843,14 @@ class SyncService
                         $existing->data = $streamDataJson;
                         $hasChanges = true;
                     }
+                    if ($existing->added_date !== $addedDate) {
+                        $existing->added_date = $addedDate;
+                        $hasChanges = true;
+                    }
+                    if ($existing->release_date !== $releaseDate) {
+                        $existing->release_date = $releaseDate;
+                        $hasChanges = true;
+                    }
                     // Always update the num field to maintain order
                     if ($existing->num !== $streamNum) {
                         $existing->num = $streamNum;
@@ -758,13 +873,15 @@ class SyncService
                     $stream->is_adult = $isAdult ? 1 : 0;
                     $stream->labels = $labels;
                     $stream->data = $streamDataJson;
+                    $stream->added_date = $addedDate;
+                    $stream->release_date = $releaseDate;
                     $stream->save();
                     $stats['added']++;
                     unset($stream);
                 }
 
                 $streamNum++; // Increment counter for next stream
-                unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson, $categoryId);
+                unset($streamData, $existingStreams, $labels, $categoryIds, $streamDataJson, $categoryId, $addedDate, $releaseDate);
             }
 
             unset($seriesList);

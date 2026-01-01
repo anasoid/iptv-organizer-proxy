@@ -194,7 +194,7 @@ class XtreamStreamClient
                     'username' => $credentials['username'],
                 ]);
 
-                $response = $httpClient->get($baseUrl, [
+                $response = $httpClient->getJson($baseUrl, [
                     'query' => $params,
                 ]);
 
@@ -290,7 +290,7 @@ class XtreamStreamClient
                     'url' => $baseUrl,
                 ]);
 
-                $response = $httpClient->get($baseUrl, [
+                $response = $httpClient->getJson($baseUrl, [
                     'query' => $params,
                 ]);
 

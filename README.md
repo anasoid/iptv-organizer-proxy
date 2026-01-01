@@ -109,6 +109,112 @@ See `.env.example.app` for all available configuration options.
 
 For detailed sync daemon configuration, see [SYNC-DAEMON.md](SYNC-DAEMON.md)
 
+## Proxy Configuration
+
+The application supports routing all backend HTTP calls through a proxy server. This is useful for:
+- Organizations with network policies requiring proxy usage
+- Bypassing geographic restrictions
+- Adding an extra security layer
+
+### Configuration
+
+Update your `.env` file with proxy settings:
+
+#### Option 1: Using Proxy URL (Recommended)
+
+```bash
+PROXY_ENABLED=true
+PROXY_URL=http://proxy.example.com:8080
+```
+
+With authentication:
+```bash
+PROXY_URL=http://username:password@proxy.example.com:8080
+```
+
+#### Option 2: Using Component-Based Configuration
+
+```bash
+PROXY_ENABLED=true
+PROXY_TYPE=http
+PROXY_HOST=proxy.example.com
+PROXY_PORT=8080
+PROXY_USERNAME=username
+PROXY_PASSWORD=password
+```
+
+### Supported Proxy Types
+
+- **HTTP/HTTPS Proxy**: Standard HTTP proxy
+  ```bash
+  PROXY_URL=http://proxy.example.com:8080
+  PROXY_URL=https://secure-proxy.example.com:8443
+  ```
+
+- **SOCKS5 Proxy**: For tunneling through SOCKS5 proxies
+  ```bash
+  PROXY_URL=socks5://proxy.example.com:1080
+  PROXY_URL=socks5://user:pass@proxy.example.com:1080
+  ```
+
+### What Gets Proxied
+
+When enabled, proxy is applied to:
+- Guzzle HTTP client (Xtream API calls to upstream servers)
+- cURL requests (stream proxying to clients)
+- All backend-to-upstream HTTP communication
+
+**Note**: The admin panel (React frontend) communicates directly with the backend API and does not use the proxy.
+
+## Streaming Architecture
+
+### Memory-Efficient Streaming
+
+The application uses true streaming for binary data (video, streams, etc.) without buffering entire files into memory:
+
+**Stream Proxying Features:**
+- **Zero buffering**: Data flows directly from upstream → proxy → client
+- **Chunked processing**: Data processed in 8 KB chunks
+- **Real-time delivery**: Clients start receiving data immediately (no wait)
+- **Memory constant**: ~8 KB memory usage regardless of file size
+- **Callback support**: Optional callbacks for monitoring/processing chunks
+
+**Memory comparison for 100 MB video:**
+- Before: Would need 100 MB memory buffer
+- After: Uses only ~8 KB constant memory
+
+### How It Works
+
+```
+Client Request (VLC, KODI, etc.)
+    ↓
+Proxy StreamDataController
+    ↓
+HttpClient::streamDirectToClient() ← TRUE STREAMING
+    ├─ CURLOPT_HEADERFUNCTION: Process headers as they arrive
+    └─ CURLOPT_WRITEFUNCTION: Stream data chunks directly to client
+    ↓
+Upstream Server Response
+    ├─ Chunk 1 (8 KB) → Client (immediately)
+    ├─ Chunk 2 (8 KB) → Client (immediately)
+    └─ Chunk 3 (8 KB) → Client (immediately)
+
+Memory: ~8 KB constant (one chunk at a time)
+```
+
+### Troubleshooting
+
+Check logs for proxy-related messages:
+```bash
+tail -f logs/app.log | grep -i proxy
+```
+
+Common issues:
+- **Connection timeout**: Verify proxy server is reachable at `PROXY_HOST:PROXY_PORT`
+- **Authentication failed**: Check `PROXY_USERNAME` and `PROXY_PASSWORD`
+- **Protocol errors**: Ensure `PROXY_TYPE` matches your proxy server configuration
+- **Validation errors**: Check that both username and password are provided together or omitted together
+
 ## Development
 
 ### Running Tests

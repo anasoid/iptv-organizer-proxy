@@ -162,7 +162,7 @@ export default function StreamDetail() {
     );
   }
 
-  const streamIcon = stream.data?.stream_icon;
+  const streamIcon = stream.data?.stream_icon || stream.data?.cover;
   const duration = stream.data?.duration;
   const episodes = stream.data?.episodes;
   const seasons = stream.data?.seasons;
@@ -394,7 +394,7 @@ export default function StreamDetail() {
                     <TableBody>
                       {Object.entries(stream.data).map(([key, value]) => {
                         // Skip certain fields we already display
-                        if (['stream_icon', 'url', 'duration', 'episodes', 'seasons'].includes(key)) {
+                        if (['stream_icon', 'cover', 'url', 'duration', 'episodes', 'seasons'].includes(key)) {
                           return null;
                         }
 

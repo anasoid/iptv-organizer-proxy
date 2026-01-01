@@ -11,6 +11,9 @@ export interface Source {
   last_sync?: string | null;
   next_sync?: string | null;
   is_active: number;
+  enableproxy?: number;
+  disablestreamproxy?: number;
+  stream_follow_location?: number;
   created_at?: string;
   updated_at?: string;
 }

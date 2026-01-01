@@ -81,7 +81,9 @@ class Connection
         $username = $_ENV['DB_USER'] ?? 'root';
         $password = $_ENV['DB_PASS'] ?? '';
 
-        $dsn = "mysql:host={$host};port={$port};dbname={$dbName};charset=utf8mb4";
+        // Use 127.0.0.1 to force TCP connection instead of Unix socket
+        // This is essential for Docker connections
+        $dsn = "mysql:host=127.0.0.1;port={$port};dbname={$dbName};charset=utf8mb4";
 
         $options = [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,

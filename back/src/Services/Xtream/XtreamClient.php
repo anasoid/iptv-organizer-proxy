@@ -6,7 +6,7 @@ namespace App\Services\Xtream;
 
 use App\Exceptions\XtreamApiException;
 use App\Models\Source;
-use GuzzleHttp\Client;
+use App\Services\HttpClient;
 use Psr\Http\Message\ResponseInterface;
 use Generator;
 
@@ -26,10 +26,10 @@ class XtreamClient
      * Constructor
      *
      * @param Source|array $config Source model or credentials array ['url', 'username', 'password']
-     * @param Client|null $httpClient Optional Guzzle client (for testing)
+     * @param HttpClient|null $httpClient Optional HTTP client (for testing)
      * @throws XtreamApiException
      */
-    public function __construct($config, ?Client $httpClient = null)
+    public function __construct($config, ?HttpClient $httpClient = null)
     {
         if ($config instanceof Source) {
             $url = $config->url;

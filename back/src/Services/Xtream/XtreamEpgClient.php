@@ -90,7 +90,7 @@ class XtreamEpgClient
 
         while ($attempt < $this->maxRetries) {
             try {
-                $response = $httpClient->get($xmltvUrl, [
+                $response = $httpClient->getJson($xmltvUrl, [
                     'query' => $params,
                     'stream' => true,  // Stream response instead of loading into memory
                 ]);
@@ -149,7 +149,7 @@ class XtreamEpgClient
 
         while ($attempt < $this->maxRetries) {
             try {
-                $response = $httpClient->get($this->authenticator->getBaseUrl(), [
+                $response = $httpClient->getJson($this->authenticator->getBaseUrl(), [
                     'query' => $params,
                 ]);
 
