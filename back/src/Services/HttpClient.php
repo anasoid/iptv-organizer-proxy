@@ -275,11 +275,12 @@ class HttpClient
      * @param string $url Request URL
      * @param array $curlOptions cURL options (merged with defaults)
      * @param bool $followLocation Whether to follow HTTP redirects (default: false)
+     * @param ?bool $sourceEnableProxy Source-level proxy setting (null = not specified)
      * @return array Result containing status, headers, body, and errno
      */
-    public function curlRequest(string $url, array $curlOptions = [], bool $followLocation = false): array
+    public function curlRequest(string $url, array $curlOptions = [], bool $followLocation = false, ?bool $sourceEnableProxy = null): array
     {
-        return $this->executeCurl($url, $curlOptions, $followLocation);
+        return $this->executeCurl($url, $curlOptions, $followLocation, $sourceEnableProxy);
     }
 
     /**
@@ -288,15 +289,16 @@ class HttpClient
      * @param string $url Request URL
      * @param array $curlOptions cURL options (merged with defaults)
      * @param bool $followLocation Whether to follow HTTP redirects (default: false)
+     * @param ?bool $sourceEnableProxy Source-level proxy setting (null = not specified)
      * @return array Result containing status, headers, body, and errno
      */
-    public function streamRequest(string $url, array $curlOptions = [], bool $followLocation = false): array
+    public function streamRequest(string $url, array $curlOptions = [], bool $followLocation = false, ?bool $sourceEnableProxy = null): array
     {
         // Ensure stream options are set
         $curlOptions[CURLOPT_RETURNTRANSFER] = true;
         $curlOptions[CURLOPT_HEADER] = true;
 
-        return $this->executeCurl($url, $curlOptions, $followLocation);
+        return $this->executeCurl($url, $curlOptions, $followLocation, $sourceEnableProxy);
     }
 
     /**
@@ -307,6 +309,7 @@ class HttpClient
      * @param callable|null $onHeader Callback for each header: function(string $headerLine): bool
      * @param array $curlOptions Additional cURL options
      * @param bool $followLocation Whether to follow HTTP redirects
+     * @param ?bool $sourceEnableProxy Source-level proxy setting (null = not specified)
      * @return array Result with keys: errno, error, http_code
      */
     public function streamDirectToClient(
@@ -314,7 +317,8 @@ class HttpClient
         ?callable $onData = null,
         ?callable $onHeader = null,
         array $curlOptions = [],
-        bool $followLocation = false
+        bool $followLocation = false,
+        ?bool $sourceEnableProxy = null
     ): array {
         $ch = curl_init();
 
@@ -333,14 +337,15 @@ class HttpClient
         $curlOptions[CURLOPT_URL] = $url;
         $curlOptions[CURLOPT_RETURNTRANSFER] = false;  // Don't buffer response
 
-        // Add proxy configuration if enabled
-        if ($this->proxyConfig->isEnabled()) {
-            $proxyOptions = $this->proxyConfig->getCurlOptions();
+        // Add proxy configuration if enabled (with source-level override)
+        if ($this->proxyConfig->shouldUseProxy($sourceEnableProxy)) {
+            $proxyOptions = $this->proxyConfig->getCurlOptions($sourceEnableProxy);
             // Use + operator instead of array_merge() to preserve numeric (constant) keys
             $curlOptions = $curlOptions + $proxyOptions;
             $this->logger->info('cURL streaming configured with proxy', [
                 'proxy_type' => $this->proxyConfig->getProxyType(),
                 'proxy_host' => $this->proxyConfig->getHost(),
+                'source_enable_proxy' => $sourceEnableProxy,
             ]);
         }
 
@@ -446,9 +451,10 @@ class HttpClient
      * @param string $url Request URL
      * @param array $curlOptions cURL options (merged with defaults)
      * @param bool $followLocation Whether to follow HTTP redirects
+     * @param ?bool $sourceEnableProxy Source-level proxy setting (null = not specified)
      * @return array Result with keys: status, headers, body, errno, error
      */
-    private function executeCurl(string $url, array $curlOptions = [], bool $followLocation = false): array
+    private function executeCurl(string $url, array $curlOptions = [], bool $followLocation = false, ?bool $sourceEnableProxy = null): array
     {
         $ch = curl_init();
 
@@ -462,14 +468,15 @@ class HttpClient
         // Set URL
         $curlOptions[CURLOPT_URL] = $url;
 
-        // Add proxy configuration if enabled
-        if ($this->proxyConfig->isEnabled()) {
-            $proxyOptions = $this->proxyConfig->getCurlOptions();
+        // Add proxy configuration if enabled (with source-level override)
+        if ($this->proxyConfig->shouldUseProxy($sourceEnableProxy)) {
+            $proxyOptions = $this->proxyConfig->getCurlOptions($sourceEnableProxy);
             // Use + operator instead of array_merge() to preserve numeric (constant) keys
             $curlOptions = $curlOptions + $proxyOptions;
             $this->logger->info('cURL request configured with proxy', [
                 'proxy_type' => $this->proxyConfig->getProxyType(),
                 'proxy_host' => $this->proxyConfig->getHost(),
+                'source_enable_proxy' => $sourceEnableProxy,
             ]);
         }
 

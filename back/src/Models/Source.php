@@ -22,6 +22,8 @@ use RuntimeException;
  * @property string|null $next_sync
  * @property string $sync_status
  * @property int $is_active
+ * @property int $enableproxy
+ * @property int $disablestreamproxy
  * @property string $created_at
  * @property string $updated_at
  */
@@ -38,6 +40,8 @@ class Source extends BaseModel
         'next_sync',
         'sync_status',
         'is_active',
+        'enableproxy',
+        'disablestreamproxy',
     ];
 
     /**

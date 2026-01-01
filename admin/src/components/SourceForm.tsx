@@ -7,8 +7,12 @@ import {
   Button,
   CircularProgress,
   Alert,
+  FormControlLabel,
+  Checkbox,
+  Box,
+  Typography,
 } from '@mui/material';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import type { Source } from '../services/sourcesApi';
 import sourcesApi from '../services/sourcesApi';
@@ -26,6 +30,7 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
     formState: { errors },
     reset,
     watch,
+    control,
   } = useForm<Source>({
     defaultValues: source || {
       name: '',
@@ -35,6 +40,8 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
       sync_interval: 1,
       is_active: 1,
       sync_status: 'idle',
+      enableproxy: 0,
+      disablestreamproxy: 0,
     },
   });
 
@@ -153,6 +160,50 @@ export default function SourceForm({ source, onSuccess, onCancel }: SourceFormPr
           error={!!errors.sync_interval}
           helperText={errors.sync_interval?.message}
         />
+
+        <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2 }}>
+          <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+            Proxy Configuration
+          </Typography>
+
+          <Controller
+            name="enableproxy"
+            control={control}
+            render={({ field }) => (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={Boolean(field.value)}
+                    onChange={(e) => field.onChange(e.target.checked ? 1 : 0)}
+                  />
+                }
+                label="Enable HTTP Proxy for Upstream Requests"
+              />
+            )}
+          />
+          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4, mb: 1 }}>
+            When enabled, all upstream requests from this source go through the configured HTTP proxy server
+          </Typography>
+
+          <Controller
+            name="disablestreamproxy"
+            control={control}
+            render={({ field }) => (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={Boolean(field.value)}
+                    onChange={(e) => field.onChange(e.target.checked ? 1 : 0)}
+                  />
+                }
+                label="Disable Stream Proxy Endpoint (Direct Redirects)"
+              />
+            )}
+          />
+          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4 }}>
+            When enabled, stream redirects are sent directly to client instead of routing through /proxy endpoint
+          </Typography>
+        </Box>
       </DialogContent>
       <DialogActions>
         <Button onClick={onCancel}>Cancel</Button>

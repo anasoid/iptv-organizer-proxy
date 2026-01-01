@@ -7,6 +7,7 @@ namespace App\Controllers;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use App\Models\Client;
+use App\Models\Source;
 use App\Services\HttpClient;
 
 /**
@@ -68,6 +69,12 @@ class ProxyController
             $client = $clients[0];
             error_log("ProxyController: Client authenticated successfully");
 
+            // Load source for proxy configuration
+            $source = null;
+            if ($client->source_id) {
+                $source = Source::find($client->source_id);
+            }
+
             // Decode the base64 encoded URL
             $decodedUrl = base64_decode($encodedUrl, true);
             if ($decodedUrl === false || empty($decodedUrl)) {
@@ -88,7 +95,7 @@ class ProxyController
             error_log("ProxyController: Decoded redirect URL - {$decodedUrl}");
 
             // Stream the data from the decoded URL with redirects enabled
-            return $this->streamWithRedirects($request, $response, $decodedUrl);
+            return $this->streamWithRedirects($request, $response, $decodedUrl, $source);
 
         } catch (\Exception $e) {
             error_log("ProxyController: Exception - " . $e->getMessage());
@@ -107,7 +114,8 @@ class ProxyController
     private function streamWithRedirects(
         ServerRequestInterface $request,
         ResponseInterface $response,
-        string $url
+        string $url,
+        ?Source $source = null
     ): ResponseInterface {
         try {
             // Log streaming start with redirects enabled
@@ -207,7 +215,8 @@ class ProxyController
                     }
                 },
                 curlOptions: [CURLOPT_HTTPHEADER => $curlHeaders],
-                followLocation: true  // ALWAYS follow redirects in proxy endpoint
+                followLocation: true,  // ALWAYS follow redirects in proxy endpoint
+                sourceEnableProxy: $source ? (bool) $source->enableproxy : null
             );
 
             // Check for cURL errors

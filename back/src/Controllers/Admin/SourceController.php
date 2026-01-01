@@ -115,6 +115,8 @@ class SourceController
             $source->sync_interval = $body['sync_interval'] ?? 1;
             $source->sync_status = 'idle';
             $source->is_active = $body['is_active'] ?? 1;
+            $source->enableproxy = $body['enableproxy'] ?? 0;
+            $source->disablestreamproxy = $body['disablestreamproxy'] ?? 0;
 
             if (!$source->save()) {
                 return $this->jsonError($response, 'Failed to create source', 500);
@@ -171,6 +173,12 @@ class SourceController
             }
             if (isset($body['is_active'])) {
                 $source->is_active = (int) $body['is_active'];
+            }
+            if (isset($body['enableproxy'])) {
+                $source->enableproxy = (int) $body['enableproxy'];
+            }
+            if (isset($body['disablestreamproxy'])) {
+                $source->disablestreamproxy = (int) $body['disablestreamproxy'];
             }
 
             if (!$source->save()) {

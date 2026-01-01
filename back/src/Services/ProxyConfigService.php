@@ -213,13 +213,36 @@ class ProxyConfigService
     }
 
     /**
+     * Check if proxy should be used based on source configuration
+     *
+     * @param ?bool $sourceEnableProxy Source-level proxy setting (null = not specified)
+     * @return bool True if proxy should be used, false otherwise
+     */
+    public function shouldUseProxy(?bool $sourceEnableProxy = null): bool
+    {
+        // Master switch takes precedence
+        if (!$this->enabled) {
+            return false;
+        }
+
+        // If source explicitly disables proxy, don't use it
+        if ($sourceEnableProxy === false) {
+            return false;
+        }
+
+        // Otherwise use proxy (default to true if source doesn't specify)
+        return true;
+    }
+
+    /**
      * Get Guzzle-compatible proxy configuration
      *
+     * @param ?bool $sourceEnableProxy Source-level proxy setting (null = not specified)
      * @return array Configuration array for Guzzle client
      */
-    public function getGuzzleConfig(): array
+    public function getGuzzleConfig(?bool $sourceEnableProxy = null): array
     {
-        if (!$this->enabled || empty($this->config)) {
+        if (!$this->shouldUseProxy($sourceEnableProxy) || empty($this->config)) {
             return [];
         }
 
@@ -230,11 +253,12 @@ class ProxyConfigService
     /**
      * Get cURL-compatible proxy options
      *
+     * @param ?bool $sourceEnableProxy Source-level proxy setting (null = not specified)
      * @return array cURL options array
      */
-    public function getCurlOptions(): array
+    public function getCurlOptions(?bool $sourceEnableProxy = null): array
     {
-        if (!$this->enabled || empty($this->config)) {
+        if (!$this->shouldUseProxy($sourceEnableProxy) || empty($this->config)) {
             return [];
         }
 

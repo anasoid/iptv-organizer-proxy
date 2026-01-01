@@ -107,7 +107,7 @@ class StreamDataController
             }
 
             // Check upstream status for 302 redirects
-            $upstreamStatus = $this->checkUpstreamStatus($streamUrl, $curlHeaders);
+            $upstreamStatus = $this->checkUpstreamStatus($streamUrl, $curlHeaders, (bool) $source->enableproxy);
 
             // Log upstream response status
             error_log("StreamDataController: Upstream response status - {$upstreamStatus['status']}");
@@ -115,26 +115,41 @@ class StreamDataController
                 error_log("StreamDataController: Upstream Location header - {$upstreamStatus['location']}");
             }
 
-            // If 302 redirect, encode the redirect URL and return proxy URL instead
+            // If 302 redirect, check if we should proxy or redirect directly
             if ($upstreamStatus['status'] === 302 && !empty($upstreamStatus['location'])) {
-                $encodedUrl = base64_encode($upstreamStatus['location']);
-                $proxyUrl = "/proxy/{$username}/{$password}?url={$encodedUrl}";
+                // Check if source disables stream proxy endpoint
+                if ($source->disablestreamproxy) {
+                    // Return direct redirect to client - they will connect directly to discovered URL
+                    $redirectUrl = $upstreamStatus['location'];
+                    error_log("StreamDataController: 302 redirect detected, returning direct redirect to client");
+                    error_log("StreamDataController: Client redirect URL - {$redirectUrl}");
+                    error_log("StreamDataController: Final status code - 302");
+                    error_log("=================================");
 
-                error_log("StreamDataController: 302 redirect detected, returning client redirect to proxy endpoint");
-                error_log("StreamDataController: Client redirect URL - {$proxyUrl}");
-                error_log("StreamDataController: Final status code - 302");
-                error_log("=================================");
+                    return $response
+                        ->withStatus(302)
+                        ->withHeader('Location', $redirectUrl);
+                } else {
+                    // Current behavior: encode and route through /proxy endpoint
+                    $encodedUrl = base64_encode($upstreamStatus['location']);
+                    $proxyUrl = "/proxy/{$username}/{$password}?url={$encodedUrl}";
 
-                return $response
-                    ->withStatus(302)
-                    ->withHeader('Location', $proxyUrl);
+                    error_log("StreamDataController: 302 redirect detected, returning client redirect to proxy endpoint");
+                    error_log("StreamDataController: Client redirect URL - {$proxyUrl}");
+                    error_log("StreamDataController: Final status code - 302");
+                    error_log("=================================");
+
+                    return $response
+                        ->withStatus(302)
+                        ->withHeader('Location', $proxyUrl);
+                }
             }
 
             // Log that we're streaming normally
             error_log("StreamDataController: No redirect, streaming data normally");
 
             // Proxy the stream normally
-            return $this->proxyStreamRequest($request, $response, $streamUrl, $ext);
+            return $this->proxyStreamRequest($request, $response, $streamUrl, $ext, (bool) $source->enableproxy);
 
         } catch (\Exception $e) {
             error_log("StreamDataController: Exception - " . $e->getMessage());
@@ -151,7 +166,8 @@ class StreamDataController
         ServerRequestInterface $request,
         ResponseInterface $response,
         string $proxyUrl,
-        string $ext
+        string $ext,
+        ?bool $sourceEnableProxy = null
     ): ResponseInterface {
         try {
             // Log streaming start
@@ -256,7 +272,8 @@ class StreamDataController
                     }
                 },
                 curlOptions: [CURLOPT_HTTPHEADER => $curlHeaders],
-                followLocation: $followLocation
+                followLocation: $followLocation,
+                sourceEnableProxy: $sourceEnableProxy
             );
 
             if ($result['errno'] !== 0) {
@@ -298,9 +315,10 @@ class StreamDataController
      *
      * @param string $url The URL to check
      * @param array $curlHeaders Headers to forward to upstream
+     * @param ?bool $sourceEnableProxy Source-level proxy setting (null = not specified)
      * @return array Array with keys: ['status' => int, 'location' => string|null]
      */
-    private function checkUpstreamStatus(string $url, array $curlHeaders = []): array
+    private function checkUpstreamStatus(string $url, array $curlHeaders = [], ?bool $sourceEnableProxy = null): array
     {
         try {
             $httpClient = HttpClient::getInstance();
@@ -316,7 +334,7 @@ class StreamDataController
             ];
 
             // Make request to get headers
-            $result = $httpClient->curlRequest($url, $curlOptions, followLocation: false);
+            $result = $httpClient->curlRequest($url, $curlOptions, followLocation: false, sourceEnableProxy: $sourceEnableProxy);
 
             $httpCode = $result['status'];
             $location = null;
