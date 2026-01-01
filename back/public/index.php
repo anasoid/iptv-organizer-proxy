@@ -17,6 +17,7 @@ use App\Controllers\Admin\StreamController;
 use App\Controllers\Admin\SyncLogController;
 use App\Controllers\Admin\AccessControlController;
 use App\Controllers\Xtream\StreamDataController;
+use App\Controllers\ProxyController;
 
 // Determine environment based on directory structure
 // In development: vendor is at ../vendor relative to public/
@@ -178,6 +179,15 @@ $app->group('/api', function ($group) {
     $group->get('/access-control/export', [$accessControlController, 'export']);
     $group->post('/access-control/import', [$accessControlController, 'import']);
 })->add(new AdminAuthMiddleware());
+
+// Proxy routing - /proxy/{username}/{password}?url={base64_encoded_url}
+// Used for streams that encounter 302 redirects
+// The original stream endpoint redirects to this endpoint with the redirect URL encoded as base64
+// This endpoint follows the redirect and streams the final data
+$app->any('/proxy/{username:[^/]+}/{password:[^/]+}', function ($request, $response, $args) {
+    $controller = new ProxyController();
+    return $controller->handleProxyRequest($request, $response, $args['username'], $args['password']);
+});
 
 // Stream routing - /{type}/{username}/{password}/{stream_id}.{ext}
 // Supports: /live, /movie, /series
