@@ -23,6 +23,8 @@ use RuntimeException;
  * @property string|null $allow_deny Explicit allow/deny override ('allow', 'deny', or null for no override)
  * @property string|null $labels
  * @property string|null $data
+ * @property string|null $added_date Date when stream was added (extracted from data.added)
+ * @property string|null $release_date Release date (extracted from data.releaseDate/release_date)
  * @property string $created_at
  * @property string $updated_at
  */
