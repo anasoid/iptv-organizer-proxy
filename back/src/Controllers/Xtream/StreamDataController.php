@@ -240,10 +240,10 @@ class StreamDataController
 
                             // Skip certain headers that shouldn't be proxied
                             $skipHeaders = [
-                                'transfer-encoding',      // Don't forward encoding
-                                'content-encoding',       // Don't forward encoding
+                                'transfer-encoding',      // Proxy will set this as needed
                                 'proxy-connection',       // Non-standard, causes issues
                                 'connection',             // Proxy manages connection
+                                // NOTE: DO NOT skip content-encoding - client needs it to decompress body
                             ];
                             if (!in_array(strtolower($name), $skipHeaders)) {
                                 if (!headers_sent()) {
