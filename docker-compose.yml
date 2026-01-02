@@ -1,19 +1,9 @@
-version: '3.8'
 
-# Docker Compose file for running pre-built Docker image from GitHub Container Registry
-# This is for production use - it pulls the image instead of building locally
-#
-# Usage:
-#   docker-compose up                          # Run with defaults
-#   docker-compose up -d                       # Run in background
-#   JWT_SECRET=xxx SESSION_SECRET=yyy docker-compose up  # With custom secrets
-#
-# For local development with build, use: docker compose -f docker/docker-compose.yml up
 
 services:
   app:
     # Use pre-built image from GitHub Container Registry
-    image: ghcr.io/anasoid/iptv-organizer-proxy:latest
+    image: ghcr.io/anasoid/iptv-organizer-proxy:${APP_VERSION:-latest}
     container_name: iptv-organizer-proxy
 
     ports:
@@ -26,14 +16,29 @@ services:
       - SYNC_ENABLED=${SYNC_ENABLED:-true}
       - SYNC_CHECK_INTERVAL=${SYNC_CHECK_INTERVAL:-10800}
       - SYNC_LOCK_TIMEOUT=${SYNC_LOCK_TIMEOUT:-600}
-    restart: unless-stopped
-    network_mode: host
+      - PROXY_URL=http://mitmproxy:8080
+      - PROXY_ENABLED=true
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:9090/health",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  mitmproxy:
+    image: mitmproxy/mitmproxy
+    command: mitmweb --web-host 0.0.0.0 --web-port 8081
+    ports:
+      - "9080:8080" # proxy
+      - "9081:8081" # web UI
 
 volumes:
   app-data:
