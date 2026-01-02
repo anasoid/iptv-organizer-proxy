@@ -1,0 +1,167 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Initialize Quarkus Gradle Project with GraalVM Native Support",
+        "description": "Create Quarkus project with Gradle build configuration, GraalVM native compilation setup, and reactive extensions for 64MB memory constraint",
+        "details": "1. Initialize Quarkus 3.6.4+ project using Gradle 8.5+\n2. Configure build.gradle with Quarkus platform BOM and dependencies:\n   - quarkus-resteasy-reactive-jackson\n   - quarkus-hibernate-reactive-panache\n   - quarkus-reactive-mysql-client\n   - quarkus-reactive-pg-client (for SQLite via reactive-pg-client)\n   - quarkus-vertx\n   - quarkus-smallrye-jwt\n   - jackson-dataformat-yaml (SnakeYAML Engine)\n3. Configure native image build settings in build.gradle:\n   - quarkus.native.additional-build-args: -H:+ReportExceptionStackTraces, --gc=serial, -march=armv7-a\n   - Set memory limits: -Xmx64m, -Xms32m\n4. Setup project structure: src/main/java/com/iptvorganizer/{controllers,services,models,migrations,config}\n5. Create application.properties with initial Quarkus configuration\n6. Verify Gradle build executes successfully: ./gradlew clean build",
+        "testStrategy": "1. Run './gradlew build' to verify project compiles\n2. Execute './gradlew build -Dquarkus.package.type=native' to test native compilation\n3. Verify generated native executable size and startup time\n4. Confirm project structure matches package hierarchy",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Implement Custom SimpleMigrator Database Migration System",
+        "description": "Build lightweight custom migration system to save 3-4MB memory vs Flyway, with version tracking and checksum validation",
+        "details": "1. Create SimpleMigrator class in com.iptvorganizer.migrations package\n2. Implement schema_version table for tracking applied migrations:\n   - Fields: id, version, description, checksum, applied_at\n3. Design migration file naming: V001__create_admin_users.sql, V002__create_sources.sql, etc.\n4. Implement migration logic:\n   - Scan resources/db/migration/{mysql,sqlite} for .sql files\n   - Calculate MD5 checksum for each migration file\n   - Compare with schema_version table to detect pending migrations\n   - Execute pending migrations in order\n   - Record successful migrations in schema_version\n5. Support both MySQL and SQLite dialects\n6. Add @ApplicationScoped bean for startup execution\n7. Implement Mutiny reactive database access for migrations\n8. NO rollback support (per PRD requirements)",
+        "testStrategy": "1. Unit tests: verify checksum calculation, migration ordering\n2. Integration tests: apply migrations to test MySQL and SQLite databases\n3. Test idempotency: re-run migrations, verify no duplicates\n4. Validate schema_version table populated correctly\n5. Memory profiling: confirm <4MB overhead vs Flyway",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Design and Implement 11 Database Schemas with Panache Reactive Entities",
+        "description": "Create MySQL and SQLite migration files for all 11 tables, implement Panache reactive entities with optimized connection pooling (2 connections max)",
+        "details": "1. Create migration SQL files in resources/db/migration/mysql/ and resources/db/migration/sqlite/:\n   - V001__create_admin_users.sql (id, username, password_hash, created_at, updated_at)\n   - V002__create_sources.sql (id, name, url, username, password, sync_interval, enableproxy, disablestreamproxy, stream_follow_location, created_at, updated_at)\n   - V003__create_filters.sql (id, source_id, yaml_config, created_at, updated_at)\n   - V004__create_clients.sql (id, source_id, username, password, expiry_date, block_adult, created_at, updated_at)\n   - V005__create_categories.sql (id, source_id, category_id, category_name, parent_id, type, created_at, updated_at)\n   - V006__create_live_streams.sql (id, source_id, stream_id, name, category_id, stream_icon, epg_channel_id, created_at, updated_at)\n   - V007__create_vod_streams.sql (id, source_id, stream_id, name, category_id, stream_icon, created_at, updated_at)\n   - V008__create_series.sql (id, source_id, series_id, name, category_id, cover, created_at, updated_at)\n   - V009__create_sync_logs.sql (id, source_id, status, message, started_at, completed_at)\n   - V010__create_connection_logs.sql (id, client_id, ip_address, user_agent, connected_at)\n   - V011__create_sync_schedule.sql (id, source_id, next_sync_time, created_at, updated_at)\n2. Create Panache reactive entities extending PanacheEntityBase:\n   - @Entity classes: AdminUser, Source, Filter, Client, Category, LiveStream, VodStream, Series, SyncLog, ConnectionLog, SyncSchedule\n   - Use @Id @GeneratedValue for primary keys\n   - Add @CreationTimestamp and @UpdateTimestamp for timestamps\n   - Implement reactive queries using Mutiny Uni/Multi\n3. Configure reactive database pool in application.properties:\n   - quarkus.datasource.reactive.max-size=2\n   - quarkus.datasource.reactive.idle-timeout=30s\n4. Support MySQL (quarkus-reactive-mysql-client) and SQLite (via reactive-pg-client configuration)",
+        "testStrategy": "1. Run SimpleMigrator to apply all 11 migrations to MySQL test database\n2. Run SimpleMigrator to apply all 11 migrations to SQLite test database\n3. Unit tests for each Panache entity: CRUD operations using reactive APIs\n4. Verify foreign key constraints (source_id, client_id)\n5. Test connection pool: confirm max 2 connections under load\n6. Memory profiling: database pool overhead <8MB",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Build Core Streaming Components (StreamingJsonParser, HttpStreamingService, FilterService)",
+        "description": "Implement memory-efficient streaming JSON parser, HTTP client with zero-copy streaming, and YAML filter engine with regex matching",
+        "details": "1. StreamingJsonParser (com.iptvorganizer.services.StreamingJsonParser):\n   - Use Jackson Streaming API (JsonParser with JsonFactory)\n   - Process JSON in 128KB chunks\n   - Emit items via Mutiny Multi<T>\n   - Explicit GC call every 1000 items: System.gc()\n   - Handle large Xtream API responses (categories, streams)\n2. HttpStreamingService (com.iptvorganizer.services.HttpStreamingService):\n   - Use Vert.x WebClient for reactive HTTP requests\n   - Implement zero-copy streaming with Multi<Buffer>\n   - Configure 8-16KB buffer chunks\n   - Support backpressure to prevent memory overflow\n   - Handle upstream timeouts and retries\n3. FilterService (com.iptvorganizer.services.FilterService):\n   - Parse YAML filter configs using SnakeYAML Engine\n   - Implement include/exclude regex pattern matching\n   - Cache compiled Pattern objects per filter\n   - Apply filters to stream lists (favoris system)\n   - Support adult content filtering flag\n4. All services must be @ApplicationScoped reactive beans\n5. Integrate with ProxyConfigService for upstream proxy support",
+        "testStrategy": "1. StreamingJsonParser: parse 10K item JSON, verify memory <30MB, time <3s\n2. HttpStreamingService: stream 100MB video file, verify constant 16KB memory usage\n3. FilterService: load 50 filters with 200 regex patterns, verify <10MB memory\n4. Integration test: stream and filter Xtream API response with 5000 items\n5. Load test: 50 concurrent HTTP streams for 10 minutes, verify no memory leaks",
+        "priority": "high",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Implement Background Sync Service with Quarkus Scheduler",
+        "description": "Build reactive sync daemon using Quarkus Scheduler with batch processing (100 items/batch), explicit GC calls, and transaction safety",
+        "details": "1. Create SyncService (@ApplicationScoped) with Quarkus Scheduler:\n   - @Scheduled(cron = \"0 */5 * * * ?\") for periodic checks\n   - Configurable via application.properties: sync.check.interval\n2. Implement sync workflow:\n   - Query Source entities for sources needing sync (next_sync_time < now)\n   - For each source: fetch categories, live streams, VOD, series from upstream Xtream API\n   - Use StreamingJsonParser for memory-efficient parsing\n   - Apply FilterService to filter content per source filters\n3. Batch processing:\n   - Process streams in batches of 100 items\n   - Use Panache Reactive transactions: Panache.withTransaction()\n   - Explicit System.gc() after each batch\n4. Implement LabelExtractor:\n   - Extract labels from stream names using regex patterns\n   - Store extracted labels in stream metadata\n5. Create SyncLog entries:\n   - Record sync start, completion, errors\n   - Update SyncSchedule.next_sync_time after successful sync\n6. Handle concurrent sync prevention using database locks or Redis\n7. Use Mutiny Multi for asynchronous processing",
+        "testStrategy": "1. Unit test: sync single source with 1000 streams\n2. Memory profiling during sync: verify <58MB RSS\n3. Test batch processing: confirm 100 items/batch, GC called between batches\n4. Integration test: sync 5 sources concurrently, verify no deadlocks\n5. Load test: sync 10K streams, verify completion time and memory usage\n6. Verify SyncLog and SyncSchedule tables updated correctly",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Implement Complete Admin REST API with JWT Authentication",
+        "description": "Build 9 RESTEasy Reactive controllers for admin UI: Auth, Sources, Clients, Filters, Categories, Streams, Sync, ConnectionLogs, Dashboard",
+        "details": "1. AuthController (com.iptvorganizer.controllers.admin.AuthController):\n   - POST /api/auth/login: validate username/password, return JWT token\n   - POST /api/auth/logout: invalidate token (blacklist or short expiry)\n   - Use SmallRye JWT for token generation/validation\n2. SourceController:\n   - GET /api/sources: list all sources (paginated)\n   - GET /api/sources/{id}: get source details\n   - POST /api/sources: create source (with proxy fields: enableproxy, disablestreamproxy, stream_follow_location)\n   - PUT /api/sources/{id}: update source\n   - DELETE /api/sources/{id}: delete source\n   - GET /api/sources/{id}/sync-status: get sync status\n   - POST /api/sources/{id}/test-connection: test upstream connection\n3. ClientController, FilterController, CategoriesController, StreamsController, SyncController, ConnectionLogsController, DashboardController:\n   - Implement CRUD endpoints per PRD specification\n   - All endpoints require @RolesAllowed(\"admin\") JWT authentication\n4. Use Mutiny Uni<Response> for reactive responses\n5. Implement JSON serialization with Jackson\n6. Add CORS configuration for React admin UI\n7. Error handling: map exceptions to HTTP status codes",
+        "testStrategy": "1. Unit tests for each controller endpoint (20+ endpoints)\n2. Integration tests with test database\n3. JWT token validation tests: valid, expired, invalid tokens\n4. Test React admin UI integration: all CRUD operations\n5. Performance: API response time p99 <100ms\n6. Test pagination, filtering, sorting for list endpoints",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Implement Xtream Codes API and Client-Facing Proxy System",
+        "description": "Build XtreamController with full Xtream API compatibility and StreamDataController with dual proxy architecture for handling 302 redirects",
+        "details": "1. XtreamController (com.iptvorganizer.controllers.XtreamController):\n   - GET /player_api.php: server info and authentication\n   - GET /player_api.php?action=get_live_categories: list live categories\n   - GET /player_api.php?action=get_vod_categories: list VOD categories\n   - GET /player_api.php?action=get_series_categories: list series categories\n   - GET /player_api.php?action=get_live_streams: list live streams\n   - GET /player_api.php?action=get_vod_streams: list VOD streams\n   - GET /player_api.php?action=get_series: list series\n   - Validate client credentials (username/password) for each request\n   - Apply FilterService to filter content per client's source\n2. StreamDataController (com.iptvorganizer.controllers.StreamDataController):\n   - GET /live/{username}/{password}/{stream_id}.{ext}: live TV streaming\n   - GET /movie/{username}/{password}/{stream_id}.{ext}: VOD streaming\n   - GET /series/{username}/{password}/{stream_id}.{ext}: series streaming\n   - Handle 302 redirects from upstream:\n     * If disablestreamproxy=true: return 302 directly to client\n     * If disablestreamproxy=false: encode redirect URL in base64, return 302 to /proxy/{user}/{pass}?url={base64}\n   - Direct streaming when no redirect: use HttpStreamingService\n3. ProxyController (com.iptvorganizer.controllers.ProxyController):\n   - GET /proxy/{username}/{password}?url={base64_encoded_url}: decode and stream\n   - Follow additional redirects based on stream_follow_location flag\n   - Use HttpStreamingService for zero-copy streaming\n4. EPG Support:\n   - GET /live/xmltv.php: return EPG data in XMLTV format\n5. All responses must comply with Xtream Codes API JSON format",
+        "testStrategy": "1. Test with VLC: play live stream, VOD, series\n2. Test with Kodi: verify Xtream plugin compatibility\n3. Test with TiviMate, GSE IPTV: verify client compatibility\n4. Test 302 redirect scenarios: direct, via proxy, bypass proxy\n5. Functional tests: all Xtream API endpoints with valid/invalid credentials\n6. Performance: stream latency <200ms for first byte\n7. Load test: 50 concurrent streams for 4 hours",
+        "priority": "high",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Implement ProxyConfigService for Upstream Proxy Support (HTTP/HTTPS/SOCKS5)",
+        "description": "Build centralized proxy configuration service with global and per-source settings, authentication support, and integration with HttpStreamingService",
+        "details": "1. Create ProxyConfigService (@ApplicationScoped):\n   - Load configuration from environment variables at startup\n   - Global settings: PROXY_ENABLED, PROXY_URL, PROXY_TYPE, PROXY_HOST, PROXY_PORT, PROXY_USERNAME, PROXY_PASSWORD\n   - Support unified URL format: http://user:pass@proxy.example.com:8080\n   - Support component-based format: separate host, port, username, password\n2. Implement proxy type detection:\n   - HTTP/HTTPS proxy\n   - SOCKS5 proxy\n3. Per-source proxy override:\n   - Check Source.enableproxy field (null/true/false)\n   - If false: bypass proxy for this source\n   - If null/true: use global proxy if enabled\n4. Integrate with Vert.x WebClient:\n   - Configure ProxyOptions for WebClient\n   - Support proxy authentication (username/password)\n5. Provide configuration methods:\n   - getProxyConfig(Source source): ProxyConfig\n   - isProxyEnabled(Source source): boolean\n6. Validate configuration on startup:\n   - If PROXY_USERNAME set, PROXY_PASSWORD must be set\n   - If PROXY_HOST set, PROXY_PORT must be set",
+        "testStrategy": "1. Unit tests: parse PROXY_URL, component-based config\n2. Test HTTP proxy: route upstream requests through HTTP proxy\n3. Test HTTPS proxy: route requests through HTTPS proxy\n4. Test SOCKS5 proxy: route requests through SOCKS5 proxy\n5. Test proxy authentication: username/password validation\n6. Test per-source override: source with enableproxy=false bypasses proxy\n7. Integration test: sync sources via proxy, stream video via proxy",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "Create Docker Multi-Stage Build and GitHub Actions Workflows",
+        "description": "Build Dockerfile for GraalVM native compilation (<80MB image), create java-build-test.yml and java-docker-build.yml workflows for automated CI/CD",
+        "details": "1. Create Dockerfile in project root:\n   - Stage 1 (builder): use ghcr.io/graalvm/native-image:22 as base\n     * Copy Gradle project files\n     * Run ./gradlew build -Dquarkus.package.type=native --no-daemon\n     * Optimize for ARM: -march=armv7-a\n   - Stage 2 (runtime): use alpine:3.18 as base\n     * Install required libraries: libstdc++, zlib\n     * Copy native executable from builder\n     * Create non-root user 'app' (UID 1000)\n     * Set memory limits: ENV JAVA_OPTS=\"-Xmx64m -Xms32m\"\n     * Expose port 9090\n     * Add health check: HEALTHCHECK --interval=30s CMD curl -f http://localhost:9090/health || exit 1\n     * Set volumes: /app/data, /logs/iptv\n     * Target image size: <80MB\n2. Create .github/workflows/java-build-test.yml:\n   - Trigger: push and pull requests on java branch only\n   - Steps: checkout, setup JDK 17, Gradle build, run tests, upload test results\n   - Upload code coverage to codecov\n3. Create .github/workflows/java-docker-build.yml:\n   - Trigger: push to java branch, tags matching java-v*, PRs to java branch\n   - Steps: checkout, setup JDK 17, Gradle native build, Docker Buildx setup, GHCR login, build and push\n   - Multi-platform builds: linux/amd64, linux/arm/v7, linux/arm64\n   - Tags: ghcr.io/anasoid/iptv-organizer-proxy:java, ghcr.io/anasoid/iptv-organizer-proxy:java-v{version}, ghcr.io/anasoid/iptv-organizer-proxy:java-latest\n   - Use GitHub Actions cache for faster rebuilds\n4. Keep existing PHP workflows unchanged (backend-ci.yml, docker-build.yml)",
+        "testStrategy": "1. Build Docker image locally: docker build -t iptv-proxy-java .\n2. Verify image size <80MB: docker images iptv-proxy-java\n3. Run container: docker run -p 9090:9090 iptv-proxy-java\n4. Verify startup time <2s\n5. Test health check endpoint: curl http://localhost:9090/health\n6. Push to java branch, verify GitHub Actions builds pass\n7. Verify multi-architecture images pushed to GHCR\n8. Test image on ARMv7 and ARM64 platforms (OpenWrt)",
+        "priority": "high",
+        "dependencies": [
+          7,
+          8
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Configuration Management and Application Properties",
+        "description": "Convert .env configuration to application.yaml, configure database connections, memory limits, JWT secrets, CORS, and sync scheduler intervals",
+        "details": "1. Create src/main/resources/application.yaml:\n   - Database configuration:\n     * quarkus.datasource.db-kind: mysql or postgresql (for SQLite emulation)\n     * quarkus.datasource.reactive.url: jdbc:mysql://localhost:3306/iptv_proxy\n     * quarkus.datasource.username/password from env vars\n   - Hibernate configuration:\n     * quarkus.hibernate-orm.database.generation: none (use SimpleMigrator)\n   - Reactive pool settings:\n     * quarkus.datasource.reactive.max-size: 2\n     * quarkus.datasource.reactive.idle-timeout: 30s\n   - Memory settings:\n     * quarkus.native.additional-build-args: -Xmx64m,-Xms32m,--gc=serial\n   - JWT configuration:\n     * mp.jwt.verify.issuer: iptv-organizer-proxy\n     * smallrye.jwt.sign.key.location: from env var JWT_SECRET\n   - CORS configuration:\n     * quarkus.http.cors: true\n     * quarkus.http.cors.origins: http://localhost:3000 (React admin UI)\n   - Sync scheduler:\n     * sync.check.interval: 300 (5 minutes)\n     * sync.default.interval: 3600 (1 hour)\n     * sync.lock.timeout: 1800 (30 minutes)\n   - Proxy configuration:\n     * proxy.enabled, proxy.url, proxy.type, proxy.host, proxy.port, proxy.username, proxy.password (from env vars)\n2. Support environment variable overrides: %dev, %prod profiles\n3. Create application-dev.yaml and application-prod.yaml for environment-specific configs",
+        "testStrategy": "1. Verify configuration loading: quarkus.log.level=DEBUG\n2. Test database connection with MySQL and SQLite\n3. Test JWT token generation with configured secret\n4. Test CORS: preflight requests from React admin UI origin\n5. Test sync scheduler: verify cron execution at configured interval\n6. Test proxy configuration: verify ProxyConfigService loads settings\n7. Verify environment variable overrides work correctly",
+        "priority": "medium",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 11,
+        "title": "Performance Testing, Memory Profiling, and Optimization",
+        "description": "Validate memory usage targets (idle <45MB, load <60MB), conduct load testing (50 concurrent streams, 4 hours), and optimize for OpenWrt deployment",
+        "details": "1. Memory profiling using JFR (Java Flight Recorder):\n   - Start application with JFR: -XX:StartFlightRecording=filename=recording.jfr\n   - Idle state profiling: verify RSS <45MB\n   - Load profiling: 3 concurrent video streams, verify RSS <60MB\n   - Sync profiling: background sync running, verify RSS <58MB\n2. Load testing using JMeter or Gatling:\n   - Simulate 50 concurrent IPTV clients streaming video\n   - Run for 4 hours continuously\n   - Monitor memory usage, CPU usage, network throughput\n   - Verify no OOM errors, no memory leaks\n3. Performance benchmarking:\n   - Startup time: measure from container start to ready state, target <2s\n   - API response time: measure p50, p95, p99 for all endpoints, target p99 <100ms\n   - Video stream latency: measure time to first byte, target <200ms\n   - JSON parsing: parse 10K item response, target <3s\n4. Optimization:\n   - Tune GC parameters: -XX:+UseSerialGC for minimal footprint\n   - Optimize native image: --initialize-at-build-time for static initialization\n   - Reduce reflection usage: add reflection-config.json for GraalVM\n   - Remove unused dependencies: analyze build output, exclude transitive deps\n5. OpenWrt hardware validation:\n   - Deploy to OpenWrt device (ARMv7 or ARM64)\n   - Verify Docker container runs successfully\n   - Test full functionality: Admin API, Xtream API, streaming",
+        "testStrategy": "1. Memory profiling: verify idle <45MB, load <60MB, sync <58MB\n2. Load test results: 50 streams for 4 hours, no OOM, no memory leaks\n3. Startup time: verify <2s on target hardware\n4. API performance: p99 <100ms for all endpoints\n5. Stream latency: <200ms time to first byte\n6. JSON parsing: 10K items in <3s\n7. OpenWrt deployment: successful deployment and full functional testing\n8. Compare performance with PHP version: match or exceed throughput",
+        "priority": "high",
+        "dependencies": [
+          9,
+          10
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 12,
+        "title": "Documentation and Release Preparation",
+        "description": "Create comprehensive documentation including deployment instructions, configuration reference, memory tuning guide, API documentation, and release notes",
+        "details": "1. Deployment documentation (DEPLOYMENT.md):\n   - Docker installation instructions\n   - docker-compose.yml configuration for OpenWrt\n   - Environment variable reference\n   - Database setup (MySQL and SQLite)\n   - Initial admin user creation\n   - Health check and monitoring setup\n2. Configuration reference (CONFIGURATION.md):\n   - application.yaml structure and options\n   - Database connection settings\n   - Memory and GC tuning parameters\n   - JWT configuration\n   - Proxy configuration (global and per-source)\n   - CORS settings\n   - Sync scheduler configuration\n3. Memory tuning guide (MEMORY-TUNING.md):\n   - Memory budget breakdown (64MB heap)\n   - GC tuning for OpenWrt\n   - Native image optimization techniques\n   - Profiling tools and commands\n   - Troubleshooting OOM errors\n4. API documentation (API.md):\n   - Admin REST API: all endpoints with request/response examples\n   - Xtream Codes API: all endpoints with Xtream format compliance\n   - Authentication flow (JWT)\n   - Error codes and responses\n5. Release notes (RELEASE-NOTES.md):\n   - Version information\n   - Features implemented\n   - Performance metrics (startup time, memory usage, throughput)\n   - Breaking changes from PHP version\n   - Known limitations\n   - Migration guide (if applicable)\n6. Developer guide (DEVELOPER.md):\n   - Build instructions\n   - Testing strategy\n   - Architecture overview\n   - Code structure and conventions\n   - Contributing guidelines",
+        "testStrategy": "1. Review documentation completeness: all features documented\n2. Test deployment instructions: deploy to fresh OpenWrt device\n3. Validate configuration examples: copy-paste test\n4. Test API examples: execute all documented API calls\n5. Peer review: have team members review documentation\n6. Generate OpenAPI/Swagger spec for Admin REST API\n7. Verify release notes accuracy: test all listed features",
+        "priority": "low",
+        "dependencies": [
+          11
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2026-01-02T17:28:03.243Z",
+      "updated": "2026-01-02T17:28:03.243Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
