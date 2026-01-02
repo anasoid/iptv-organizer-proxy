@@ -17,7 +17,7 @@ Build new Java/Quarkus implementation of IPTV Organizer Proxy with GraalVM nativ
 - Create Quarkus Gradle project with GraalVM native compilation
 - Setup Gradle with Quarkus BOM 3.6.4+ and dependencies
 - Configure project structure: controllers, services, models, migrations
-- Setup version control and CI/CD pipeline
+- Setup version control and CI/CD pipeline (GitHub Actions for build, test, and Docker image generation)
 
 ### Phase 2: Database Layer
 **Goal**: Build database schema and ORM layer with custom migration system
@@ -291,6 +291,149 @@ Each upstream source has three proxy-related settings:
 
 ---
 
+## CI/CD Pipeline - GitHub Actions
+
+### Overview
+Separate, dedicated workflows for Java and PHP builds to enable independent testing and deployment.
+
+**Java Workflows** (java branch):
+1. **java-build-test.yml** - Build and test Java code with Gradle
+2. **java-docker-build.yml** - Build and push Quarkus native Docker images
+
+**PHP Workflows** (main, develop branches):
+1. **backend-ci.yml** - PHP linting and validation
+2. **docker-build.yml** - Build and push PHP Docker images
+
+---
+
+### Java Workflows
+
+#### Workflow: Java Build & Test (java-build-test.yml)
+
+**Trigger**: Push and pull requests on `java` branch only
+
+**Steps**:
+1. Checkout repository (v4)
+2. Setup JDK 17 (Temurin distribution)
+   - Enable Gradle build cache
+3. Build with Gradle
+   - Command: `cd java && ./gradlew build -Dquarkus.package.type=native`
+   - Compile Java sources
+   - Run linting/analysis
+4. Run tests
+   - Command: `cd java && ./gradlew test`
+   - Execute all unit and integration tests
+5. Upload test results (if available)
+   - Artifact: `java/build/test-results/test/`
+6. Upload code coverage (if available)
+   - Artifact: `java/build/reports/jacoco/test/jacocoTestReport.xml`
+   - Sends to codecov for tracking
+
+**Success Criteria**:
+- Gradle build completes without errors
+- All tests pass
+- No compiler warnings
+- Native image compilation succeeds
+
+#### Workflow: Java Docker Build & Push (java-docker-build.yml)
+
+**Trigger**:
+- Push to `java` branch (excluding branches `main`, `develop`)
+- Version tags matching `java-v*` pattern
+- Pull requests to `java` branch
+
+**Steps**:
+1. Checkout repository
+2. Setup JDK 17 (Temurin distribution)
+   - Enable Gradle build cache
+3. Build Java with Gradle native compilation
+   - Command: `cd java && ./gradlew build -Dquarkus.package.type=native --no-daemon`
+   - Produces GraalVM native executable (`*-runner`)
+4. Setup Docker Buildx for multi-platform builds
+5. Login to GHCR (GitHub Container Registry)
+   - Skip on pull requests
+   - Uses GitHub Actions token
+6. Extract metadata and generate tags
+   - Branch tag: `ghcr.io/anasoid/iptv-organizer-proxy:java`
+   - Semantic version tags: `v1.2.3`, `1.2` (from `java-v*` tags)
+   - Latest tag: `java-latest` for java branch
+7. Build and push Docker image
+   - Docker Buildx with GitHub Actions cache
+   - Multi-platforms: `linux/amd64`, `linux/arm/v7`, `linux/arm64`
+   - Push only on successful builds to main branches (skip on PRs)
+8. Generate build summary
+   - Posts to GitHub workflow summary with tags and platforms
+
+**Docker Image Details (Java)**:
+
+| Aspect | Value |
+|--------|-------|
+| Base Image | `alpine:3.18` (runtime) |
+| Builder Image | `ghcr.io/graalvm/native-image:22` |
+| Executable | GraalVM native binary |
+| Memory Target | 64MB heap (-Xmx64m -Xms32m) |
+| Startup Time | < 2 seconds |
+| Image Size Target | < 80MB |
+| Health Check | `/health` endpoint, 30s interval |
+| Port | 9090 |
+| Volumes | `/app/data`, `/logs/iptv` |
+| Non-root User | `app` (UID 1000) |
+
+**Platforms Supported (Java)**:
+- `linux/amd64` - x86-64 servers, desktops
+- `linux/arm/v7` - ARMv7 OpenWrt routers (primary target)
+- `linux/arm64` - ARM64 modern routers, Raspberry Pi 4+
+
+**Registry**: GitHub Container Registry (GHCR)
+- URL: `ghcr.io/anasoid/iptv-organizer-proxy` with `java` tag prefix
+- Authentication: GitHub Actions token (automatic)
+- Image naming: `ghcr.io/anasoid/iptv-organizer-proxy:java`, `ghcr.io/anasoid/iptv-organizer-proxy:java-v1.2.3`
+
+**Caching**:
+- GitHub Actions cache layer for faster rebuilds
+- BuildKit cache optimization
+
+---
+
+### PHP Workflows
+
+#### Workflow: Backend CI (backend-ci.yml)
+
+**Trigger**: Push and pull requests on `main`, `develop` branches
+
+**Purpose**: PHP linting, composer validation, security scanning
+
+#### Workflow: Docker Build & Push (docker-build.yml)
+
+**Trigger**:
+- Push to `main`, `develop` branches
+- Version tags matching `v*` pattern (without `java-` prefix)
+- Pull requests to `main`, `develop` branches
+
+**Configuration**:
+- Uses: `./docker/Dockerfile` (PHP multi-stage build)
+- Platforms: `linux/amd64`, `linux/arm64`
+- Build command: Composer + PHP-FPM with Alpine
+- Tags: Branch-based (`main`, `develop`), semantic versions (`v1.2.3`)
+
+---
+
+## Workflow Separation Summary
+
+| Aspect | Java (java branch) | PHP (main/develop) |
+|--------|-------------------|-------------------|
+| **Build Workflow** | `java-build-test.yml` | `backend-ci.yml` |
+| **Docker Workflow** | `java-docker-build.yml` | `docker-build.yml` |
+| **Build Tool** | Gradle 8.5+ | Composer |
+| **Compilation** | GraalVM native | PHP-FPM runtime |
+| **Platforms** | amd64, arm/v7, arm64 | amd64, arm64 |
+| **Image Base** | Alpine 3.18 + native binary | Alpine 3.18 + PHP-FPM |
+| **Tag Prefix** | `java` | none (main is latest) |
+| **Registry** | GHCR | GHCR |
+| **Testing** | JUnit + Gradle test | PHP linter + composer validate |
+
+---
+
 ## Success Metrics
 
 ### Memory
@@ -409,6 +552,13 @@ Each upstream source has three proxy-related settings:
 - [ ] Add dependencies: Vert.x WebClient, Jackson, SnakeYAML, SmallRye JWT
 - [ ] Configure native build: -Xmx64m, --gc=serial, -march=armv7-a
 - [ ] Setup package structure: controllers, services, models, migrations
+- [ ] Create separate GitHub Actions workflows for Java:
+  - [ ] `.github/workflows/java-build-test.yml` - Build Java with Gradle + run tests (java branch only)
+  - [ ] `.github/workflows/java-docker-build.yml` - Build and push Quarkus native Docker images
+- [ ] Keep existing PHP workflows unchanged:
+  - [ ] `.github/workflows/backend-ci.yml` - PHP linting (main, develop)
+  - [ ] `.github/workflows/docker-build.yml` - PHP Docker builds (main, develop)
+- [ ] Configure GHCR authentication and image tagging strategy (java-prefixed tags for Java images)
 
 ### Phase 2: Database Layer
 - [ ] Create custom migration system (SimpleMigrator pattern)
@@ -469,12 +619,19 @@ Each upstream source has three proxy-related settings:
 - [ ] CORS and security settings
 
 ### Phase 7: Docker & Testing
-- [ ] Multi-stage Dockerfile: Gradle builder + Alpine runtime
-- [ ] Native image build configuration
-- [ ] ARM architecture optimization (armv7/armv8)
-- [ ] Image size optimization (target: <80MB)
-- [ ] Health check endpoint (/health)
-- [ ] docker-compose.yml for OpenWrt
+- [ ] Create Dockerfile for Quarkus native build
+  - [ ] Multi-stage: GraalVM builder + Alpine 3.18 runtime
+  - [ ] Configure native image compilation with aggressive optimization
+  - [ ] ARM architecture optimization (armv7-a, armv8-a)
+  - [ ] Target image size: < 80MB
+- [ ] Setup Java-specific GitHub Actions workflows
+  - [ ] Create `java-docker-build.yml` for automated GHCR pushes
+  - [ ] Configure multi-architecture builds (amd64, arm/v7, arm64)
+  - [ ] Setup java-prefixed semantic versioning and branch tagging (java, java-v1.2.3, java-latest)
+  - [ ] Keep PHP workflows independent (docker-build.yml remains unchanged)
+- [ ] Implement health check endpoint (/health for liveness checks)
+- [ ] Create docker-compose.yml for OpenWrt deployment
+- [ ] Test image on target platforms (OpenWrt ARMv7/ARMv8)
 
 ### Phase 8: Validation & Optimization
 - [ ] Memory profiling: idle <45MB, load <60MB, sync <58MB
@@ -497,7 +654,16 @@ Each upstream source has three proxy-related settings:
 - Gradle 8.5+
 - Java 17+
 - Docker for multi-stage builds
-- CI/CD pipeline (GitHub Actions)
+- **CI/CD Pipeline**: GitHub Actions with separate Java and PHP workflows
+  - **Java Workflows** (java branch):
+    - `.github/workflows/java-build-test.yml` - Gradle build and test
+    - `.github/workflows/java-docker-build.yml` - Quarkus native Docker builds
+  - **PHP Workflows** (main, develop branches):
+    - `.github/workflows/backend-ci.yml` - PHP linting and validation
+    - `.github/workflows/docker-build.yml` - PHP Docker builds
+  - Multi-architecture builds (Java: amd64, arm/v7, arm64; PHP: amd64, arm64)
+  - Automated pushes to GitHub Container Registry (GHCR)
+  - Separate image tags (java-prefixed for Java, plain for PHP)
 
 ### Testing Infrastructure
 - JFR (Java Flight Recorder) for memory profiling
@@ -546,13 +712,17 @@ Each upstream source has three proxy-related settings:
 - [ ] MySQL and SQLite databases work
 - [ ] Runs on OpenWrt ARMv7/ARMv8
 
-### Operations
+### Operations & Deployment
 - [ ] Docker image < 80MB
-- [ ] Health check endpoint
+- [ ] Automated Docker builds (GitHub Actions) on java branch push
+- [ ] Multi-architecture Docker image (amd64, arm/v7, arm64)
+- [ ] Images published to GHCR with version tags
+- [ ] Health check endpoint (`/health`)
 - [ ] Startup < 2 seconds
 - [ ] No memory leaks (4-hour test)
 - [ ] Graceful shutdown
 - [ ] Configuration via environment variables
+- [ ] GitHub Actions workflows functional and passing
 
 ---
 
@@ -584,7 +754,21 @@ All 11 tables include these fields:
 
 ---
 
-**Document Version**: 1.1 (Updated with Proxy Architecture)
+**Document Version**: 1.3 (Separate Java and PHP GitHub Actions Workflows)
 **Created**: 2026-01-02
 **Last Updated**: 2026-01-02
 **Status**: Approved for New Development
+
+**Latest Updates (v1.3)**:
+- Separated Java and PHP GitHub Actions workflows completely
+- Java Workflows: `java-build-test.yml`, `java-docker-build.yml` (java branch only)
+- PHP Workflows: `backend-ci.yml`, `docker-build.yml` (main/develop branches)
+- Added workflow separation table for clarity
+- Configured java-prefixed image tags in GHCR (java, java-v1.2.3, java-latest)
+- Java builds support 3 platforms (amd64, arm/v7, arm64) for full OpenWrt compatibility
+
+**Previous Updates (v1.2)**:
+- Added comprehensive GitHub Actions CI/CD section
+- Created multi-stage Dockerfile for Quarkus native build
+- Configured multi-architecture Docker builds (amd64, arm/v7, arm64)
+- Integrated GHCR publishing with semantic versioning
