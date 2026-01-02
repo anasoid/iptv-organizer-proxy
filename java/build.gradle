@@ -15,7 +15,8 @@ dependencies {
     implementation 'io.quarkus:quarkus-resteasy-reactive-jackson'
     implementation 'io.quarkus:quarkus-vertx'
 
-    // Reactive Database Clients
+    // Datasource and Reactive Database Clients
+    implementation 'io.quarkus:quarkus-datasource'
     implementation 'io.quarkus:quarkus-reactive-mysql-client'
     implementation 'io.quarkus:quarkus-reactive-pg-client'
 
