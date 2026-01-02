@@ -1,0 +1,47 @@
+plugins {
+    id 'java'
+    id 'io.quarkus' version '3.6.4'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Quarkus Platform BOM
+    implementation platform("io.quarkus.platform:quarkus-bom:3.6.4")
+
+    // Reactive REST Framework
+    implementation 'io.quarkus:quarkus-resteasy-reactive-jackson'
+    implementation 'io.quarkus:quarkus-vertx'
+
+    // Reactive Database Clients
+    implementation 'io.quarkus:quarkus-reactive-mysql-client'
+    implementation 'io.quarkus:quarkus-reactive-pg-client'
+
+    // JSON/YAML Processing
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
+    implementation 'org.yaml:snakeyaml:2.0'
+
+    // Security & JWT
+    implementation 'io.quarkus:quarkus-smallrye-jwt'
+
+    // Lombok for reducing boilerplate (compile-time only, zero runtime impact)
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+    testCompileOnly 'org.projectlombok:lombok:1.18.30'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+    // Testing
+    testImplementation 'io.quarkus:quarkus-junit5'
+    testImplementation 'io.rest-assured:rest-assured'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+group 'com.iptvorganizer'
+version '0.1.0-SNAPSHOT'
+
