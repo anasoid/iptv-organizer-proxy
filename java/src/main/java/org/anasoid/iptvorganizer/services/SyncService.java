@@ -203,17 +203,53 @@ public class SyncService {
 
                 LOGGER.info("Fetched " + categories.size() + " " + categoryType + " categories from API");
 
-                // Upsert categories in transaction
-                return categoryRepository.batchUpsert(categories)
-                    .flatMap(v -> categoryRepository.getCategoryIdsBySourceAndType(source.getId(), categoryType))
-                    .flatMap(existingIds -> {
-                        int deleted = existingIds.size() - fetchedCategoryIds.size();
-                        if (deleted > 0) {
-                            LOGGER.info("Deleting " + deleted + " obsolete " + categoryType + " categories");
-                            return categoryRepository.deleteCategoriesNotInSet(source.getId(), categoryType, fetchedCategoryIds)
-                                .replaceWithVoid();
+                // Get all existing categories for this source
+                return categoryRepository.findBySourceId(source.getId())
+                    .collect()
+                    .asList()
+                    .flatMap(existingCategories -> {
+                        // Create a map of existing categories
+                        Map<Integer, Category> existingMap = new HashMap<>();
+                        for (Category cat : existingCategories) {
+                            if (cat.getCategoryType().equals(categoryType)) {
+                                existingMap.put(cat.getCategoryId(), cat);
+                            }
                         }
-                        return Uni.createFrom().voidItem();
+
+                        // Insert/update categories one-by-one
+                        return Multi.createFrom().iterable(categories)
+                            .onItem()
+                            .transformToUniAndConcatenate(category -> {
+                                if (existingMap.containsKey(category.getCategoryId())) {
+                                    // Update existing category
+                                    category.setId(existingMap.get(category.getCategoryId()).getId());
+                                    return categoryRepository.update(category);
+                                } else {
+                                    // Insert new category
+                                    return categoryRepository.insert(category).replaceWithVoid();
+                                }
+                            })
+                            .collect()
+                            .asList()
+                            .flatMap(v -> {
+                                // Delete obsolete categories
+                                List<Category> toDelete = existingCategories.stream()
+                                    .filter(c -> c.getCategoryType().equals(categoryType)
+                                        && !fetchedCategoryIds.contains(c.getCategoryId()))
+                                    .toList();
+
+                                if (toDelete.isEmpty()) {
+                                    return Uni.createFrom().voidItem();
+                                }
+
+                                LOGGER.info("Deleting " + toDelete.size() + " obsolete " + categoryType + " categories");
+                                return Multi.createFrom().iterable(toDelete)
+                                    .onItem()
+                                    .transformToUniAndConcatenate(cat -> categoryRepository.delete(cat.getId()))
+                                    .collect()
+                                    .asList()
+                                    .replaceWithVoid();
+                            });
                     })
                     .onFailure()
                     .invoke(ex -> LOGGER.severe("Failed to sync " + categoryType + " categories: " + ex.getMessage()));
@@ -248,39 +284,69 @@ public class SyncService {
                     fetchedStreamIds.add(stream.getStreamId());
                 }
 
-                // Get existing stream IDs
-                return liveStreamRepository.getStreamIdsBySourceId(source.getId())
-                    .flatMap(existingStreamIds -> {
+                // Get all existing streams for this source
+                return liveStreamRepository.findAll()
+                    .filter(s -> s.getSourceId().equals(source.getId()))
+                    .collect()
+                    .asList()
+                    .flatMap(existingStreams -> {
+                        // Create a map of existing streams by stream_id for quick lookup
+                        Map<Integer, LiveStream> existingMap = new HashMap<>();
+                        for (LiveStream stream : existingStreams) {
+                            existingMap.put(stream.getStreamId(), stream);
+                        }
+
                         // Calculate statistics
-                        int added = 0, updated = 0;
+                        AtomicInteger added = new AtomicInteger(0);
+                        AtomicInteger updated = new AtomicInteger(0);
                         for (LiveStream stream : allStreams) {
-                            if (existingStreamIds.contains(stream.getStreamId())) {
-                                updated++;
+                            if (existingMap.containsKey(stream.getStreamId())) {
+                                updated.incrementAndGet();
                             } else {
-                                added++;
+                                added.incrementAndGet();
                             }
                         }
 
-                        Set<Integer> toDelete = new HashSet<>(existingStreamIds);
-                        toDelete.removeAll(fetchedStreamIds);
-                        int deleted = toDelete.size();
+                        Set<Long> toDeleteIds = new HashSet<>();
+                        for (LiveStream stream : existingStreams) {
+                            if (!fetchedStreamIds.contains(stream.getStreamId())) {
+                                toDeleteIds.add(stream.getId());
+                            }
+                        }
 
-                        syncLog.setItemsAdded(syncLog.getItemsAdded() + added);
-                        syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated);
-                        syncLog.setItemsDeleted(syncLog.getItemsDeleted() + deleted);
+                        syncLog.setItemsAdded(syncLog.getItemsAdded() + added.get());
+                        syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated.get());
+                        syncLog.setItemsDeleted(syncLog.getItemsDeleted() + toDeleteIds.size());
 
                         LOGGER.info(String.format("Live streams - Added: %d, Updated: %d, Deleted: %d",
-                            added, updated, deleted));
+                            added.get(), updated.get(), toDeleteIds.size()));
 
-                        // Upsert and delete in transaction
-                        return liveStreamRepository.batchUpsert(allStreams)
-                            .flatMap(v -> {
-                                if (deleted > 0) {
-                                    return liveStreamRepository.deleteStreamsNotInSet(
-                                        source.getId(), fetchedStreamIds
-                                    ).replaceWithVoid();
+                        // Insert/update streams one-by-one
+                        return Multi.createFrom().iterable(allStreams)
+                            .onItem()
+                            .transformToUniAndConcatenate(stream -> {
+                                if (existingMap.containsKey(stream.getStreamId())) {
+                                    // Update: set the ID from existing and update
+                                    stream.setId(existingMap.get(stream.getStreamId()).getId());
+                                    return liveStreamRepository.update(stream);
+                                } else {
+                                    // Insert new stream
+                                    return liveStreamRepository.insert(stream).replaceWithVoid();
                                 }
-                                return Uni.createFrom().voidItem();
+                            })
+                            .collect()
+                            .asList()
+                            .flatMap(v -> {
+                                // Delete obsolete streams
+                                if (toDeleteIds.isEmpty()) {
+                                    return Uni.createFrom().voidItem();
+                                }
+                                return Multi.createFrom().iterable(toDeleteIds)
+                                    .onItem()
+                                    .transformToUniAndConcatenate(id -> liveStreamRepository.delete(id))
+                                    .collect()
+                                    .asList()
+                                    .replaceWithVoid();
                             })
                             .invoke(v -> {
                                 // Explicit GC after processing large batches
@@ -295,7 +361,7 @@ public class SyncService {
     }
 
     /**
-     * Sync VOD streams for a source with batch upsert and transactions
+     * Sync VOD streams for a source one-by-one
      */
     private Uni<Source> syncVod(Source source, SyncLog syncLog) {
         LOGGER.info("Syncing VOD for source: " + source.getName());
@@ -322,39 +388,69 @@ public class SyncService {
                     fetchedStreamIds.add(stream.getStreamId());
                 }
 
-                // Get existing stream IDs
-                return vodStreamRepository.getStreamIdsBySourceId(source.getId())
-                    .flatMap(existingStreamIds -> {
+                // Get all existing streams for this source
+                return vodStreamRepository.findAll()
+                    .filter(s -> s.getSourceId().equals(source.getId()))
+                    .collect()
+                    .asList()
+                    .flatMap(existingStreams -> {
+                        // Create a map of existing streams by stream_id for quick lookup
+                        Map<Integer, VodStream> existingMap = new HashMap<>();
+                        for (VodStream stream : existingStreams) {
+                            existingMap.put(stream.getStreamId(), stream);
+                        }
+
                         // Calculate statistics
-                        int added = 0, updated = 0;
+                        AtomicInteger added = new AtomicInteger(0);
+                        AtomicInteger updated = new AtomicInteger(0);
                         for (VodStream stream : allStreams) {
-                            if (existingStreamIds.contains(stream.getStreamId())) {
-                                updated++;
+                            if (existingMap.containsKey(stream.getStreamId())) {
+                                updated.incrementAndGet();
                             } else {
-                                added++;
+                                added.incrementAndGet();
                             }
                         }
 
-                        Set<Integer> toDelete = new HashSet<>(existingStreamIds);
-                        toDelete.removeAll(fetchedStreamIds);
-                        int deleted = toDelete.size();
+                        Set<Long> toDeleteIds = new HashSet<>();
+                        for (VodStream stream : existingStreams) {
+                            if (!fetchedStreamIds.contains(stream.getStreamId())) {
+                                toDeleteIds.add(stream.getId());
+                            }
+                        }
 
-                        syncLog.setItemsAdded(syncLog.getItemsAdded() + added);
-                        syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated);
-                        syncLog.setItemsDeleted(syncLog.getItemsDeleted() + deleted);
+                        syncLog.setItemsAdded(syncLog.getItemsAdded() + added.get());
+                        syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated.get());
+                        syncLog.setItemsDeleted(syncLog.getItemsDeleted() + toDeleteIds.size());
 
                         LOGGER.info(String.format("VOD streams - Added: %d, Updated: %d, Deleted: %d",
-                            added, updated, deleted));
+                            added.get(), updated.get(), toDeleteIds.size()));
 
-                        // Upsert and delete in transaction
-                        return vodStreamRepository.batchUpsert(allStreams)
-                            .flatMap(v -> {
-                                if (deleted > 0) {
-                                    return vodStreamRepository.deleteStreamsNotInSet(
-                                        source.getId(), fetchedStreamIds
-                                    ).replaceWithVoid();
+                        // Insert/update streams one-by-one
+                        return Multi.createFrom().iterable(allStreams)
+                            .onItem()
+                            .transformToUniAndConcatenate(stream -> {
+                                if (existingMap.containsKey(stream.getStreamId())) {
+                                    // Update: set the ID from existing and update
+                                    stream.setId(existingMap.get(stream.getStreamId()).getId());
+                                    return vodStreamRepository.update(stream);
+                                } else {
+                                    // Insert new stream
+                                    return vodStreamRepository.insert(stream).replaceWithVoid();
                                 }
-                                return Uni.createFrom().voidItem();
+                            })
+                            .collect()
+                            .asList()
+                            .flatMap(v -> {
+                                // Delete obsolete streams
+                                if (toDeleteIds.isEmpty()) {
+                                    return Uni.createFrom().voidItem();
+                                }
+                                return Multi.createFrom().iterable(toDeleteIds)
+                                    .onItem()
+                                    .transformToUniAndConcatenate(id -> vodStreamRepository.delete(id))
+                                    .collect()
+                                    .asList()
+                                    .replaceWithVoid();
                             })
                             .invoke(v -> {
                                 // Explicit GC after processing large batches
@@ -369,7 +465,7 @@ public class SyncService {
     }
 
     /**
-     * Sync series for a source with batch upsert and transactions
+     * Sync series for a source one-by-one
      */
     private Uni<Source> syncSeries(Source source, SyncLog syncLog) {
         LOGGER.info("Syncing series for source: " + source.getName());
@@ -396,39 +492,69 @@ public class SyncService {
                     fetchedStreamIds.add(series.getStreamId());
                 }
 
-                // Get existing stream IDs
-                return seriesRepository.getStreamIdsBySourceId(source.getId())
-                    .flatMap(existingStreamIds -> {
+                // Get all existing series for this source
+                return seriesRepository.findAll()
+                    .filter(s -> s.getSourceId().equals(source.getId()))
+                    .collect()
+                    .asList()
+                    .flatMap(existingSeries -> {
+                        // Create a map of existing series by stream_id for quick lookup
+                        Map<Integer, Series> existingMap = new HashMap<>();
+                        for (Series series : existingSeries) {
+                            existingMap.put(series.getStreamId(), series);
+                        }
+
                         // Calculate statistics
-                        int added = 0, updated = 0;
+                        AtomicInteger added = new AtomicInteger(0);
+                        AtomicInteger updated = new AtomicInteger(0);
                         for (Series series : allSeries) {
-                            if (existingStreamIds.contains(series.getStreamId())) {
-                                updated++;
+                            if (existingMap.containsKey(series.getStreamId())) {
+                                updated.incrementAndGet();
                             } else {
-                                added++;
+                                added.incrementAndGet();
                             }
                         }
 
-                        Set<Integer> toDelete = new HashSet<>(existingStreamIds);
-                        toDelete.removeAll(fetchedStreamIds);
-                        int deleted = toDelete.size();
+                        Set<Long> toDeleteIds = new HashSet<>();
+                        for (Series series : existingSeries) {
+                            if (!fetchedStreamIds.contains(series.getStreamId())) {
+                                toDeleteIds.add(series.getId());
+                            }
+                        }
 
-                        syncLog.setItemsAdded(syncLog.getItemsAdded() + added);
-                        syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated);
-                        syncLog.setItemsDeleted(syncLog.getItemsDeleted() + deleted);
+                        syncLog.setItemsAdded(syncLog.getItemsAdded() + added.get());
+                        syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated.get());
+                        syncLog.setItemsDeleted(syncLog.getItemsDeleted() + toDeleteIds.size());
 
                         LOGGER.info(String.format("Series - Added: %d, Updated: %d, Deleted: %d",
-                            added, updated, deleted));
+                            added.get(), updated.get(), toDeleteIds.size()));
 
-                        // Upsert and delete in transaction
-                        return seriesRepository.batchUpsert(allSeries)
-                            .flatMap(v -> {
-                                if (deleted > 0) {
-                                    return seriesRepository.deleteStreamsNotInSet(
-                                        source.getId(), fetchedStreamIds
-                                    ).replaceWithVoid();
+                        // Insert/update series one-by-one
+                        return Multi.createFrom().iterable(allSeries)
+                            .onItem()
+                            .transformToUniAndConcatenate(series -> {
+                                if (existingMap.containsKey(series.getStreamId())) {
+                                    // Update: set the ID from existing and update
+                                    series.setId(existingMap.get(series.getStreamId()).getId());
+                                    return seriesRepository.update(series);
+                                } else {
+                                    // Insert new series
+                                    return seriesRepository.insert(series).replaceWithVoid();
                                 }
-                                return Uni.createFrom().voidItem();
+                            })
+                            .collect()
+                            .asList()
+                            .flatMap(v -> {
+                                // Delete obsolete series
+                                if (toDeleteIds.isEmpty()) {
+                                    return Uni.createFrom().voidItem();
+                                }
+                                return Multi.createFrom().iterable(toDeleteIds)
+                                    .onItem()
+                                    .transformToUniAndConcatenate(id -> seriesRepository.delete(id))
+                                    .collect()
+                                    .asList()
+                                    .replaceWithVoid();
                             })
                             .invoke(v -> {
                                 // Explicit GC after processing large batches
