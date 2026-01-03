@@ -43,14 +43,19 @@ public class AuthController extends BaseController {
         }
 
         return authService.login(request.getUsername(), request.getPassword())
-            .map(token -> {
-                // Create response with token and user info
-                var response = new java.util.HashMap<String, Object>();
-                response.put("token", token);
-                return ApiResponse.success(response);
+            .map(loginResponse -> {
+                // Extract token and user from login response
+                String token = (String) loginResponse.get("token");
+                org.anasoid.iptvorganizer.models.AdminUser user = (org.anasoid.iptvorganizer.models.AdminUser) loginResponse.get("user");
+
+                // Create response with token and user DTO
+                var responseData = new java.util.HashMap<String, Object>();
+                responseData.put("token", token);
+                responseData.put("user", AdminUserDTO.fromEntity(user));
+                return (Object) responseData;
             })
             .onFailure().recoverWithItem(ex ->
-                ApiResponse.error(ex.getMessage())
+                (Object) ApiResponse.error(ex.getMessage())
             );
     }
 

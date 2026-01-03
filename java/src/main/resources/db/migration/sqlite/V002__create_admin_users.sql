@@ -17,3 +17,17 @@ FOR EACH ROW
 BEGIN
     UPDATE admin_users SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
+
+-- Insert default admin user
+-- Username: admin
+-- Password: nimda$123 (BCrypt hashed with cost factor 10)
+-- Email: admin@iptv-organizer.local
+INSERT OR IGNORE INTO admin_users (username, password_hash, email, is_active, created_at, updated_at)
+VALUES (
+    'admin',
+    '$2a$10$HQw4.xDjswR5u.qq28vovOC4oHiZjWfgIUbCv4n5MPmoK.6EMBlGS',
+    'admin@iptv-organizer.local',
+    1,
+    datetime('now'),
+    datetime('now')
+);

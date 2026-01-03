@@ -138,9 +138,29 @@ public class SimpleMigrator {
             String sql = loadSqlFile(filename);
 
             return client.withTransaction(conn -> {
-                return conn.query(sql)
-                    .execute()
-                    .flatMap(rs -> {
+                // Split SQL by semicolon and execute each statement
+                List<Uni<Void>> statements = new ArrayList<>();
+                String[] sqlStatements = sql.split(";");
+
+                for (String statement : sqlStatements) {
+                    String trimmed = statement.trim();
+                    if (!trimmed.isEmpty()) {
+                        statements.add(
+                            conn.query(trimmed)
+                                .execute()
+                                .replaceWithVoid()
+                        );
+                    }
+                }
+
+                // Execute all statements sequentially
+                if (statements.isEmpty()) {
+                    return Uni.createFrom().voidItem();
+                }
+
+                return Uni.join().all(statements).andFailFast().replaceWithVoid()
+                    .flatMap(v -> {
+                        // Record migration in schema_version
                         String insertSql = "INSERT INTO schema_version (version, description, checksum) VALUES (?, ?, ?)";
                         return conn.preparedQuery(insertSql)
                             .execute(Tuple.of(version, description, checksum));

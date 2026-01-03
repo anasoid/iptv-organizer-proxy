@@ -1,6 +1,7 @@
 package org.anasoid.iptvorganizer.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.anasoid.iptvorganizer.config.BooleanAsIntSerializer;
 import org.anasoid.iptvorganizer.models.AdminUser;
@@ -13,6 +14,7 @@ import java.time.LocalDateTime;
 /**
  * DTO for AdminUser - excludes password hash from API responses
  * All boolean fields serialize as 0/1 for frontend compatibility
+ * Fields use snake_case naming for frontend compatibility
  */
 @Data
 @Builder
@@ -24,11 +26,17 @@ public class AdminUserDTO {
     private String username;
     private String email;
 
+    @JsonProperty("is_active")
     @JsonSerialize(using = BooleanAsIntSerializer.class)
     private Boolean isActive;
 
+    @JsonProperty("last_login")
     private LocalDateTime lastLogin;
+
+    @JsonProperty("created_at")
     private LocalDateTime createdAt;
+
+    @JsonProperty("updated_at")
     private LocalDateTime updatedAt;
 
     /**

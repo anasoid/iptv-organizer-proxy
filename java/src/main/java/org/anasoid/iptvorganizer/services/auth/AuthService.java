@@ -23,12 +23,12 @@ public class AuthService {
     JwtService jwtService;
 
     /**
-     * Authenticate user and return JWT token
+     * Authenticate user and return JWT token with user info
      * @param username Admin username
      * @param password Plain text password
-     * @return JWT token
+     * @return Map with token and user object
      */
-    public Uni<String> login(String username, String password) {
+    public Uni<java.util.Map<String, Object>> login(String username, String password) {
         if (username == null || username.isBlank() || password == null || password.isBlank()) {
             return Uni.createFrom().failure(new SecurityException("Username and password are required"));
         }
@@ -54,7 +54,13 @@ public class AuthService {
                 return adminUserRepository.updateLastLogin(user.getId(), user.getLastLogin())
                     .replaceWith(user);
             })
-            .onItem().transform(user -> jwtService.generateToken(user));
+            .onItem().transform(user -> {
+                String token = jwtService.generateToken(user);
+                java.util.Map<String, Object> response = new java.util.HashMap<>();
+                response.put("token", token);
+                response.put("user", user);
+                return response;
+            });
     }
 
     /**
