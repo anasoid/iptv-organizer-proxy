@@ -28,6 +28,12 @@ dependencies {
     // Security & JWT
     implementation 'io.quarkus:quarkus-smallrye-jwt'
 
+    // Scheduler for background tasks
+    implementation 'io.quarkus:quarkus-scheduler'
+
+    // BCrypt for password hashing (pure Java, minimal footprint)
+    implementation 'at.favre.lib:bcrypt:0.10.2'
+
     // Lombok for reducing boilerplate (compile-time only, zero runtime impact)
     compileOnly 'org.projectlombok:lombok:1.18.30'
     annotationProcessor 'org.projectlombok:lombok:1.18.30'
@@ -37,6 +43,10 @@ dependencies {
     // Testing
     testImplementation 'io.quarkus:quarkus-junit5'
     testImplementation 'io.rest-assured:rest-assured'
+
+    // H2 database for testing (in-memory)
+    testImplementation 'io.quarkus:quarkus-jdbc-h2'
+    testImplementation 'com.h2database:h2'
 }
 
 configurations.all {

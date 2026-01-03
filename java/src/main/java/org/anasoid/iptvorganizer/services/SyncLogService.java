@@ -2,6 +2,7 @@ package org.anasoid.iptvorganizer.services;
 
 import org.anasoid.iptvorganizer.models.SyncLog;
 import org.anasoid.iptvorganizer.repositories.SyncLogRepository;
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -29,5 +30,12 @@ public class SyncLogService extends BaseService<SyncLog, SyncLogRepository> {
             syncLog.setStatus("running");
         }
         return repository.insert(syncLog);
+    }
+
+    /**
+     * Find sync logs by source ID
+     */
+    public Multi<SyncLog> findBySourceId(Long sourceId) {
+        return repository.findBySourceId(sourceId);
     }
 }

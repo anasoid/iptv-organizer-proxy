@@ -1,8 +1,10 @@
 package org.anasoid.iptvorganizer.repositories;
 
 import org.anasoid.iptvorganizer.models.SyncLog;
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
+import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
@@ -66,6 +68,59 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
             .itemsDeleted(row.getInteger("items_deleted"))
             .errorMessage(row.getString("error_message"))
             .durationSeconds(row.getInteger("duration_seconds"))
+            .createdAt(row.getLocalDateTime("created_at"))
+            .updatedAt(row.getLocalDateTime("updated_at"))
             .build();
+    }
+
+    /**
+     * Find sync logs by source ID with optional sync_type and status filters
+     */
+    public Multi<SyncLog> findBySourceIdFiltered(Long sourceId, String syncType, String status, int page, int limit) {
+        StringBuilder whereClause = new StringBuilder("source_id = ?");
+        Tuple params = Tuple.of(sourceId);
+
+        if (syncType != null && !syncType.isEmpty()) {
+            whereClause.append(" AND sync_type = ?");
+            params = params.addString(syncType);
+        }
+
+        if (status != null && !status.isEmpty()) {
+            whereClause.append(" AND status = ?");
+            params = params.addString(status);
+        }
+
+        return findWherePaged(whereClause.toString(), params, page, limit, "started_at DESC");
+    }
+
+    /**
+     * Count sync logs by source ID with optional filters
+     */
+    public Uni<Long> countBySourceIdFiltered(Long sourceId, String syncType, String status) {
+        StringBuilder whereClause = new StringBuilder("source_id = ?");
+        Tuple params = Tuple.of(sourceId);
+
+        if (syncType != null && !syncType.isEmpty()) {
+            whereClause.append(" AND sync_type = ?");
+            params = params.addString(syncType);
+        }
+
+        if (status != null && !status.isEmpty()) {
+            whereClause.append(" AND status = ?");
+            params = params.addString(status);
+        }
+
+        return countWhere(whereClause.toString(), params);
+    }
+
+    /**
+     * Find sync logs by source ID
+     */
+    public Multi<SyncLog> findBySourceId(Long sourceId) {
+        return pool.preparedQuery("SELECT * FROM sync_logs WHERE source_id = ? ORDER BY started_at DESC")
+            .execute(Tuple.of(sourceId))
+            .onItem()
+            .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
+            .map(this::mapRow);
     }
 }

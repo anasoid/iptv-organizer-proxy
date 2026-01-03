@@ -1,10 +1,12 @@
 package org.anasoid.iptvorganizer.repositories;
 
 import org.anasoid.iptvorganizer.models.Source;
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
+import java.time.LocalDateTime;
 
 @ApplicationScoped
 public class SourceRepository extends BaseRepository<Source> {
@@ -12,6 +14,39 @@ public class SourceRepository extends BaseRepository<Source> {
     @Override
     protected String getTableName() {
         return "sources";
+    }
+
+    /**
+     * Find all sources that need syncing (next_sync_time <= now and is_active = true)
+     */
+    public Multi<Source> findSourcesNeedingSync() {
+        String sql = "SELECT * FROM sources WHERE next_sync <= ? AND is_active = true AND sync_status != 'syncing' ORDER BY next_sync ASC";
+        return pool.preparedQuery(sql)
+            .execute(Tuple.of(LocalDateTime.now()))
+            .onItem()
+            .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
+            .map(this::mapRow);
+    }
+
+    /**
+     * Try to acquire lock on source for syncing
+     * Returns true if lock acquired (source was not already syncing)
+     */
+    public Uni<Boolean> acquireSyncLock(Long sourceId) {
+        String sql = "UPDATE sources SET sync_status = 'syncing' WHERE id = ? AND sync_status != 'syncing'";
+        return pool.preparedQuery(sql)
+            .execute(Tuple.of(sourceId))
+            .map(rowSet -> rowSet.rowCount() > 0);
+    }
+
+    /**
+     * Release sync lock on source
+     */
+    public Uni<Void> releaseSyncLock(Long sourceId) {
+        String sql = "UPDATE sources SET sync_status = 'idle' WHERE id = ?";
+        return pool.preparedQuery(sql)
+            .execute(Tuple.of(sourceId))
+            .replaceWithVoid();
     }
 
     @Override

@@ -5,6 +5,7 @@ import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
+import java.time.LocalDateTime;
 
 @ApplicationScoped
 public class AdminUserRepository extends BaseRepository<AdminUser> {
@@ -42,5 +43,35 @@ public class AdminUserRepository extends BaseRepository<AdminUser> {
             .updatedAt(row.getLocalDateTime("updated_at"))
             .lastLogin(row.getLocalDateTime("last_login"))
             .build();
+    }
+
+    /**
+     * Find admin user by username
+     */
+    public Uni<AdminUser> findByUsername(String username) {
+        String sql = "SELECT * FROM admin_users WHERE username = ?";
+        return pool.preparedQuery(sql)
+            .execute(Tuple.of(username))
+            .map(rowSet -> rowSet.size() == 0 ? null : mapRow(rowSet.iterator().next()));
+    }
+
+    /**
+     * Update last login timestamp
+     */
+    public Uni<Void> updateLastLogin(Long userId, LocalDateTime lastLogin) {
+        String sql = "UPDATE admin_users SET last_login = ? WHERE id = ?";
+        return pool.preparedQuery(sql)
+            .execute(Tuple.of(lastLogin, userId))
+            .replaceWithVoid();
+    }
+
+    /**
+     * Check if username exists
+     */
+    public Uni<Boolean> usernameExists(String username) {
+        String sql = "SELECT COUNT(*) as count FROM admin_users WHERE username = ?";
+        return pool.preparedQuery(sql)
+            .execute(Tuple.of(username))
+            .map(rowSet -> rowSet.iterator().next().getInteger("count") > 0);
     }
 }

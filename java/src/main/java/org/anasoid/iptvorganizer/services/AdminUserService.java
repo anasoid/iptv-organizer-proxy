@@ -30,4 +30,11 @@ public class AdminUserService extends BaseService<AdminUser, AdminUserRepository
         }
         return repository.insert(user);
     }
+
+    /**
+     * Check if username exists
+     */
+    public Uni<Boolean> existsByUsername(String username) {
+        return repository.usernameExists(username);
+    }
 }

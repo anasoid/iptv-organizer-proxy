@@ -40,4 +40,58 @@ public abstract class BaseRepository<T extends BaseEntity> {
             .execute(Tuple.of(id))
             .replaceWithVoid();
     }
+
+    /**
+     * Get total count of records in the table
+     */
+    public Uni<Long> count() {
+        return pool.query("SELECT COUNT(*) as cnt FROM " + getTableName())
+            .execute()
+            .map(rowSet -> rowSet.iterator().hasNext() ? rowSet.iterator().next().getLong("cnt") : 0L);
+    }
+
+    /**
+     * Get paginated results
+     */
+    public Multi<T> findAllPaged(int page, int limit) {
+        int offset = (page - 1) * limit;
+        String sql = "SELECT * FROM " + getTableName() + " LIMIT ? OFFSET ?";
+        return pool.preparedQuery(sql)
+            .execute(Tuple.of(limit, offset))
+            .onItem()
+            .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
+            .map(this::mapRow);
+    }
+
+    /**
+     * Count records matching a where clause
+     */
+    protected Uni<Long> countWhere(String whereClause, Tuple params) {
+        String sql = "SELECT COUNT(*) as cnt FROM " + getTableName() + " WHERE " + whereClause;
+        return pool.preparedQuery(sql)
+            .execute(params)
+            .map(rowSet -> rowSet.iterator().hasNext() ? rowSet.iterator().next().getLong("cnt") : 0L);
+    }
+
+    /**
+     * Find records with where clause and pagination
+     */
+    protected Multi<T> findWherePaged(String whereClause, Tuple params, int page, int limit, String orderBy) {
+        int offset = (page - 1) * limit;
+        StringBuilder sql = new StringBuilder("SELECT * FROM ").append(getTableName())
+            .append(" WHERE ").append(whereClause);
+        if (orderBy != null && !orderBy.isEmpty()) {
+            sql.append(" ORDER BY ").append(orderBy);
+        }
+        sql.append(" LIMIT ? OFFSET ?");
+
+        // Add limit and offset to params
+        Tuple finalParams = params.addInteger(limit).addInteger(offset);
+
+        return pool.preparedQuery(sql.toString())
+            .execute(finalParams)
+            .onItem()
+            .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
+            .map(this::mapRow);
+    }
 }

@@ -2,6 +2,7 @@ package org.anasoid.iptvorganizer.services;
 
 import org.anasoid.iptvorganizer.models.Category;
 import org.anasoid.iptvorganizer.repositories.CategoryRepository;
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -29,5 +30,19 @@ public class CategoryService extends BaseService<Category, CategoryRepository> {
             return Uni.createFrom().failure(new IllegalArgumentException("Category type is required"));
         }
         return repository.insert(category);
+    }
+
+    /**
+     * Find categories by source ID with optional filters
+     */
+    public Multi<Category> findBySourceIdFiltered(Long sourceId, String categoryType, String search, int page, int limit) {
+        return repository.findBySourceIdFiltered(sourceId, categoryType, search, page, limit);
+    }
+
+    /**
+     * Count categories by source ID with optional filters
+     */
+    public Uni<Long> countBySourceIdFiltered(Long sourceId, String categoryType, String search) {
+        return repository.countBySourceIdFiltered(sourceId, categoryType, search);
     }
 }

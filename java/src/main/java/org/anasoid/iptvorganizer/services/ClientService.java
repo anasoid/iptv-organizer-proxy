@@ -2,6 +2,7 @@ package org.anasoid.iptvorganizer.services;
 
 import org.anasoid.iptvorganizer.models.Client;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -32,5 +33,19 @@ public class ClientService extends BaseService<Client, ClientRepository> {
             client.setIsActive(true);
         }
         return repository.insert(client);
+    }
+
+    /**
+     * Search clients by name/email/username
+     */
+    public Multi<Client> searchClients(String search, int page, int limit) {
+        return repository.searchClients(search, page, limit);
+    }
+
+    /**
+     * Count clients matching search criteria
+     */
+    public Uni<Long> countSearchClients(String search) {
+        return repository.countSearchClients(search);
     }
 }

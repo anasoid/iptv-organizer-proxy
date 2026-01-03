@@ -1,8 +1,10 @@
 package org.anasoid.iptvorganizer.repositories;
 
 import org.anasoid.iptvorganizer.models.Client;
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
+import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
@@ -73,5 +75,25 @@ public class ClientRepository extends BaseRepository<Client> {
             .updatedAt(row.getLocalDateTime("updated_at"))
             .lastLogin(row.getLocalDateTime("last_login"))
             .build();
+    }
+
+    /**
+     * Search clients by username, name, or email with pagination
+     */
+    public Multi<Client> searchClients(String search, int page, int limit) {
+        String whereClause = "(username LIKE ? OR name LIKE ? OR email LIKE ?)";
+        String searchTerm = "%" + search + "%";
+        Tuple params = Tuple.of(searchTerm, searchTerm, searchTerm);
+        return findWherePaged(whereClause, params, page, limit, "id DESC");
+    }
+
+    /**
+     * Count clients matching search criteria
+     */
+    public Uni<Long> countSearchClients(String search) {
+        String whereClause = "(username LIKE ? OR name LIKE ? OR email LIKE ?)";
+        String searchTerm = "%" + search + "%";
+        Tuple params = Tuple.of(searchTerm, searchTerm, searchTerm);
+        return countWhere(whereClause, params);
     }
 }

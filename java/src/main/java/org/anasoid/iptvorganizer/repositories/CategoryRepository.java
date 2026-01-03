@@ -1,8 +1,10 @@
 package org.anasoid.iptvorganizer.repositories;
 
 import org.anasoid.iptvorganizer.models.Category;
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
+import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
@@ -62,5 +64,56 @@ public class CategoryRepository extends BaseRepository<Category> {
             .labels(row.getString("labels"))
             .createdAt(row.getLocalDateTime("created_at"))
             .build();
+    }
+
+    /**
+     * Find categories by source ID with optional category type filter and search
+     */
+    public Multi<Category> findBySourceIdFiltered(Long sourceId, String categoryType, String search, int page, int limit) {
+        StringBuilder whereClause = new StringBuilder("source_id = ?");
+        Tuple params = Tuple.of(sourceId);
+
+        if (categoryType != null && !categoryType.isEmpty()) {
+            whereClause.append(" AND category_type = ?");
+            params = params.addString(categoryType);
+        }
+
+        if (search != null && !search.isEmpty()) {
+            whereClause.append(" AND category_name LIKE ?");
+            params = params.addString("%" + search + "%");
+        }
+
+        return findWherePaged(whereClause.toString(), params, page, limit, "id DESC");
+    }
+
+    /**
+     * Count categories by source ID with optional filters
+     */
+    public Uni<Long> countBySourceIdFiltered(Long sourceId, String categoryType, String search) {
+        StringBuilder whereClause = new StringBuilder("source_id = ?");
+        Tuple params = Tuple.of(sourceId);
+
+        if (categoryType != null && !categoryType.isEmpty()) {
+            whereClause.append(" AND category_type = ?");
+            params = params.addString(categoryType);
+        }
+
+        if (search != null && !search.isEmpty()) {
+            whereClause.append(" AND category_name LIKE ?");
+            params = params.addString("%" + search + "%");
+        }
+
+        return countWhere(whereClause.toString(), params);
+    }
+
+    /**
+     * Find categories by source ID
+     */
+    public Multi<Category> findBySourceId(Long sourceId) {
+        return pool.preparedQuery("SELECT * FROM categories WHERE source_id = ? ORDER BY id DESC")
+            .execute(Tuple.of(sourceId))
+            .onItem()
+            .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
+            .map(this::mapRow);
     }
 }
