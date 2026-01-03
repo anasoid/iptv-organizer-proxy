@@ -14,6 +14,7 @@ dependencies {
     // Reactive REST Framework
     implementation 'io.quarkus:quarkus-resteasy-reactive-jackson'
     implementation 'io.quarkus:quarkus-vertx'
+    implementation 'io.vertx:vertx-web-client'
 
     // Datasource and Reactive Database Clients
     implementation 'io.quarkus:quarkus-datasource'
