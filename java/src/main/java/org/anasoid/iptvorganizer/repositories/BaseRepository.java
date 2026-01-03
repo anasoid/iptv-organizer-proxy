@@ -7,6 +7,9 @@ import io.vertx.mutiny.sqlclient.Pool;
 import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.inject.Inject;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
 
 public abstract class BaseRepository<T extends BaseEntity> {
 
@@ -93,5 +96,89 @@ public abstract class BaseRepository<T extends BaseEntity> {
             .onItem()
             .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
             .map(this::mapRow);
+    }
+
+    /**
+     * Chunk a list into smaller sublists
+     * Useful for batch processing to avoid MySQL query size limits
+     */
+    protected <E> List<List<E>> chunkList(List<E> list, int chunkSize) {
+        List<List<E>> chunks = new ArrayList<>();
+        if (list == null || list.isEmpty()) {
+            return chunks;
+        }
+        for (int i = 0; i < list.size(); i += chunkSize) {
+            int end = Math.min(list.size(), i + chunkSize);
+            chunks.add(new ArrayList<>(list.subList(i, end)));
+        }
+        return chunks;
+    }
+
+    /**
+     * Execute a batch upsert operation with automatic chunking
+     * Chunks large batches to avoid exceeding MySQL query parameter limits
+     *
+     * @param entities List of entities to upsert
+     * @param valueTupleMapper Function to convert entity to Tuple of values
+     * @param baseInsertSql SQL template: "INSERT INTO table (col1, col2, ...) VALUES "
+     * @param updateClause SQL clause: " ON DUPLICATE KEY UPDATE col1 = VALUES(col1), ..."
+     * @return Uni that completes when all chunks are upserted
+     */
+    protected Uni<Void> executeBatchUpsert(List<T> entities,
+                                           Function<T, Tuple> valueTupleMapper,
+                                           String baseInsertSql,
+                                           String updateClause) {
+        if (entities == null || entities.isEmpty()) {
+            return Uni.createFrom().voidItem();
+        }
+
+        // Chunk into batches of 500 to avoid query parameter limits
+        // MySQL max_allowed_packet and parameter limits
+        List<List<T>> chunks = chunkList(entities, 500);
+
+        return Multi.createFrom().iterable(chunks)
+            .onItem().transformToUniAndConcatenate(chunk ->
+                executeSingleBatchUpsert(chunk, valueTupleMapper, baseInsertSql, updateClause)
+            )
+            .collect().asList()
+            .replaceWithVoid();
+    }
+
+    /**
+     * Execute a single batch upsert (one chunk)
+     */
+    private Uni<Void> executeSingleBatchUpsert(List<T> batch,
+                                               Function<T, Tuple> valueTupleMapper,
+                                               String baseInsertSql,
+                                               String updateClause) {
+        if (batch.isEmpty()) {
+            return Uni.createFrom().voidItem();
+        }
+
+        StringBuilder sql = new StringBuilder(baseInsertSql);
+        Tuple params = Tuple.tuple();
+
+        // Build multi-value statement
+        for (int i = 0; i < batch.size(); i++) {
+            if (i > 0) sql.append(", ");
+
+            T entity = batch.get(i);
+            Tuple valueTuple = valueTupleMapper.apply(entity);
+
+            // Add placeholders (assumes all tuples have same size)
+            sql.append("(");
+            for (int j = 0; j < valueTuple.size(); j++) {
+                if (j > 0) sql.append(", ");
+                sql.append("?");
+                params.addValue(valueTuple.getValue(j));
+            }
+            sql.append(")");
+        }
+
+        sql.append(updateClause);
+
+        return pool.preparedQuery(sql.toString())
+            .execute(params)
+            .replaceWithVoid();
     }
 }

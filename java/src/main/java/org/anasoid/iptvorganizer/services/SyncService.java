@@ -151,12 +151,11 @@ public class SyncService {
     }
 
     /**
-     * Sync categories for a source
+     * Sync categories for a source (live, VOD, series)
      */
     private Uni<Source> syncCategories(Source source) {
         LOGGER.info("Syncing categories for source: " + source.getName());
 
-        // Build category API URLs for live, VOD, and series
         String liveUrl = buildApiUrl(source, "get_live_categories");
         String vodUrl = buildApiUrl(source, "get_vod_categories");
         String seriesUrl = buildApiUrl(source, "get_series_categories");
@@ -165,24 +164,64 @@ public class SyncService {
         httpOptions.setTimeout(30);
         httpOptions.setMaxRetries(3);
 
-        // Concatenate all category streams
-        Multi<Map> allCategories = Multi.createBy().concatenating().streams(
-            httpStreamingService.streamJson(liveUrl, Map.class, httpOptions)
-                .onItem().invoke(cat -> LOGGER.fine("Received live category: " + cat)),
-            httpStreamingService.streamJson(vodUrl, Map.class, httpOptions)
-                .onItem().invoke(cat -> LOGGER.fine("Received VOD category: " + cat)),
-            httpStreamingService.streamJson(seriesUrl, Map.class, httpOptions)
-                .onItem().invoke(cat -> LOGGER.fine("Received series category: " + cat))
-        );
-
-        return allCategories
-            .collect()
-            .asList()
+        // Fetch all categories from three endpoints
+        return Uni.createFrom().item("")
+            .flatMap(v -> fetchAndSyncCategoryType(source, liveUrl, "live", httpOptions))
+            .flatMap(v -> fetchAndSyncCategoryType(source, vodUrl, "vod", httpOptions))
+            .flatMap(v -> fetchAndSyncCategoryType(source, seriesUrl, "series", httpOptions))
             .replaceWith(source);
     }
 
     /**
-     * Sync live streams for a source
+     * Fetch and sync categories for a single type (live/vod/series)
+     */
+    private Uni<Void> fetchAndSyncCategoryType(Source source, String url, String categoryType, HttpOptions httpOptions) {
+        return httpStreamingService.streamJson(url, Map.class, httpOptions)
+            .collect()
+            .asList()
+            .flatMap(categoryMaps -> {
+                List<Category> categories = new ArrayList<>();
+                Set<Integer> fetchedCategoryIds = new HashSet<>();
+                AtomicInteger num = new AtomicInteger(1);
+
+                for (Map catData : categoryMaps) {
+                    Category category = new Category();
+                    category.setSourceId(source.getId());
+                    category.setCategoryId(getIntValue(catData, "category_id"));
+                    category.setCategoryName(getStringValue(catData, "category_name"));
+                    category.setCategoryType(categoryType);
+                    category.setNum(num.getAndIncrement());
+                    category.setParentId(getIntValue(catData, "parent_id"));
+
+                    // Extract labels from category name
+                    List<String> labels = labelExtractor.extractLabels(category.getCategoryName());
+                    category.setLabels(labelExtractor.labelsToString(labels));
+
+                    categories.add(category);
+                    fetchedCategoryIds.add(category.getCategoryId());
+                }
+
+                LOGGER.info("Fetched " + categories.size() + " " + categoryType + " categories from API");
+
+                // Upsert categories in transaction
+                return categoryRepository.batchUpsert(categories)
+                    .flatMap(v -> categoryRepository.getCategoryIdsBySourceAndType(source.getId(), categoryType))
+                    .flatMap(existingIds -> {
+                        int deleted = existingIds.size() - fetchedCategoryIds.size();
+                        if (deleted > 0) {
+                            LOGGER.info("Deleting " + deleted + " obsolete " + categoryType + " categories");
+                            return categoryRepository.deleteCategoriesNotInSet(source.getId(), categoryType, fetchedCategoryIds)
+                                .replaceWithVoid();
+                        }
+                        return Uni.createFrom().voidItem();
+                    })
+                    .onFailure()
+                    .invoke(ex -> LOGGER.severe("Failed to sync " + categoryType + " categories: " + ex.getMessage()));
+            });
+    }
+
+    /**
+     * Sync live streams for a source with batch upsert and transactions
      */
     private Uni<Source> syncLiveStreams(Source source, SyncLog syncLog) {
         LOGGER.info("Syncing live streams for source: " + source.getName());
@@ -192,41 +231,71 @@ public class SyncService {
         httpOptions.setTimeout(30);
         httpOptions.setMaxRetries(3);
 
-        AtomicInteger itemCount = new AtomicInteger(0);
-        List<LiveStream> batch = new ArrayList<>();
-
         return httpStreamingService.streamJson(url, Map.class, httpOptions)
-            .onItem()
-            .invoke(streamData -> {
-                LiveStream stream = mapToLiveStream(source, streamData);
-                batch.add(stream);
-
-                if (batch.size() >= BATCH_SIZE) {
-                    processBatch(batch, "live", syncLog);
-                    batch.clear();
-
-                    // Explicit GC every BATCH_SIZE items
-                    if (itemCount.addAndGet(BATCH_SIZE) % GC_THRESHOLD == 0) {
-                        System.gc();
-                        LOGGER.fine("GC called after " + itemCount.get() + " live streams");
-                    }
-                }
-            })
+            .map(streamData -> mapToLiveStream(source, streamData))
             .collect()
             .asList()
-            .onItem()
-            .invoke(items -> {
-                // Process remaining items
-                if (!batch.isEmpty()) {
-                    processBatch(batch, "live", syncLog);
+            .flatMap(allStreams -> {
+                LOGGER.info("Fetched " + allStreams.size() + " live streams from API");
+
+                // Assign num ordering
+                for (int i = 0; i < allStreams.size(); i++) {
+                    allStreams.get(i).setNum(i + 1);
                 }
-                LOGGER.info("Synced " + (itemCount.get() + batch.size()) + " live streams");
+
+                Set<Integer> fetchedStreamIds = new HashSet<>();
+                for (LiveStream stream : allStreams) {
+                    fetchedStreamIds.add(stream.getStreamId());
+                }
+
+                // Get existing stream IDs
+                return liveStreamRepository.getStreamIdsBySourceId(source.getId())
+                    .flatMap(existingStreamIds -> {
+                        // Calculate statistics
+                        int added = 0, updated = 0;
+                        for (LiveStream stream : allStreams) {
+                            if (existingStreamIds.contains(stream.getStreamId())) {
+                                updated++;
+                            } else {
+                                added++;
+                            }
+                        }
+
+                        Set<Integer> toDelete = new HashSet<>(existingStreamIds);
+                        toDelete.removeAll(fetchedStreamIds);
+                        int deleted = toDelete.size();
+
+                        syncLog.setItemsAdded(syncLog.getItemsAdded() + added);
+                        syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated);
+                        syncLog.setItemsDeleted(syncLog.getItemsDeleted() + deleted);
+
+                        LOGGER.info(String.format("Live streams - Added: %d, Updated: %d, Deleted: %d",
+                            added, updated, deleted));
+
+                        // Upsert and delete in transaction
+                        return liveStreamRepository.batchUpsert(allStreams)
+                            .flatMap(v -> {
+                                if (deleted > 0) {
+                                    return liveStreamRepository.deleteStreamsNotInSet(
+                                        source.getId(), fetchedStreamIds
+                                    ).replaceWithVoid();
+                                }
+                                return Uni.createFrom().voidItem();
+                            })
+                            .invoke(v -> {
+                                // Explicit GC after processing large batches
+                                if (allStreams.size() >= GC_THRESHOLD) {
+                                    System.gc();
+                                    LOGGER.fine("GC called after " + allStreams.size() + " live streams");
+                                }
+                            });
+                    });
             })
             .replaceWith(source);
     }
 
     /**
-     * Sync VOD streams for a source
+     * Sync VOD streams for a source with batch upsert and transactions
      */
     private Uni<Source> syncVod(Source source, SyncLog syncLog) {
         LOGGER.info("Syncing VOD for source: " + source.getName());
@@ -236,39 +305,71 @@ public class SyncService {
         httpOptions.setTimeout(30);
         httpOptions.setMaxRetries(3);
 
-        AtomicInteger itemCount = new AtomicInteger(0);
-        List<VodStream> batch = new ArrayList<>();
-
         return httpStreamingService.streamJson(url, Map.class, httpOptions)
-            .onItem()
-            .invoke(streamData -> {
-                VodStream stream = mapToVodStream(source, streamData);
-                batch.add(stream);
-
-                if (batch.size() >= BATCH_SIZE) {
-                    processBatch(batch, "vod", syncLog);
-                    batch.clear();
-
-                    if (itemCount.addAndGet(BATCH_SIZE) % GC_THRESHOLD == 0) {
-                        System.gc();
-                        LOGGER.fine("GC called after " + itemCount.get() + " VOD streams");
-                    }
-                }
-            })
+            .map(streamData -> mapToVodStream(source, streamData))
             .collect()
             .asList()
-            .onItem()
-            .invoke(items -> {
-                if (!batch.isEmpty()) {
-                    processBatch(batch, "vod", syncLog);
+            .flatMap(allStreams -> {
+                LOGGER.info("Fetched " + allStreams.size() + " VOD streams from API");
+
+                // Assign num ordering
+                for (int i = 0; i < allStreams.size(); i++) {
+                    allStreams.get(i).setNum(i + 1);
                 }
-                LOGGER.info("Synced " + (itemCount.get() + batch.size()) + " VOD streams");
+
+                Set<Integer> fetchedStreamIds = new HashSet<>();
+                for (VodStream stream : allStreams) {
+                    fetchedStreamIds.add(stream.getStreamId());
+                }
+
+                // Get existing stream IDs
+                return vodStreamRepository.getStreamIdsBySourceId(source.getId())
+                    .flatMap(existingStreamIds -> {
+                        // Calculate statistics
+                        int added = 0, updated = 0;
+                        for (VodStream stream : allStreams) {
+                            if (existingStreamIds.contains(stream.getStreamId())) {
+                                updated++;
+                            } else {
+                                added++;
+                            }
+                        }
+
+                        Set<Integer> toDelete = new HashSet<>(existingStreamIds);
+                        toDelete.removeAll(fetchedStreamIds);
+                        int deleted = toDelete.size();
+
+                        syncLog.setItemsAdded(syncLog.getItemsAdded() + added);
+                        syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated);
+                        syncLog.setItemsDeleted(syncLog.getItemsDeleted() + deleted);
+
+                        LOGGER.info(String.format("VOD streams - Added: %d, Updated: %d, Deleted: %d",
+                            added, updated, deleted));
+
+                        // Upsert and delete in transaction
+                        return vodStreamRepository.batchUpsert(allStreams)
+                            .flatMap(v -> {
+                                if (deleted > 0) {
+                                    return vodStreamRepository.deleteStreamsNotInSet(
+                                        source.getId(), fetchedStreamIds
+                                    ).replaceWithVoid();
+                                }
+                                return Uni.createFrom().voidItem();
+                            })
+                            .invoke(v -> {
+                                // Explicit GC after processing large batches
+                                if (allStreams.size() >= GC_THRESHOLD) {
+                                    System.gc();
+                                    LOGGER.fine("GC called after " + allStreams.size() + " VOD streams");
+                                }
+                            });
+                    });
             })
             .replaceWith(source);
     }
 
     /**
-     * Sync series for a source
+     * Sync series for a source with batch upsert and transactions
      */
     private Uni<Source> syncSeries(Source source, SyncLog syncLog) {
         LOGGER.info("Syncing series for source: " + source.getName());
@@ -278,69 +379,67 @@ public class SyncService {
         httpOptions.setTimeout(30);
         httpOptions.setMaxRetries(3);
 
-        AtomicInteger itemCount = new AtomicInteger(0);
-        List<Series> batch = new ArrayList<>();
-
         return httpStreamingService.streamJson(url, Map.class, httpOptions)
-            .onItem()
-            .invoke(seriesData -> {
-                Series series = mapToSeries(source, seriesData);
-                batch.add(series);
-
-                if (batch.size() >= BATCH_SIZE) {
-                    processBatch(batch, "series", syncLog);
-                    batch.clear();
-
-                    if (itemCount.addAndGet(BATCH_SIZE) % GC_THRESHOLD == 0) {
-                        System.gc();
-                        LOGGER.fine("GC called after " + itemCount.get() + " series");
-                    }
-                }
-            })
+            .map(seriesData -> mapToSeries(source, seriesData))
             .collect()
             .asList()
-            .onItem()
-            .invoke(items -> {
-                if (!batch.isEmpty()) {
-                    processBatch(batch, "series", syncLog);
+            .flatMap(allSeries -> {
+                LOGGER.info("Fetched " + allSeries.size() + " series from API");
+
+                // Assign num ordering
+                for (int i = 0; i < allSeries.size(); i++) {
+                    allSeries.get(i).setNum(i + 1);
                 }
-                LOGGER.info("Synced " + (itemCount.get() + batch.size()) + " series");
+
+                Set<Integer> fetchedStreamIds = new HashSet<>();
+                for (Series series : allSeries) {
+                    fetchedStreamIds.add(series.getStreamId());
+                }
+
+                // Get existing stream IDs
+                return seriesRepository.getStreamIdsBySourceId(source.getId())
+                    .flatMap(existingStreamIds -> {
+                        // Calculate statistics
+                        int added = 0, updated = 0;
+                        for (Series series : allSeries) {
+                            if (existingStreamIds.contains(series.getStreamId())) {
+                                updated++;
+                            } else {
+                                added++;
+                            }
+                        }
+
+                        Set<Integer> toDelete = new HashSet<>(existingStreamIds);
+                        toDelete.removeAll(fetchedStreamIds);
+                        int deleted = toDelete.size();
+
+                        syncLog.setItemsAdded(syncLog.getItemsAdded() + added);
+                        syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated);
+                        syncLog.setItemsDeleted(syncLog.getItemsDeleted() + deleted);
+
+                        LOGGER.info(String.format("Series - Added: %d, Updated: %d, Deleted: %d",
+                            added, updated, deleted));
+
+                        // Upsert and delete in transaction
+                        return seriesRepository.batchUpsert(allSeries)
+                            .flatMap(v -> {
+                                if (deleted > 0) {
+                                    return seriesRepository.deleteStreamsNotInSet(
+                                        source.getId(), fetchedStreamIds
+                                    ).replaceWithVoid();
+                                }
+                                return Uni.createFrom().voidItem();
+                            })
+                            .invoke(v -> {
+                                // Explicit GC after processing large batches
+                                if (allSeries.size() >= GC_THRESHOLD) {
+                                    System.gc();
+                                    LOGGER.fine("GC called after " + allSeries.size() + " series");
+                                }
+                            });
+                    });
             })
             .replaceWith(source);
-    }
-
-    /**
-     * Process a batch of items - insert into database
-     */
-    @SuppressWarnings("unchecked")
-    private <T> void processBatch(List<T> batch, String type, SyncLog syncLog) {
-        // This is synchronous batch processing
-        // In production, this should be wrapped in a Panache transaction
-        batch.forEach(item -> {
-            if (item instanceof LiveStream) {
-                // Save to database
-                liveStreamRepository.insert((LiveStream) item)
-                    .subscribe()
-                    .with(
-                        id -> syncLog.setItemsAdded(syncLog.getItemsAdded() + 1),
-                        error -> LOGGER.warning("Failed to insert live stream: " + error.getMessage())
-                    );
-            } else if (item instanceof VodStream) {
-                vodStreamRepository.insert((VodStream) item)
-                    .subscribe()
-                    .with(
-                        id -> syncLog.setItemsAdded(syncLog.getItemsAdded() + 1),
-                        error -> LOGGER.warning("Failed to insert VOD stream: " + error.getMessage())
-                    );
-            } else if (item instanceof Series) {
-                seriesRepository.insert((Series) item)
-                    .subscribe()
-                    .with(
-                        id -> syncLog.setItemsAdded(syncLog.getItemsAdded() + 1),
-                        error -> LOGGER.warning("Failed to insert series: " + error.getMessage())
-                    );
-            }
-        });
     }
 
     /**
@@ -478,5 +577,146 @@ public class SyncService {
         } catch (Exception e) {
             return "{}";
         }
+    }
+
+    /**
+     * Trigger manual full sync for a source from admin panel
+     */
+    public Uni<Void> triggerManualSync(Source source) {
+        LOGGER.info("Manual sync triggered for source: " + source.getName());
+
+        return sourceRepository.acquireSyncLock(source.getId())
+            .flatMap(lockAcquired -> {
+                if (!lockAcquired) {
+                    LOGGER.warning("Source " + source.getId() + " is already syncing, cannot start manual sync");
+                    return Uni.createFrom().failure(
+                        new RuntimeException("Source is already syncing")
+                    );
+                }
+
+                LocalDateTime syncStartTime = LocalDateTime.now();
+                SyncLog syncLog = SyncLog.builder()
+                    .sourceId(source.getId())
+                    .syncType("manual_full")
+                    .startedAt(syncStartTime)
+                    .status("running")
+                    .itemsAdded(0)
+                    .itemsUpdated(0)
+                    .itemsDeleted(0)
+                    .build();
+
+                return syncLogRepository.insert(syncLog)
+                    .flatMap(logId -> {
+                        syncLog.setId(logId);
+                        source.setLastSync(syncStartTime);
+
+                        return performFullSync(source, syncLog, syncStartTime)
+                            .eventually(() -> sourceRepository.releaseSyncLock(source.getId()));
+                    })
+                    .onFailure()
+                    .recoverWithUni(failure -> {
+                        // Release lock on failure and propagate error
+                        return sourceRepository.releaseSyncLock(source.getId())
+                            .onItem()
+                            .transformToUni(v -> Uni.createFrom().failure(failure));
+                    });
+            });
+    }
+
+    /**
+     * Trigger sync for a specific task type (granular sync)
+     * Valid task types: live_categories, live_streams, vod_categories, vod_streams, series_categories, series
+     */
+    public Uni<Void> triggerManualSyncTask(Source source, String taskType) {
+        LOGGER.info("Manual sync triggered for source: " + source.getName() + ", task type: " + taskType);
+
+        // Validate task type
+        Set<String> validTaskTypes = Set.of(
+            "live_categories", "live_streams",
+            "vod_categories", "vod_streams",
+            "series_categories", "series"
+        );
+
+        if (!validTaskTypes.contains(taskType)) {
+            return Uni.createFrom().failure(
+                new IllegalArgumentException("Invalid task type: " + taskType)
+            );
+        }
+
+        return sourceRepository.acquireSyncLock(source.getId())
+            .flatMap(lockAcquired -> {
+                if (!lockAcquired) {
+                    LOGGER.warning("Source " + source.getId() + " is already syncing");
+                    return Uni.createFrom().failure(
+                        new RuntimeException("Source is already syncing")
+                    );
+                }
+
+                LocalDateTime syncStartTime = LocalDateTime.now();
+                SyncLog syncLog = SyncLog.builder()
+                    .sourceId(source.getId())
+                    .syncType("manual_" + taskType)
+                    .startedAt(syncStartTime)
+                    .status("running")
+                    .itemsAdded(0)
+                    .itemsUpdated(0)
+                    .itemsDeleted(0)
+                    .build();
+
+                return syncLogRepository.insert(syncLog)
+                    .flatMap(logId -> {
+                        syncLog.setId(logId);
+                        source.setLastSync(syncStartTime);
+
+                        // Execute the specific task
+                        Uni<Source> taskResult = switch (taskType) {
+                            case "live_categories" -> fetchAndSyncCategoryType(source,
+                                buildApiUrl(source, "get_live_categories"), "live", createHttpOptions())
+                                .replaceWith(source);
+                            case "vod_categories" -> fetchAndSyncCategoryType(source,
+                                buildApiUrl(source, "get_vod_categories"), "vod", createHttpOptions())
+                                .replaceWith(source);
+                            case "series_categories" -> fetchAndSyncCategoryType(source,
+                                buildApiUrl(source, "get_series_categories"), "series", createHttpOptions())
+                                .replaceWith(source);
+                            case "live_streams" -> syncLiveStreams(source, syncLog);
+                            case "vod_streams" -> syncVod(source, syncLog);
+                            case "series" -> syncSeries(source, syncLog);
+                            default -> Uni.createFrom().failure(
+                                new IllegalArgumentException("Unknown task type: " + taskType)
+                            );
+                        };
+
+                        return taskResult
+                            .flatMap(s -> finalizeSyncLog(source, syncLog, syncStartTime, null))
+                            .eventually(() -> sourceRepository.releaseSyncLock(source.getId()))
+                            .onFailure()
+                            .recoverWithUni(failure -> {
+                                // Finalize as failed and release lock
+                                return finalizeSyncLog(source, syncLog, syncStartTime, failure)
+                                    .onItem()
+                                    .transformToUni(v -> sourceRepository.releaseSyncLock(source.getId()))
+                                    .onItem()
+                                    .transformToUni(v -> Uni.createFrom().failure(failure));
+                            });
+                    });
+            });
+    }
+
+    /**
+     * Trigger full sync (alias for triggerManualSync)
+     */
+    public Uni<Void> triggerFullSync(Source source) {
+        return triggerManualSync(source);
+    }
+
+    /**
+     * Create HTTP options for API calls
+     */
+    private HttpOptions createHttpOptions() {
+        HttpOptions httpOptions = new HttpOptions();
+        httpOptions.setTimeout(30);
+        httpOptions.setMaxRetries(3);
+        return httpOptions;
     }
 }

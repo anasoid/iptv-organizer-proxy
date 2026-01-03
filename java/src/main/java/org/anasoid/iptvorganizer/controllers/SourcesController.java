@@ -8,11 +8,13 @@ import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.Source;
 import org.anasoid.iptvorganizer.services.SourceService;
 import org.anasoid.iptvorganizer.services.SyncLogService;
+import org.anasoid.iptvorganizer.services.SyncService;
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
 
 /**
@@ -30,6 +32,9 @@ public class SourcesController extends BaseController {
 
     @Inject
     SyncLogService syncLogService;
+
+    @Inject
+    SyncService syncService;
 
     /**
      * Get all sources with pagination
@@ -203,7 +208,7 @@ public class SourcesController extends BaseController {
     }
 
     /**
-     * Trigger manual sync for a source
+     * Trigger full manual sync for a source
      * POST /api/sources/:id/sync
      */
     @POST
@@ -211,13 +216,131 @@ public class SourcesController extends BaseController {
     public Uni<?> syncSource(@PathParam("id") Long id) {
         return sourceService.getById(id)
             .flatMap(source -> {
-                // TODO: Implement sync trigger logic
-                return Uni.createFrom().item(
-                    ApiResponse.success("Sync triggered successfully")
-                );
+                if (source == null) {
+                    return Uni.createFrom().item(
+                        Response.status(Response.Status.NOT_FOUND)
+                            .entity(ApiResponse.error("Source not found"))
+                            .build()
+                    );
+                }
+
+                return syncService.triggerManualSync(source)
+                    .map(v -> Response.ok(
+                        ApiResponse.success("Full sync triggered for source: " + source.getName())
+                    ).build())
+                    .onFailure()
+                    .recoverWithItem(ex -> {
+                        if (ex.getMessage().contains("already syncing")) {
+                            return Response.status(Response.Status.CONFLICT)
+                                .entity(ApiResponse.error("Source is already syncing"))
+                                .build();
+                        }
+                        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                            .entity(ApiResponse.error("Failed to trigger sync: " + ex.getMessage()))
+                            .build();
+                    });
             })
             .onFailure().recoverWithItem(ex ->
-                ApiResponse.error("Failed to trigger sync: " + ex.getMessage())
+                Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(ApiResponse.error("Failed to trigger sync: " + ex.getMessage()))
+                    .build()
+            );
+    }
+
+    /**
+     * Trigger sync for a specific task type (granular sync)
+     * POST /api/sources/:id/sync/{taskType}
+     * Valid task types: live_categories, live_streams, vod_categories, vod_streams, series_categories, series
+     */
+    @POST
+    @Path("/{id}/sync/{taskType}")
+    public Uni<?> syncSourceTaskType(@PathParam("id") Long id,
+                                     @PathParam("taskType") String taskType) {
+        // Validate task type
+        java.util.Set<String> validTaskTypes = java.util.Set.of(
+            "live_categories", "live_streams",
+            "vod_categories", "vod_streams",
+            "series_categories", "series"
+        );
+
+        if (!validTaskTypes.contains(taskType)) {
+            return Uni.createFrom().item(
+                Response.status(Response.Status.BAD_REQUEST)
+                    .entity(ApiResponse.error("Invalid task type. Valid types: " + String.join(", ", validTaskTypes)))
+                    .build()
+            );
+        }
+
+        return sourceService.getById(id)
+            .flatMap(source -> {
+                if (source == null) {
+                    return Uni.createFrom().item(
+                        Response.status(Response.Status.NOT_FOUND)
+                            .entity(ApiResponse.error("Source not found"))
+                            .build()
+                    );
+                }
+
+                return syncService.triggerManualSyncTask(source, taskType)
+                    .map(v -> Response.ok(
+                        ApiResponse.success("Sync triggered for " + taskType + " on source: " + source.getName())
+                    ).build())
+                    .onFailure()
+                    .recoverWithItem(ex -> {
+                        if (ex.getMessage().contains("already syncing")) {
+                            return Response.status(Response.Status.CONFLICT)
+                                .entity(ApiResponse.error("Source is already syncing"))
+                                .build();
+                        }
+                        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                            .entity(ApiResponse.error("Failed to trigger sync: " + ex.getMessage()))
+                            .build();
+                    });
+            })
+            .onFailure().recoverWithItem(ex ->
+                Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(ApiResponse.error("Failed to trigger sync: " + ex.getMessage()))
+                    .build()
+            );
+    }
+
+    /**
+     * Trigger full sync for all task types
+     * POST /api/sources/:id/sync-all
+     */
+    @POST
+    @Path("/{id}/sync-all")
+    public Uni<?> syncSourceAll(@PathParam("id") Long id) {
+        return sourceService.getById(id)
+            .flatMap(source -> {
+                if (source == null) {
+                    return Uni.createFrom().item(
+                        Response.status(Response.Status.NOT_FOUND)
+                            .entity(ApiResponse.error("Source not found"))
+                            .build()
+                    );
+                }
+
+                return syncService.triggerFullSync(source)
+                    .map(v -> Response.ok(
+                        ApiResponse.success("Full sync triggered for all types on source: " + source.getName())
+                    ).build())
+                    .onFailure()
+                    .recoverWithItem(ex -> {
+                        if (ex.getMessage().contains("already syncing")) {
+                            return Response.status(Response.Status.CONFLICT)
+                                .entity(ApiResponse.error("Source is already syncing"))
+                                .build();
+                        }
+                        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                            .entity(ApiResponse.error("Failed to trigger full sync: " + ex.getMessage()))
+                            .build();
+                    });
+            })
+            .onFailure().recoverWithItem(ex ->
+                Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(ApiResponse.error("Failed to trigger full sync: " + ex.getMessage()))
+                    .build()
             );
     }
 
