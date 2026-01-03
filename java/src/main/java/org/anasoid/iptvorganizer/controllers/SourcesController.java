@@ -2,6 +2,7 @@ package org.anasoid.iptvorganizer.controllers;
 
 import org.anasoid.iptvorganizer.dto.SourceDTO;
 import org.anasoid.iptvorganizer.dto.SyncLogDTO;
+import org.anasoid.iptvorganizer.dto.request.CreateSourceRequest;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.Source;
@@ -79,7 +80,7 @@ public class SourcesController extends BaseController {
      * POST /api/sources
      */
     @POST
-    public Uni<?> createSource(Source request) {
+    public Uni<?> createSource(CreateSourceRequest request) {
         if (request.getName() == null || request.getName().isBlank()) {
             return Uni.createFrom().item(
                 ApiResponse.error("Name is required")
@@ -90,17 +91,23 @@ public class SourcesController extends BaseController {
                 ApiResponse.error("URL is required")
             );
         }
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            return Uni.createFrom().item(
+                ApiResponse.error("Password is required")
+            );
+        }
 
         Source source = Source.builder()
             .name(request.getName())
             .url(request.getUrl())
             .username(request.getUsername())
+            .password(request.getPassword())
             .syncInterval(request.getSyncInterval() != null ? request.getSyncInterval() : 3600)
             .isActive(request.getIsActive() != null ? request.getIsActive() : true)
             .enableProxy(request.getEnableProxy() != null ? request.getEnableProxy() : false)
             .disableStreamProxy(request.getDisableStreamProxy() != null ? request.getDisableStreamProxy() : false)
             .streamFollowLocation(request.getStreamFollowLocation() != null ? request.getStreamFollowLocation() : false)
-            .syncStatus("pending")
+            .syncStatus(request.getSyncStatus() != null ? request.getSyncStatus() : "pending")
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
             .build();
@@ -118,7 +125,7 @@ public class SourcesController extends BaseController {
      */
     @PUT
     @Path("/{id}")
-    public Uni<?> updateSource(@PathParam("id") Long id, Source request) {
+    public Uni<?> updateSource(@PathParam("id") Long id, CreateSourceRequest request) {
         return sourceService.getById(id)
             .flatMap(source -> {
                 if (request.getName() != null) {
@@ -130,8 +137,14 @@ public class SourcesController extends BaseController {
                 if (request.getUsername() != null) {
                     source.setUsername(request.getUsername());
                 }
+                if (request.getPassword() != null) {
+                    source.setPassword(request.getPassword());
+                }
                 if (request.getSyncInterval() != null) {
                     source.setSyncInterval(request.getSyncInterval());
+                }
+                if (request.getSyncStatus() != null) {
+                    source.setSyncStatus(request.getSyncStatus());
                 }
                 if (request.getIsActive() != null) {
                     source.setIsActive(request.getIsActive());
