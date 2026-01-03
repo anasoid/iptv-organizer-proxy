@@ -38,11 +38,27 @@ dependencies {
     testImplementation 'io.rest-assured:rest-assured'
 }
 
+configurations.all {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group == 'io.quarkus.platform') {
+            details.useVersion '3.6.4'
+        }
+    }
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
 }
 
-group 'com.iptvorganizer'
+group 'org.anasoid.iptvorganizer'
 version '0.1.0-SNAPSHOT'
+
+// Quarkus dev mode debugging task
+// Usage: ./gradlew quarkusDevDebug -Ddebug=8000 -Dsuspend=n
+// Or simpler: ./gradlew quarkusDev -Ddebug=8000 -Dsuspend=n
+tasks.register('quarkusDevDebug') {
+    description = 'Run quarkusDev with debugging enabled (use: ./gradlew quarkusDevDebug -Ddebug=8000)'
+    dependsOn quarkusDev
+}
 

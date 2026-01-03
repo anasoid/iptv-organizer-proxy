@@ -1,10 +1,9 @@
-package com.iptvorganizer.migrations;
+package org.anasoid.iptvorganizer.migrations;
 
 import io.quarkus.runtime.StartupEvent;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Pool;
 import io.vertx.mutiny.sqlclient.Row;
-import io.vertx.mutiny.sqlclient.RowSet;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -32,7 +31,18 @@ public class SimpleMigrator {
     // Hardcoded migration list for native image compatibility
     // Updated as new migrations are added
     private static final List<String> MIGRATIONS = List.of(
-        "V001__create_schema_version.sql"
+        "V001__create_schema_version.sql",
+        "V002__create_admin_users.sql",
+        "V003__create_sources.sql",
+        "V004__create_filters.sql",
+        "V005__create_clients.sql",
+        "V006__create_categories.sql",
+        "V007__create_live_streams.sql",
+        "V008__create_vod_streams.sql",
+        "V009__create_series.sql",
+        "V010__create_sync_logs.sql",
+        "V011__create_connection_logs.sql",
+        "V012__create_sync_schedule.sql"
     );
 
     void onStart(@Observes StartupEvent event) {

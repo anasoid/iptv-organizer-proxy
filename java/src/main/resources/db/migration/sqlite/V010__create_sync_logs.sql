@@ -1,0 +1,17 @@
+CREATE TABLE IF NOT EXISTS sync_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_id INTEGER NOT NULL,
+    sync_type TEXT NOT NULL CHECK(sync_type IN ('live_categories', 'live_streams', 'vod_categories', 'vod_streams', 'series_categories', 'series')),
+    started_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP,
+    status TEXT NOT NULL DEFAULT 'running' CHECK(status IN ('running', 'completed', 'failed')),
+    items_added INTEGER NOT NULL DEFAULT 0,
+    items_updated INTEGER NOT NULL DEFAULT 0,
+    items_deleted INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT,
+    duration_seconds INTEGER DEFAULT 0,
+    FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_logs_source_status_started ON sync_logs(source_id, status, started_at);
+CREATE INDEX IF NOT EXISTS idx_sync_logs_status_started ON sync_logs(status, started_at);

@@ -1,4 +1,4 @@
-package com.iptvorganizer.config;
+package org.anasoid.iptvorganizer.config;
 
 import io.vertx.mutiny.mysqlclient.MySQLPool;
 import io.vertx.mutiny.pgclient.PgPool;
