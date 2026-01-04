@@ -27,8 +27,6 @@ public class SyncLogDTO {
     private Integer itemsDeleted;
     private String errorMessage;
     private Integer durationSeconds;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 
     /**
      * Convert entity to DTO
@@ -48,8 +46,6 @@ public class SyncLogDTO {
             .itemsDeleted(entity.getItemsDeleted())
             .errorMessage(entity.getErrorMessage())
             .durationSeconds(entity.getDurationSeconds())
-            .createdAt(entity.getCreatedAt())
-            .updatedAt(entity.getUpdatedAt())
             .build();
     }
 }

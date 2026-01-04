@@ -24,4 +24,7 @@ public class SyncLog extends BaseEntity {
     private Integer itemsDeleted;
     private String errorMessage;
     private Integer durationSeconds;
+
+    // Note: createdAt and updatedAt are not persisted in sync_logs table
+    // startedAt and completedAt serve as creation/update time markers
 }

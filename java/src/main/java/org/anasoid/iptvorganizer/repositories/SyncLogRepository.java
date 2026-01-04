@@ -18,26 +18,7 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
 
     @Override
     public Uni<Long> insert(SyncLog syncLog) {
-        String sql = "INSERT INTO sync_logs (source_id, sync_type, started_at, completed_at, status, items_added, items_updated, items_deleted, error_message, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        io.vertx.mutiny.sqlclient.Tuple tuple = io.vertx.mutiny.sqlclient.Tuple.tuple()
-            .addLong(syncLog.getSourceId())
-            .addString(syncLog.getSyncType())
-            .addLocalDateTime(syncLog.getStartedAt())
-            .addLocalDateTime(syncLog.getCompletedAt())
-            .addString(syncLog.getStatus() != null ? syncLog.getStatus().getValue() : null)
-            .addInteger(syncLog.getItemsAdded())
-            .addInteger(syncLog.getItemsUpdated())
-            .addInteger(syncLog.getItemsDeleted())
-            .addString(syncLog.getErrorMessage())
-            .addInteger(syncLog.getDurationSeconds());
-        return pool.preparedQuery(sql)
-            .execute(tuple)
-            .map(rowSet -> rowSet.property(io.vertx.mutiny.mysqlclient.MySQLClient.LAST_INSERTED_ID));
-    }
-
-    @Override
-    public Uni<Void> update(SyncLog syncLog) {
-        String sql = "UPDATE sync_logs SET source_id = ?, sync_type = ?, started_at = ?, completed_at = ?, status = ?, items_added = ?, items_updated = ?, items_deleted = ?, error_message = ?, duration_seconds = ? WHERE id = ?";
+        String sql = "INSERT INTO sync_logs (source_id, sync_type, started_at, completed_at, status, items_added, items_updated, items_deleted, error_message, duration_seconds, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         io.vertx.mutiny.sqlclient.Tuple tuple = io.vertx.mutiny.sqlclient.Tuple.tuple()
             .addLong(syncLog.getSourceId())
             .addString(syncLog.getSyncType())
@@ -49,6 +30,28 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
             .addInteger(syncLog.getItemsDeleted())
             .addString(syncLog.getErrorMessage())
             .addInteger(syncLog.getDurationSeconds())
+            .addLocalDateTime(syncLog.getCreatedAt() != null ? syncLog.getCreatedAt() : java.time.LocalDateTime.now())
+            .addLocalDateTime(syncLog.getUpdatedAt() != null ? syncLog.getUpdatedAt() : java.time.LocalDateTime.now());
+        return pool.preparedQuery(sql)
+            .execute(tuple)
+            .map(rowSet -> rowSet.property(io.vertx.mutiny.mysqlclient.MySQLClient.LAST_INSERTED_ID));
+    }
+
+    @Override
+    public Uni<Void> update(SyncLog syncLog) {
+        String sql = "UPDATE sync_logs SET source_id = ?, sync_type = ?, started_at = ?, completed_at = ?, status = ?, items_added = ?, items_updated = ?, items_deleted = ?, error_message = ?, duration_seconds = ?, updated_at = ? WHERE id = ?";
+        io.vertx.mutiny.sqlclient.Tuple tuple = io.vertx.mutiny.sqlclient.Tuple.tuple()
+            .addLong(syncLog.getSourceId())
+            .addString(syncLog.getSyncType())
+            .addLocalDateTime(syncLog.getStartedAt())
+            .addLocalDateTime(syncLog.getCompletedAt())
+            .addString(syncLog.getStatus() != null ? syncLog.getStatus().getValue() : null)
+            .addInteger(syncLog.getItemsAdded())
+            .addInteger(syncLog.getItemsUpdated())
+            .addInteger(syncLog.getItemsDeleted())
+            .addString(syncLog.getErrorMessage())
+            .addInteger(syncLog.getDurationSeconds())
+            .addLocalDateTime(syncLog.getUpdatedAt() != null ? syncLog.getUpdatedAt() : java.time.LocalDateTime.now())
             .addLong(syncLog.getId());
         return pool.preparedQuery(sql)
             .execute(tuple)
@@ -69,8 +72,6 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
             .itemsDeleted(row.getInteger("items_deleted"))
             .errorMessage(row.getString("error_message"))
             .durationSeconds(row.getInteger("duration_seconds"))
-            .createdAt(row.getLocalDateTime("created_at"))
-            .updatedAt(row.getLocalDateTime("updated_at"))
             .build();
     }
 

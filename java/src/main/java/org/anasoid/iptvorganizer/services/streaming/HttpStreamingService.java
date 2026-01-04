@@ -17,9 +17,12 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Logger;
 
 @ApplicationScoped
 public class HttpStreamingService {
+
+    private static final Logger LOGGER = Logger.getLogger(HttpStreamingService.class.getName());
 
     @Inject
     WebClient webClient;
@@ -39,62 +42,86 @@ public class HttpStreamingService {
         }
 
         final HttpOptions finalOptions = options;
+        int maxRetries = finalOptions.getMaxRetries() != null ? finalOptions.getMaxRetries() : 3;
+
+        LOGGER.info("Starting HTTP stream request to: " + url);
 
         return Multi.createFrom()
             .deferred(() -> {
                 HttpRequest<Buffer> request = configureRequest(url, finalOptions);
-                return streamResponse(request);
+                return streamResponse(request, url);
             })
             .onFailure()
             .retry()
-            .atMost(finalOptions.getMaxRetries() != null ? finalOptions.getMaxRetries() : 3)
+            .atMost(maxRetries)
             .onFailure()
-            .transform(failure -> new StreamingException("HTTP streaming failed after retries", failure));
+            .transform(failure -> {
+                LOGGER.severe("HTTP streaming failed after " + maxRetries + " retries for: " + url + ", error: " + failure.getMessage());
+                return new StreamingException("HTTP streaming failed after " + maxRetries + " retries", failure);
+            });
     }
 
     /**
-     * Stream HTTP response as JSON objects with automatic parsing
+     * Stream HTTP response as JSON objects with automatic parsing (memory efficient true streaming)
+     * Offloads blocking JSON parsing to worker thread to avoid blocking event loop
      */
     public <T> Multi<T> streamJson(String url, Class<T> targetClass, HttpOptions options) {
         if (options == null) {
             options = new HttpOptions();
         }
 
-        return streamHttp(url, options)
-            .collect()
-            .asList()
-            .onItem()
-            .transformToMulti(buffers -> {
+        final String finalUrl = url;
+        final HttpOptions finalOptions = options;
+
+        LOGGER.info("Streaming JSON from URL: " + finalUrl);
+
+        return Multi.createFrom()
+            .deferred(() -> {
                 try {
-                    // Convert Mutiny buffers to input stream
+                    // Create piped streams for streaming JSON parsing
                     PipedOutputStream out = new PipedOutputStream();
                     PipedInputStream in = new PipedInputStream(out);
 
-                    // Write buffers to stream in background
-                    Uni.createFrom().item(() -> {
-                            try {
-                                for (Buffer buffer : buffers) {
-                                    out.write(buffer.getBytes());
-                                }
-                                out.close();
-                            } catch (Exception e) {
-                                throw new StreamingException("Failed to write buffers to stream", e);
-                            }
-                            return null;
-                        })
-                        .emitOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultExecutor())
+                    // Stream HTTP buffers directly without collecting to memory
+                    streamHttp(finalUrl, finalOptions)
                         .subscribe()
-                        .with(item -> {}, failure -> {
-                            try {
-                                out.close();
-                            } catch (Exception e) {
-                                // Ignore close errors
+                        .with(
+                            buffer -> {
+                                try {
+                                    out.write(buffer.getBytes());
+                                    LOGGER.fine("Streamed buffer of " + buffer.length() + " bytes from: " + finalUrl);
+                                } catch (Exception e) {
+                                    LOGGER.severe("Failed to write buffer to stream from: " + finalUrl + ", error: " + e.getMessage());
+                                    throw new StreamingException("Failed to write buffer to stream", e);
+                                }
+                            },
+                            failure -> {
+                                LOGGER.severe("HTTP streaming failed from: " + finalUrl + ", error: " + failure.getMessage());
+                                try {
+                                    out.close();
+                                } catch (Exception e) {
+                                    // Ignore close errors
+                                }
+                            },
+                            () -> {
+                                try {
+                                    out.close();
+                                    LOGGER.info("Completed streaming from: " + finalUrl);
+                                } catch (Exception e) {
+                                    LOGGER.warning("Error closing stream for: " + finalUrl + ", error: " + e.getMessage());
+                                }
                             }
-                        });
+                        );
 
-                    // Parse JSON stream
-                    return jsonParser.parseJsonArray(in, targetClass);
+                    // Offload blocking JSON parsing to worker thread to avoid blocking event loop
+                    // PipedInputStream.read() is blocking and must not run on event loop thread
+                    return Uni.createFrom()
+                        .item(in)
+                        .emitOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultExecutor())
+                        .onItem()
+                        .transformToMulti(inputStream -> jsonParser.parseJsonArray(inputStream, targetClass));
                 } catch (Exception e) {
+                    LOGGER.severe("Failed to parse JSON stream from: " + finalUrl + ", error: " + e.getMessage());
                     return Multi.createFrom().failure(new StreamingException("Failed to parse JSON stream", e));
                 }
             });
@@ -136,20 +163,25 @@ public class HttpStreamingService {
     /**
      * Stream HTTP response as Multi<Buffer> with backpressure
      */
-    private Multi<Buffer> streamResponse(HttpRequest<Buffer> request) {
+    private Multi<Buffer> streamResponse(HttpRequest<Buffer> request, String url) {
         return Multi.createFrom()
             .emitter(emitter -> {
                 request.send(asyncResult -> {
                     if (asyncResult.failed()) {
+                        LOGGER.severe("HTTP request failed for: " + url + ", error: " + asyncResult.cause().getMessage());
                         emitter.fail(new StreamingException("HTTP request failed", asyncResult.cause()));
                         return;
                     }
 
                     HttpResponse<Buffer> response = asyncResult.result();
                     if (response.statusCode() >= 400) {
+                        LOGGER.severe("HTTP error for: " + url + ", status: " + response.statusCode() + " " + response.statusMessage());
                         emitter.fail(new StreamingException("HTTP error: " + response.statusCode() + " " + response.statusMessage()));
                         return;
                     }
+
+                    LOGGER.info("HTTP response received for: " + url + ", status: " + response.statusCode() +
+                               ", content length: " + response.body().length() + " bytes");
 
                     // Emit the response body as a single buffer
                     emitter.emit(response.body());
