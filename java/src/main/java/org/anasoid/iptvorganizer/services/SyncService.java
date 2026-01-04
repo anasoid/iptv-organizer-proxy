@@ -283,7 +283,28 @@ public class SyncService {
                     allStreams.get(i).setNum(i + 1);
                 }
 
-                Set<Integer> fetchedStreamIds = new HashSet<>();
+                // Handle streams without category - get/create Unknown category
+                List<Uni<Void>> categoryProcessing = new ArrayList<>();
+                for (LiveStream stream : allStreams) {
+                    if (stream.getCategoryId() == null || stream.getCategoryId() == 0) {
+                        categoryProcessing.add(
+                            categoryRepository.getOrCreateUnknownCategory(source.getId(), "live")
+                                .invoke(unknownCategoryId -> {
+                                    stream.setCategoryId(unknownCategoryId.intValue());
+                                    LOGGER.info("Live stream assigned to Unknown category: stream_id=" + stream.getStreamId());
+                                })
+                                .replaceWithVoid()
+                        );
+                    }
+                }
+
+                // If category processing needed, wait for it; otherwise continue
+                Uni<Void> categoryProcessingDone = categoryProcessing.isEmpty()
+                    ? Uni.createFrom().voidItem()
+                    : Uni.join().all(categoryProcessing).andFailFast().replaceWithVoid();
+
+                return categoryProcessingDone.flatMap(categoryReady -> {
+                    Set<Integer> fetchedStreamIds = new HashSet<>();
                 for (LiveStream stream : allStreams) {
                     fetchedStreamIds.add(stream.getStreamId());
                 }
@@ -360,6 +381,7 @@ public class SyncService {
                                 }
                             });
                     });
+                });
             })
             .replaceWith(source);
     }
@@ -387,10 +409,31 @@ public class SyncService {
                     allStreams.get(i).setNum(i + 1);
                 }
 
-                Set<Integer> fetchedStreamIds = new HashSet<>();
+                // Handle streams without category - get/create Unknown category
+                List<Uni<Void>> categoryProcessing = new ArrayList<>();
                 for (VodStream stream : allStreams) {
-                    fetchedStreamIds.add(stream.getStreamId());
+                    if (stream.getCategoryId() == null || stream.getCategoryId() == 0) {
+                        categoryProcessing.add(
+                            categoryRepository.getOrCreateUnknownCategory(source.getId(), "vod")
+                                .invoke(unknownCategoryId -> {
+                                    stream.setCategoryId(unknownCategoryId.intValue());
+                                    LOGGER.info("VOD stream assigned to Unknown category: stream_id=" + stream.getStreamId());
+                                })
+                                .replaceWithVoid()
+                        );
+                    }
                 }
+
+                // If category processing needed, wait for it; otherwise continue
+                Uni<Void> categoryProcessingDone = categoryProcessing.isEmpty()
+                    ? Uni.createFrom().voidItem()
+                    : Uni.join().all(categoryProcessing).andFailFast().replaceWithVoid();
+
+                return categoryProcessingDone.flatMap(categoryReady -> {
+                    Set<Integer> fetchedStreamIds = new HashSet<>();
+                    for (VodStream stream : allStreams) {
+                        fetchedStreamIds.add(stream.getStreamId());
+                    }
 
                 // Get all existing streams for this source
                 return vodStreamRepository.findAll()
@@ -464,6 +507,7 @@ public class SyncService {
                                 }
                             });
                     });
+                });
             })
             .replaceWith(source);
     }
@@ -491,10 +535,31 @@ public class SyncService {
                     allSeries.get(i).setNum(i + 1);
                 }
 
-                Set<Integer> fetchedStreamIds = new HashSet<>();
+                // Handle series without category - get/create Unknown category
+                List<Uni<Void>> categoryProcessing = new ArrayList<>();
                 for (Series series : allSeries) {
-                    fetchedStreamIds.add(series.getStreamId());
+                    if (series.getCategoryId() == null || series.getCategoryId() == 0) {
+                        categoryProcessing.add(
+                            categoryRepository.getOrCreateUnknownCategory(source.getId(), "series")
+                                .invoke(unknownCategoryId -> {
+                                    series.setCategoryId(unknownCategoryId.intValue());
+                                    LOGGER.info("Series assigned to Unknown category: stream_id=" + series.getStreamId());
+                                })
+                                .replaceWithVoid()
+                        );
+                    }
                 }
+
+                // If category processing needed, wait for it; otherwise continue
+                Uni<Void> categoryProcessingDone = categoryProcessing.isEmpty()
+                    ? Uni.createFrom().voidItem()
+                    : Uni.join().all(categoryProcessing).andFailFast().replaceWithVoid();
+
+                return categoryProcessingDone.flatMap(categoryReady -> {
+                    Set<Integer> fetchedStreamIds = new HashSet<>();
+                    for (Series series : allSeries) {
+                        fetchedStreamIds.add(series.getStreamId());
+                    }
 
                 // Get all existing series for this source
                 return seriesRepository.findAll()
@@ -568,6 +633,7 @@ public class SyncService {
                                 }
                             });
                     });
+                });
             })
             .replaceWith(source);
     }

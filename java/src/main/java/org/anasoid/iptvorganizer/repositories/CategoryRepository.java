@@ -116,4 +116,47 @@ public class CategoryRepository extends BaseRepository<Category> {
             .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
             .map(this::mapRow);
     }
+
+    /**
+     * Find category by source, category_id, and type
+     */
+    public Uni<Category> findBySourceCategoryType(Long sourceId, Integer categoryId, String categoryType) {
+        String sql = "SELECT * FROM categories WHERE source_id = ? AND category_id = ? AND category_type = ? LIMIT 1";
+        return pool.preparedQuery(sql)
+            .execute(Tuple.of(sourceId, categoryId, categoryType))
+            .map(rowSet -> {
+                if (rowSet.size() > 0) {
+                    return mapRow(rowSet.iterator().next());
+                }
+                return null;
+            });
+    }
+
+    /**
+     * Get or create "Unknown" category for a source and type
+     * Used when streams have no category assigned
+     *
+     * @param sourceId Source ID
+     * @param categoryType Category type (live, vod, series)
+     * @return Database ID of the Unknown category
+     */
+    public Uni<Long> getOrCreateUnknownCategory(Long sourceId, String categoryType) {
+        return findBySourceCategoryType(sourceId, 0, categoryType)
+            .flatMap(existing -> {
+                if (existing != null) {
+                    return Uni.createFrom().item(existing.getId());
+                }
+
+                // Create new Unknown category
+                Category unknownCategory = new Category();
+                unknownCategory.setSourceId(sourceId);
+                unknownCategory.setCategoryId(0);
+                unknownCategory.setCategoryType(categoryType);
+                unknownCategory.setCategoryName("Unknown");
+                unknownCategory.setParentId(null);
+                unknownCategory.setLabels("unknown");
+
+                return insert(unknownCategory);
+            });
+    }
 }

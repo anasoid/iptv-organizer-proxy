@@ -45,7 +45,8 @@ public class SimpleMigrator {
         "V012__create_sync_schedule.sql",
         "V013__update_sync_logs_sync_type_enum.sql",
         "V014__remove_sync_status_column.sql",
-        "V015__add_timestamps_to_sync_logs.sql"
+        "V015__add_timestamps_to_sync_logs.sql",
+        "V016__add_interrupted_status_to_sync_logs.sql"
     );
 
     void onStart(@Observes StartupEvent event) {
