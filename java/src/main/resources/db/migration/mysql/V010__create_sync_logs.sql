@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS sync_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     source_id INT NOT NULL,
-    sync_type ENUM('live_categories', 'live_streams', 'vod_categories', 'vod_streams', 'series_categories', 'series') NOT NULL,
+    sync_type ENUM('full', 'manual_full', 'live_categories', 'live_streams', 'vod_categories', 'vod_streams', 'series_categories', 'series', 'manual_live_categories', 'manual_live_streams', 'manual_vod_categories', 'manual_vod_streams', 'manual_series_categories', 'manual_series') NOT NULL,
     started_at DATETIME NOT NULL,
     completed_at DATETIME,
     status ENUM('running', 'completed', 'failed') NOT NULL DEFAULT 'running',

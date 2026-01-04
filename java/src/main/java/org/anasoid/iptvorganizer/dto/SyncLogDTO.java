@@ -42,7 +42,7 @@ public class SyncLogDTO {
             .syncType(entity.getSyncType())
             .startedAt(entity.getStartedAt())
             .completedAt(entity.getCompletedAt())
-            .status(entity.getStatus())
+            .status(entity.getStatus() != null ? entity.getStatus().getValue() : null)
             .itemsAdded(entity.getItemsAdded())
             .itemsUpdated(entity.getItemsUpdated())
             .itemsDeleted(entity.getItemsDeleted())

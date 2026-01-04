@@ -26,9 +26,6 @@ public class CreateSourceRequest {
     @JsonProperty("is_active")
     private Boolean isActive;
 
-    @JsonProperty("sync_status")
-    private String syncStatus;
-
     @JsonProperty("enableproxy")
     private Boolean enableProxy;
 

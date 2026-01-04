@@ -1,6 +1,7 @@
 package org.anasoid.iptvorganizer.services;
 
 import org.anasoid.iptvorganizer.models.SyncLog;
+import org.anasoid.iptvorganizer.models.SyncLogStatus;
 import org.anasoid.iptvorganizer.repositories.SyncLogRepository;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
@@ -27,7 +28,7 @@ public class SyncLogService extends BaseService<SyncLog, SyncLogRepository> {
             return Uni.createFrom().failure(new IllegalArgumentException("Sync type is required"));
         }
         if (syncLog.getStatus() == null) {
-            syncLog.setStatus("running");
+            syncLog.setStatus(SyncLogStatus.RUNNING);
         }
         return repository.insert(syncLog);
     }

@@ -1,3 +1,11 @@
+-- SQLite doesn't allow direct ALTER COLUMN, so we need to recreate the table
+-- Save existing data
+CREATE TABLE IF NOT EXISTS sync_logs_backup AS SELECT * FROM sync_logs;
+
+-- Drop old table
+DROP TABLE IF EXISTS sync_logs;
+
+-- Create new table with updated ENUM values
 CREATE TABLE IF NOT EXISTS sync_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_id INTEGER NOT NULL,
@@ -13,5 +21,12 @@ CREATE TABLE IF NOT EXISTS sync_logs (
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE
 );
 
+-- Restore data
+INSERT INTO sync_logs SELECT * FROM sync_logs_backup;
+
+-- Drop backup table
+DROP TABLE sync_logs_backup;
+
+-- Recreate indices
 CREATE INDEX IF NOT EXISTS idx_sync_logs_source_status_started ON sync_logs(source_id, status, started_at);
 CREATE INDEX IF NOT EXISTS idx_sync_logs_status_started ON sync_logs(status, started_at);

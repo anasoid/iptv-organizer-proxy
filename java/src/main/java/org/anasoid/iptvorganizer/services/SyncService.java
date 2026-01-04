@@ -55,6 +55,9 @@ public class SyncService {
     @Inject
     LabelExtractor labelExtractor;
 
+    @Inject
+    SyncLockManager syncLockManager;
+
     /**
      * Scheduled task to check for sources needing sync
      * Runs every 5 minutes by default, configurable via sync.check.interval
@@ -87,7 +90,7 @@ public class SyncService {
      */
     private Uni<Void> syncSource(Source source) {
         // Try to acquire lock first
-        return sourceRepository.acquireSyncLock(source.getId())
+        return Uni.createFrom().item(() -> syncLockManager.tryAcquireLock(source.getId(), "full"))
             .onItem()
             .transformToUni(lockAcquired -> {
                 if (!lockAcquired) {
@@ -100,7 +103,7 @@ public class SyncService {
                     .sourceId(source.getId())
                     .syncType("full")
                     .startedAt(syncStartTime)
-                    .status("running")
+                    .status(SyncLogStatus.RUNNING)
                     .itemsAdded(0)
                     .itemsUpdated(0)
                     .itemsDeleted(0)
@@ -113,14 +116,16 @@ public class SyncService {
                         source.setLastSync(syncStartTime);
 
                         return performFullSync(source, syncLog, syncStartTime)
-                            .eventually(() -> sourceRepository.releaseSyncLock(source.getId()));
+                            .eventually(() -> {
+                                syncLockManager.releaseLock(source.getId());
+                                return Uni.createFrom().voidItem();
+                            });
                     })
                     .onFailure()
                     .recoverWithUni(failure -> {
                         // Release lock on failure
-                        return sourceRepository.releaseSyncLock(source.getId())
-                            .onItem()
-                            .transformToUni(v -> Uni.createFrom().failure(failure));
+                        syncLockManager.releaseLock(source.getId());
+                        return Uni.createFrom().failure(failure);
                     });
             });
     }
@@ -575,11 +580,11 @@ public class SyncService {
         LocalDateTime syncEndTime = LocalDateTime.now();
 
         if (error != null) {
-            syncLog.setStatus("failed");
+            syncLog.setStatus(SyncLogStatus.FAILED);
             syncLog.setErrorMessage(error.getMessage());
             LOGGER.severe("Sync failed for source " + source.getId() + ": " + error.getMessage());
         } else {
-            syncLog.setStatus("completed");
+            syncLog.setStatus(SyncLogStatus.COMPLETED);
             LOGGER.info("Sync completed for source " + source.getId());
         }
 
@@ -711,7 +716,7 @@ public class SyncService {
     public Uni<Void> triggerManualSync(Source source) {
         LOGGER.info("Manual sync triggered for source: " + source.getName());
 
-        return sourceRepository.acquireSyncLock(source.getId())
+        return Uni.createFrom().item(() -> syncLockManager.tryAcquireLock(source.getId(), "manual_full"))
             .flatMap(lockAcquired -> {
                 if (!lockAcquired) {
                     LOGGER.warning("Source " + source.getId() + " is already syncing, cannot start manual sync");
@@ -725,7 +730,7 @@ public class SyncService {
                     .sourceId(source.getId())
                     .syncType("manual_full")
                     .startedAt(syncStartTime)
-                    .status("running")
+                    .status(SyncLogStatus.RUNNING)
                     .itemsAdded(0)
                     .itemsUpdated(0)
                     .itemsDeleted(0)
@@ -737,14 +742,16 @@ public class SyncService {
                         source.setLastSync(syncStartTime);
 
                         return performFullSync(source, syncLog, syncStartTime)
-                            .eventually(() -> sourceRepository.releaseSyncLock(source.getId()));
+                            .eventually(() -> {
+                                syncLockManager.releaseLock(source.getId());
+                                return Uni.createFrom().voidItem();
+                            });
                     })
                     .onFailure()
                     .recoverWithUni(failure -> {
                         // Release lock on failure and propagate error
-                        return sourceRepository.releaseSyncLock(source.getId())
-                            .onItem()
-                            .transformToUni(v -> Uni.createFrom().failure(failure));
+                        syncLockManager.releaseLock(source.getId());
+                        return Uni.createFrom().failure(failure);
                     });
             });
     }
@@ -769,7 +776,7 @@ public class SyncService {
             );
         }
 
-        return sourceRepository.acquireSyncLock(source.getId())
+        return Uni.createFrom().item(() -> syncLockManager.tryAcquireLock(source.getId(), "manual_" + taskType))
             .flatMap(lockAcquired -> {
                 if (!lockAcquired) {
                     LOGGER.warning("Source " + source.getId() + " is already syncing");
@@ -783,7 +790,7 @@ public class SyncService {
                     .sourceId(source.getId())
                     .syncType("manual_" + taskType)
                     .startedAt(syncStartTime)
-                    .status("running")
+                    .status(SyncLogStatus.RUNNING)
                     .itemsAdded(0)
                     .itemsUpdated(0)
                     .itemsDeleted(0)
@@ -815,13 +822,15 @@ public class SyncService {
 
                         return taskResult
                             .flatMap(s -> finalizeSyncLog(source, syncLog, syncStartTime, null))
-                            .eventually(() -> sourceRepository.releaseSyncLock(source.getId()))
+                            .eventually(() -> {
+                                syncLockManager.releaseLock(source.getId());
+                                return Uni.createFrom().voidItem();
+                            })
                             .onFailure()
                             .recoverWithUni(failure -> {
                                 // Finalize as failed and release lock
+                                syncLockManager.releaseLock(source.getId());
                                 return finalizeSyncLog(source, syncLog, syncStartTime, failure)
-                                    .onItem()
-                                    .transformToUni(v -> sourceRepository.releaseSyncLock(source.getId()))
                                     .onItem()
                                     .transformToUni(v -> Uni.createFrom().failure(failure));
                             });

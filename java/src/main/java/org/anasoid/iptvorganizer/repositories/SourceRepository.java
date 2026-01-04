@@ -20,7 +20,7 @@ public class SourceRepository extends BaseRepository<Source> {
      * Find all sources that need syncing (next_sync_time <= now and is_active = true)
      */
     public Multi<Source> findSourcesNeedingSync() {
-        String sql = "SELECT * FROM sources WHERE next_sync <= ? AND is_active = true AND sync_status != 'syncing' ORDER BY next_sync ASC";
+        String sql = "SELECT * FROM sources WHERE next_sync <= ? AND is_active = true ORDER BY next_sync ASC";
         return pool.preparedQuery(sql)
             .execute(Tuple.of(LocalDateTime.now()))
             .onItem()
@@ -28,37 +28,15 @@ public class SourceRepository extends BaseRepository<Source> {
             .map(this::mapRow);
     }
 
-    /**
-     * Try to acquire lock on source for syncing
-     * Returns true if lock acquired (source was not already syncing)
-     */
-    public Uni<Boolean> acquireSyncLock(Long sourceId) {
-        String sql = "UPDATE sources SET sync_status = 'syncing' WHERE id = ? AND sync_status != 'syncing'";
-        return pool.preparedQuery(sql)
-            .execute(Tuple.of(sourceId))
-            .map(rowSet -> rowSet.rowCount() > 0);
-    }
-
-    /**
-     * Release sync lock on source
-     */
-    public Uni<Void> releaseSyncLock(Long sourceId) {
-        String sql = "UPDATE sources SET sync_status = 'idle' WHERE id = ?";
-        return pool.preparedQuery(sql)
-            .execute(Tuple.of(sourceId))
-            .replaceWithVoid();
-    }
-
     @Override
     public Uni<Long> insert(Source source) {
-        String sql = "INSERT INTO sources (name, url, username, password, sync_interval, sync_status, is_active, enableproxy, disablestreamproxy, stream_follow_location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO sources (name, url, username, password, sync_interval, is_active, enableproxy, disablestreamproxy, stream_follow_location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         Tuple tuple = Tuple.tuple()
             .addString(source.getName())
             .addString(source.getUrl())
             .addString(source.getUsername())
             .addString(source.getPassword())
             .addInteger(source.getSyncInterval())
-            .addString(source.getSyncStatus())
             .addBoolean(source.getIsActive())
             .addBoolean(source.getEnableProxy())
             .addBoolean(source.getDisableStreamProxy())
@@ -70,7 +48,7 @@ public class SourceRepository extends BaseRepository<Source> {
 
     @Override
     public Uni<Void> update(Source source) {
-        String sql = "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, sync_status = ?, is_active = ?, enableproxy = ?, disablestreamproxy = ?, stream_follow_location = ? WHERE id = ?";
+        String sql = "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, enableproxy = ?, disablestreamproxy = ?, stream_follow_location = ? WHERE id = ?";
         Tuple tuple = Tuple.tuple()
             .addString(source.getName())
             .addString(source.getUrl())
@@ -79,7 +57,6 @@ public class SourceRepository extends BaseRepository<Source> {
             .addInteger(source.getSyncInterval())
             .addLocalDateTime(source.getLastSync())
             .addLocalDateTime(source.getNextSync())
-            .addString(source.getSyncStatus())
             .addBoolean(source.getIsActive())
             .addBoolean(source.getEnableProxy())
             .addBoolean(source.getDisableStreamProxy())
@@ -101,7 +78,6 @@ public class SourceRepository extends BaseRepository<Source> {
             .syncInterval(row.getInteger("sync_interval"))
             .lastSync(row.getLocalDateTime("last_sync"))
             .nextSync(row.getLocalDateTime("next_sync"))
-            .syncStatus(row.getString("sync_status"))
             .isActive(row.getBoolean("is_active"))
             .enableProxy(row.getBoolean("enableproxy"))
             .disableStreamProxy(row.getBoolean("disablestreamproxy"))

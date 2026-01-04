@@ -1,6 +1,7 @@
 package org.anasoid.iptvorganizer.repositories;
 
 import org.anasoid.iptvorganizer.models.SyncLog;
+import org.anasoid.iptvorganizer.models.SyncLogStatus;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
@@ -23,7 +24,7 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
             .addString(syncLog.getSyncType())
             .addLocalDateTime(syncLog.getStartedAt())
             .addLocalDateTime(syncLog.getCompletedAt())
-            .addString(syncLog.getStatus())
+            .addString(syncLog.getStatus() != null ? syncLog.getStatus().getValue() : null)
             .addInteger(syncLog.getItemsAdded())
             .addInteger(syncLog.getItemsUpdated())
             .addInteger(syncLog.getItemsDeleted())
@@ -42,7 +43,7 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
             .addString(syncLog.getSyncType())
             .addLocalDateTime(syncLog.getStartedAt())
             .addLocalDateTime(syncLog.getCompletedAt())
-            .addString(syncLog.getStatus())
+            .addString(syncLog.getStatus() != null ? syncLog.getStatus().getValue() : null)
             .addInteger(syncLog.getItemsAdded())
             .addInteger(syncLog.getItemsUpdated())
             .addInteger(syncLog.getItemsDeleted())
@@ -62,7 +63,7 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
             .syncType(row.getString("sync_type"))
             .startedAt(row.getLocalDateTime("started_at"))
             .completedAt(row.getLocalDateTime("completed_at"))
-            .status(row.getString("status"))
+            .status(SyncLogStatus.fromValue(row.getString("status")))
             .itemsAdded(row.getInteger("items_added"))
             .itemsUpdated(row.getInteger("items_updated"))
             .itemsDeleted(row.getInteger("items_deleted"))
@@ -119,6 +120,17 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
     public Multi<SyncLog> findBySourceId(Long sourceId) {
         return pool.preparedQuery("SELECT * FROM sync_logs WHERE source_id = ? ORDER BY started_at DESC")
             .execute(Tuple.of(sourceId))
+            .onItem()
+            .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
+            .map(this::mapRow);
+    }
+
+    /**
+     * Find sync logs by status
+     */
+    public Multi<SyncLog> findByStatus(SyncLogStatus status) {
+        return pool.preparedQuery("SELECT * FROM sync_logs WHERE status = ? ORDER BY started_at DESC")
+            .execute(Tuple.of(status.getValue()))
             .onItem()
             .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
             .map(this::mapRow);

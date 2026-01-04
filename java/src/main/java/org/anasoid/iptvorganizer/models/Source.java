@@ -21,7 +21,6 @@ public class Source extends BaseEntity {
     private Integer syncInterval;
     private LocalDateTime lastSync;
     private LocalDateTime nextSync;
-    private String syncStatus;
     private Boolean isActive;
     private Boolean enableProxy;
     private Boolean disableStreamProxy;

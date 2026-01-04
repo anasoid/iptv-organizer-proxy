@@ -42,7 +42,9 @@ public class SimpleMigrator {
         "V009__create_series.sql",
         "V010__create_sync_logs.sql",
         "V011__create_connection_logs.sql",
-        "V012__create_sync_schedule.sql"
+        "V012__create_sync_schedule.sql",
+        "V013__update_sync_logs_sync_type_enum.sql",
+        "V014__remove_sync_status_column.sql"
     );
 
     void onStart(@Observes StartupEvent event) {
@@ -89,6 +91,21 @@ public class SimpleMigrator {
                     checksum TEXT NOT NULL,
                     applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
+                """;
+        } else if ("mssql".equalsIgnoreCase(dbKind)) {
+            // SQL Server
+            createTableSql = """
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'schema_version')
+                BEGIN
+                    CREATE TABLE schema_version (
+                        id BIGINT IDENTITY(1,1) PRIMARY KEY,
+                        version VARCHAR(255) NOT NULL UNIQUE,
+                        description VARCHAR(500),
+                        checksum VARCHAR(32) NOT NULL,
+                        applied_at DATETIME2 DEFAULT GETDATE()
+                    )
+                    CREATE INDEX idx_version ON schema_version(version)
+                END
                 """;
         } else {
             // MySQL and PostgreSQL

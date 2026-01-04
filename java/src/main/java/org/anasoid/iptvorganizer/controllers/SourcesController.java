@@ -8,6 +8,7 @@ import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.Source;
 import org.anasoid.iptvorganizer.services.SourceService;
 import org.anasoid.iptvorganizer.services.SyncLogService;
+import org.anasoid.iptvorganizer.services.SyncLockManager;
 import org.anasoid.iptvorganizer.services.SyncService;
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
@@ -16,6 +17,9 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Sources controller
@@ -35,6 +39,9 @@ public class SourcesController extends BaseController {
 
     @Inject
     SyncService syncService;
+
+    @Inject
+    SyncLockManager syncLockManager;
 
     /**
      * Get all sources with pagination
@@ -112,7 +119,6 @@ public class SourcesController extends BaseController {
             .enableProxy(request.getEnableProxy() != null ? request.getEnableProxy() : false)
             .disableStreamProxy(request.getDisableStreamProxy() != null ? request.getDisableStreamProxy() : false)
             .streamFollowLocation(request.getStreamFollowLocation() != null ? request.getStreamFollowLocation() : false)
-            .syncStatus(request.getSyncStatus() != null ? request.getSyncStatus() : "pending")
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
             .build();
@@ -147,9 +153,6 @@ public class SourcesController extends BaseController {
                 }
                 if (request.getSyncInterval() != null) {
                     source.setSyncInterval(request.getSyncInterval());
-                }
-                if (request.getSyncStatus() != null) {
-                    source.setSyncStatus(request.getSyncStatus());
                 }
                 if (request.getIsActive() != null) {
                     source.setIsActive(request.getIsActive());
@@ -371,10 +374,22 @@ public class SourcesController extends BaseController {
         return sourceService.getAll()
             .collect().asList()
             .map(sources -> sources.stream().map(s -> {
-                var status = new java.util.HashMap<String, Object>();
+                var status = new HashMap<String, Object>();
                 status.put("sourceId", s.getId());
                 status.put("name", s.getName());
-                status.put("syncStatus", s.getSyncStatus());
+
+                // Check if currently syncing from in-memory lock manager
+                boolean isCurrentlySyncing = syncLockManager.isLocked(s.getId());
+                status.put("isSyncing", isCurrentlySyncing);
+
+                // Include metadata if syncing
+                if (isCurrentlySyncing) {
+                    syncLockManager.getSyncMetadata(s.getId()).ifPresent(metadata -> {
+                        status.put("currentSyncType", metadata.getSyncType());
+                        status.put("syncStartTime", metadata.getStartTime());
+                    });
+                }
+
                 status.put("lastSync", s.getLastSync());
                 status.put("nextSync", s.getNextSync());
                 return status;
@@ -383,5 +398,31 @@ public class SourcesController extends BaseController {
             .onFailure().recoverWithItem(ex ->
                 ApiResponse.error("Failed to fetch sync status: " + ex.getMessage())
             );
+    }
+
+    /**
+     * Get currently active sync operations
+     * GET /api/sync/active
+     */
+    @GET
+    @Path("/../sync/active")
+    public Uni<?> getActiveSyncs() {
+        return Uni.createFrom().item(() -> {
+            var activeSyncs = syncLockManager.getActiveSyncs();
+
+            var response = activeSyncs.stream()
+                .map(metadata -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("sourceId", metadata.getSourceId());
+                    map.put("syncType", metadata.getSyncType());
+                    map.put("startTime", metadata.getStartTime());
+                    map.put("durationSeconds",
+                        ChronoUnit.SECONDS.between(metadata.getStartTime(), LocalDateTime.now()));
+                    return map;
+                })
+                .toList();
+
+            return ApiResponse.success(response);
+        });
     }
 }

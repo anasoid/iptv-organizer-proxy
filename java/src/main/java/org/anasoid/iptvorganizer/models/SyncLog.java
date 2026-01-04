@@ -18,7 +18,7 @@ public class SyncLog extends BaseEntity {
     private String syncType;
     private LocalDateTime startedAt;
     private LocalDateTime completedAt;
-    private String status;
+    private SyncLogStatus status;
     private Integer itemsAdded;
     private Integer itemsUpdated;
     private Integer itemsDeleted;

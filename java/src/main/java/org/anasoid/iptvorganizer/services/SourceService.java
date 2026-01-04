@@ -28,9 +28,6 @@ public class SourceService extends BaseService<Source, SourceRepository> {
         if (source.getIsActive() == null) {
             source.setIsActive(true);
         }
-        if (source.getSyncStatus() == null) {
-            source.setSyncStatus("idle");
-        }
         return repository.insert(source);
     }
 }

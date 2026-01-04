@@ -27,7 +27,6 @@ public class SourceDTO {
     private Integer syncInterval;
     private LocalDateTime lastSync;
     private LocalDateTime nextSync;
-    private String syncStatus;
 
     @JsonSerialize(using = BooleanAsIntSerializer.class)
     private Boolean isActive;
@@ -58,7 +57,6 @@ public class SourceDTO {
             .syncInterval(entity.getSyncInterval())
             .lastSync(entity.getLastSync())
             .nextSync(entity.getNextSync())
-            .syncStatus(entity.getSyncStatus())
             .isActive(entity.getIsActive())
             .enableProxy(entity.getEnableProxy())
             .disableStreamProxy(entity.getDisableStreamProxy())
