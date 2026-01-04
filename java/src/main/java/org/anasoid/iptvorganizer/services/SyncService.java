@@ -199,8 +199,7 @@ public class SyncService {
                     category.setParentId(getIntValue(catData, "parent_id"));
 
                     // Extract labels from category name
-                    List<String> labels = labelExtractor.extractLabels(category.getCategoryName());
-                    category.setLabels(labelExtractor.labelsToString(labels));
+                    category.setLabels(labelExtractor.extractLabels(category.getCategoryName()));
 
                     categories.add(category);
                     fetchedCategoryIds.add(category.getCategoryId());
@@ -622,8 +621,7 @@ public class SyncService {
         stream.setIsAdult(getBooleanValue(data, "is_adult"));
 
         // Extract and set labels from stream name
-        List<String> labels = labelExtractor.extractLabels(stream.getName());
-        stream.setLabels(labelExtractor.labelsToString(labels));
+        stream.setLabels(labelExtractor.extractLabels(stream.getName()));
 
         stream.setData(convertMapToJson(data));
         return stream;
@@ -642,8 +640,7 @@ public class SyncService {
         stream.setIsAdult(getBooleanValue(data, "is_adult"));
 
         // Extract and set labels
-        List<String> labels = labelExtractor.extractLabels(stream.getName());
-        stream.setLabels(labelExtractor.labelsToString(labels));
+        stream.setLabels(labelExtractor.extractLabels(stream.getName()));
 
         stream.setData(convertMapToJson(data));
         return stream;
@@ -662,8 +659,7 @@ public class SyncService {
         series.setIsAdult(getBooleanValue(data, "is_adult"));
 
         // Extract and set labels
-        List<String> labels = labelExtractor.extractLabels(series.getName());
-        series.setLabels(labelExtractor.labelsToString(labels));
+        series.setLabels(labelExtractor.extractLabels(series.getName()));
 
         series.setData(convertMapToJson(data));
         return series;
