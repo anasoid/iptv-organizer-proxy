@@ -73,3 +73,11 @@ tasks.register('quarkusDevDebug') {
     dependsOn quarkusDev
 }
 
+
+
+tasks.named('quarkusDev') {
+     jvmArgs = [
+        '-Xmx64M'
+    ]
+}
+
