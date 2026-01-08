@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'io.quarkus' version '3.6.4'
     id 'jacoco'
+    id "com.diffplug.spotless" version "6.25.0"
 }
 
 repositories {
@@ -51,6 +52,16 @@ dependencies {
 
     // JaCoCo for code coverage with Quarkus
     testImplementation 'io.quarkus:quarkus-jacoco'
+}
+
+spotless {
+    java {
+        // target 'src/*/java/**/*.java' // default
+        removeUnusedImports()
+        // googleJavaFormat() // Disabled to preserve 4-space indent
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
 }
 
 configurations.all {

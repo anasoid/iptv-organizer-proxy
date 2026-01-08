@@ -4,7 +4,6 @@ import org.anasoid.iptvorganizer.models.SyncLog;
 import org.anasoid.iptvorganizer.models.SyncLogStatus;
 import org.anasoid.iptvorganizer.repositories.SyncLogRepository;
 import io.quarkus.runtime.StartupEvent;
-import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;

@@ -1,7 +1,5 @@
 package org.anasoid.iptvorganizer.config;
 
-import io.quarkus.arc.Arc;
-import io.quarkus.arc.ArcContainer;
 import io.vertx.mutiny.mysqlclient.MySQLPool;
 import io.vertx.mutiny.pgclient.PgPool;
 import io.vertx.mutiny.sqlclient.Pool;
@@ -14,7 +12,6 @@ import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import javax.sql.DataSource;
 import java.util.logging.Logger;
 
 @ApplicationScoped

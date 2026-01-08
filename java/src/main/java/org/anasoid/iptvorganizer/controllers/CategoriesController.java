@@ -3,7 +3,6 @@ package org.anasoid.iptvorganizer.controllers;
 import org.anasoid.iptvorganizer.dto.CategoryDTO;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
-import org.anasoid.iptvorganizer.models.Category;
 import org.anasoid.iptvorganizer.services.CategoryService;
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;

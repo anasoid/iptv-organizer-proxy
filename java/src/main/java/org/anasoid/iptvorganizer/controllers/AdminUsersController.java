@@ -5,7 +5,6 @@ import org.anasoid.iptvorganizer.dto.request.CreateAdminUserRequest;
 import org.anasoid.iptvorganizer.dto.request.UpdateAdminUserRequest;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
-import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.ValidationException;
 import org.anasoid.iptvorganizer.models.AdminUser;
 import org.anasoid.iptvorganizer.services.AdminUserService;

@@ -10,13 +10,11 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.anasoid.iptvorganizer.exceptions.StreamingException;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.util.Base64;
-import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
 @ApplicationScoped
