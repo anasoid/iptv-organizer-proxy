@@ -19,7 +19,7 @@ public class FilterRepository extends BaseRepository<Filter> {
         String sql = "INSERT INTO filters (name, description, filter_config, use_source_filter, favoris) VALUES (?, ?, ?, ?, ?)";
         return pool.preparedQuery(sql)
             .execute(Tuple.of(filter.getName(), filter.getDescription(), filter.getFilterConfig(), filter.getUseSourceFilter(), filter.getFavoris()))
-            .map(rowSet -> rowSet.property(io.vertx.mutiny.mysqlclient.MySQLClient.LAST_INSERTED_ID));
+            .map(this::getInsertedId);
     }
 
     @Override

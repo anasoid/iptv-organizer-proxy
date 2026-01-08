@@ -31,7 +31,7 @@ public class SeriesRepository extends BaseRepository<Series> {
             .addLocalDate(series.getReleaseDate());
         return pool.preparedQuery(sql)
             .execute(tuple)
-            .map(rowSet -> rowSet.property(io.vertx.mutiny.mysqlclient.MySQLClient.LAST_INSERTED_ID));
+            .map(this::getInsertedId);
     }
 
     @Override

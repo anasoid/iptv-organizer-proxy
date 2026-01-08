@@ -19,7 +19,7 @@ public class ConnectionLogRepository extends BaseRepository<ConnectionLog> {
         String sql = "INSERT INTO connection_logs (client_id, action, ip_address, user_agent) VALUES (?, ?, ?, ?)";
         return pool.preparedQuery(sql)
             .execute(Tuple.of(log.getClientId(), log.getAction(), log.getIpAddress(), log.getUserAgent()))
-            .map(rowSet -> rowSet.property(io.vertx.mutiny.mysqlclient.MySQLClient.LAST_INSERTED_ID));
+            .map(this::getInsertedId);
     }
 
     @Override

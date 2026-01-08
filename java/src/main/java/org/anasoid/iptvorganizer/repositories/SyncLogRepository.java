@@ -34,7 +34,7 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
             .addLocalDateTime(syncLog.getUpdatedAt() != null ? syncLog.getUpdatedAt() : java.time.LocalDateTime.now());
         return pool.preparedQuery(sql)
             .execute(tuple)
-            .map(rowSet -> rowSet.property(io.vertx.mutiny.mysqlclient.MySQLClient.LAST_INSERTED_ID));
+            .map(this::getInsertedId);
     }
 
     @Override

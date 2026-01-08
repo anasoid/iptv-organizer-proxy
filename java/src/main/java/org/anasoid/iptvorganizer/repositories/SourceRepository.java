@@ -43,7 +43,7 @@ public class SourceRepository extends BaseRepository<Source> {
             .addBoolean(source.getStreamFollowLocation());
         return pool.preparedQuery(sql)
             .execute(tuple)
-            .map(rowSet -> rowSet.property(io.vertx.mutiny.mysqlclient.MySQLClient.LAST_INSERTED_ID));
+            .map(this::getInsertedId);
     }
 
     @Override

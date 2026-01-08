@@ -95,4 +95,33 @@ public abstract class BaseRepository<T extends BaseEntity> {
             .map(this::mapRow);
     }
 
+    /**
+     * Get the inserted ID from a RowSet in a database-agnostic way.
+     * Handles both reactive MySQL/PostgreSQL (via LAST_INSERTED_ID property) and JDBC/H2 databases.
+     */
+    protected Long getInsertedId(io.vertx.mutiny.sqlclient.RowSet<Row> rowSet) {
+        try {
+            // Try MySQL-specific property first (for reactive MySQL/PostgreSQL drivers)
+            Object lastInsertedId = rowSet.property(io.vertx.mutiny.mysqlclient.MySQLClient.LAST_INSERTED_ID);
+            if (lastInsertedId != null) {
+                return (Long) lastInsertedId;
+            }
+        } catch (Exception e) {
+            // MySQLClient not available or property doesn't exist, fall through to JDBC approach
+        }
+
+        // For JDBC-based databases (H2), try to get generated key from first row
+        if (rowSet.iterator().hasNext()) {
+            Row row = rowSet.iterator().next();
+            try {
+                // Try to get the first column which should be the generated ID
+                return row.getLong(0);
+            } catch (Exception e) {
+                // Fall through
+            }
+        }
+
+        throw new IllegalStateException("Unable to retrieve inserted ID from RowSet");
+    }
+
 }

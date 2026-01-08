@@ -1,0 +1,3 @@
+-- Migration V016: Add 'interrupted' status to sync_logs status (already included in H2 initial table creation)
+-- This migration is a no-op for H2 since the status enum was created with 'interrupted' value in V011
+-- Included for compatibility with migration version numbering

@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'io.quarkus' version '3.6.4'
+    id 'jacoco'
 }
 
 repositories {
@@ -47,6 +48,9 @@ dependencies {
     // H2 database for testing (in-memory)
     testImplementation 'io.quarkus:quarkus-jdbc-h2'
     testImplementation 'com.h2database:h2'
+
+    // JaCoCo for code coverage with Quarkus
+    testImplementation 'io.quarkus:quarkus-jacoco'
 }
 
 configurations.all {
@@ -58,8 +62,8 @@ configurations.all {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 group 'org.anasoid.iptvorganizer'
@@ -81,3 +85,35 @@ tasks.named('quarkusDev') {
     ]
 }
 
+// JaCoCo Configuration
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+test {
+    finalizedBy jacocoTestReport
+    jacoco {
+        excludeClassLoaders = ["*QuarkusClassLoader"]
+        destinationFile = layout.buildDirectory.file("jacoco/jacoco.exec").get().asFile
+    }
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        xml.outputLocation = layout.buildDirectory.file("reports/jacoco/test/jacocoTestReport.xml")
+        html.required = true
+        html.outputLocation = layout.buildDirectory.dir("reports/jacoco/test/html")
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.0  // Start with 0%, increase gradually
+            }
+        }
+    }
+}

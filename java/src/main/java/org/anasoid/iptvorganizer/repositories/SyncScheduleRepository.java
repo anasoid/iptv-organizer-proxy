@@ -19,7 +19,7 @@ public class SyncScheduleRepository extends BaseRepository<SyncSchedule> {
         String sql = "INSERT INTO sync_schedule (source_id, task_type, next_sync, last_sync, sync_interval) VALUES (?, ?, ?, ?, ?)";
         return pool.preparedQuery(sql)
             .execute(Tuple.of(schedule.getSourceId(), schedule.getTaskType(), schedule.getNextSync(), schedule.getLastSync(), schedule.getSyncInterval()))
-            .map(rowSet -> rowSet.property(io.vertx.mutiny.mysqlclient.MySQLClient.LAST_INSERTED_ID));
+            .map(this::getInsertedId);
     }
 
     @Override

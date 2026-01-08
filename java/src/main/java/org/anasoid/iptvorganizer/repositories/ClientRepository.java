@@ -32,7 +32,7 @@ public class ClientRepository extends BaseRepository<Client> {
             .addString(client.getNotes());
         return pool.preparedQuery(sql)
             .execute(tuple)
-            .map(rowSet -> rowSet.property(io.vertx.mutiny.mysqlclient.MySQLClient.LAST_INSERTED_ID));
+            .map(this::getInsertedId);
     }
 
     @Override

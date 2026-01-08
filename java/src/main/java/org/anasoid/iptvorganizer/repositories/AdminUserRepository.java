@@ -20,7 +20,7 @@ public class AdminUserRepository extends BaseRepository<AdminUser> {
         String sql = "INSERT INTO admin_users (username, password_hash, email, is_active) VALUES (?, ?, ?, ?)";
         return pool.preparedQuery(sql)
             .execute(Tuple.of(user.getUsername(), user.getPasswordHash(), user.getEmail(), user.getIsActive()))
-            .map(rowSet -> rowSet.property(io.vertx.mutiny.mysqlclient.MySQLClient.LAST_INSERTED_ID));
+            .map(this::getInsertedId);
     }
 
     @Override
