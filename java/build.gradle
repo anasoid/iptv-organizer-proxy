@@ -96,13 +96,9 @@ test {
         excludeClassLoaders = ["*QuarkusClassLoader"]
         destinationFile = layout.buildDirectory.file("jacoco/jacoco.exec").get().asFile
     }
-    // Skip tests by default - run with: ./gradlew test -Prun-tests
-    enabled = project.hasProperty('run-tests')
 }
 
 jacocoTestReport {
-    // Only generate report if tests are enabled
-    onlyIf { project.hasProperty('run-tests') }
     dependsOn test
     reports {
         xml.required = true

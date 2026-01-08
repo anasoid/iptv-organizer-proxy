@@ -1,26 +1,25 @@
 package org.anasoid.iptvorganizer.services;
 
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
-import jakarta.inject.Inject;
-import org.anasoid.iptvorganizer.H2TestProfile;
 import org.anasoid.iptvorganizer.models.Filter;
 import org.anasoid.iptvorganizer.models.filtering.FilterAction;
 import org.anasoid.iptvorganizer.models.filtering.FilterConfig;
 import org.anasoid.iptvorganizer.models.filtering.FilterField;
 import org.anasoid.iptvorganizer.models.filtering.FilterRule;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@QuarkusTest
-@TestProfile(H2TestProfile.class)
 public class FilterServiceTest {
 
-    @Inject
-    FilterService filterService;
+    private FilterService filterService;
+
+    @BeforeEach
+    void setUp() {
+        filterService = new FilterService();
+    }
 
     @Test
     void testParseFilterConfigValidYaml() {

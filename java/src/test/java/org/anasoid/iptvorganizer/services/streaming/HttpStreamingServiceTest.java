@@ -1,22 +1,21 @@
 package org.anasoid.iptvorganizer.services.streaming;
 
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 import io.smallrye.mutiny.Multi;
 import io.vertx.core.buffer.Buffer;
-import jakarta.inject.Inject;
-import org.anasoid.iptvorganizer.H2TestProfile;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@QuarkusTest
-@TestProfile(H2TestProfile.class)
 public class HttpStreamingServiceTest {
 
-    @Inject
-    HttpStreamingService httpStreamingService;
+    private HttpStreamingService httpStreamingService;
+
+    @BeforeEach
+    void setUp() {
+        httpStreamingService = new HttpStreamingService();
+    }
 
     @Test
     void testHttpOptionsBuilder() {
