@@ -49,17 +49,24 @@ public class DataSourceConfig {
     @ApplicationScoped
     public Pool pool() {
         if ("h2".equalsIgnoreCase(dbKind)) {
-            LOGGER.warning("H2 database selected but reactive pool is not available. Using null pool - H2 not fully supported yet.");
+            // H2 is JDBC-only, doesn't have reactive support
+            // In test environment with H2TestProfile, tests use JDBC directly
+            // For production, use MySQL or PostgreSQL
+            LOGGER.info("H2 database detected - no reactive pool available. Using JDBC connection pool.");
             return null;
-        } else if ("mysql".equalsIgnoreCase(dbKind)) {
+        }
+
+        if ("mysql".equalsIgnoreCase(dbKind)) {
             LOGGER.info("Creating reactive MySQL pool");
             return createMySQLPool();
-        } else if ("postgresql".equalsIgnoreCase(dbKind) || "postgres".equalsIgnoreCase(dbKind)) {
+        }
+
+        if ("postgresql".equalsIgnoreCase(dbKind) || "postgres".equalsIgnoreCase(dbKind)) {
             LOGGER.info("Creating reactive PostgreSQL pool");
             return createPostgresPool();
-        } else {
-            throw new IllegalArgumentException("Unsupported database kind: " + dbKind);
         }
+
+        throw new IllegalArgumentException("Unsupported database kind: " + dbKind);
     }
 
     private Pool createMySQLPool() {

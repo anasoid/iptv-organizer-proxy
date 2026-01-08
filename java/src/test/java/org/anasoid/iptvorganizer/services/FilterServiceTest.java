@@ -1,7 +1,9 @@
 package org.anasoid.iptvorganizer.services;
 
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
+import org.anasoid.iptvorganizer.H2TestProfile;
 import org.anasoid.iptvorganizer.models.Filter;
 import org.anasoid.iptvorganizer.models.filtering.FilterAction;
 import org.anasoid.iptvorganizer.models.filtering.FilterConfig;
@@ -14,6 +16,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @QuarkusTest
+@TestProfile(H2TestProfile.class)
 public class FilterServiceTest {
 
     @Inject

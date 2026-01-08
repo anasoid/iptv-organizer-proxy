@@ -3,8 +3,10 @@ package org.anasoid.iptvorganizer.services.streaming;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
 import io.smallrye.mutiny.Multi;
 import jakarta.inject.Inject;
+import org.anasoid.iptvorganizer.H2TestProfile;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -15,6 +17,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @QuarkusTest
+@TestProfile(H2TestProfile.class)
 public class StreamingJsonParserTest {
 
     @Inject
