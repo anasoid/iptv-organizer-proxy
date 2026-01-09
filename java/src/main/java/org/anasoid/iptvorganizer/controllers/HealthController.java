@@ -9,11 +9,9 @@ import jakarta.ws.rs.core.Response;
 @Path("/health")
 public class HealthController {
 
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response health() {
-        return Response.ok()
-            .entity("{\"status\":\"UP\"}")
-            .build();
-    }
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response health() {
+    return Response.ok().entity("{\"status\":\"UP\"}").build();
+  }
 }

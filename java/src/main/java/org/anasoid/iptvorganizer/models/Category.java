@@ -12,12 +12,12 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
 public class Category extends BaseEntity {
-    private Long sourceId;
-    private Integer categoryId;
-    private String categoryName;
-    private String categoryType;
-    private Integer num;
-    private String allowDeny;
-    private Integer parentId;
-    private String labels;
+  private Long sourceId;
+  private Integer categoryId;
+  private String categoryName;
+  private String categoryType;
+  private Integer num;
+  private String allowDeny;
+  private Integer parentId;
+  private String labels;
 }

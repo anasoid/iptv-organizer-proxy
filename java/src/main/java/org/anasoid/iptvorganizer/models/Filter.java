@@ -12,9 +12,9 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
 public class Filter extends BaseEntity {
-    private String name;
-    private String description;
-    private String filterConfig;
-    private Boolean useSourceFilter;
-    private String favoris;
+  private String name;
+  private String description;
+  private String filterConfig;
+  private Boolean useSourceFilter;
+  private String favoris;
 }

@@ -1,15 +1,5 @@
 package org.anasoid.iptvorganizer.controllers;
 
-import org.anasoid.iptvorganizer.dto.SourceDTO;
-import org.anasoid.iptvorganizer.dto.SyncLogDTO;
-import org.anasoid.iptvorganizer.dto.request.CreateSourceRequest;
-import org.anasoid.iptvorganizer.dto.response.ApiResponse;
-import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
-import org.anasoid.iptvorganizer.models.Source;
-import org.anasoid.iptvorganizer.services.SourceService;
-import org.anasoid.iptvorganizer.services.SyncLogService;
-import org.anasoid.iptvorganizer.services.SyncLockManager;
-import org.anasoid.iptvorganizer.services.SyncService;
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
@@ -20,96 +10,89 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
+import org.anasoid.iptvorganizer.dto.SourceDTO;
+import org.anasoid.iptvorganizer.dto.SyncLogDTO;
+import org.anasoid.iptvorganizer.dto.request.CreateSourceRequest;
+import org.anasoid.iptvorganizer.dto.response.ApiResponse;
+import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
+import org.anasoid.iptvorganizer.models.Source;
+import org.anasoid.iptvorganizer.services.SourceService;
+import org.anasoid.iptvorganizer.services.SyncLockManager;
+import org.anasoid.iptvorganizer.services.SyncLogService;
+import org.anasoid.iptvorganizer.services.SyncService;
 
-/**
- * Sources controller
- * CRUD operations for sources with sync management
- */
+/** Sources controller CRUD operations for sources with sync management */
 @Path("/api/sources")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @RolesAllowed("admin")
 public class SourcesController extends BaseController {
 
-    @Inject
-    SourceService sourceService;
+  @Inject SourceService sourceService;
 
-    @Inject
-    SyncLogService syncLogService;
+  @Inject SyncLogService syncLogService;
 
-    @Inject
-    SyncService syncService;
+  @Inject SyncService syncService;
 
-    @Inject
-    SyncLockManager syncLockManager;
+  @Inject SyncLockManager syncLockManager;
 
-    /**
-     * Get all sources with pagination
-     * GET /api/sources?page=1&limit=20
-     */
-    @GET
-    public Uni<?> getAllSources(
-            @QueryParam("page") @DefaultValue("1") int page,
-            @QueryParam("limit") @DefaultValue("20") int limit) {
+  /** Get all sources with pagination GET /api/sources?page=1&limit=20 */
+  @GET
+  public Uni<?> getAllSources(
+      @QueryParam("page") @DefaultValue("1") int page,
+      @QueryParam("limit") @DefaultValue("20") int limit) {
 
-        if (page < 1 || limit < 1) {
-            return Uni.createFrom().item(
-                ApiResponse.error("Page and limit must be greater than 0")
-            );
-        }
+    if (page < 1 || limit < 1) {
+      return Uni.createFrom().item(ApiResponse.error("Page and limit must be greater than 0"));
+    }
 
-        return Uni.combine().all().unis(
+    return Uni.combine()
+        .all()
+        .unis(
             sourceService.getAllPaged(page, limit).map(SourceDTO::fromEntity).collect().asList(),
-            sourceService.count()
-        ).asTuple()
-            .map(tuple -> {
-                var sources = tuple.getItem1();
-                long total = tuple.getItem2();
-                var pagination = PaginationMeta.of(page, limit, total);
-                return ApiResponse.successWithPagination(sources, pagination);
+            sourceService.count())
+        .asTuple()
+        .map(
+            tuple -> {
+              var sources = tuple.getItem1();
+              long total = tuple.getItem2();
+              var pagination = PaginationMeta.of(page, limit, total);
+              return ApiResponse.successWithPagination(sources, pagination);
             })
-            .onFailure().recoverWithItem(ex ->
-                ApiResponse.error("Failed to fetch sources: " + ex.getMessage())
-            );
+        .onFailure()
+        .recoverWithItem(ex -> ApiResponse.error("Failed to fetch sources: " + ex.getMessage()));
+  }
+
+  /** Get source by ID GET /api/sources/:id */
+  @GET
+  @Path("/{id}")
+  public Uni<?> getSource(@PathParam("id") Long id) {
+    return sourceService
+        .getById(id)
+        .map(
+            source ->
+                source != null
+                    ? ApiResponse.success(SourceDTO.fromEntity(source))
+                    : ApiResponse.error("Source not found"))
+        .onFailure()
+        .recoverWithItem(ex -> ApiResponse.error("Source not found"));
+  }
+
+  /** Create source POST /api/sources */
+  @POST
+  public Uni<?> createSource(CreateSourceRequest request) {
+    if (request.getName() == null || request.getName().isBlank()) {
+      return Uni.createFrom().item(ApiResponse.error("Name is required"));
+    }
+    if (request.getUrl() == null || request.getUrl().isBlank()) {
+      return Uni.createFrom().item(ApiResponse.error("URL is required"));
+    }
+    if (request.getPassword() == null || request.getPassword().isBlank()) {
+      return Uni.createFrom().item(ApiResponse.error("Password is required"));
     }
 
-    /**
-     * Get source by ID
-     * GET /api/sources/:id
-     */
-    @GET
-    @Path("/{id}")
-    public Uni<?> getSource(@PathParam("id") Long id) {
-        return sourceService.getById(id)
-            .map(source -> source != null ? ApiResponse.success(SourceDTO.fromEntity(source)) : ApiResponse.error("Source not found"))
-            .onFailure().recoverWithItem(ex ->
-                ApiResponse.error("Source not found")
-            );
-    }
-
-    /**
-     * Create source
-     * POST /api/sources
-     */
-    @POST
-    public Uni<?> createSource(CreateSourceRequest request) {
-        if (request.getName() == null || request.getName().isBlank()) {
-            return Uni.createFrom().item(
-                ApiResponse.error("Name is required")
-            );
-        }
-        if (request.getUrl() == null || request.getUrl().isBlank()) {
-            return Uni.createFrom().item(
-                ApiResponse.error("URL is required")
-            );
-        }
-        if (request.getPassword() == null || request.getPassword().isBlank()) {
-            return Uni.createFrom().item(
-                ApiResponse.error("Password is required")
-            );
-        }
-
-        Source source = Source.builder()
+    Source source =
+        Source.builder()
             .name(request.getName())
             .url(request.getUrl())
             .username(request.getUsername())
@@ -117,312 +100,342 @@ public class SourcesController extends BaseController {
             .syncInterval(request.getSyncInterval() != null ? request.getSyncInterval() : 3600)
             .isActive(request.getIsActive() != null ? request.getIsActive() : true)
             .enableProxy(request.getEnableProxy() != null ? request.getEnableProxy() : false)
-            .disableStreamProxy(request.getDisableStreamProxy() != null ? request.getDisableStreamProxy() : false)
-            .streamFollowLocation(request.getStreamFollowLocation() != null ? request.getStreamFollowLocation() : false)
+            .disableStreamProxy(
+                request.getDisableStreamProxy() != null ? request.getDisableStreamProxy() : false)
+            .streamFollowLocation(
+                request.getStreamFollowLocation() != null
+                    ? request.getStreamFollowLocation()
+                    : false)
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
             .build();
 
-        return sourceService.save(source)
-            .map(s -> ApiResponse.success(SourceDTO.fromEntity(s)))
-            .onFailure().recoverWithItem(ex ->
-                ApiResponse.error("Failed to create source: " + ex.getMessage())
-            );
-    }
+    return sourceService
+        .save(source)
+        .map(s -> ApiResponse.success(SourceDTO.fromEntity(s)))
+        .onFailure()
+        .recoverWithItem(ex -> ApiResponse.error("Failed to create source: " + ex.getMessage()));
+  }
 
-    /**
-     * Update source
-     * PUT /api/sources/:id
-     */
-    @PUT
-    @Path("/{id}")
-    public Uni<?> updateSource(@PathParam("id") Long id, CreateSourceRequest request) {
-        return sourceService.getById(id)
-            .flatMap(source -> {
-                if (request.getName() != null) {
-                    source.setName(request.getName());
-                }
-                if (request.getUrl() != null) {
-                    source.setUrl(request.getUrl());
-                }
-                if (request.getUsername() != null) {
-                    source.setUsername(request.getUsername());
-                }
-                if (request.getPassword() != null) {
-                    source.setPassword(request.getPassword());
-                }
-                if (request.getSyncInterval() != null) {
-                    source.setSyncInterval(request.getSyncInterval());
-                }
-                if (request.getIsActive() != null) {
-                    source.setIsActive(request.getIsActive());
-                }
-                if (request.getEnableProxy() != null) {
-                    source.setEnableProxy(request.getEnableProxy());
-                }
-                if (request.getDisableStreamProxy() != null) {
-                    source.setDisableStreamProxy(request.getDisableStreamProxy());
-                }
-                if (request.getStreamFollowLocation() != null) {
-                    source.setStreamFollowLocation(request.getStreamFollowLocation());
-                }
+  /** Update source PUT /api/sources/:id */
+  @PUT
+  @Path("/{id}")
+  public Uni<?> updateSource(@PathParam("id") Long id, CreateSourceRequest request) {
+    return sourceService
+        .getById(id)
+        .flatMap(
+            source -> {
+              if (request.getName() != null) {
+                source.setName(request.getName());
+              }
+              if (request.getUrl() != null) {
+                source.setUrl(request.getUrl());
+              }
+              if (request.getUsername() != null) {
+                source.setUsername(request.getUsername());
+              }
+              if (request.getPassword() != null) {
+                source.setPassword(request.getPassword());
+              }
+              if (request.getSyncInterval() != null) {
+                source.setSyncInterval(request.getSyncInterval());
+              }
+              if (request.getIsActive() != null) {
+                source.setIsActive(request.getIsActive());
+              }
+              if (request.getEnableProxy() != null) {
+                source.setEnableProxy(request.getEnableProxy());
+              }
+              if (request.getDisableStreamProxy() != null) {
+                source.setDisableStreamProxy(request.getDisableStreamProxy());
+              }
+              if (request.getStreamFollowLocation() != null) {
+                source.setStreamFollowLocation(request.getStreamFollowLocation());
+              }
 
-                source.setUpdatedAt(LocalDateTime.now());
-                return sourceService.update(source)
-                    .map(v -> source);  // Return the updated source after successful update
+              source.setUpdatedAt(LocalDateTime.now());
+              return sourceService
+                  .update(source)
+                  .map(v -> source); // Return the updated source after successful update
             })
-            .map(source -> ApiResponse.success(SourceDTO.fromEntity(source)))
-            .onFailure().recoverWithItem(ex ->
-                ApiResponse.error("Failed to update source: " + ex.getMessage())
-            );
-    }
+        .map(source -> ApiResponse.success(SourceDTO.fromEntity(source)))
+        .onFailure()
+        .recoverWithItem(ex -> ApiResponse.error("Failed to update source: " + ex.getMessage()));
+  }
 
-    /**
-     * Delete source
-     * DELETE /api/sources/:id
-     */
-    @DELETE
-    @Path("/{id}")
-    public Uni<?> deleteSource(@PathParam("id") Long id) {
-        return sourceService.delete(id)
-            .map(v -> ApiResponse.success("Source deleted successfully"))
-            .onFailure().recoverWithItem(ex ->
-                ApiResponse.error("Failed to delete source: " + ex.getMessage())
-            );
-    }
+  /** Delete source DELETE /api/sources/:id */
+  @DELETE
+  @Path("/{id}")
+  public Uni<?> deleteSource(@PathParam("id") Long id) {
+    return sourceService
+        .delete(id)
+        .map(v -> ApiResponse.success("Source deleted successfully"))
+        .onFailure()
+        .recoverWithItem(ex -> ApiResponse.error("Failed to delete source: " + ex.getMessage()));
+  }
 
-    /**
-     * Test source connection
-     * POST /api/sources/:id/test
-     */
-    @POST
-    @Path("/{id}/test")
-    public Uni<?> testConnection(@PathParam("id") Long id) {
-        return sourceService.getById(id)
-            .flatMap(source -> {
-                // TODO: Implement connection test logic
-                return Uni.createFrom().item(
-                    ApiResponse.success("Connection test passed")
-                );
+  /** Test source connection POST /api/sources/:id/test */
+  @POST
+  @Path("/{id}/test")
+  public Uni<?> testConnection(@PathParam("id") Long id) {
+    return sourceService
+        .getById(id)
+        .flatMap(
+            source -> {
+              // TODO: Implement connection test logic
+              return Uni.createFrom().item(ApiResponse.success("Connection test passed"));
             })
-            .onFailure().recoverWithItem(ex ->
-                ApiResponse.error("Connection test failed: " + ex.getMessage())
-            );
-    }
+        .onFailure()
+        .recoverWithItem(ex -> ApiResponse.error("Connection test failed: " + ex.getMessage()));
+  }
 
-    /**
-     * Trigger full manual sync for a source
-     * POST /api/sources/:id/sync
-     */
-    @POST
-    @Path("/{id}/sync")
-    public Uni<?> syncSource(@PathParam("id") Long id) {
-        return sourceService.getById(id)
-            .flatMap(source -> {
-                if (source == null) {
-                    return Uni.createFrom().item(
+  /** Trigger full manual sync for a source POST /api/sources/:id/sync */
+  @POST
+  @Path("/{id}/sync")
+  public Uni<?> syncSource(@PathParam("id") Long id) {
+    return sourceService
+        .getById(id)
+        .flatMap(
+            source -> {
+              if (source == null) {
+                return Uni.createFrom()
+                    .item(
                         Response.status(Response.Status.NOT_FOUND)
                             .entity(ApiResponse.error("Source not found"))
-                            .build()
-                    );
-                }
+                            .build());
+              }
 
-                return syncService.triggerManualSync(source)
-                    .map(v -> Response.ok(
-                        ApiResponse.success("Full sync triggered for source: " + source.getName())
-                    ).build())
-                    .onFailure()
-                    .recoverWithItem(ex -> {
+              return syncService
+                  .triggerManualSync(source)
+                  .map(
+                      v ->
+                          Response.ok(
+                                  ApiResponse.success(
+                                      "Full sync triggered for source: " + source.getName()))
+                              .build())
+                  .onFailure()
+                  .recoverWithItem(
+                      ex -> {
                         if (ex.getMessage().contains("already syncing")) {
-                            return Response.status(Response.Status.CONFLICT)
-                                .entity(ApiResponse.error("Source is already syncing"))
-                                .build();
+                          return Response.status(Response.Status.CONFLICT)
+                              .entity(ApiResponse.error("Source is already syncing"))
+                              .build();
                         }
                         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                             .entity(ApiResponse.error("Failed to trigger sync: " + ex.getMessage()))
                             .build();
-                    });
+                      });
             })
-            .onFailure().recoverWithItem(ex ->
+        .onFailure()
+        .recoverWithItem(
+            ex ->
                 Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity(ApiResponse.error("Failed to trigger sync: " + ex.getMessage()))
-                    .build()
-            );
-    }
+                    .build());
+  }
 
-    /**
-     * Trigger sync for a specific task type (granular sync)
-     * POST /api/sources/:id/sync/{taskType}
-     * Valid task types: live_categories, live_streams, vod_categories, vod_streams, series_categories, series
-     */
-    @POST
-    @Path("/{id}/sync/{taskType}")
-    public Uni<?> syncSourceTaskType(@PathParam("id") Long id,
-                                     @PathParam("taskType") String taskType) {
-        // Validate task type
-        java.util.Set<String> validTaskTypes = java.util.Set.of(
+  /**
+   * Trigger sync for a specific task type (granular sync) POST /api/sources/:id/sync/{taskType}
+   * Valid task types: live_categories, live_streams, vod_categories, vod_streams,
+   * series_categories, series
+   */
+  @POST
+  @Path("/{id}/sync/{taskType}")
+  public Uni<?> syncSourceTaskType(
+      @PathParam("id") Long id, @PathParam("taskType") String taskType) {
+    // Validate task type
+    java.util.Set<String> validTaskTypes =
+        java.util.Set.of(
             "live_categories", "live_streams",
             "vod_categories", "vod_streams",
-            "series_categories", "series"
-        );
+            "series_categories", "series");
 
-        if (!validTaskTypes.contains(taskType)) {
-            return Uni.createFrom().item(
-                Response.status(Response.Status.BAD_REQUEST)
-                    .entity(ApiResponse.error("Invalid task type. Valid types: " + String.join(", ", validTaskTypes)))
-                    .build()
-            );
-        }
+    if (!validTaskTypes.contains(taskType)) {
+      return Uni.createFrom()
+          .item(
+              Response.status(Response.Status.BAD_REQUEST)
+                  .entity(
+                      ApiResponse.error(
+                          "Invalid task type. Valid types: " + String.join(", ", validTaskTypes)))
+                  .build());
+    }
 
-        return sourceService.getById(id)
-            .flatMap(source -> {
-                if (source == null) {
-                    return Uni.createFrom().item(
+    return sourceService
+        .getById(id)
+        .flatMap(
+            source -> {
+              if (source == null) {
+                return Uni.createFrom()
+                    .item(
                         Response.status(Response.Status.NOT_FOUND)
                             .entity(ApiResponse.error("Source not found"))
-                            .build()
-                    );
-                }
+                            .build());
+              }
 
-                return syncService.triggerManualSyncTask(source, taskType)
-                    .map(v -> Response.ok(
-                        ApiResponse.success("Sync triggered for " + taskType + " on source: " + source.getName())
-                    ).build())
-                    .onFailure()
-                    .recoverWithItem(ex -> {
+              return syncService
+                  .triggerManualSyncTask(source, taskType)
+                  .map(
+                      v ->
+                          Response.ok(
+                                  ApiResponse.success(
+                                      "Sync triggered for "
+                                          + taskType
+                                          + " on source: "
+                                          + source.getName()))
+                              .build())
+                  .onFailure()
+                  .recoverWithItem(
+                      ex -> {
                         if (ex.getMessage().contains("already syncing")) {
-                            return Response.status(Response.Status.CONFLICT)
-                                .entity(ApiResponse.error("Source is already syncing"))
-                                .build();
+                          return Response.status(Response.Status.CONFLICT)
+                              .entity(ApiResponse.error("Source is already syncing"))
+                              .build();
                         }
                         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                             .entity(ApiResponse.error("Failed to trigger sync: " + ex.getMessage()))
                             .build();
-                    });
+                      });
             })
-            .onFailure().recoverWithItem(ex ->
+        .onFailure()
+        .recoverWithItem(
+            ex ->
                 Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity(ApiResponse.error("Failed to trigger sync: " + ex.getMessage()))
-                    .build()
-            );
-    }
+                    .build());
+  }
 
-    /**
-     * Trigger full sync for all task types
-     * POST /api/sources/:id/sync-all
-     */
-    @POST
-    @Path("/{id}/sync-all")
-    public Uni<?> syncSourceAll(@PathParam("id") Long id) {
-        return sourceService.getById(id)
-            .flatMap(source -> {
-                if (source == null) {
-                    return Uni.createFrom().item(
+  /** Trigger full sync for all task types POST /api/sources/:id/sync-all */
+  @POST
+  @Path("/{id}/sync-all")
+  public Uni<?> syncSourceAll(@PathParam("id") Long id) {
+    return sourceService
+        .getById(id)
+        .flatMap(
+            source -> {
+              if (source == null) {
+                return Uni.createFrom()
+                    .item(
                         Response.status(Response.Status.NOT_FOUND)
                             .entity(ApiResponse.error("Source not found"))
-                            .build()
-                    );
-                }
+                            .build());
+              }
 
-                return syncService.triggerFullSync(source)
-                    .map(v -> Response.ok(
-                        ApiResponse.success("Full sync triggered for all types on source: " + source.getName())
-                    ).build())
-                    .onFailure()
-                    .recoverWithItem(ex -> {
+              return syncService
+                  .triggerFullSync(source)
+                  .map(
+                      v ->
+                          Response.ok(
+                                  ApiResponse.success(
+                                      "Full sync triggered for all types on source: "
+                                          + source.getName()))
+                              .build())
+                  .onFailure()
+                  .recoverWithItem(
+                      ex -> {
                         if (ex.getMessage().contains("already syncing")) {
-                            return Response.status(Response.Status.CONFLICT)
-                                .entity(ApiResponse.error("Source is already syncing"))
-                                .build();
+                          return Response.status(Response.Status.CONFLICT)
+                              .entity(ApiResponse.error("Source is already syncing"))
+                              .build();
                         }
                         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                            .entity(ApiResponse.error("Failed to trigger full sync: " + ex.getMessage()))
+                            .entity(
+                                ApiResponse.error(
+                                    "Failed to trigger full sync: " + ex.getMessage()))
                             .build();
-                    });
+                      });
             })
-            .onFailure().recoverWithItem(ex ->
+        .onFailure()
+        .recoverWithItem(
+            ex ->
                 Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity(ApiResponse.error("Failed to trigger full sync: " + ex.getMessage()))
-                    .build()
-            );
-    }
+                    .build());
+  }
 
-    /**
-     * Get sync logs for a source
-     * GET /api/sources/:id/sync-logs?limit=20
-     */
-    @GET
-    @Path("/{id}/sync-logs")
-    public Uni<?> getSyncLogs(@PathParam("id") Long id,
-                                         @QueryParam("limit") @DefaultValue("20") int limit) {
-        return syncLogService.findBySourceId(id)
-            .map(SyncLogDTO::fromEntity)
-            .collect().asList()
-            .map(logs -> ApiResponse.success(logs.stream().limit(limit).toList()))
-            .onFailure().recoverWithItem(ex ->
-                ApiResponse.error("Failed to fetch sync logs: " + ex.getMessage())
-            );
-    }
+  /** Get sync logs for a source GET /api/sources/:id/sync-logs?limit=20 */
+  @GET
+  @Path("/{id}/sync-logs")
+  public Uni<?> getSyncLogs(
+      @PathParam("id") Long id, @QueryParam("limit") @DefaultValue("20") int limit) {
+    return syncLogService
+        .findBySourceId(id)
+        .map(SyncLogDTO::fromEntity)
+        .collect()
+        .asList()
+        .map(logs -> ApiResponse.success(logs.stream().limit(limit).toList()))
+        .onFailure()
+        .recoverWithItem(ex -> ApiResponse.error("Failed to fetch sync logs: " + ex.getMessage()));
+  }
 
-    /**
-     * Get sync status for all sources
-     * GET /api/sync/status
-     */
-    @GET
-    @Path("/../sync/status")
-    public Uni<?> getSyncStatus() {
-        return sourceService.getAll()
-            .collect().asList()
-            .map(sources -> sources.stream().map(s -> {
-                var status = new HashMap<String, Object>();
-                status.put("sourceId", s.getId());
-                status.put("name", s.getName());
+  /** Get sync status for all sources GET /api/sync/status */
+  @GET
+  @Path("/../sync/status")
+  public Uni<?> getSyncStatus() {
+    return sourceService
+        .getAll()
+        .collect()
+        .asList()
+        .map(
+            sources ->
+                sources.stream()
+                    .map(
+                        s -> {
+                          var status = new HashMap<String, Object>();
+                          status.put("sourceId", s.getId());
+                          status.put("name", s.getName());
 
-                // Check if currently syncing from in-memory lock manager
-                boolean isCurrentlySyncing = syncLockManager.isLocked(s.getId());
-                status.put("isSyncing", isCurrentlySyncing);
+                          // Check if currently syncing from in-memory lock manager
+                          boolean isCurrentlySyncing = syncLockManager.isLocked(s.getId());
+                          status.put("isSyncing", isCurrentlySyncing);
 
-                // Include metadata if syncing
-                if (isCurrentlySyncing) {
-                    syncLockManager.getSyncMetadata(s.getId()).ifPresent(metadata -> {
-                        status.put("currentSyncType", metadata.getSyncType());
-                        status.put("syncStartTime", metadata.getStartTime());
-                    });
-                }
+                          // Include metadata if syncing
+                          if (isCurrentlySyncing) {
+                            syncLockManager
+                                .getSyncMetadata(s.getId())
+                                .ifPresent(
+                                    metadata -> {
+                                      status.put("currentSyncType", metadata.getSyncType());
+                                      status.put("syncStartTime", metadata.getStartTime());
+                                    });
+                          }
 
-                status.put("lastSync", s.getLastSync());
-                status.put("nextSync", s.getNextSync());
-                return status;
-            }).toList())
-            .map(ApiResponse::success)
-            .onFailure().recoverWithItem(ex ->
-                ApiResponse.error("Failed to fetch sync status: " + ex.getMessage())
-            );
-    }
+                          status.put("lastSync", s.getLastSync());
+                          status.put("nextSync", s.getNextSync());
+                          return status;
+                        })
+                    .toList())
+        .map(ApiResponse::success)
+        .onFailure()
+        .recoverWithItem(
+            ex -> ApiResponse.error("Failed to fetch sync status: " + ex.getMessage()));
+  }
 
-    /**
-     * Get currently active sync operations
-     * GET /api/sync/active
-     */
-    @GET
-    @Path("/../sync/active")
-    public Uni<?> getActiveSyncs() {
-        return Uni.createFrom().item(() -> {
-            var activeSyncs = syncLockManager.getActiveSyncs();
+  /** Get currently active sync operations GET /api/sync/active */
+  @GET
+  @Path("/../sync/active")
+  public Uni<?> getActiveSyncs() {
+    return Uni.createFrom()
+        .item(
+            () -> {
+              var activeSyncs = syncLockManager.getActiveSyncs();
 
-            var response = activeSyncs.stream()
-                .map(metadata -> {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("sourceId", metadata.getSourceId());
-                    map.put("syncType", metadata.getSyncType());
-                    map.put("startTime", metadata.getStartTime());
-                    map.put("durationSeconds",
-                        ChronoUnit.SECONDS.between(metadata.getStartTime(), LocalDateTime.now()));
-                    return map;
-                })
-                .toList();
+              var response =
+                  activeSyncs.stream()
+                      .map(
+                          metadata -> {
+                            Map<String, Object> map = new HashMap<>();
+                            map.put("sourceId", metadata.getSourceId());
+                            map.put("syncType", metadata.getSyncType());
+                            map.put("startTime", metadata.getStartTime());
+                            map.put(
+                                "durationSeconds",
+                                ChronoUnit.SECONDS.between(
+                                    metadata.getStartTime(), LocalDateTime.now()));
+                            return map;
+                          })
+                      .toList();
 
-            return ApiResponse.success(response);
-        });
-    }
+              return ApiResponse.success(response);
+            });
+  }
 }

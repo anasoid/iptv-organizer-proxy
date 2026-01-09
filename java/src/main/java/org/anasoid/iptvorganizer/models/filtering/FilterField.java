@@ -1,32 +1,32 @@
 package org.anasoid.iptvorganizer.models.filtering;
 
-import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 
 public enum FilterField {
-    NAME("name"),
-    CATEGORY_NAME("categoryName"),
-    IS_ADULT("isAdult"),
-    LABELS("labels");
+  NAME("name"),
+  CATEGORY_NAME("categoryName"),
+  IS_ADULT("isAdult"),
+  LABELS("labels");
 
-    private final String fieldName;
+  private final String fieldName;
 
-    FilterField(String fieldName) {
-        this.fieldName = fieldName;
+  FilterField(String fieldName) {
+    this.fieldName = fieldName;
+  }
+
+  @JsonValue
+  public String getFieldName() {
+    return fieldName;
+  }
+
+  @JsonCreator
+  public static FilterField fromFieldName(String fieldName) {
+    for (FilterField field : FilterField.values()) {
+      if (field.fieldName.equals(fieldName)) {
+        return field;
+      }
     }
-
-    @JsonValue
-    public String getFieldName() {
-        return fieldName;
-    }
-
-    @JsonCreator
-    public static FilterField fromFieldName(String fieldName) {
-        for (FilterField field : FilterField.values()) {
-            if (field.fieldName.equals(fieldName)) {
-                return field;
-            }
-        }
-        throw new IllegalArgumentException("Unknown field: " + fieldName);
-    }
+    throw new IllegalArgumentException("Unknown field: " + fieldName);
+  }
 }

@@ -58,7 +58,7 @@ spotless {
     java {
         // target 'src/*/java/**/*.java' // default
         removeUnusedImports()
-        // googleJavaFormat() // Disabled to preserve 4-space indent
+        googleJavaFormat() // Disabled to preserve 4-space indent
         trimTrailingWhitespace()
         endWithNewline()
     }

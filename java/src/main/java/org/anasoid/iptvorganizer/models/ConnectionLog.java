@@ -12,8 +12,8 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
 public class ConnectionLog extends BaseEntity {
-    private Long clientId;
-    private String action;
-    private String ipAddress;
-    private String userAgent;
+  private Long clientId;
+  private String action;
+  private String ipAddress;
+  private String userAgent;
 }

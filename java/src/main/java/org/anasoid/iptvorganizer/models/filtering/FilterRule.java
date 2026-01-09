@@ -10,8 +10,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class FilterRule {
-    private FilterField field;
-    private String pattern;
-    private Object value;
-    private FilterAction action;
+  private FilterField field;
+  private String pattern;
+  private Object value;
+  private FilterAction action;
 }
