@@ -18,14 +18,12 @@ public class CreateCategoryRequest {
   @JsonProperty("source_id")
   private Long sourceId;
 
-  @JsonProperty("category_id")
-  private Integer categoryId;
+  @JsonProperty("external_id")
+  private Integer externalId;
 
-  @JsonProperty("category_name")
-  private String categoryName;
+  private String name;
 
-  @JsonProperty("category_type")
-  private String categoryType;
+  private String type;
 
   private Integer num;
 

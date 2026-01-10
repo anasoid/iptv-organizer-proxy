@@ -276,7 +276,7 @@ public class FilterServiceTest {
   @Test
   void testFilterFieldEnum() {
     assertEquals("name", FilterField.NAME.getFieldName());
-    assertEquals("categoryName", FilterField.CATEGORY_NAME.getFieldName());
+    assertEquals("name", FilterField.CATEGORY_NAME.getFieldName());
     assertEquals("isAdult", FilterField.IS_ADULT.getFieldName());
     assertEquals("labels", FilterField.LABELS.getFieldName());
   }

@@ -14,10 +14,10 @@ import org.anasoid.iptvorganizer.models.stream.BaseStream;
 public abstract class BaseStreamRepository<T extends BaseStream>
     extends SourcedEntityRepository<T> {
 
-  /** Batch upsert streams (update if exists by stream_id, insert if new) */
+  /** Batch upsert streams (update if exists by external_id, insert if new) */
   public abstract Uni<Void> batchUpsert(List<T> entities);
 
-  /** Find existing streams by a list of stream_ids for a specific source */
+  /** Find existing streams by a list of external_ids for a specific source */
   public Multi<T> findByStreamIds(Long sourceId, List<Integer> streamIds) {
     if (streamIds == null || streamIds.isEmpty()) {
       return Multi.createFrom().empty();
@@ -26,7 +26,7 @@ public abstract class BaseStreamRepository<T extends BaseStream>
     StringBuilder sql =
         new StringBuilder("SELECT * FROM ")
             .append(getTableName())
-            .append(" WHERE source_id = ? AND stream_id IN (");
+            .append(" WHERE source_id = ? AND external_id IN (");
     for (int i = 0; i < streamIds.size(); i++) {
       if (i > 0) sql.append(", ");
       sql.append("?");

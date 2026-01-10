@@ -1,6 +1,7 @@
 package org.anasoid.iptvorganizer.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,10 +17,19 @@ import org.anasoid.iptvorganizer.models.stream.Category;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CategoryDTO {
   private Long id;
+
+  @JsonProperty("source_id")
   private Long sourceId;
-  private Integer categoryId;
-  private String categoryName;
-  private String categoryType;
+
+  @JsonProperty("category_id")
+  private Integer externalId;
+
+  @JsonProperty("category_name")
+  private String name;
+
+  @JsonProperty("category_type")
+  private String type;
+
   private Integer num;
   private String allowDeny;
   private Integer parentId;
@@ -34,9 +44,9 @@ public class CategoryDTO {
     return CategoryDTO.builder()
         .id(entity.getId())
         .sourceId(entity.getSourceId())
-        .categoryId(entity.getCategoryId())
-        .categoryName(entity.getCategoryName())
-        .categoryType(entity.getCategoryType())
+        .externalId(entity.getExternalId())
+        .name(entity.getName())
+        .type(entity.getType())
         .num(entity.getNum())
         .allowDeny(entity.getAllowDeny())
         .parentId(entity.getParentId())

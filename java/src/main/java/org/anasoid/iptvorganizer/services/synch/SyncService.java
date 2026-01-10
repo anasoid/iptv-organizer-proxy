@@ -226,8 +226,8 @@ public class SyncService {
     // Create a map of existing categories by ID for quick lookup
     Map<Integer, Category> existingMap = new HashMap<>();
     for (Category cat : existingCategories) {
-      if (cat.getCategoryType().equals(categoryType)) {
-        existingMap.put(cat.getCategoryId(), cat);
+      if (cat.getType().equals(categoryType)) {
+        existingMap.put(cat.getExternalId(), cat);
       }
     }
 
@@ -237,8 +237,8 @@ public class SyncService {
         .onItem()
         .transformToUniAndConcatenate(
             category -> {
-              if (existingMap.containsKey(category.getCategoryId())) {
-                category.setId(existingMap.get(category.getCategoryId()).getId());
+              if (existingMap.containsKey(category.getExternalId())) {
+                category.setId(existingMap.get(category.getExternalId()).getId());
                 return categoryRepository.update(category);
               } else {
                 return categoryRepository.insert(category).replaceWithVoid();
@@ -255,9 +255,7 @@ public class SyncService {
     List<Category> toDelete =
         existingCategories.stream()
             .filter(
-                c ->
-                    c.getCategoryType().equals(categoryType)
-                        && !fetchedIds.contains(c.getCategoryId()))
+                c -> c.getType().equals(categoryType) && !fetchedIds.contains(c.getExternalId()))
             .toList();
 
     if (toDelete.isEmpty()) {
@@ -343,7 +341,7 @@ public class SyncService {
                                 LOGGER.info(
                                     type.getStreamTypeName()
                                         + " assigned to Unknown category: stream_id="
-                                        + stream.getStreamId());
+                                        + stream.getExternalId());
                               })
                           .replaceWithVoid());
                 }
@@ -359,7 +357,7 @@ public class SyncService {
                   categoryReady -> {
                     Set<Integer> fetchedStreamIds = new HashSet<>();
                     for (T stream : allStreams) {
-                      fetchedStreamIds.add(stream.getStreamId());
+                      fetchedStreamIds.add(stream.getExternalId());
                     }
 
                     // Get all existing streams for this source
@@ -373,14 +371,14 @@ public class SyncService {
                               // Create a map of existing streams by stream_id for quick lookup
                               Map<Integer, T> existingMap = new HashMap<>();
                               for (T stream : existingStreams) {
-                                existingMap.put(stream.getStreamId(), stream);
+                                existingMap.put(stream.getExternalId(), stream);
                               }
 
                               // Calculate statistics
                               AtomicInteger added = new AtomicInteger(0);
                               AtomicInteger updated = new AtomicInteger(0);
                               for (T stream : allStreams) {
-                                if (existingMap.containsKey(stream.getStreamId())) {
+                                if (existingMap.containsKey(stream.getExternalId())) {
                                   updated.incrementAndGet();
                                 } else {
                                   added.incrementAndGet();
@@ -389,7 +387,7 @@ public class SyncService {
 
                               Set<Long> toDeleteIds = new HashSet<>();
                               for (T stream : existingStreams) {
-                                if (!fetchedStreamIds.contains(stream.getStreamId())) {
+                                if (!fetchedStreamIds.contains(stream.getExternalId())) {
                                   toDeleteIds.add(stream.getId());
                                 }
                               }
@@ -413,10 +411,10 @@ public class SyncService {
                                   .onItem()
                                   .transformToUniAndConcatenate(
                                       stream -> {
-                                        if (existingMap.containsKey(stream.getStreamId())) {
+                                        if (existingMap.containsKey(stream.getExternalId())) {
                                           // Update: set the ID from existing and update
                                           stream.setId(
-                                              existingMap.get(stream.getStreamId()).getId());
+                                              existingMap.get(stream.getExternalId()).getId());
                                           return repository.update(stream);
                                         } else {
                                           // Insert new stream

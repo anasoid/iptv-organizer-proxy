@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS series (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_id INTEGER NOT NULL,
-    stream_id INTEGER NOT NULL,
+    external_id INTEGER NOT NULL,
     num INTEGER DEFAULT 0,
     allow_deny TEXT CHECK(allow_deny IS NULL OR allow_deny IN ('allow', 'deny')),
     name TEXT NOT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS series (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
-    UNIQUE (source_id, stream_id)
+    UNIQUE (source_id, external_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_series_source_category_num ON series(source_id, category_id, num);

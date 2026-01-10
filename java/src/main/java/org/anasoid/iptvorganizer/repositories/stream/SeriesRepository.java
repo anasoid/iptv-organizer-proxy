@@ -19,13 +19,13 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
   @Override
   public Uni<Long> insert(Series series) {
     String sql =
-        "INSERT INTO series (source_id, stream_id, num, allow_deny, name, category_id,"
+        "INSERT INTO series (source_id, external_id, num, allow_deny, name, category_id,"
             + " category_ids, is_adult, labels, data, added_date, release_date) VALUES (?, ?, ?, ?,"
             + " ?, ?, ?, ?, ?, ?, ?, ?)";
     io.vertx.mutiny.sqlclient.Tuple tuple =
         io.vertx.mutiny.sqlclient.Tuple.tuple()
             .addLong(series.getSourceId())
-            .addInteger(series.getStreamId())
+            .addInteger(series.getExternalId())
             .addInteger(series.getNum())
             .addString(series.getAllowDeny())
             .addString(series.getName())
@@ -42,13 +42,13 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
   @Override
   public Uni<Void> update(Series series) {
     String sql =
-        "UPDATE series SET source_id = ?, stream_id = ?, num = ?, allow_deny = ?, name = ?,"
+        "UPDATE series SET source_id = ?, external_id = ?, num = ?, allow_deny = ?, name = ?,"
             + " category_id = ?, category_ids = ?, is_adult = ?, labels = ?, data = ?, added_date ="
             + " ?, release_date = ? WHERE id = ?";
     io.vertx.mutiny.sqlclient.Tuple tuple =
         io.vertx.mutiny.sqlclient.Tuple.tuple()
             .addLong(series.getSourceId())
-            .addInteger(series.getStreamId())
+            .addInteger(series.getExternalId())
             .addInteger(series.getNum())
             .addString(series.getAllowDeny())
             .addString(series.getName())
@@ -68,7 +68,7 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
     return Series.builder()
         .id(row.getLong("id"))
         .sourceId(row.getLong("source_id"))
-        .streamId(row.getInteger("stream_id"))
+        .externalId(row.getInteger("external_id"))
         .num(row.getInteger("num"))
         .allowDeny(row.getString("allow_deny"))
         .name(row.getString("name"))
@@ -85,8 +85,8 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
   }
 
   /**
-   * Batch upsert series (update if exists by stream_id, insert if new) Uses ON DUPLICATE KEY UPDATE
-   * for efficient batch processing
+   * Batch upsert series (update if exists by external_id, insert if new) Uses ON DUPLICATE KEY
+   * UPDATE for efficient batch processing
    */
   @Override
   public Uni<Void> batchUpsert(List<Series> seriesList) {
@@ -96,7 +96,7 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
 
     // Build INSERT ... ON DUPLICATE KEY UPDATE statement
     String sql =
-        "INSERT INTO series (source_id, stream_id, num, allow_deny, name, category_id,"
+        "INSERT INTO series (source_id, external_id, num, allow_deny, name, category_id,"
             + " category_ids, is_adult, labels, data, added_date, release_date) VALUES (?, ?, ?, ?,"
             + " ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE num=VALUES(num),"
             + " allow_deny=VALUES(allow_deny), name=VALUES(name), category_id=VALUES(category_id),"
@@ -111,7 +111,7 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
                     series ->
                         Tuple.tuple()
                             .addLong(series.getSourceId())
-                            .addInteger(series.getStreamId())
+                            .addInteger(series.getExternalId())
                             .addInteger(series.getNum())
                             .addString(series.getAllowDeny())
                             .addString(series.getName())

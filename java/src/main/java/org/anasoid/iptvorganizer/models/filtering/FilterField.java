@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 public enum FilterField {
   NAME("name"),
-  CATEGORY_NAME("categoryName"),
+  CATEGORY_NAME("name"),
   IS_ADULT("isAdult"),
   LABELS("labels");
 

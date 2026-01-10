@@ -1,6 +1,7 @@
 package org.anasoid.iptvorganizer.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -18,8 +19,13 @@ import org.anasoid.iptvorganizer.config.BooleanAsIntSerializer;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class StreamDTO {
   private Long id;
+
+  @JsonProperty("source_id")
   private Long sourceId;
-  private Integer streamId;
+
+  @JsonProperty("stream_id")
+  private Integer externalId;
+
   private Integer num;
   private String allowDeny;
   private String name;

@@ -7,13 +7,12 @@ CREATE TABLE IF NOT EXISTS sources (
     sync_interval INT NOT NULL DEFAULT 1,
     last_sync DATETIME NULL,
     next_sync DATETIME NULL,
-    sync_status ENUM('idle', 'syncing', 'error') NOT NULL DEFAULT 'idle',
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     enableproxy TINYINT(1) NOT NULL DEFAULT 0,
     disablestreamproxy TINYINT(1) NOT NULL DEFAULT 0,
     stream_follow_location TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_source_is_active_sync_status (is_active, sync_status),
+    INDEX idx_source_is_active (is_active),
     INDEX idx_source_next_sync (next_sync)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

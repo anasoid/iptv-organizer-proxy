@@ -18,14 +18,14 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
   @Override
   public Uni<Long> insert(Category category) {
     String sql =
-        "INSERT INTO categories (source_id, category_id, category_name, category_type, num,"
+        "INSERT INTO categories (source_id, external_id, name, type, num,"
             + " allow_deny, parent_id, labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
     io.vertx.mutiny.sqlclient.Tuple tuple =
         io.vertx.mutiny.sqlclient.Tuple.tuple()
             .addLong(category.getSourceId())
-            .addInteger(category.getCategoryId())
-            .addString(category.getCategoryName())
-            .addString(category.getCategoryType())
+            .addInteger(category.getExternalId())
+            .addString(category.getName())
+            .addString(category.getType())
             .addInteger(category.getNum())
             .addString(category.getAllowDeny())
             .addInteger(category.getParentId())
@@ -36,14 +36,14 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
   @Override
   public Uni<Void> update(Category category) {
     String sql =
-        "UPDATE categories SET source_id = ?, category_id = ?, category_name = ?, category_type ="
+        "UPDATE categories SET source_id = ?, external_id = ?, name = ?, type ="
             + " ?, num = ?, allow_deny = ?, parent_id = ?, labels = ? WHERE id = ?";
     io.vertx.mutiny.sqlclient.Tuple tuple =
         io.vertx.mutiny.sqlclient.Tuple.tuple()
             .addLong(category.getSourceId())
-            .addInteger(category.getCategoryId())
-            .addString(category.getCategoryName())
-            .addString(category.getCategoryType())
+            .addInteger(category.getExternalId())
+            .addString(category.getName())
+            .addString(category.getType())
             .addInteger(category.getNum())
             .addString(category.getAllowDeny())
             .addInteger(category.getParentId())
@@ -57,9 +57,9 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
     return Category.builder()
         .id(row.getLong("id"))
         .sourceId(row.getLong("source_id"))
-        .categoryId(row.getInteger("category_id"))
-        .categoryName(row.getString("category_name"))
-        .categoryType(row.getString("category_type"))
+        .externalId(row.getInteger("external_id"))
+        .name(row.getString("name"))
+        .type(row.getString("type"))
         .num(row.getInteger("num"))
         .allowDeny(row.getString("allow_deny"))
         .parentId(row.getInteger("parent_id"))
@@ -76,12 +76,12 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
     Tuple params = Tuple.of(sourceId);
 
     if (categoryType != null && !categoryType.isEmpty()) {
-      whereClause.append(" AND category_type = ?");
+      whereClause.append(" AND type = ?");
       params = params.addString(categoryType);
     }
 
     if (search != null && !search.isEmpty()) {
-      whereClause.append(" AND category_name LIKE ?");
+      whereClause.append(" AND name LIKE ?");
       params = params.addString("%" + search + "%");
     }
 
@@ -94,23 +94,23 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
     Tuple params = Tuple.of(sourceId);
 
     if (categoryType != null && !categoryType.isEmpty()) {
-      whereClause.append(" AND category_type = ?");
+      whereClause.append(" AND type = ?");
       params = params.addString(categoryType);
     }
 
     if (search != null && !search.isEmpty()) {
-      whereClause.append(" AND category_name LIKE ?");
+      whereClause.append(" AND name LIKE ?");
       params = params.addString("%" + search + "%");
     }
 
     return countWhere(whereClause.toString(), params);
   }
 
-  /** Find category by source, category_id, and type */
+  /** Find category by source, external_id, and type */
   public Uni<Category> findBySourceCategoryType(
       Long sourceId, Integer categoryId, String categoryType) {
     String sql =
-        "SELECT * FROM categories WHERE source_id = ? AND category_id = ? AND category_type = ?"
+        "SELECT * FROM categories WHERE source_id = ? AND external_id = ? AND type = ?"
             + " LIMIT 1";
     return pool.preparedQuery(sql)
         .execute(Tuple.of(sourceId, categoryId, categoryType))
@@ -142,9 +142,9 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
               // Create new Unknown category
               Category unknownCategory = new Category();
               unknownCategory.setSourceId(sourceId);
-              unknownCategory.setCategoryId(0);
-              unknownCategory.setCategoryType(categoryType);
-              unknownCategory.setCategoryName("Unknown");
+              unknownCategory.setExternalId(0);
+              unknownCategory.setType(categoryType);
+              unknownCategory.setName("Unknown");
               unknownCategory.setParentId(null);
               unknownCategory.setLabels("unknown");
 

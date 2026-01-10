@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS series (
     id INT AUTO_INCREMENT PRIMARY KEY,
     source_id INT NOT NULL,
-    stream_id INT NOT NULL,
+    external_id INT NOT NULL,
     num INT DEFAULT 0,
     allow_deny ENUM('allow', 'deny'),
     name VARCHAR(500) NOT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS series (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_stream (source_id, stream_id),
+    UNIQUE KEY unique_stream (source_id, external_id),
     INDEX idx_series_source_category_num (source_id, category_id, num),
     INDEX idx_series_source_num (source_id, num),
     INDEX idx_series_allow_deny (allow_deny),

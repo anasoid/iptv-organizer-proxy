@@ -19,8 +19,8 @@ public class CreateStreamRequest {
   @JsonProperty("source_id")
   private Long sourceId;
 
-  @JsonProperty("stream_id")
-  private Integer streamId;
+  @JsonProperty("external_id")
+  private Integer externalId;
 
   private Integer num;
 

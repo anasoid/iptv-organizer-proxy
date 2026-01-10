@@ -1,3 +1,0 @@
--- Migration V013: Update sync_logs table sync_type (already included in H2 initial table creation)
--- This migration is a no-op for H2 since the sync_type enum was created with all values in V011
--- Included for compatibility with migration version numbering

@@ -21,7 +21,7 @@ public abstract class BaseStream extends SourcedEntity {
   private Integer categoryId;
 
   /** Stream ID from the source provider */
-  private Integer streamId;
+  private Integer externalId;
 
   /** Allow/deny status for filtering */
   private String allowDeny;

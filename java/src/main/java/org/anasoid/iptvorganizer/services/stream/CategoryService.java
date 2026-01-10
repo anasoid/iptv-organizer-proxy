@@ -23,10 +23,10 @@ public class CategoryService extends BaseService<Category, CategoryRepository> {
     if (category.getSourceId() == null) {
       return Uni.createFrom().failure(new IllegalArgumentException("Source ID is required"));
     }
-    if (category.getCategoryName() == null || category.getCategoryName().isBlank()) {
+    if (category.getName() == null || category.getName().isBlank()) {
       return Uni.createFrom().failure(new IllegalArgumentException("Category name is required"));
     }
-    if (category.getCategoryType() == null || category.getCategoryType().isBlank()) {
+    if (category.getType() == null || category.getType().isBlank()) {
       return Uni.createFrom().failure(new IllegalArgumentException("Category type is required"));
     }
     return repository.insert(category);

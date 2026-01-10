@@ -4,7 +4,7 @@ package org.anasoid.iptvorganizer.models.stream;
 public interface StreamLike {
   Long getSourceId();
 
-  Integer getStreamId();
+  Integer getExternalId();
 
   Integer getNum();
 

@@ -32,15 +32,15 @@ public class SynchMapper {
     for (Map catData : categoryMaps) {
       Category category = new Category();
       category.setSourceId(source.getId());
-      category.setCategoryId(getIntValue(catData, "category_id"));
-      category.setCategoryName(getStringValue(catData, "category_name"));
-      category.setCategoryType(categoryType);
+      category.setExternalId(getIntValue(catData, "category_id"));
+      category.setName(getStringValue(catData, "category_name"));
+      category.setType(categoryType);
       category.setNum(num.getAndIncrement());
       category.setParentId(getIntValue(catData, "parent_id"));
-      category.setLabels(labelExtractor.extractLabels(category.getCategoryName()));
+      category.setLabels(labelExtractor.extractLabels(category.getName()));
 
       categories.add(category);
-      fetchedCategoryIds.add(category.getCategoryId());
+      fetchedCategoryIds.add(category.getExternalId());
     }
 
     log.info("Fetched " + categories.size() + " " + categoryType + " categories from API");
@@ -62,7 +62,7 @@ public class SynchMapper {
   public LiveStream mapToLiveStream(Source source, Map<?, ?> data) {
     return LiveStream.builder()
         .sourceId(source.getId())
-        .streamId(getIntValue(data, "stream_id"))
+        .externalId(getIntValue(data, "stream_id"))
         .num(getIntValue(data, "num"))
         .name(getStringValue(data, "name"))
         .categoryId(getIntValue(data, "category_id"))
@@ -76,7 +76,7 @@ public class SynchMapper {
   public VodStream mapToVodStream(Source source, Map<?, ?> data) {
     return VodStream.builder()
         .sourceId(source.getId())
-        .streamId(getIntValue(data, "stream_id"))
+        .externalId(getIntValue(data, "stream_id"))
         .num(getIntValue(data, "num"))
         .name(getStringValue(data, "name"))
         .categoryId(getIntValue(data, "category_id"))
@@ -90,7 +90,7 @@ public class SynchMapper {
   public Series mapToSeries(Source source, Map<?, ?> data) {
     return Series.builder()
         .sourceId(source.getId())
-        .streamId(getIntValue(data, "series_id"))
+        .externalId(getIntValue(data, "series_id"))
         .num(getIntValue(data, "num"))
         .name(getStringValue(data, "name"))
         .categoryId(getIntValue(data, "category_id"))
