@@ -554,53 +554,44 @@ public class SyncService {
 
   /** Map API response to LiveStream entity */
   private LiveStream mapToLiveStream(Source source, Map<?, ?> data) {
-    LiveStream stream = new LiveStream();
-    stream.setSourceId(source.getId());
-    stream.setStreamId(getIntValue(data, "stream_id"));
-    stream.setNum(getIntValue(data, "num"));
-    stream.setName(getStringValue(data, "name"));
-    stream.setCategoryId(getIntValue(data, "category_id"));
-    stream.setIsAdult(getBooleanValue(data, "is_adult"));
-
-    // Extract and set labels from stream name
-    stream.setLabels(labelExtractor.extractLabels(stream.getName()));
-
-    stream.setData(convertMapToJson(data));
-    return stream;
+    return LiveStream.builder()
+        .sourceId(source.getId())
+        .streamId(getIntValue(data, "stream_id"))
+        .num(getIntValue(data, "num"))
+        .name(getStringValue(data, "name"))
+        .categoryId(getIntValue(data, "category_id"))
+        .isAdult(getBooleanValue(data, "is_adult"))
+        .labels(labelExtractor.extractLabels(getStringValue(data, "name")))
+        .data(convertMapToJson(data))
+        .build();
   }
 
   /** Map API response to VodStream entity */
   private VodStream mapToVodStream(Source source, Map<?, ?> data) {
-    VodStream stream = new VodStream();
-    stream.setSourceId(source.getId());
-    stream.setStreamId(getIntValue(data, "stream_id"));
-    stream.setNum(getIntValue(data, "num"));
-    stream.setName(getStringValue(data, "name"));
-    stream.setCategoryId(getIntValue(data, "category_id"));
-    stream.setIsAdult(getBooleanValue(data, "is_adult"));
-
-    // Extract and set labels
-    stream.setLabels(labelExtractor.extractLabels(stream.getName()));
-
-    stream.setData(convertMapToJson(data));
-    return stream;
+    return VodStream.builder()
+        .sourceId(source.getId())
+        .streamId(getIntValue(data, "stream_id"))
+        .num(getIntValue(data, "num"))
+        .name(getStringValue(data, "name"))
+        .categoryId(getIntValue(data, "category_id"))
+        .isAdult(getBooleanValue(data, "is_adult"))
+        .labels(labelExtractor.extractLabels(getStringValue(data, "name")))
+        .data(convertMapToJson(data))
+        .build();
   }
 
   /** Map API response to Series entity */
   private Series mapToSeries(Source source, Map<?, ?> data) {
-    Series series = new Series();
-    series.setSourceId(source.getId());
-    series.setStreamId(getIntValue(data, "series_id"));
-    series.setNum(getIntValue(data, "num"));
-    series.setName(getStringValue(data, "name"));
-    series.setCategoryId(getIntValue(data, "category_id"));
-    series.setIsAdult(getBooleanValue(data, "is_adult"));
-
-    // Extract and set labels
-    series.setLabels(labelExtractor.extractLabels(series.getName()));
-
-    series.setData(convertMapToJson(data));
-    return series;
+    return Series.builder()
+        .sourceId(source.getId())
+        .streamId(getIntValue(data, "series_id"))
+        .num(getIntValue(data, "num"))
+        .name(getStringValue(data, "name"))
+        .categoryId(getIntValue(data, "category_id"))
+        .isAdult(getBooleanValue(data, "is_adult"))
+        .labels(labelExtractor.extractLabels(getStringValue(data, "name")))
+        .data(convertMapToJson(data))
+        .build();
   }
 
   private Integer getIntValue(Map<?, ?> data, String key) {

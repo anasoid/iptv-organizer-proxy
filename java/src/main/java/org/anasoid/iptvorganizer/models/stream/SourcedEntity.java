@@ -1,0 +1,25 @@
+package org.anasoid.iptvorganizer.models.stream;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
+import org.anasoid.iptvorganizer.models.BaseEntity;
+
+/**
+ * Base class for all entities that belong to a source and have ordering. This includes both
+ * categories and streams.
+ */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@SuperBuilder
+@EqualsAndHashCode(callSuper = true)
+public abstract class SourcedEntity extends BaseEntity {
+  /** ID of the source this entity belongs to */
+  private Long sourceId;
+
+  /** Ordering number within the source */
+  private Integer num;
+}
