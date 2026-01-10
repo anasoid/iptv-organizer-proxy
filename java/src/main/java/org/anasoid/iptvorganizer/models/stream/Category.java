@@ -12,7 +12,7 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
 public class Category extends SourcedEntity {
-  private Integer externalId;
+
   private String name;
   private String type;
   private String allowDeny;

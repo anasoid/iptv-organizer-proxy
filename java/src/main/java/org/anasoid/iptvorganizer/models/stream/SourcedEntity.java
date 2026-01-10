@@ -20,6 +20,9 @@ public abstract class SourcedEntity extends BaseEntity {
   /** ID of the source this entity belongs to */
   private Long sourceId;
 
+  /** Stream ID from the source provider */
+  private Integer externalId;
+
   /** Ordering number within the source */
   private Integer num;
 }
