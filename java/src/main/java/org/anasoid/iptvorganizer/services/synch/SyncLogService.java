@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.services;
+package org.anasoid.iptvorganizer.services.synch;
 
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
@@ -6,7 +6,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.anasoid.iptvorganizer.models.SyncLog;
 import org.anasoid.iptvorganizer.models.SyncLogStatus;
-import org.anasoid.iptvorganizer.repositories.SyncLogRepository;
+import org.anasoid.iptvorganizer.repositories.synch.SyncLogRepository;
+import org.anasoid.iptvorganizer.services.BaseService;
 
 @ApplicationScoped
 public class SyncLogService extends BaseService<SyncLog, SyncLogRepository> {

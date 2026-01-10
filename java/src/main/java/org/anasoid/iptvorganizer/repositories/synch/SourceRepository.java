@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.repositories;
+package org.anasoid.iptvorganizer.repositories.synch;
 
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
@@ -7,6 +7,7 @@ import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.models.Source;
+import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
 @ApplicationScoped
 public class SourceRepository extends BaseRepository<Source> {

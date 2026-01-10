@@ -26,9 +26,9 @@ import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.Source;
 import org.anasoid.iptvorganizer.services.SourceService;
-import org.anasoid.iptvorganizer.services.SyncLockManager;
-import org.anasoid.iptvorganizer.services.SyncLogService;
-import org.anasoid.iptvorganizer.services.SyncService;
+import org.anasoid.iptvorganizer.services.synch.SyncLockManager;
+import org.anasoid.iptvorganizer.services.synch.SyncLogService;
+import org.anasoid.iptvorganizer.services.synch.SyncService;
 
 /** Sources controller CRUD operations for sources with sync management */
 @Path("/api/sources")

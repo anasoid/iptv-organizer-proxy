@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.services;
+package org.anasoid.iptvorganizer.services.synch;
 
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;

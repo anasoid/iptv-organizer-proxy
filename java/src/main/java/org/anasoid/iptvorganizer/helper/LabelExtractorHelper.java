@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.services;
+package org.anasoid.iptvorganizer.helper;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.ArrayList;
@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
  * pipes |, and dashes -
  */
 @ApplicationScoped
-public class LabelExtractor {
+public class LabelExtractorHelper {
 
   private static final Pattern BRACKET_PATTERN = Pattern.compile("\\[([^\\]]+)\\]");
 

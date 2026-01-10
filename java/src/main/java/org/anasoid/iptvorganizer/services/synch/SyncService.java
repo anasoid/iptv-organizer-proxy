@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.services;
+package org.anasoid.iptvorganizer.services.synch;
 
 import io.quarkus.scheduler.Scheduled;
 import io.smallrye.mutiny.Multi;
@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
+import org.anasoid.iptvorganizer.helper.LabelExtractorHelper;
 import org.anasoid.iptvorganizer.models.BaseEntity;
 import org.anasoid.iptvorganizer.models.Source;
 import org.anasoid.iptvorganizer.models.SyncLog;
@@ -25,13 +26,14 @@ import org.anasoid.iptvorganizer.models.stream.Series;
 import org.anasoid.iptvorganizer.models.stream.StreamLike;
 import org.anasoid.iptvorganizer.models.stream.VodStream;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
-import org.anasoid.iptvorganizer.repositories.SourceRepository;
-import org.anasoid.iptvorganizer.repositories.SyncLogRepository;
-import org.anasoid.iptvorganizer.repositories.SyncScheduleRepository;
 import org.anasoid.iptvorganizer.repositories.stream.CategoryRepository;
 import org.anasoid.iptvorganizer.repositories.stream.LiveStreamRepository;
 import org.anasoid.iptvorganizer.repositories.stream.SeriesRepository;
 import org.anasoid.iptvorganizer.repositories.stream.VodStreamRepository;
+import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
+import org.anasoid.iptvorganizer.repositories.synch.SyncLogRepository;
+import org.anasoid.iptvorganizer.repositories.synch.SyncScheduleRepository;
+import org.anasoid.iptvorganizer.services.FilterService;
 import org.anasoid.iptvorganizer.services.streaming.HttpStreamingService;
 
 /**
@@ -63,7 +65,7 @@ public class SyncService {
 
   @Inject FilterService filterService;
 
-  @Inject LabelExtractor labelExtractor;
+  @Inject LabelExtractorHelper labelExtractor;
 
   @Inject SyncLockManager syncLockManager;
 

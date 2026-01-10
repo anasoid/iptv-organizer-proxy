@@ -4,7 +4,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.anasoid.iptvorganizer.models.Source;
-import org.anasoid.iptvorganizer.repositories.SourceRepository;
+import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 
 @ApplicationScoped
 public class SourceService extends BaseService<Source, SourceRepository> {
