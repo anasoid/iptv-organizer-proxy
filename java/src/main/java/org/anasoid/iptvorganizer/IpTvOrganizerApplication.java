@@ -22,7 +22,7 @@ public class IpTvOrganizerApplication {
    * Scheduled task to check for sources needing sync Runs every 5 minutes by default, configurable
    * via sync.check.interval
    */
-  @Scheduled(cron = "0 */5 * * * ?", identity = "sync-daemon")
+  @Scheduled(every = "{sync.check.interval}", identity = "sync-daemon")
   public void scheduledSync() {
     syncService.scheduledSync();
   }
