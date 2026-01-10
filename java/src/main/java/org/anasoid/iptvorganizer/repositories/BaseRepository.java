@@ -6,6 +6,7 @@ import io.vertx.mutiny.sqlclient.Pool;
 import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.inject.Inject;
+import java.util.List;
 import org.anasoid.iptvorganizer.models.BaseEntity;
 
 public abstract class BaseRepository<T extends BaseEntity> {
@@ -118,5 +119,39 @@ public abstract class BaseRepository<T extends BaseEntity> {
     }
 
     throw new IllegalStateException("Unable to retrieve inserted ID from RowSet");
+  }
+
+  /**
+   * Find IDs only for a specific source_id (lightweight query) Used for delete detection in sync
+   * operations
+   */
+  public Multi<Long> findIdsBySourceId(Long sourceId) {
+    String sql = "SELECT id FROM " + getTableName() + " WHERE source_id = ?";
+    return pool.preparedQuery(sql)
+        .execute(Tuple.of(sourceId))
+        .onItem()
+        .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
+        .map(row -> row.getLong("id"));
+  }
+
+  /** Delete multiple entities by IDs in batch Used for cleanup of obsolete records during sync */
+  public Uni<Void> batchDeleteByIds(List<Long> ids) {
+    if (ids == null || ids.isEmpty()) {
+      return Uni.createFrom().voidItem();
+    }
+
+    StringBuilder sql = new StringBuilder("DELETE FROM " + getTableName() + " WHERE id IN (");
+    for (int i = 0; i < ids.size(); i++) {
+      if (i > 0) sql.append(", ");
+      sql.append("?");
+    }
+    sql.append(")");
+
+    Tuple tuple = Tuple.tuple();
+    for (Long id : ids) {
+      tuple = tuple.addLong(id);
+    }
+
+    return pool.preparedQuery(sql.toString()).execute(tuple).replaceWithVoid();
   }
 }

@@ -3,14 +3,17 @@ package org.anasoid.iptvorganizer.services.streaming;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
+import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
+import io.vertx.core.http.HttpClient;
+import io.vertx.core.http.HttpMethod;
 import io.vertx.ext.web.client.HttpRequest;
-import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.net.URI;
 import java.util.Base64;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.exceptions.StreamingException;
@@ -26,6 +29,8 @@ public class HttpStreamingService {
   @Inject StreamingJsonParser jsonParser;
 
   @Inject ObjectMapper objectMapper;
+
+  @Inject Vertx vertx;
 
   /** Stream HTTP response as buffers with backpressure support */
   public Multi<Buffer> streamHttp(String url, HttpOptions options) {
@@ -176,55 +181,154 @@ public class HttpStreamingService {
     request.putHeader("Authorization", "Basic " + encodedCredentials);
   }
 
-  /** Stream HTTP response as Multi<Buffer> with backpressure */
+  /** Stream HTTP response as Multi<Buffer> with backpressure (true streaming without buffering) */
   private Multi<Buffer> streamResponse(HttpRequest<Buffer> request, String url) {
     return Multi.createFrom()
         .emitter(
             emitter -> {
-              request.send(
-                  asyncResult -> {
-                    if (asyncResult.failed()) {
-                      LOGGER.severe(
-                          "HTTP request failed for: "
-                              + url
-                              + ", error: "
-                              + asyncResult.cause().getMessage());
-                      emitter.fail(
-                          new StreamingException("HTTP request failed", asyncResult.cause()));
-                      return;
-                    }
+              try {
+                URI uri = new URI(url);
+                HttpClient httpClient = vertx.createHttpClient();
 
-                    HttpResponse<Buffer> response = asyncResult.result();
-                    if (response.statusCode() >= 400) {
-                      LOGGER.severe(
-                          "HTTP error for: "
-                              + url
-                              + ", status: "
-                              + response.statusCode()
-                              + " "
-                              + response.statusMessage());
-                      emitter.fail(
-                          new StreamingException(
-                              "HTTP error: "
-                                  + response.statusCode()
-                                  + " "
-                                  + response.statusMessage()));
-                      return;
-                    }
+                int port = uri.getPort();
+                if (port == -1) {
+                  port = "https".equals(uri.getScheme()) ? 443 : 80;
+                }
 
-                    LOGGER.info(
-                        "HTTP response received for: "
-                            + url
-                            + ", status: "
-                            + response.statusCode()
-                            + ", content length: "
-                            + response.body().length()
-                            + " bytes");
+                String host = uri.getHost();
+                String path = uri.getPath();
+                if (uri.getQuery() != null) {
+                  path += "?" + uri.getQuery();
+                }
+                if (path == null || path.isEmpty()) {
+                  path = "/";
+                }
 
-                    // Emit the response body as a single buffer
-                    emitter.emit(response.body());
-                    emitter.complete();
-                  });
+                // Add authentication if provided (collect headers from configured request)
+                java.util.Map<String, String> headers = new java.util.HashMap<>();
+                if (request.headers() != null) {
+                  request
+                      .headers()
+                      .forEach(header -> headers.put(header.getKey(), header.getValue()));
+                }
+
+                // Create streaming request asynchronously - response chunks are emitted without
+                // buffering
+                httpClient
+                    .request(HttpMethod.GET, port, host, path)
+                    .onSuccess(
+                        clientRequest -> {
+                          // Set timeout
+                          clientRequest.setTimeout(30000L);
+
+                          // Add headers
+                          headers.forEach(clientRequest::putHeader);
+
+                          // Set response handler before sending
+                          clientRequest.response(
+                              asyncResult -> {
+                                if (asyncResult.failed()) {
+                                  LOGGER.severe(
+                                      "HTTP request failed for: "
+                                          + url
+                                          + ", error: "
+                                          + asyncResult.cause().getMessage());
+                                  httpClient.close();
+                                  emitter.fail(
+                                      new StreamingException(
+                                          "HTTP request failed", asyncResult.cause()));
+                                  return;
+                                }
+
+                                var response = asyncResult.result();
+                                if (response.statusCode() >= 400) {
+                                  LOGGER.severe(
+                                      "HTTP error for: "
+                                          + url
+                                          + ", status: "
+                                          + response.statusCode()
+                                          + " "
+                                          + response.statusMessage());
+                                  httpClient.close();
+                                  emitter.fail(
+                                      new StreamingException(
+                                          "HTTP error: "
+                                              + response.statusCode()
+                                              + " "
+                                              + response.statusMessage()));
+                                  return;
+                                }
+
+                                LOGGER.info(
+                                    "HTTP response started for: "
+                                        + url
+                                        + ", status: "
+                                        + response.statusCode());
+
+                                // Emit each chunk as it arrives (true streaming - no buffering
+                                // entire body)
+                                response.handler(
+                                    buffer -> {
+                                      try {
+                                        LOGGER.fine(
+                                            "Received chunk of "
+                                                + buffer.length()
+                                                + " bytes from: "
+                                                + url);
+                                        emitter.emit(buffer);
+                                      } catch (Exception e) {
+                                        LOGGER.severe(
+                                            "Failed to emit buffer from: "
+                                                + url
+                                                + ", error: "
+                                                + e.getMessage());
+                                        emitter.fail(
+                                            new StreamingException("Failed to emit buffer", e));
+                                      }
+                                    });
+
+                                // Complete when response ends
+                                response.endHandler(
+                                    v -> {
+                                      LOGGER.info("Completed streaming from: " + url);
+                                      httpClient.close();
+                                      emitter.complete();
+                                    });
+
+                                // Handle response errors
+                                response.exceptionHandler(
+                                    failure -> {
+                                      LOGGER.severe(
+                                          "HTTP response error from: "
+                                              + url
+                                              + ", error: "
+                                              + failure.getMessage());
+                                      httpClient.close();
+                                      emitter.fail(
+                                          new StreamingException("HTTP response error", failure));
+                                    });
+                              });
+
+                          // Send request
+                          clientRequest.end();
+                        })
+                    .onFailure(
+                        failure -> {
+                          LOGGER.severe(
+                              "Failed to create HTTP request for: "
+                                  + url
+                                  + ", error: "
+                                  + failure.getMessage());
+                          httpClient.close();
+                          emitter.fail(
+                              new StreamingException("Failed to create HTTP request", failure));
+                        });
+
+              } catch (Exception e) {
+                LOGGER.severe(
+                    "Failed to create HTTP request for: " + url + ", error: " + e.getMessage());
+                emitter.fail(new StreamingException("Failed to create HTTP request", e));
+              }
             });
   }
 }

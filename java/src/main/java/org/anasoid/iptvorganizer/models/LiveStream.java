@@ -12,7 +12,7 @@ import lombok.experimental.SuperBuilder;
 @AllArgsConstructor
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
-public class LiveStream extends BaseEntity {
+public class LiveStream extends BaseEntity implements StreamLike {
   private Long sourceId;
   private Integer streamId;
   private Integer num;

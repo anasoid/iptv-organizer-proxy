@@ -10,6 +10,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.*;
+import org.anasoid.iptvorganizer.models.StreamLike;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.repositories.*;
 import org.anasoid.iptvorganizer.services.streaming.HttpStreamingService;
@@ -182,272 +183,183 @@ public class SyncService {
         .streamJson(url, Map.class, httpOptions)
         .collect()
         .asList()
+        .flatMap(categoryMaps -> processCategorySync(source, categoryMaps, categoryType))
+        .onFailure()
+        .invoke(
+            ex ->
+                LOGGER.severe(
+                    "Failed to sync " + categoryType + " categories: " + ex.getMessage()));
+  }
+
+  /** Map API response data to Category objects */
+  private CategoryMappingResult mapCategoryData(
+      Source source, List<Map> categoryMaps, String categoryType) {
+    List<Category> categories = new ArrayList<>();
+    Set<Integer> fetchedCategoryIds = new HashSet<>();
+    AtomicInteger num = new AtomicInteger(1);
+
+    for (Map catData : categoryMaps) {
+      Category category = new Category();
+      category.setSourceId(source.getId());
+      category.setCategoryId(getIntValue(catData, "category_id"));
+      category.setCategoryName(getStringValue(catData, "category_name"));
+      category.setCategoryType(categoryType);
+      category.setNum(num.getAndIncrement());
+      category.setParentId(getIntValue(catData, "parent_id"));
+      category.setLabels(labelExtractor.extractLabels(category.getCategoryName()));
+
+      categories.add(category);
+      fetchedCategoryIds.add(category.getCategoryId());
+    }
+
+    LOGGER.info("Fetched " + categories.size() + " " + categoryType + " categories from API");
+    return new CategoryMappingResult(categories, fetchedCategoryIds);
+  }
+
+  /** Helper class to hold category mapping results */
+  private static class CategoryMappingResult {
+    List<Category> categories;
+    Set<Integer> fetchedIds;
+
+    CategoryMappingResult(List<Category> categories, Set<Integer> fetchedIds) {
+      this.categories = categories;
+      this.fetchedIds = fetchedIds;
+    }
+  }
+
+  /** Process category synchronization: insert/update new, delete obsolete */
+  private Uni<Void> processCategorySync(
+      Source source, List<Map> categoryMaps, String categoryType) {
+    CategoryMappingResult mappingResult = mapCategoryData(source, categoryMaps, categoryType);
+
+    return categoryRepository
+        .findBySourceId(source.getId())
+        .collect()
+        .asList()
         .flatMap(
-            categoryMaps -> {
-              List<Category> categories = new ArrayList<>();
-              Set<Integer> fetchedCategoryIds = new HashSet<>();
-              AtomicInteger num = new AtomicInteger(1);
+            existingCategories ->
+                syncAndDeleteCategories(
+                    mappingResult.categories,
+                    existingCategories,
+                    categoryType,
+                    mappingResult.fetchedIds));
+  }
 
-              for (Map catData : categoryMaps) {
-                Category category = new Category();
-                category.setSourceId(source.getId());
-                category.setCategoryId(getIntValue(catData, "category_id"));
-                category.setCategoryName(getStringValue(catData, "category_name"));
-                category.setCategoryType(categoryType);
-                category.setNum(num.getAndIncrement());
-                category.setParentId(getIntValue(catData, "parent_id"));
+  /** Sync (insert/update) and delete obsolete categories */
+  private Uni<Void> syncAndDeleteCategories(
+      List<Category> newCategories,
+      List<Category> existingCategories,
+      String categoryType,
+      Set<Integer> fetchedIds) {
+    // Create a map of existing categories by ID for quick lookup
+    Map<Integer, Category> existingMap = new HashMap<>();
+    for (Category cat : existingCategories) {
+      if (cat.getCategoryType().equals(categoryType)) {
+        existingMap.put(cat.getCategoryId(), cat);
+      }
+    }
 
-                // Extract labels from category name
-                category.setLabels(labelExtractor.extractLabels(category.getCategoryName()));
-
-                categories.add(category);
-                fetchedCategoryIds.add(category.getCategoryId());
+    // Insert/update categories
+    return Multi.createFrom()
+        .iterable(newCategories)
+        .onItem()
+        .transformToUniAndConcatenate(
+            category -> {
+              if (existingMap.containsKey(category.getCategoryId())) {
+                category.setId(existingMap.get(category.getCategoryId()).getId());
+                return categoryRepository.update(category);
+              } else {
+                return categoryRepository.insert(category).replaceWithVoid();
               }
+            })
+        .collect()
+        .asList()
+        .flatMap(v -> deleteObsoleteCategories(existingCategories, categoryType, fetchedIds));
+  }
 
-              LOGGER.info(
-                  "Fetched " + categories.size() + " " + categoryType + " categories from API");
+  /** Delete obsolete categories that are no longer in the API response */
+  private Uni<Void> deleteObsoleteCategories(
+      List<Category> existingCategories, String categoryType, Set<Integer> fetchedIds) {
+    List<Category> toDelete =
+        existingCategories.stream()
+            .filter(
+                c ->
+                    c.getCategoryType().equals(categoryType)
+                        && !fetchedIds.contains(c.getCategoryId()))
+            .toList();
 
-              // Get all existing categories for this source
-              return categoryRepository
-                  .findBySourceId(source.getId())
-                  .collect()
-                  .asList()
-                  .flatMap(
-                      existingCategories -> {
-                        // Create a map of existing categories
-                        Map<Integer, Category> existingMap = new HashMap<>();
-                        for (Category cat : existingCategories) {
-                          if (cat.getCategoryType().equals(categoryType)) {
-                            existingMap.put(cat.getCategoryId(), cat);
-                          }
-                        }
+    if (toDelete.isEmpty()) {
+      return Uni.createFrom().voidItem();
+    }
 
-                        // Insert/update categories one-by-one
-                        return Multi.createFrom()
-                            .iterable(categories)
-                            .onItem()
-                            .transformToUniAndConcatenate(
-                                category -> {
-                                  if (existingMap.containsKey(category.getCategoryId())) {
-                                    // Update existing category
-                                    category.setId(
-                                        existingMap.get(category.getCategoryId()).getId());
-                                    return categoryRepository.update(category);
-                                  } else {
-                                    // Insert new category
-                                    return categoryRepository.insert(category).replaceWithVoid();
-                                  }
-                                })
-                            .collect()
-                            .asList()
-                            .flatMap(
-                                v -> {
-                                  // Delete obsolete categories
-                                  List<Category> toDelete =
-                                      existingCategories.stream()
-                                          .filter(
-                                              c ->
-                                                  c.getCategoryType().equals(categoryType)
-                                                      && !fetchedCategoryIds.contains(
-                                                          c.getCategoryId()))
-                                          .toList();
-
-                                  if (toDelete.isEmpty()) {
-                                    return Uni.createFrom().voidItem();
-                                  }
-
-                                  LOGGER.info(
-                                      "Deleting "
-                                          + toDelete.size()
-                                          + " obsolete "
-                                          + categoryType
-                                          + " categories");
-                                  return Multi.createFrom()
-                                      .iterable(toDelete)
-                                      .onItem()
-                                      .transformToUniAndConcatenate(
-                                          cat -> categoryRepository.delete(cat.getId()))
-                                      .collect()
-                                      .asList()
-                                      .replaceWithVoid();
-                                });
-                      })
-                  .onFailure()
-                  .invoke(
-                      ex ->
-                          LOGGER.severe(
-                              "Failed to sync "
-                                  + categoryType
-                                  + " categories: "
-                                  + ex.getMessage()));
-            });
+    LOGGER.info("Deleting " + toDelete.size() + " obsolete " + categoryType + " categories");
+    return Multi.createFrom()
+        .iterable(toDelete)
+        .onItem()
+        .transformToUniAndConcatenate(cat -> categoryRepository.delete(cat.getId()))
+        .collect()
+        .asList()
+        .replaceWithVoid();
   }
 
   /** Sync live streams for a source with batch upsert and transactions */
   private Uni<Source> syncLiveStreams(Source source, SyncLog syncLog) {
-    LOGGER.info("Syncing live streams for source: " + source.getName());
-
-    String url = buildApiUrl(source, "get_live_streams");
-    HttpOptions httpOptions = new HttpOptions();
-    httpOptions.setTimeout(30);
-    httpOptions.setMaxRetries(3);
-
-    return httpStreamingService
-        .streamJson(url, Map.class, httpOptions)
-        .map(streamData -> mapToLiveStream(source, streamData))
-        .collect()
-        .asList()
-        .flatMap(
-            allStreams -> {
-              LOGGER.info("Fetched " + allStreams.size() + " live streams from API");
-
-              // Assign num ordering
-              for (int i = 0; i < allStreams.size(); i++) {
-                allStreams.get(i).setNum(i + 1);
-              }
-
-              // Handle streams without category - get/create Unknown category
-              List<Uni<Void>> categoryProcessing = new ArrayList<>();
-              for (LiveStream stream : allStreams) {
-                if (stream.getCategoryId() == null || stream.getCategoryId() == 0) {
-                  categoryProcessing.add(
-                      categoryRepository
-                          .getOrCreateUnknownCategory(source.getId(), "live")
-                          .invoke(
-                              unknownCategoryId -> {
-                                stream.setCategoryId(unknownCategoryId.intValue());
-                                LOGGER.info(
-                                    "Live stream assigned to Unknown category: stream_id="
-                                        + stream.getStreamId());
-                              })
-                          .replaceWithVoid());
-                }
-              }
-
-              // If category processing needed, wait for it; otherwise continue
-              Uni<Void> categoryProcessingDone =
-                  categoryProcessing.isEmpty()
-                      ? Uni.createFrom().voidItem()
-                      : Uni.join().all(categoryProcessing).andFailFast().replaceWithVoid();
-
-              return categoryProcessingDone.flatMap(
-                  categoryReady -> {
-                    Set<Integer> fetchedStreamIds = new HashSet<>();
-                    for (LiveStream stream : allStreams) {
-                      fetchedStreamIds.add(stream.getStreamId());
-                    }
-
-                    // Get all existing streams for this source
-                    return liveStreamRepository
-                        .findAll()
-                        .filter(s -> s.getSourceId().equals(source.getId()))
-                        .collect()
-                        .asList()
-                        .flatMap(
-                            existingStreams -> {
-                              // Create a map of existing streams by stream_id for quick lookup
-                              Map<Integer, LiveStream> existingMap = new HashMap<>();
-                              for (LiveStream stream : existingStreams) {
-                                existingMap.put(stream.getStreamId(), stream);
-                              }
-
-                              // Calculate statistics
-                              AtomicInteger added = new AtomicInteger(0);
-                              AtomicInteger updated = new AtomicInteger(0);
-                              for (LiveStream stream : allStreams) {
-                                if (existingMap.containsKey(stream.getStreamId())) {
-                                  updated.incrementAndGet();
-                                } else {
-                                  added.incrementAndGet();
-                                }
-                              }
-
-                              Set<Long> toDeleteIds = new HashSet<>();
-                              for (LiveStream stream : existingStreams) {
-                                if (!fetchedStreamIds.contains(stream.getStreamId())) {
-                                  toDeleteIds.add(stream.getId());
-                                }
-                              }
-
-                              syncLog.setItemsAdded(syncLog.getItemsAdded() + added.get());
-                              syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated.get());
-                              syncLog.setItemsDeleted(
-                                  syncLog.getItemsDeleted() + toDeleteIds.size());
-
-                              LOGGER.info(
-                                  String.format(
-                                      "Live streams - Added: %d, Updated: %d, Deleted: %d",
-                                      added.get(), updated.get(), toDeleteIds.size()));
-
-                              // Insert/update streams one-by-one
-                              return Multi.createFrom()
-                                  .iterable(allStreams)
-                                  .onItem()
-                                  .transformToUniAndConcatenate(
-                                      stream -> {
-                                        if (existingMap.containsKey(stream.getStreamId())) {
-                                          // Update: set the ID from existing and update
-                                          stream.setId(
-                                              existingMap.get(stream.getStreamId()).getId());
-                                          return liveStreamRepository.update(stream);
-                                        } else {
-                                          // Insert new stream
-                                          return liveStreamRepository
-                                              .insert(stream)
-                                              .replaceWithVoid();
-                                        }
-                                      })
-                                  .collect()
-                                  .asList()
-                                  .flatMap(
-                                      v -> {
-                                        // Delete obsolete streams
-                                        if (toDeleteIds.isEmpty()) {
-                                          return Uni.createFrom().voidItem();
-                                        }
-                                        return Multi.createFrom()
-                                            .iterable(toDeleteIds)
-                                            .onItem()
-                                            .transformToUniAndConcatenate(
-                                                id -> liveStreamRepository.delete(id))
-                                            .collect()
-                                            .asList()
-                                            .replaceWithVoid();
-                                      })
-                                  .invoke(
-                                      v -> {
-                                        // Explicit GC after processing large batches
-                                        if (allStreams.size() >= GC_THRESHOLD) {
-                                          System.gc();
-                                          LOGGER.fine(
-                                              "GC called after "
-                                                  + allStreams.size()
-                                                  + " live streams");
-                                        }
-                                      });
-                            });
-                  });
-            })
-        .replaceWith(source);
+    return syncStreams(
+        source,
+        syncLog,
+        "live streams",
+        "get_live_streams",
+        "live",
+        streamData -> mapToLiveStream(source, streamData),
+        liveStreamRepository);
   }
 
   /** Sync VOD streams for a source one-by-one */
   private Uni<Source> syncVod(Source source, SyncLog syncLog) {
-    LOGGER.info("Syncing VOD for source: " + source.getName());
+    return syncStreams(
+        source,
+        syncLog,
+        "VOD streams",
+        "get_vod_streams",
+        "vod",
+        streamData -> mapToVodStream(source, streamData),
+        vodStreamRepository);
+  }
 
-    String url = buildApiUrl(source, "get_vod_streams");
-    HttpOptions httpOptions = new HttpOptions();
-    httpOptions.setTimeout(30);
-    httpOptions.setMaxRetries(3);
+  /** Sync series for a source one-by-one */
+  private Uni<Source> syncSeries(Source source, SyncLog syncLog) {
+    return syncStreams(
+        source,
+        syncLog,
+        "series",
+        "get_series",
+        "series",
+        streamData -> mapToSeries(source, streamData),
+        seriesRepository);
+  }
+
+  /** Generic stream synchronization method for all stream types */
+  private <T extends BaseEntity & StreamLike> Uni<Source> syncStreams(
+      Source source,
+      SyncLog syncLog,
+      String streamTypeName,
+      String apiAction,
+      String categoryType,
+      java.util.function.Function<Map<?, ?>, T> mapper,
+      BaseRepository<T> repository) {
+    LOGGER.info("Syncing " + streamTypeName + " for source: " + source.getName());
+
+    String url = buildApiUrl(source, apiAction);
+    HttpOptions httpOptions = createHttpOptions();
 
     return httpStreamingService
         .streamJson(url, Map.class, httpOptions)
-        .map(streamData -> mapToVodStream(source, streamData))
+        .map(mapper::apply)
         .collect()
         .asList()
         .flatMap(
             allStreams -> {
-              LOGGER.info("Fetched " + allStreams.size() + " VOD streams from API");
+              LOGGER.info("Fetched " + allStreams.size() + " " + streamTypeName + " from API");
 
               // Assign num ordering
               for (int i = 0; i < allStreams.size(); i++) {
@@ -456,16 +368,17 @@ public class SyncService {
 
               // Handle streams without category - get/create Unknown category
               List<Uni<Void>> categoryProcessing = new ArrayList<>();
-              for (VodStream stream : allStreams) {
+              for (T stream : allStreams) {
                 if (stream.getCategoryId() == null || stream.getCategoryId() == 0) {
                   categoryProcessing.add(
                       categoryRepository
-                          .getOrCreateUnknownCategory(source.getId(), "vod")
+                          .getOrCreateUnknownCategory(source.getId(), categoryType)
                           .invoke(
                               unknownCategoryId -> {
                                 stream.setCategoryId(unknownCategoryId.intValue());
                                 LOGGER.info(
-                                    "VOD stream assigned to Unknown category: stream_id="
+                                    streamTypeName
+                                        + " assigned to Unknown category: stream_id="
                                         + stream.getStreamId());
                               })
                           .replaceWithVoid());
@@ -481,12 +394,12 @@ public class SyncService {
               return categoryProcessingDone.flatMap(
                   categoryReady -> {
                     Set<Integer> fetchedStreamIds = new HashSet<>();
-                    for (VodStream stream : allStreams) {
+                    for (T stream : allStreams) {
                       fetchedStreamIds.add(stream.getStreamId());
                     }
 
                     // Get all existing streams for this source
-                    return vodStreamRepository
+                    return repository
                         .findAll()
                         .filter(s -> s.getSourceId().equals(source.getId()))
                         .collect()
@@ -494,15 +407,15 @@ public class SyncService {
                         .flatMap(
                             existingStreams -> {
                               // Create a map of existing streams by stream_id for quick lookup
-                              Map<Integer, VodStream> existingMap = new HashMap<>();
-                              for (VodStream stream : existingStreams) {
+                              Map<Integer, T> existingMap = new HashMap<>();
+                              for (T stream : existingStreams) {
                                 existingMap.put(stream.getStreamId(), stream);
                               }
 
                               // Calculate statistics
                               AtomicInteger added = new AtomicInteger(0);
                               AtomicInteger updated = new AtomicInteger(0);
-                              for (VodStream stream : allStreams) {
+                              for (T stream : allStreams) {
                                 if (existingMap.containsKey(stream.getStreamId())) {
                                   updated.incrementAndGet();
                                 } else {
@@ -511,7 +424,7 @@ public class SyncService {
                               }
 
                               Set<Long> toDeleteIds = new HashSet<>();
-                              for (VodStream stream : existingStreams) {
+                              for (T stream : existingStreams) {
                                 if (!fetchedStreamIds.contains(stream.getStreamId())) {
                                   toDeleteIds.add(stream.getId());
                                 }
@@ -524,8 +437,11 @@ public class SyncService {
 
                               LOGGER.info(
                                   String.format(
-                                      "VOD streams - Added: %d, Updated: %d, Deleted: %d",
-                                      added.get(), updated.get(), toDeleteIds.size()));
+                                      "%s - Added: %d, Updated: %d, Deleted: %d",
+                                      streamTypeName,
+                                      added.get(),
+                                      updated.get(),
+                                      toDeleteIds.size()));
 
                               // Insert/update streams one-by-one
                               return Multi.createFrom()
@@ -537,12 +453,10 @@ public class SyncService {
                                           // Update: set the ID from existing and update
                                           stream.setId(
                                               existingMap.get(stream.getStreamId()).getId());
-                                          return vodStreamRepository.update(stream);
+                                          return repository.update(stream);
                                         } else {
                                           // Insert new stream
-                                          return vodStreamRepository
-                                              .insert(stream)
-                                              .replaceWithVoid();
+                                          return repository.insert(stream).replaceWithVoid();
                                         }
                                       })
                                   .collect()
@@ -556,8 +470,7 @@ public class SyncService {
                                         return Multi.createFrom()
                                             .iterable(toDeleteIds)
                                             .onItem()
-                                            .transformToUniAndConcatenate(
-                                                id -> vodStreamRepository.delete(id))
+                                            .transformToUniAndConcatenate(repository::delete)
                                             .collect()
                                             .asList()
                                             .replaceWithVoid();
@@ -570,151 +483,8 @@ public class SyncService {
                                           LOGGER.fine(
                                               "GC called after "
                                                   + allStreams.size()
-                                                  + " VOD streams");
-                                        }
-                                      });
-                            });
-                  });
-            })
-        .replaceWith(source);
-  }
-
-  /** Sync series for a source one-by-one */
-  private Uni<Source> syncSeries(Source source, SyncLog syncLog) {
-    LOGGER.info("Syncing series for source: " + source.getName());
-
-    String url = buildApiUrl(source, "get_series");
-    HttpOptions httpOptions = new HttpOptions();
-    httpOptions.setTimeout(30);
-    httpOptions.setMaxRetries(3);
-
-    return httpStreamingService
-        .streamJson(url, Map.class, httpOptions)
-        .map(seriesData -> mapToSeries(source, seriesData))
-        .collect()
-        .asList()
-        .flatMap(
-            allSeries -> {
-              LOGGER.info("Fetched " + allSeries.size() + " series from API");
-
-              // Assign num ordering
-              for (int i = 0; i < allSeries.size(); i++) {
-                allSeries.get(i).setNum(i + 1);
-              }
-
-              // Handle series without category - get/create Unknown category
-              List<Uni<Void>> categoryProcessing = new ArrayList<>();
-              for (Series series : allSeries) {
-                if (series.getCategoryId() == null || series.getCategoryId() == 0) {
-                  categoryProcessing.add(
-                      categoryRepository
-                          .getOrCreateUnknownCategory(source.getId(), "series")
-                          .invoke(
-                              unknownCategoryId -> {
-                                series.setCategoryId(unknownCategoryId.intValue());
-                                LOGGER.info(
-                                    "Series assigned to Unknown category: stream_id="
-                                        + series.getStreamId());
-                              })
-                          .replaceWithVoid());
-                }
-              }
-
-              // If category processing needed, wait for it; otherwise continue
-              Uni<Void> categoryProcessingDone =
-                  categoryProcessing.isEmpty()
-                      ? Uni.createFrom().voidItem()
-                      : Uni.join().all(categoryProcessing).andFailFast().replaceWithVoid();
-
-              return categoryProcessingDone.flatMap(
-                  categoryReady -> {
-                    Set<Integer> fetchedStreamIds = new HashSet<>();
-                    for (Series series : allSeries) {
-                      fetchedStreamIds.add(series.getStreamId());
-                    }
-
-                    // Get all existing series for this source
-                    return seriesRepository
-                        .findAll()
-                        .filter(s -> s.getSourceId().equals(source.getId()))
-                        .collect()
-                        .asList()
-                        .flatMap(
-                            existingSeries -> {
-                              // Create a map of existing series by stream_id for quick lookup
-                              Map<Integer, Series> existingMap = new HashMap<>();
-                              for (Series series : existingSeries) {
-                                existingMap.put(series.getStreamId(), series);
-                              }
-
-                              // Calculate statistics
-                              AtomicInteger added = new AtomicInteger(0);
-                              AtomicInteger updated = new AtomicInteger(0);
-                              for (Series series : allSeries) {
-                                if (existingMap.containsKey(series.getStreamId())) {
-                                  updated.incrementAndGet();
-                                } else {
-                                  added.incrementAndGet();
-                                }
-                              }
-
-                              Set<Long> toDeleteIds = new HashSet<>();
-                              for (Series series : existingSeries) {
-                                if (!fetchedStreamIds.contains(series.getStreamId())) {
-                                  toDeleteIds.add(series.getId());
-                                }
-                              }
-
-                              syncLog.setItemsAdded(syncLog.getItemsAdded() + added.get());
-                              syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated.get());
-                              syncLog.setItemsDeleted(
-                                  syncLog.getItemsDeleted() + toDeleteIds.size());
-
-                              LOGGER.info(
-                                  String.format(
-                                      "Series - Added: %d, Updated: %d, Deleted: %d",
-                                      added.get(), updated.get(), toDeleteIds.size()));
-
-                              // Insert/update series one-by-one
-                              return Multi.createFrom()
-                                  .iterable(allSeries)
-                                  .onItem()
-                                  .transformToUniAndConcatenate(
-                                      series -> {
-                                        if (existingMap.containsKey(series.getStreamId())) {
-                                          // Update: set the ID from existing and update
-                                          series.setId(
-                                              existingMap.get(series.getStreamId()).getId());
-                                          return seriesRepository.update(series);
-                                        } else {
-                                          // Insert new series
-                                          return seriesRepository.insert(series).replaceWithVoid();
-                                        }
-                                      })
-                                  .collect()
-                                  .asList()
-                                  .flatMap(
-                                      v -> {
-                                        // Delete obsolete series
-                                        if (toDeleteIds.isEmpty()) {
-                                          return Uni.createFrom().voidItem();
-                                        }
-                                        return Multi.createFrom()
-                                            .iterable(toDeleteIds)
-                                            .onItem()
-                                            .transformToUniAndConcatenate(
-                                                id -> seriesRepository.delete(id))
-                                            .collect()
-                                            .asList()
-                                            .replaceWithVoid();
-                                      })
-                                  .invoke(
-                                      v -> {
-                                        // Explicit GC after processing large batches
-                                        if (allSeries.size() >= GC_THRESHOLD) {
-                                          System.gc();
-                                          LOGGER.fine(
-                                              "GC called after " + allSeries.size() + " series");
+                                                  + " "
+                                                  + streamTypeName);
                                         }
                                       });
                             });
