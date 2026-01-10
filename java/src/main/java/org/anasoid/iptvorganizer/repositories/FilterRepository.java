@@ -5,6 +5,7 @@ import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.anasoid.iptvorganizer.models.Filter;
+import org.anasoid.iptvorganizer.models.stream.*;
 
 @ApplicationScoped
 public class FilterRepository extends BaseRepository<Filter> {

@@ -1,9 +1,10 @@
-package org.anasoid.iptvorganizer.controllers;
+package org.anasoid.iptvorganizer.controllers.stream;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
+import org.anasoid.iptvorganizer.controllers.BaseController;
 import org.anasoid.iptvorganizer.dto.StreamDTO;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;

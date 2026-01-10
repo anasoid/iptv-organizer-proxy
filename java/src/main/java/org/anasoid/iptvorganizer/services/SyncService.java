@@ -10,9 +10,12 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.*;
-import org.anasoid.iptvorganizer.models.StreamLike;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
+import org.anasoid.iptvorganizer.models.stream.*;
+import org.anasoid.iptvorganizer.models.stream.StreamLike;
 import org.anasoid.iptvorganizer.repositories.*;
+import org.anasoid.iptvorganizer.repositories.stream.*;
+import org.anasoid.iptvorganizer.services.stream.*;
 import org.anasoid.iptvorganizer.services.streaming.HttpStreamingService;
 
 /**

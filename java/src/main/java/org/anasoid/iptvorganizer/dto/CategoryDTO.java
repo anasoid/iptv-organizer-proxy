@@ -6,7 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.anasoid.iptvorganizer.models.Category;
+import org.anasoid.iptvorganizer.models.stream.*;
+import org.anasoid.iptvorganizer.models.stream.Category;
 
 /** DTO for Category */
 @Data

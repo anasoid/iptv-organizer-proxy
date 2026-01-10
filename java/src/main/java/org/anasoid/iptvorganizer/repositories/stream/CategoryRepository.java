@@ -1,11 +1,13 @@
-package org.anasoid.iptvorganizer.repositories;
+package org.anasoid.iptvorganizer.repositories.stream;
 
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
-import org.anasoid.iptvorganizer.models.Category;
+import org.anasoid.iptvorganizer.models.stream.*;
+import org.anasoid.iptvorganizer.models.stream.Category;
+import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
 @ApplicationScoped
 public class CategoryRepository extends BaseRepository<Category> {

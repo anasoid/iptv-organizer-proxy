@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.models;
+package org.anasoid.iptvorganizer.models.stream;
 
 import java.time.LocalDate;
 import lombok.AllArgsConstructor;
@@ -6,13 +6,14 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import org.anasoid.iptvorganizer.models.BaseEntity;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
-public class VodStream extends BaseEntity implements StreamLike {
+public class Series extends BaseEntity implements StreamLike {
   private Long sourceId;
   private Integer streamId;
   private Integer num;

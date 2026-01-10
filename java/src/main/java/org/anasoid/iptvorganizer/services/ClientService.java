@@ -5,7 +5,9 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.anasoid.iptvorganizer.models.Client;
+import org.anasoid.iptvorganizer.models.stream.*;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
+import org.anasoid.iptvorganizer.repositories.stream.*;
 
 @ApplicationScoped
 public class ClientService extends BaseService<Client, ClientRepository> {

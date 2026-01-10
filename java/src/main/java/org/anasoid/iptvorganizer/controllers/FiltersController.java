@@ -10,7 +10,9 @@ import org.anasoid.iptvorganizer.dto.FilterDTO;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.Filter;
+import org.anasoid.iptvorganizer.models.stream.*;
 import org.anasoid.iptvorganizer.services.FilterService;
+import org.anasoid.iptvorganizer.services.stream.*;
 
 /** Filters controller CRUD operations for filters */
 @Path("/api/filters")

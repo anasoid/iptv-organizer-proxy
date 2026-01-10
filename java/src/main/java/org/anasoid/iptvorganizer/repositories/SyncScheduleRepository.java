@@ -5,6 +5,7 @@ import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.anasoid.iptvorganizer.models.SyncSchedule;
+import org.anasoid.iptvorganizer.models.stream.*;
 
 @ApplicationScoped
 public class SyncScheduleRepository extends BaseRepository<SyncSchedule> {

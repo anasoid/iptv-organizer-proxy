@@ -4,7 +4,9 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.anasoid.iptvorganizer.models.ConnectionLog;
+import org.anasoid.iptvorganizer.models.stream.*;
 import org.anasoid.iptvorganizer.repositories.ConnectionLogRepository;
+import org.anasoid.iptvorganizer.repositories.stream.*;
 
 @ApplicationScoped
 public class ConnectionLogService extends BaseService<ConnectionLog, ConnectionLogRepository> {

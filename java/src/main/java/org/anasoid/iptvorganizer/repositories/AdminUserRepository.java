@@ -6,6 +6,7 @@ import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.models.AdminUser;
+import org.anasoid.iptvorganizer.models.stream.*;
 
 @ApplicationScoped
 public class AdminUserRepository extends BaseRepository<AdminUser> {

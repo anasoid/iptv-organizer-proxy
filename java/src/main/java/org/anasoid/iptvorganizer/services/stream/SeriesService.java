@@ -1,10 +1,13 @@
-package org.anasoid.iptvorganizer.services;
+package org.anasoid.iptvorganizer.services.stream;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.anasoid.iptvorganizer.models.Series;
-import org.anasoid.iptvorganizer.repositories.SeriesRepository;
+import org.anasoid.iptvorganizer.models.stream.*;
+import org.anasoid.iptvorganizer.models.stream.Series;
+import org.anasoid.iptvorganizer.repositories.stream.*;
+import org.anasoid.iptvorganizer.repositories.stream.SeriesRepository;
+import org.anasoid.iptvorganizer.services.BaseService;
 
 @ApplicationScoped
 public class SeriesService extends BaseService<Series, SeriesRepository> {

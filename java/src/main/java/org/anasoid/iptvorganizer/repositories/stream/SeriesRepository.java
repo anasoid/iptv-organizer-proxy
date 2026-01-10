@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.repositories;
+package org.anasoid.iptvorganizer.repositories.stream;
 
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
@@ -7,7 +7,9 @@ import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.anasoid.iptvorganizer.models.Series;
+import org.anasoid.iptvorganizer.models.stream.*;
+import org.anasoid.iptvorganizer.models.stream.Series;
+import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
 @ApplicationScoped
 public class SeriesRepository extends BaseRepository<Series> {

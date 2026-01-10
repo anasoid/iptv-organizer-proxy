@@ -1,0 +1,85 @@
+> Task :processResources UP-TO-DATE
+> Task :quarkusGenerateCode UP-TO-DATE
+> Task :quarkusGenerateCodeDev UP-TO-DATE
+
+> Task :compileJava FAILED
+/mnt/data/work/anasoid/repo/iptv-organizer-proxy/java/src/main/java/org/anasoid/iptvorganizer/services/SyncService.java:35: error: cannot find symbol
+  @Inject LiveStreamRepository liveStreamRepository;
+          ^
+  symbol:   class LiveStreamRepository
+  location: class SyncService
+/mnt/data/work/anasoid/repo/iptv-organizer-proxy/java/src/main/java/org/anasoid/iptvorganizer/services/SyncService.java:37: error: cannot find symbol
+  @Inject VodStreamRepository vodStreamRepository;
+          ^
+  symbol:   class VodStreamRepository
+  location: class SyncService
+/mnt/data/work/anasoid/repo/iptv-organizer-proxy/java/src/main/java/org/anasoid/iptvorganizer/services/SyncService.java:39: error: cannot find symbol
+  @Inject SeriesRepository seriesRepository;
+          ^
+  symbol:   class SeriesRepository
+  location: class SyncService
+/mnt/data/work/anasoid/repo/iptv-organizer-proxy/java/src/main/java/org/anasoid/iptvorganizer/services/SyncService.java:41: error: cannot find symbol
+  @Inject CategoryRepository categoryRepository;
+          ^
+  symbol:   class CategoryRepository
+  location: class SyncService
+/mnt/data/work/anasoid/repo/iptv-organizer-proxy/java/src/main/java/org/anasoid/iptvorganizer/services/SyncService.java:250: error: cannot find symbol
+      List<Category> newCategories,
+           ^
+  symbol:   class Category
+  location: class SyncService
+/mnt/data/work/anasoid/repo/iptv-organizer-proxy/java/src/main/java/org/anasoid/iptvorganizer/services/SyncService.java:251: error: cannot find symbol
+      List<Category> existingCategories,
+           ^
+  symbol:   class Category
+  location: class SyncService
+/mnt/data/work/anasoid/repo/iptv-organizer-proxy/java/src/main/java/org/anasoid/iptvorganizer/services/SyncService.java:282: error: cannot find symbol
+      List<Category> existingCategories, String categoryType, Set<Integer> fetchedIds) {
+           ^
+  symbol:   class Category
+  location: class SyncService
+/mnt/data/work/anasoid/repo/iptv-organizer-proxy/java/src/main/java/org/anasoid/iptvorganizer/services/SyncService.java:535: error: cannot find symbol
+  private LiveStream mapToLiveStream(Source source, Map<?, ?> data) {
+          ^
+  symbol:   class LiveStream
+  location: class SyncService
+/mnt/data/work/anasoid/repo/iptv-organizer-proxy/java/src/main/java/org/anasoid/iptvorganizer/services/SyncService.java:552: error: cannot find symbol
+  private VodStream mapToVodStream(Source source, Map<?, ?> data) {
+          ^
+  symbol:   class VodStream
+  location: class SyncService
+/mnt/data/work/anasoid/repo/iptv-organizer-proxy/java/src/main/java/org/anasoid/iptvorganizer/services/SyncService.java:569: error: cannot find symbol
+  private Series mapToSeries(Source source, Map<?, ?> data) {
+          ^
+  symbol:   class Series
+  location: class SyncService
+/mnt/data/work/anasoid/repo/iptv-organizer-proxy/java/src/main/java/org/anasoid/iptvorganizer/services/SyncService.java:221: error: cannot find symbol
+    List<Category> categories;
+         ^
+  symbol:   class Category
+  location: class CategoryMappingResult
+/mnt/data/work/anasoid/repo/iptv-organizer-proxy/java/src/main/java/org/anasoid/iptvorganizer/services/SyncService.java:224: error: cannot find symbol
+    CategoryMappingResult(List<Category> categories, Set<Integer> fetchedIds) {
+                               ^
+  symbol:   class Category
+  location: class CategoryMappingResult
+12 errors
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler error output for details.
+
+* Try:
+> Run with --info option to get more log output.
+> Run with --scan to get full insights.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 1s
+4 actionable tasks: 1 executed, 3 up-to-date

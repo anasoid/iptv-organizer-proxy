@@ -7,6 +7,7 @@ import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.anasoid.iptvorganizer.models.SyncLog;
 import org.anasoid.iptvorganizer.models.SyncLogStatus;
+import org.anasoid.iptvorganizer.models.stream.*;
 
 @ApplicationScoped
 public class SyncLogRepository extends BaseRepository<SyncLog> {

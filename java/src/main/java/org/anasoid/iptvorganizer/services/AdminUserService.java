@@ -4,7 +4,9 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.anasoid.iptvorganizer.models.AdminUser;
+import org.anasoid.iptvorganizer.models.stream.*;
 import org.anasoid.iptvorganizer.repositories.AdminUserRepository;
+import org.anasoid.iptvorganizer.repositories.stream.*;
 
 @ApplicationScoped
 public class AdminUserService extends BaseService<AdminUser, AdminUserRepository> {

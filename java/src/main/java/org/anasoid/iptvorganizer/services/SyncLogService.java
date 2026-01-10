@@ -6,7 +6,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.anasoid.iptvorganizer.models.SyncLog;
 import org.anasoid.iptvorganizer.models.SyncLogStatus;
+import org.anasoid.iptvorganizer.models.stream.*;
 import org.anasoid.iptvorganizer.repositories.SyncLogRepository;
+import org.anasoid.iptvorganizer.repositories.stream.*;
 
 @ApplicationScoped
 public class SyncLogService extends BaseService<SyncLog, SyncLogRepository> {

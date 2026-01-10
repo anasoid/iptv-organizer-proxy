@@ -1,14 +1,16 @@
-package org.anasoid.iptvorganizer.controllers;
+package org.anasoid.iptvorganizer.controllers.stream;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
+import org.anasoid.iptvorganizer.controllers.BaseController;
 import org.anasoid.iptvorganizer.dto.CategoryDTO;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
-import org.anasoid.iptvorganizer.services.CategoryService;
+import org.anasoid.iptvorganizer.services.stream.*;
+import org.anasoid.iptvorganizer.services.stream.CategoryService;
 
 /** Categories controller */
 @Path("/api/categories")

@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.models;
+package org.anasoid.iptvorganizer.models.stream;
 
 /** Interface for stream-like entities (LiveStream, VodStream, Series) */
 public interface StreamLike {
