@@ -8,9 +8,7 @@ import java.time.LocalDateTime;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.SyncLog;
 import org.anasoid.iptvorganizer.models.SyncLogStatus;
-import org.anasoid.iptvorganizer.models.stream.*;
 import org.anasoid.iptvorganizer.repositories.SyncLogRepository;
-import org.anasoid.iptvorganizer.repositories.stream.*;
 
 /**
  * Handles cleanup of interrupted syncs on application startup Marks any sync_logs with status =

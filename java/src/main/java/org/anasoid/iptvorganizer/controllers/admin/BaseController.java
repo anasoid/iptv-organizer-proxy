@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.controllers;
+package org.anasoid.iptvorganizer.controllers.admin;
 
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;

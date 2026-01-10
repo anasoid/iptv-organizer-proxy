@@ -15,7 +15,6 @@ import org.anasoid.iptvorganizer.exceptions.StreamingException;
 @ApplicationScoped
 public class StreamingJsonParser {
 
-  private static final int CHUNK_SIZE = 128 * 1024; // 128KB
   private static final int GC_THRESHOLD = 1000;
 
   @Inject ObjectMapper objectMapper;

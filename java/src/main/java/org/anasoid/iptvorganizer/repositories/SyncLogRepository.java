@@ -7,7 +7,6 @@ import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.anasoid.iptvorganizer.models.SyncLog;
 import org.anasoid.iptvorganizer.models.SyncLogStatus;
-import org.anasoid.iptvorganizer.models.stream.*;
 
 @ApplicationScoped
 public class SyncLogRepository extends BaseRepository<SyncLog> {
@@ -20,7 +19,9 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
   @Override
   public Uni<Long> insert(SyncLog syncLog) {
     String sql =
-        "INSERT INTO sync_logs (source_id, sync_type, started_at, completed_at, status, items_added, items_updated, items_deleted, error_message, duration_seconds, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO sync_logs (source_id, sync_type, started_at, completed_at, status,"
+            + " items_added, items_updated, items_deleted, error_message, duration_seconds,"
+            + " created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     io.vertx.mutiny.sqlclient.Tuple tuple =
         io.vertx.mutiny.sqlclient.Tuple.tuple()
             .addLong(syncLog.getSourceId())
@@ -47,7 +48,9 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
   @Override
   public Uni<Void> update(SyncLog syncLog) {
     String sql =
-        "UPDATE sync_logs SET source_id = ?, sync_type = ?, started_at = ?, completed_at = ?, status = ?, items_added = ?, items_updated = ?, items_deleted = ?, error_message = ?, duration_seconds = ?, updated_at = ? WHERE id = ?";
+        "UPDATE sync_logs SET source_id = ?, sync_type = ?, started_at = ?, completed_at = ?,"
+            + " status = ?, items_added = ?, items_updated = ?, items_deleted = ?, error_message ="
+            + " ?, duration_seconds = ?, updated_at = ? WHERE id = ?";
     io.vertx.mutiny.sqlclient.Tuple tuple =
         io.vertx.mutiny.sqlclient.Tuple.tuple()
             .addLong(syncLog.getSourceId())

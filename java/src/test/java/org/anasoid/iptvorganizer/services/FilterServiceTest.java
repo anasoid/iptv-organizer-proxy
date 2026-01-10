@@ -48,7 +48,8 @@ public class FilterServiceTest {
 
   @Test
   void testParseFilterConfigInvalidYaml() {
-    String yaml = """
+    String yaml =
+        """
             invalid: [
                 invalid yaml structure
             """;

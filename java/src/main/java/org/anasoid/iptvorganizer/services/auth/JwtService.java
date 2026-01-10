@@ -4,7 +4,6 @@ import io.smallrye.jwt.build.Jwt;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.Set;
 import org.anasoid.iptvorganizer.models.AdminUser;
-import org.anasoid.iptvorganizer.models.stream.*;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /** JWT token generation service using SmallRye JWT */

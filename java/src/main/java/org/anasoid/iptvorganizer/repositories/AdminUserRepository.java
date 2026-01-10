@@ -6,7 +6,6 @@ import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.models.AdminUser;
-import org.anasoid.iptvorganizer.models.stream.*;
 
 @ApplicationScoped
 public class AdminUserRepository extends BaseRepository<AdminUser> {
@@ -30,7 +29,8 @@ public class AdminUserRepository extends BaseRepository<AdminUser> {
   @Override
   public Uni<Void> update(AdminUser user) {
     String sql =
-        "UPDATE admin_users SET username = ?, password_hash = ?, email = ?, is_active = ? WHERE id = ?";
+        "UPDATE admin_users SET username = ?, password_hash = ?, email = ?, is_active = ? WHERE id"
+            + " = ?";
     return pool.preparedQuery(sql)
         .execute(
             Tuple.of(

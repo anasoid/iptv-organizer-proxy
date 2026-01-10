@@ -7,7 +7,6 @@ import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.models.Source;
-import org.anasoid.iptvorganizer.models.stream.*;
 
 @ApplicationScoped
 public class SourceRepository extends BaseRepository<Source> {
@@ -31,7 +30,8 @@ public class SourceRepository extends BaseRepository<Source> {
   @Override
   public Uni<Long> insert(Source source) {
     String sql =
-        "INSERT INTO sources (name, url, username, password, sync_interval, is_active, enableproxy, disablestreamproxy, stream_follow_location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO sources (name, url, username, password, sync_interval, is_active, enableproxy,"
+            + " disablestreamproxy, stream_follow_location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
     Tuple tuple =
         Tuple.tuple()
             .addString(source.getName())
@@ -49,7 +49,9 @@ public class SourceRepository extends BaseRepository<Source> {
   @Override
   public Uni<Void> update(Source source) {
     String sql =
-        "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, enableproxy = ?, disablestreamproxy = ?, stream_follow_location = ? WHERE id = ?";
+        "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?,"
+            + " last_sync = ?, next_sync = ?, is_active = ?, enableproxy = ?, disablestreamproxy ="
+            + " ?, stream_follow_location = ? WHERE id = ?";
     Tuple tuple =
         Tuple.tuple()
             .addString(source.getName())

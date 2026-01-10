@@ -5,7 +5,6 @@ import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.anasoid.iptvorganizer.models.Filter;
-import org.anasoid.iptvorganizer.models.stream.*;
 
 @ApplicationScoped
 public class FilterRepository extends BaseRepository<Filter> {
@@ -18,7 +17,8 @@ public class FilterRepository extends BaseRepository<Filter> {
   @Override
   public Uni<Long> insert(Filter filter) {
     String sql =
-        "INSERT INTO filters (name, description, filter_config, use_source_filter, favoris) VALUES (?, ?, ?, ?, ?)";
+        "INSERT INTO filters (name, description, filter_config, use_source_filter, favoris) VALUES"
+            + " (?, ?, ?, ?, ?)";
     return pool.preparedQuery(sql)
         .execute(
             Tuple.of(
@@ -33,7 +33,8 @@ public class FilterRepository extends BaseRepository<Filter> {
   @Override
   public Uni<Void> update(Filter filter) {
     String sql =
-        "UPDATE filters SET name = ?, description = ?, filter_config = ?, use_source_filter = ?, favoris = ? WHERE id = ?";
+        "UPDATE filters SET name = ?, description = ?, filter_config = ?, use_source_filter = ?,"
+            + " favoris = ? WHERE id = ?";
     return pool.preparedQuery(sql)
         .execute(
             Tuple.of(

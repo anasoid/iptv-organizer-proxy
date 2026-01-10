@@ -13,9 +13,7 @@ import org.anasoid.iptvorganizer.exceptions.FilterException;
 import org.anasoid.iptvorganizer.models.Filter;
 import org.anasoid.iptvorganizer.models.filtering.FilterConfig;
 import org.anasoid.iptvorganizer.models.filtering.FilterRule;
-import org.anasoid.iptvorganizer.models.stream.*;
 import org.anasoid.iptvorganizer.repositories.FilterRepository;
-import org.anasoid.iptvorganizer.repositories.stream.*;
 
 @ApplicationScoped
 public class FilterService extends BaseService<Filter, FilterRepository> {

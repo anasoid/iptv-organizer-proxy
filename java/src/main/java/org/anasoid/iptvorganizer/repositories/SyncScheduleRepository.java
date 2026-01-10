@@ -5,7 +5,6 @@ import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.anasoid.iptvorganizer.models.SyncSchedule;
-import org.anasoid.iptvorganizer.models.stream.*;
 
 @ApplicationScoped
 public class SyncScheduleRepository extends BaseRepository<SyncSchedule> {
@@ -18,7 +17,8 @@ public class SyncScheduleRepository extends BaseRepository<SyncSchedule> {
   @Override
   public Uni<Long> insert(SyncSchedule schedule) {
     String sql =
-        "INSERT INTO sync_schedule (source_id, task_type, next_sync, last_sync, sync_interval) VALUES (?, ?, ?, ?, ?)";
+        "INSERT INTO sync_schedule (source_id, task_type, next_sync, last_sync, sync_interval)"
+            + " VALUES (?, ?, ?, ?, ?)";
     return pool.preparedQuery(sql)
         .execute(
             Tuple.of(
@@ -33,7 +33,8 @@ public class SyncScheduleRepository extends BaseRepository<SyncSchedule> {
   @Override
   public Uni<Void> update(SyncSchedule schedule) {
     String sql =
-        "UPDATE sync_schedule SET source_id = ?, task_type = ?, next_sync = ?, last_sync = ?, sync_interval = ? WHERE id = ?";
+        "UPDATE sync_schedule SET source_id = ?, task_type = ?, next_sync = ?, last_sync = ?,"
+            + " sync_interval = ? WHERE id = ?";
     return pool.preparedQuery(sql)
         .execute(
             Tuple.of(

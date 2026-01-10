@@ -6,7 +6,6 @@ import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.anasoid.iptvorganizer.models.Client;
-import org.anasoid.iptvorganizer.models.stream.*;
 
 @ApplicationScoped
 public class ClientRepository extends BaseRepository<Client> {
@@ -19,7 +18,9 @@ public class ClientRepository extends BaseRepository<Client> {
   @Override
   public Uni<Long> insert(Client client) {
     String sql =
-        "INSERT INTO clients (source_id, filter_id, username, password, name, email, expiry_date, is_active, hide_adult_content, max_connections, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO clients (source_id, filter_id, username, password, name, email, expiry_date,"
+            + " is_active, hide_adult_content, max_connections, notes) VALUES (?, ?, ?, ?, ?, ?, ?,"
+            + " ?, ?, ?, ?)";
     io.vertx.mutiny.sqlclient.Tuple tuple =
         io.vertx.mutiny.sqlclient.Tuple.tuple()
             .addLong(client.getSourceId())
@@ -39,7 +40,9 @@ public class ClientRepository extends BaseRepository<Client> {
   @Override
   public Uni<Void> update(Client client) {
     String sql =
-        "UPDATE clients SET source_id = ?, filter_id = ?, username = ?, password = ?, name = ?, email = ?, expiry_date = ?, is_active = ?, hide_adult_content = ?, max_connections = ?, notes = ? WHERE id = ?";
+        "UPDATE clients SET source_id = ?, filter_id = ?, username = ?, password = ?, name = ?,"
+            + " email = ?, expiry_date = ?, is_active = ?, hide_adult_content = ?, max_connections"
+            + " = ?, notes = ? WHERE id = ?";
     io.vertx.mutiny.sqlclient.Tuple tuple =
         io.vertx.mutiny.sqlclient.Tuple.tuple()
             .addLong(client.getSourceId())

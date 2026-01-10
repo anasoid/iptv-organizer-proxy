@@ -103,7 +103,8 @@ public class StreamingJsonParserTest {
 
   @Test
   void testParseJsonStream_SingleObject() {
-    String json = """
+    String json =
+        """
             {"id": 1, "name": "Item 1"}
             """;
 
@@ -153,7 +154,8 @@ public class StreamingJsonParserTest {
 
   @Test
   void testParseJsonArrayNotArray() {
-    String json = """
+    String json =
+        """
             {"id": 1, "name": "Item 1"}
             """;
 

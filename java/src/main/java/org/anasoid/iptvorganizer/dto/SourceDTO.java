@@ -9,7 +9,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.anasoid.iptvorganizer.config.BooleanAsIntSerializer;
 import org.anasoid.iptvorganizer.models.Source;
-import org.anasoid.iptvorganizer.models.stream.*;
 
 /** DTO for Source - excludes password from API responses All boolean fields serialize as 0/1 */
 @Data

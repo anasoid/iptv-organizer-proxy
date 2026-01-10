@@ -6,16 +6,32 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
-import org.anasoid.iptvorganizer.models.*;
+import org.anasoid.iptvorganizer.models.BaseEntity;
+import org.anasoid.iptvorganizer.models.Source;
+import org.anasoid.iptvorganizer.models.SyncLog;
+import org.anasoid.iptvorganizer.models.SyncLogStatus;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
-import org.anasoid.iptvorganizer.models.stream.*;
+import org.anasoid.iptvorganizer.models.stream.Category;
+import org.anasoid.iptvorganizer.models.stream.LiveStream;
+import org.anasoid.iptvorganizer.models.stream.Series;
 import org.anasoid.iptvorganizer.models.stream.StreamLike;
-import org.anasoid.iptvorganizer.repositories.*;
-import org.anasoid.iptvorganizer.repositories.stream.*;
-import org.anasoid.iptvorganizer.services.stream.*;
+import org.anasoid.iptvorganizer.models.stream.VodStream;
+import org.anasoid.iptvorganizer.repositories.BaseRepository;
+import org.anasoid.iptvorganizer.repositories.SourceRepository;
+import org.anasoid.iptvorganizer.repositories.SyncLogRepository;
+import org.anasoid.iptvorganizer.repositories.SyncScheduleRepository;
+import org.anasoid.iptvorganizer.repositories.stream.CategoryRepository;
+import org.anasoid.iptvorganizer.repositories.stream.LiveStreamRepository;
+import org.anasoid.iptvorganizer.repositories.stream.SeriesRepository;
+import org.anasoid.iptvorganizer.repositories.stream.VodStreamRepository;
 import org.anasoid.iptvorganizer.services.streaming.HttpStreamingService;
 
 /**
@@ -26,7 +42,7 @@ import org.anasoid.iptvorganizer.services.streaming.HttpStreamingService;
 public class SyncService {
 
   private static final Logger LOGGER = Logger.getLogger(SyncService.class.getName());
-  private static final int BATCH_SIZE = 100;
+
   private static final int GC_THRESHOLD = 1000;
 
   @Inject SourceRepository sourceRepository;

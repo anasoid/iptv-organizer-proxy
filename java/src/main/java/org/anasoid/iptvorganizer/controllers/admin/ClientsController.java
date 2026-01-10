@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.controllers;
+package org.anasoid.iptvorganizer.controllers.admin;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
@@ -10,9 +10,7 @@ import org.anasoid.iptvorganizer.dto.ClientDTO;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.Client;
-import org.anasoid.iptvorganizer.models.stream.*;
 import org.anasoid.iptvorganizer.services.ClientService;
-import org.anasoid.iptvorganizer.services.stream.*;
 
 /** Clients controller CRUD operations for clients with search and filtering */
 @Path("/api/clients")

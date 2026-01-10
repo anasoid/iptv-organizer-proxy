@@ -5,7 +5,6 @@ import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
-import org.anasoid.iptvorganizer.models.stream.*;
 import org.anasoid.iptvorganizer.models.stream.Category;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
@@ -20,7 +19,8 @@ public class CategoryRepository extends BaseRepository<Category> {
   @Override
   public Uni<Long> insert(Category category) {
     String sql =
-        "INSERT INTO categories (source_id, category_id, category_name, category_type, num, allow_deny, parent_id, labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO categories (source_id, category_id, category_name, category_type, num,"
+            + " allow_deny, parent_id, labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
     io.vertx.mutiny.sqlclient.Tuple tuple =
         io.vertx.mutiny.sqlclient.Tuple.tuple()
             .addLong(category.getSourceId())
@@ -37,7 +37,8 @@ public class CategoryRepository extends BaseRepository<Category> {
   @Override
   public Uni<Void> update(Category category) {
     String sql =
-        "UPDATE categories SET source_id = ?, category_id = ?, category_name = ?, category_type = ?, num = ?, allow_deny = ?, parent_id = ?, labels = ? WHERE id = ?";
+        "UPDATE categories SET source_id = ?, category_id = ?, category_name = ?, category_type ="
+            + " ?, num = ?, allow_deny = ?, parent_id = ?, labels = ? WHERE id = ?";
     io.vertx.mutiny.sqlclient.Tuple tuple =
         io.vertx.mutiny.sqlclient.Tuple.tuple()
             .addLong(category.getSourceId())
@@ -118,7 +119,8 @@ public class CategoryRepository extends BaseRepository<Category> {
   public Uni<Category> findBySourceCategoryType(
       Long sourceId, Integer categoryId, String categoryType) {
     String sql =
-        "SELECT * FROM categories WHERE source_id = ? AND category_id = ? AND category_type = ? LIMIT 1";
+        "SELECT * FROM categories WHERE source_id = ? AND category_id = ? AND category_type = ?"
+            + " LIMIT 1";
     return pool.preparedQuery(sql)
         .execute(Tuple.of(sourceId, categoryId, categoryType))
         .map(

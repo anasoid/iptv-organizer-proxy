@@ -5,7 +5,6 @@ import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.anasoid.iptvorganizer.models.ConnectionLog;
-import org.anasoid.iptvorganizer.models.stream.*;
 
 @ApplicationScoped
 public class ConnectionLogRepository extends BaseRepository<ConnectionLog> {
@@ -18,7 +17,8 @@ public class ConnectionLogRepository extends BaseRepository<ConnectionLog> {
   @Override
   public Uni<Long> insert(ConnectionLog log) {
     String sql =
-        "INSERT INTO connection_logs (client_id, action, ip_address, user_agent) VALUES (?, ?, ?, ?)";
+        "INSERT INTO connection_logs (client_id, action, ip_address, user_agent) VALUES (?, ?, ?,"
+            + " ?)";
     return pool.preparedQuery(sql)
         .execute(
             Tuple.of(log.getClientId(), log.getAction(), log.getIpAddress(), log.getUserAgent()))
@@ -28,7 +28,8 @@ public class ConnectionLogRepository extends BaseRepository<ConnectionLog> {
   @Override
   public Uni<Void> update(ConnectionLog log) {
     String sql =
-        "UPDATE connection_logs SET client_id = ?, action = ?, ip_address = ?, user_agent = ? WHERE id = ?";
+        "UPDATE connection_logs SET client_id = ?, action = ?, ip_address = ?, user_agent = ? WHERE"
+            + " id = ?";
     return pool.preparedQuery(sql)
         .execute(
             Tuple.of(

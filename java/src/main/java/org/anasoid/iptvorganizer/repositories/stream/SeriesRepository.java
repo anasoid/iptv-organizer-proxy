@@ -7,7 +7,6 @@ import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.anasoid.iptvorganizer.models.stream.*;
 import org.anasoid.iptvorganizer.models.stream.Series;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
@@ -22,7 +21,9 @@ public class SeriesRepository extends BaseRepository<Series> {
   @Override
   public Uni<Long> insert(Series series) {
     String sql =
-        "INSERT INTO series (source_id, stream_id, num, allow_deny, name, category_id, category_ids, is_adult, labels, data, added_date, release_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO series (source_id, stream_id, num, allow_deny, name, category_id,"
+            + " category_ids, is_adult, labels, data, added_date, release_date) VALUES (?, ?, ?, ?,"
+            + " ?, ?, ?, ?, ?, ?, ?, ?)";
     io.vertx.mutiny.sqlclient.Tuple tuple =
         io.vertx.mutiny.sqlclient.Tuple.tuple()
             .addLong(series.getSourceId())
@@ -43,7 +44,9 @@ public class SeriesRepository extends BaseRepository<Series> {
   @Override
   public Uni<Void> update(Series series) {
     String sql =
-        "UPDATE series SET source_id = ?, stream_id = ?, num = ?, allow_deny = ?, name = ?, category_id = ?, category_ids = ?, is_adult = ?, labels = ?, data = ?, added_date = ?, release_date = ? WHERE id = ?";
+        "UPDATE series SET source_id = ?, stream_id = ?, num = ?, allow_deny = ?, name = ?,"
+            + " category_id = ?, category_ids = ?, is_adult = ?, labels = ?, data = ?, added_date ="
+            + " ?, release_date = ? WHERE id = ?";
     io.vertx.mutiny.sqlclient.Tuple tuple =
         io.vertx.mutiny.sqlclient.Tuple.tuple()
             .addLong(series.getSourceId())
@@ -123,13 +126,13 @@ public class SeriesRepository extends BaseRepository<Series> {
 
     // Build INSERT ... ON DUPLICATE KEY UPDATE statement
     String sql =
-        "INSERT INTO series (source_id, stream_id, num, allow_deny, name, category_id, category_ids, is_adult, labels, data, added_date, release_date) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
-            + "ON DUPLICATE KEY UPDATE "
-            + "num=VALUES(num), allow_deny=VALUES(allow_deny), name=VALUES(name), "
-            + "category_id=VALUES(category_id), category_ids=VALUES(category_ids), "
-            + "is_adult=VALUES(is_adult), labels=VALUES(labels), data=VALUES(data), "
-            + "added_date=VALUES(added_date), release_date=VALUES(release_date)";
+        "INSERT INTO series (source_id, stream_id, num, allow_deny, name, category_id,"
+            + " category_ids, is_adult, labels, data, added_date, release_date) VALUES (?, ?, ?, ?,"
+            + " ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE num=VALUES(num),"
+            + " allow_deny=VALUES(allow_deny), name=VALUES(name), category_id=VALUES(category_id),"
+            + " category_ids=VALUES(category_ids), is_adult=VALUES(is_adult),"
+            + " labels=VALUES(labels), data=VALUES(data), added_date=VALUES(added_date),"
+            + " release_date=VALUES(release_date)";
 
     return pool.preparedQuery(sql)
         .executeBatch(

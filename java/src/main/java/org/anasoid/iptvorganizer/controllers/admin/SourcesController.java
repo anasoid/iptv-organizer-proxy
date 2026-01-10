@@ -1,9 +1,18 @@
-package org.anasoid.iptvorganizer.controllers;
+package org.anasoid.iptvorganizer.controllers.admin;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.*;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
@@ -16,12 +25,10 @@ import org.anasoid.iptvorganizer.dto.request.CreateSourceRequest;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.Source;
-import org.anasoid.iptvorganizer.models.stream.*;
 import org.anasoid.iptvorganizer.services.SourceService;
 import org.anasoid.iptvorganizer.services.SyncLockManager;
 import org.anasoid.iptvorganizer.services.SyncLogService;
 import org.anasoid.iptvorganizer.services.SyncService;
-import org.anasoid.iptvorganizer.services.stream.*;
 
 /** Sources controller CRUD operations for sources with sync management */
 @Path("/api/sources")
