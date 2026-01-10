@@ -45,7 +45,8 @@ public class SimpleMigrator {
           "V013__update_sync_logs_sync_type_enum.sql",
           "V014__remove_sync_status_column.sql",
           "V015__add_timestamps_to_sync_logs.sql",
-          "V016__add_interrupted_status_to_sync_logs.sql");
+          "V016__add_interrupted_status_to_sync_logs.sql",
+          "V017__add_updated_at_to_categories.sql");
 
   void onStart(@Observes StartupEvent event) {
     LOG.info("Starting database migrations for: " + dbKind);
@@ -84,43 +85,43 @@ public class SimpleMigrator {
     if ("sqlite".equalsIgnoreCase(dbKind)) {
       createTableSql =
           """
-                CREATE TABLE IF NOT EXISTS schema_version (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    version TEXT NOT NULL UNIQUE,
-                    description TEXT,
-                    checksum TEXT NOT NULL,
-                    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """;
+          CREATE TABLE IF NOT EXISTS schema_version (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              version TEXT NOT NULL UNIQUE,
+              description TEXT,
+              checksum TEXT NOT NULL,
+              applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+          """;
     } else if ("mssql".equalsIgnoreCase(dbKind)) {
       // SQL Server
       createTableSql =
           """
-                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'schema_version')
-                BEGIN
-                    CREATE TABLE schema_version (
-                        id BIGINT IDENTITY(1,1) PRIMARY KEY,
-                        version VARCHAR(255) NOT NULL UNIQUE,
-                        description VARCHAR(500),
-                        checksum VARCHAR(32) NOT NULL,
-                        applied_at DATETIME2 DEFAULT GETDATE()
-                    )
-                    CREATE INDEX idx_version ON schema_version(version)
-                END
-                """;
+          IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'schema_version')
+          BEGIN
+              CREATE TABLE schema_version (
+                  id BIGINT IDENTITY(1,1) PRIMARY KEY,
+                  version VARCHAR(255) NOT NULL UNIQUE,
+                  description VARCHAR(500),
+                  checksum VARCHAR(32) NOT NULL,
+                  applied_at DATETIME2 DEFAULT GETDATE()
+              )
+              CREATE INDEX idx_version ON schema_version(version)
+          END
+          """;
     } else {
       // MySQL and PostgreSQL
       createTableSql =
           """
-                CREATE TABLE IF NOT EXISTS schema_version (
-                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-                    version VARCHAR(255) NOT NULL UNIQUE,
-                    description VARCHAR(500),
-                    checksum VARCHAR(32) NOT NULL,
-                    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_version (version)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-                """;
+          CREATE TABLE IF NOT EXISTS schema_version (
+              id BIGINT AUTO_INCREMENT PRIMARY KEY,
+              version VARCHAR(255) NOT NULL UNIQUE,
+              description VARCHAR(500),
+              checksum VARCHAR(32) NOT NULL,
+              applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              INDEX idx_version (version)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+          """;
     }
 
     return client
@@ -190,7 +191,8 @@ public class SimpleMigrator {
                             v -> {
                               // Record migration in schema_version
                               String insertSql =
-                                  "INSERT INTO schema_version (version, description, checksum) VALUES (?, ?, ?)";
+                                  "INSERT INTO schema_version (version, description, checksum)"
+                                      + " VALUES (?, ?, ?)";
                               return conn.preparedQuery(insertSql)
                                   .execute(Tuple.of(version, description, checksum));
                             })

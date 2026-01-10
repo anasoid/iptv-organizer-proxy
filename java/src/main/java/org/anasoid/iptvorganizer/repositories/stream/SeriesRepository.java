@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.repositories.stream;
 
-import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
@@ -8,10 +7,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.models.stream.Series;
-import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
 @ApplicationScoped
-public class SeriesRepository extends BaseRepository<Series> {
+public class SeriesRepository extends BaseStreamRepository<Series> {
 
   @Override
   protected String getTableName() {
@@ -87,38 +85,10 @@ public class SeriesRepository extends BaseRepository<Series> {
   }
 
   /**
-   * Find existing series by a list of stream_ids for a specific source Used for batch upsert
-   * operations during sync
-   */
-  public Multi<Series> findByStreamIds(Long sourceId, List<Integer> streamIds) {
-    if (streamIds == null || streamIds.isEmpty()) {
-      return Multi.createFrom().empty();
-    }
-
-    StringBuilder sql =
-        new StringBuilder("SELECT * FROM series WHERE source_id = ? AND stream_id IN (");
-    for (int i = 0; i < streamIds.size(); i++) {
-      if (i > 0) sql.append(", ");
-      sql.append("?");
-    }
-    sql.append(")");
-
-    Tuple tuple = Tuple.of(sourceId);
-    for (Integer streamId : streamIds) {
-      tuple = tuple.addInteger(streamId);
-    }
-
-    return pool.preparedQuery(sql.toString())
-        .execute(tuple)
-        .onItem()
-        .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
-        .map(this::mapRow);
-  }
-
-  /**
    * Batch upsert series (update if exists by stream_id, insert if new) Uses ON DUPLICATE KEY UPDATE
    * for efficient batch processing
    */
+  @Override
   public Uni<Void> batchUpsert(List<Series> seriesList) {
     if (seriesList == null || seriesList.isEmpty()) {
       return Uni.createFrom().voidItem();

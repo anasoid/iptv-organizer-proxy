@@ -6,10 +6,9 @@ import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.anasoid.iptvorganizer.models.stream.Category;
-import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
 @ApplicationScoped
-public class CategoryRepository extends BaseRepository<Category> {
+public class CategoryRepository extends SourcedEntityRepository<Category> {
 
   @Override
   protected String getTableName() {
@@ -66,6 +65,7 @@ public class CategoryRepository extends BaseRepository<Category> {
         .parentId(row.getInteger("parent_id"))
         .labels(row.getString("labels"))
         .createdAt(row.getLocalDateTime("created_at"))
+        .updatedAt(row.getLocalDateTime("updated_at"))
         .build();
   }
 
@@ -104,15 +104,6 @@ public class CategoryRepository extends BaseRepository<Category> {
     }
 
     return countWhere(whereClause.toString(), params);
-  }
-
-  /** Find categories by source ID */
-  public Multi<Category> findBySourceId(Long sourceId) {
-    return pool.preparedQuery("SELECT * FROM categories WHERE source_id = ? ORDER BY id DESC")
-        .execute(Tuple.of(sourceId))
-        .onItem()
-        .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
-        .map(this::mapRow);
   }
 
   /** Find category by source, category_id, and type */
