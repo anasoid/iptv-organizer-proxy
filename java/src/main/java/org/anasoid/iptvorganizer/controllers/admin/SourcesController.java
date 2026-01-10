@@ -106,7 +106,7 @@ public class SourcesController extends BaseController {
             .url(request.getUrl())
             .username(request.getUsername())
             .password(request.getPassword())
-            .syncInterval(request.getSyncInterval() != null ? request.getSyncInterval() : 3600)
+            .syncInterval(request.getSyncInterval() != null ? request.getSyncInterval() : 1)
             .isActive(request.getIsActive() != null ? request.getIsActive() : true)
             .enableProxy(request.getEnableProxy() != null ? request.getEnableProxy() : false)
             .disableStreamProxy(

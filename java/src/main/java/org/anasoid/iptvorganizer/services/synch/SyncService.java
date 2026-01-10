@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.services.synch;
 
-import io.quarkus.scheduler.Scheduled;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -69,11 +68,6 @@ public class SyncService {
 
   @Inject SyncLockManager syncLockManager;
 
-  /**
-   * Scheduled task to check for sources needing sync Runs every 5 minutes by default, configurable
-   * via sync.check.interval
-   */
-  @Scheduled(cron = "0 */5 * * * ?", identity = "sync-daemon")
   public void scheduledSync() {
     LOGGER.info("Starting scheduled sync check");
 
@@ -536,7 +530,7 @@ public class SyncService {
     // Update source with next sync time (lock will be released separately)
     source.setNextSync(
         LocalDateTime.now()
-            .plusMinutes(source.getSyncInterval() != null ? source.getSyncInterval() : 5));
+            .plusDays(source.getSyncInterval() != null ? source.getSyncInterval() : 1));
 
     return syncLogRepository
         .update(syncLog)
