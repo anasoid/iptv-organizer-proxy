@@ -13,17 +13,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
-import org.anasoid.iptvorganizer.helper.LabelExtractorHelper;
 import org.anasoid.iptvorganizer.models.BaseEntity;
 import org.anasoid.iptvorganizer.models.Source;
 import org.anasoid.iptvorganizer.models.SyncLog;
 import org.anasoid.iptvorganizer.models.SyncLogStatus;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.stream.Category;
-import org.anasoid.iptvorganizer.models.stream.LiveStream;
-import org.anasoid.iptvorganizer.models.stream.Series;
 import org.anasoid.iptvorganizer.models.stream.StreamLike;
-import org.anasoid.iptvorganizer.models.stream.VodStream;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 import org.anasoid.iptvorganizer.repositories.stream.CategoryRepository;
 import org.anasoid.iptvorganizer.repositories.stream.LiveStreamRepository;
@@ -34,6 +30,8 @@ import org.anasoid.iptvorganizer.repositories.synch.SyncLogRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SyncScheduleRepository;
 import org.anasoid.iptvorganizer.services.FilterService;
 import org.anasoid.iptvorganizer.services.streaming.HttpStreamingService;
+import org.anasoid.iptvorganizer.services.synch.mapper.SynchMapper;
+import org.anasoid.iptvorganizer.services.synch.mapper.SynchMapper.CategoryMappingResult;
 
 /**
  * Background sync service using Quarkus Scheduler Syncs live streams, VOD, series, and categories
@@ -64,7 +62,7 @@ public class SyncService {
 
   @Inject FilterService filterService;
 
-  @Inject LabelExtractorHelper labelExtractor;
+  @Inject SynchMapper synchMapper;
 
   @Inject SyncLockManager syncLockManager;
 
@@ -206,46 +204,11 @@ public class SyncService {
                     "Failed to sync " + categoryType + " categories: " + ex.getMessage()));
   }
 
-  /** Map API response data to Category objects */
-  private CategoryMappingResult mapCategoryData(
-      Source source, List<Map> categoryMaps, String categoryType) {
-    List<Category> categories = new ArrayList<>();
-    Set<Integer> fetchedCategoryIds = new HashSet<>();
-    AtomicInteger num = new AtomicInteger(1);
-
-    for (Map catData : categoryMaps) {
-      Category category = new Category();
-      category.setSourceId(source.getId());
-      category.setCategoryId(getIntValue(catData, "category_id"));
-      category.setCategoryName(getStringValue(catData, "category_name"));
-      category.setCategoryType(categoryType);
-      category.setNum(num.getAndIncrement());
-      category.setParentId(getIntValue(catData, "parent_id"));
-      category.setLabels(labelExtractor.extractLabels(category.getCategoryName()));
-
-      categories.add(category);
-      fetchedCategoryIds.add(category.getCategoryId());
-    }
-
-    LOGGER.info("Fetched " + categories.size() + " " + categoryType + " categories from API");
-    return new CategoryMappingResult(categories, fetchedCategoryIds);
-  }
-
-  /** Helper class to hold category mapping results */
-  private static class CategoryMappingResult {
-    List<Category> categories;
-    Set<Integer> fetchedIds;
-
-    CategoryMappingResult(List<Category> categories, Set<Integer> fetchedIds) {
-      this.categories = categories;
-      this.fetchedIds = fetchedIds;
-    }
-  }
-
   /** Process category synchronization: insert/update new, delete obsolete */
   private Uni<Void> processCategorySync(
       Source source, List<Map> categoryMaps, String categoryType) {
-    CategoryMappingResult mappingResult = mapCategoryData(source, categoryMaps, categoryType);
+    CategoryMappingResult mappingResult =
+        synchMapper.mapCategoryData(source, categoryMaps, categoryType);
 
     return categoryRepository
         .findBySourceId(source.getId())
@@ -325,7 +288,7 @@ public class SyncService {
         "live streams",
         "get_live_streams",
         "live",
-        streamData -> mapToLiveStream(source, streamData),
+        streamData -> synchMapper.mapToLiveStream(source, streamData),
         liveStreamRepository);
   }
 
@@ -337,7 +300,7 @@ public class SyncService {
         "VOD streams",
         "get_vod_streams",
         "vod",
-        streamData -> mapToVodStream(source, streamData),
+        streamData -> synchMapper.mapToVodStream(source, streamData),
         vodStreamRepository);
   }
 
@@ -349,7 +312,7 @@ public class SyncService {
         "series",
         "get_series",
         "series",
-        streamData -> mapToSeries(source, streamData),
+        streamData -> synchMapper.mapToSeries(source, streamData),
         seriesRepository);
   }
 
@@ -544,89 +507,6 @@ public class SyncService {
     return String.format(
         "%s/player_api.php?action=%s&username=%s&password=%s",
         baseUrl, action, source.getUsername(), source.getPassword());
-  }
-
-  /** Map API response to LiveStream entity */
-  private LiveStream mapToLiveStream(Source source, Map<?, ?> data) {
-    return LiveStream.builder()
-        .sourceId(source.getId())
-        .streamId(getIntValue(data, "stream_id"))
-        .num(getIntValue(data, "num"))
-        .name(getStringValue(data, "name"))
-        .categoryId(getIntValue(data, "category_id"))
-        .isAdult(getBooleanValue(data, "is_adult"))
-        .labels(labelExtractor.extractLabels(getStringValue(data, "name")))
-        .data(convertMapToJson(data))
-        .build();
-  }
-
-  /** Map API response to VodStream entity */
-  private VodStream mapToVodStream(Source source, Map<?, ?> data) {
-    return VodStream.builder()
-        .sourceId(source.getId())
-        .streamId(getIntValue(data, "stream_id"))
-        .num(getIntValue(data, "num"))
-        .name(getStringValue(data, "name"))
-        .categoryId(getIntValue(data, "category_id"))
-        .isAdult(getBooleanValue(data, "is_adult"))
-        .labels(labelExtractor.extractLabels(getStringValue(data, "name")))
-        .data(convertMapToJson(data))
-        .build();
-  }
-
-  /** Map API response to Series entity */
-  private Series mapToSeries(Source source, Map<?, ?> data) {
-    return Series.builder()
-        .sourceId(source.getId())
-        .streamId(getIntValue(data, "series_id"))
-        .num(getIntValue(data, "num"))
-        .name(getStringValue(data, "name"))
-        .categoryId(getIntValue(data, "category_id"))
-        .isAdult(getBooleanValue(data, "is_adult"))
-        .labels(labelExtractor.extractLabels(getStringValue(data, "name")))
-        .data(convertMapToJson(data))
-        .build();
-  }
-
-  private Integer getIntValue(Map<?, ?> data, String key) {
-    Object value = data.get(key);
-    if (value instanceof Integer) {
-      return (Integer) value;
-    } else if (value instanceof Number) {
-      return ((Number) value).intValue();
-    } else if (value instanceof String) {
-      try {
-        return Integer.parseInt((String) value);
-      } catch (NumberFormatException e) {
-        return null;
-      }
-    }
-    return null;
-  }
-
-  private String getStringValue(Map<?, ?> data, String key) {
-    Object value = data.get(key);
-    return value != null ? value.toString() : null;
-  }
-
-  private Boolean getBooleanValue(Map<?, ?> data, String key) {
-    Object value = data.get(key);
-    if (value instanceof Boolean) {
-      return (Boolean) value;
-    } else if (value instanceof String) {
-      return Boolean.parseBoolean((String) value);
-    } else if (value instanceof Number) {
-      return ((Number) value).intValue() == 1;
-    }
-    return false;
-  }
-
-  private String convertMapToJson(Map<?, ?> data) {
-    try {
-      return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(data);
-    } catch (Exception e) {
-      return "{}";
-    }
   }
 
   /** Trigger manual full sync for a source from admin panel */
