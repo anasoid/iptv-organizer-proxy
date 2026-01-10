@@ -17,9 +17,9 @@ import org.anasoid.iptvorganizer.models.BaseEntity;
 import org.anasoid.iptvorganizer.models.Source;
 import org.anasoid.iptvorganizer.models.SyncLog;
 import org.anasoid.iptvorganizer.models.SyncLogStatus;
-import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.stream.Category;
 import org.anasoid.iptvorganizer.models.stream.StreamLike;
+import org.anasoid.iptvorganizer.models.stream.StreamType;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 import org.anasoid.iptvorganizer.repositories.stream.CategoryRepository;
 import org.anasoid.iptvorganizer.repositories.stream.LiveStreamRepository;
@@ -168,40 +168,34 @@ public class SyncService {
         .recoverWithUni(failure -> finalizeSyncLog(source, syncLog, syncStartTime, failure));
   }
 
-  /** Sync categories for a source (live, VOD, series) */
   private Uni<Source> syncCategories(Source source) {
     LOGGER.info("Syncing categories for source: " + source.getName());
-
-    String liveUrl = buildApiUrl(source, "get_live_categories");
-    String vodUrl = buildApiUrl(source, "get_vod_categories");
-    String seriesUrl = buildApiUrl(source, "get_series_categories");
-
-    HttpOptions httpOptions = new HttpOptions();
-    httpOptions.setTimeout(30);
-    httpOptions.setMaxRetries(3);
 
     // Fetch all categories from three endpoints
     return Uni.createFrom()
         .item("")
-        .flatMap(v -> fetchAndSyncCategoryType(source, liveUrl, "live", httpOptions))
-        .flatMap(v -> fetchAndSyncCategoryType(source, vodUrl, "vod", httpOptions))
-        .flatMap(v -> fetchAndSyncCategoryType(source, seriesUrl, "series", httpOptions))
+        .flatMap(v -> fetchAndSyncCategoryType(source, StreamType.LIVE))
+        .flatMap(v -> fetchAndSyncCategoryType(source, StreamType.VOD))
+        .flatMap(v -> fetchAndSyncCategoryType(source, StreamType.SERIES))
         .replaceWith(source);
   }
 
   /** Fetch and sync categories for a single type (live/vod/series) */
-  private Uni<Void> fetchAndSyncCategoryType(
-      Source source, String url, String categoryType, HttpOptions httpOptions) {
+  private Uni<Void> fetchAndSyncCategoryType(Source source, StreamType type) {
+    String url = buildApiUrl(source, type.getCategoryAction());
     return httpStreamingService
-        .streamJson(url, Map.class, httpOptions)
+        .streamJson(url, Map.class)
         .collect()
         .asList()
-        .flatMap(categoryMaps -> processCategorySync(source, categoryMaps, categoryType))
+        .flatMap(categoryMaps -> processCategorySync(source, categoryMaps, type.getCategoryType()))
         .onFailure()
         .invoke(
             ex ->
                 LOGGER.severe(
-                    "Failed to sync " + categoryType + " categories: " + ex.getMessage()));
+                    "Failed to sync "
+                        + type.getCategoryType()
+                        + " categories: "
+                        + ex.getMessage()));
   }
 
   /** Process category synchronization: insert/update new, delete obsolete */
@@ -285,9 +279,7 @@ public class SyncService {
     return syncStreams(
         source,
         syncLog,
-        "live streams",
-        "get_live_streams",
-        "live",
+        StreamType.LIVE,
         streamData -> synchMapper.mapToLiveStream(source, streamData),
         liveStreamRepository);
   }
@@ -297,9 +289,7 @@ public class SyncService {
     return syncStreams(
         source,
         syncLog,
-        "VOD streams",
-        "get_vod_streams",
-        "vod",
+        StreamType.VOD,
         streamData -> synchMapper.mapToVodStream(source, streamData),
         vodStreamRepository);
   }
@@ -309,9 +299,7 @@ public class SyncService {
     return syncStreams(
         source,
         syncLog,
-        "series",
-        "get_series",
-        "series",
+        StreamType.SERIES,
         streamData -> synchMapper.mapToSeries(source, streamData),
         seriesRepository);
   }
@@ -320,24 +308,22 @@ public class SyncService {
   private <T extends BaseEntity & StreamLike> Uni<Source> syncStreams(
       Source source,
       SyncLog syncLog,
-      String streamTypeName,
-      String apiAction,
-      String categoryType,
+      StreamType type,
       java.util.function.Function<Map<?, ?>, T> mapper,
       BaseRepository<T> repository) {
-    LOGGER.info("Syncing " + streamTypeName + " for source: " + source.getName());
+    LOGGER.info("Syncing " + type.getStreamTypeName() + " for source: " + source.getName());
 
-    String url = buildApiUrl(source, apiAction);
-    HttpOptions httpOptions = createHttpOptions();
+    String url = buildApiUrl(source, type.getStreamAction());
 
     return httpStreamingService
-        .streamJson(url, Map.class, httpOptions)
+        .streamJson(url, Map.class)
         .map(mapper::apply)
         .collect()
         .asList()
         .flatMap(
             allStreams -> {
-              LOGGER.info("Fetched " + allStreams.size() + " " + streamTypeName + " from API");
+              LOGGER.info(
+                  "Fetched " + allStreams.size() + " " + type.getStreamTypeName() + " from API");
 
               // Assign num ordering
               for (int i = 0; i < allStreams.size(); i++) {
@@ -350,12 +336,12 @@ public class SyncService {
                 if (stream.getCategoryId() == null || stream.getCategoryId() == 0) {
                   categoryProcessing.add(
                       categoryRepository
-                          .getOrCreateUnknownCategory(source.getId(), categoryType)
+                          .getOrCreateUnknownCategory(source.getId(), type.getCategoryType())
                           .invoke(
                               unknownCategoryId -> {
                                 stream.setCategoryId(unknownCategoryId.intValue());
                                 LOGGER.info(
-                                    streamTypeName
+                                    type.getStreamTypeName()
                                         + " assigned to Unknown category: stream_id="
                                         + stream.getStreamId());
                               })
@@ -416,7 +402,7 @@ public class SyncService {
                               LOGGER.info(
                                   String.format(
                                       "%s - Added: %d, Updated: %d, Deleted: %d",
-                                      streamTypeName,
+                                      type.getStreamTypeName(),
                                       added.get(),
                                       updated.get(),
                                       toDeleteIds.size()));
@@ -462,7 +448,7 @@ public class SyncService {
                                               "GC called after "
                                                   + allStreams.size()
                                                   + " "
-                                                  + streamTypeName);
+                                                  + type.getStreamTypeName());
                                         }
                                       });
                             });
@@ -611,25 +597,13 @@ public class SyncService {
                         Uni<Source> taskResult =
                             switch (taskType) {
                               case "live_categories" ->
-                                  fetchAndSyncCategoryType(
-                                          source,
-                                          buildApiUrl(source, "get_live_categories"),
-                                          "live",
-                                          createHttpOptions())
+                                  fetchAndSyncCategoryType(source, StreamType.LIVE)
                                       .replaceWith(source);
                               case "vod_categories" ->
-                                  fetchAndSyncCategoryType(
-                                          source,
-                                          buildApiUrl(source, "get_vod_categories"),
-                                          "vod",
-                                          createHttpOptions())
+                                  fetchAndSyncCategoryType(source, StreamType.VOD)
                                       .replaceWith(source);
                               case "series_categories" ->
-                                  fetchAndSyncCategoryType(
-                                          source,
-                                          buildApiUrl(source, "get_series_categories"),
-                                          "series",
-                                          createHttpOptions())
+                                  fetchAndSyncCategoryType(source, StreamType.SERIES)
                                       .replaceWith(source);
                               case "live_streams" -> syncLiveStreams(source, syncLog);
                               case "vod_streams" -> syncVod(source, syncLog);
@@ -664,13 +638,5 @@ public class SyncService {
   /** Trigger full sync (alias for triggerManualSync) */
   public Uni<Void> triggerFullSync(Source source) {
     return triggerManualSync(source);
-  }
-
-  /** Create HTTP options for API calls */
-  private HttpOptions createHttpOptions() {
-    HttpOptions httpOptions = new HttpOptions();
-    httpOptions.setTimeout(30);
-    httpOptions.setMaxRetries(3);
-    return httpOptions;
   }
 }

@@ -71,9 +71,20 @@ public class HttpStreamingService {
    * Stream HTTP response as JSON objects with automatic parsing (memory efficient true streaming)
    * Offloads blocking JSON parsing to worker thread to avoid blocking event loop
    */
+  public <T> Multi<T> streamJson(String url, Class<T> targetClass) {
+    return streamJson(url, targetClass, null);
+  }
+
+  private HttpOptions createHttpOptions() {
+    HttpOptions httpOptions = new HttpOptions();
+    httpOptions.setTimeout(30);
+    httpOptions.setMaxRetries(3);
+    return httpOptions;
+  }
+
   public <T> Multi<T> streamJson(String url, Class<T> targetClass, HttpOptions options) {
     if (options == null) {
-      options = new HttpOptions();
+      options = createHttpOptions();
     }
 
     final String finalUrl = url;
