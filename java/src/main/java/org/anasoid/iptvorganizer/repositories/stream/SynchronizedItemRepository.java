@@ -2,7 +2,9 @@ package org.anasoid.iptvorganizer.repositories.stream;
 
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
+import java.util.Map;
 import java.util.Set;
+import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.SourcedEntity;
 
 public interface SynchronizedItemRepository<T extends SourcedEntity> {
@@ -22,4 +24,6 @@ public interface SynchronizedItemRepository<T extends SourcedEntity> {
   Uni<T> findByExternalId(Integer externalId, Long sourceId);
 
   Uni<Void> deleteByExternalId(Integer externalId, Long sourceId);
+
+  Multi<Map> fetchExternalData(Source source);
 }

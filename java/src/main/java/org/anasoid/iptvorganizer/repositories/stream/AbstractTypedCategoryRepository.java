@@ -22,8 +22,8 @@ public abstract class AbstractTypedCategoryRepository
   @Override
   public Uni<Void> update(Category category) {
     if (category.getType() == null) {
-      category.setType(getCategoryType().getCategoryType());
-    } else if (category.getType().equals(getCategoryType().getCategoryType())) {
+      category.setType(getType().getCategoryType());
+    } else if (category.getType().equals(getType().getCategoryType())) {
       throw new IllegalArgumentException("Category type does not match");
     }
     return categoryRepository.update(category);
@@ -38,11 +38,10 @@ public abstract class AbstractTypedCategoryRepository
    * @return Database ID of the Unknown category
    */
   public Uni<Long> getOrCreateUnknownCategory(Long sourceId) {
-    return categoryRepository.getOrCreateUnknownCategory(
-        sourceId, getCategoryType().getCategoryType());
+    return categoryRepository.getOrCreateUnknownCategory(sourceId, getType().getCategoryType());
   }
 
-  abstract StreamType getCategoryType();
+  public abstract StreamType getType();
 
   @Override
   public Uni<Category> findById(Long id) {
@@ -56,16 +55,16 @@ public abstract class AbstractTypedCategoryRepository
 
   @Override
   public Uni<Set<Integer>> findExternalIdsBySourceId(Long sourceId) {
-    return categoryRepository.findExternalIdsBySourceIdAndType(sourceId, getCategoryType());
+    return categoryRepository.findExternalIdsBySourceIdAndType(sourceId, getType());
   }
 
   @Override
   public Uni<Category> findByExternalId(Integer externalId, Long sourceId) {
-    return categoryRepository.findByExternalIdAndType(externalId, sourceId, getCategoryType());
+    return categoryRepository.findByExternalIdAndType(externalId, sourceId, getType());
   }
 
   @Override
   public Uni<Void> deleteByExternalId(Integer externalId, Long sourceId) {
-    return categoryRepository.deleteByExternalIdAndType(externalId, sourceId, getCategoryType());
+    return categoryRepository.deleteByExternalIdAndType(externalId, sourceId, getType());
   }
 }

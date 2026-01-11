@@ -1,16 +1,28 @@
 package org.anasoid.iptvorganizer.repositories.stream;
 
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import java.util.Map;
+import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.Series;
+import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 
 @ApplicationScoped
 public class SeriesRepository extends BaseStreamRepository<Series> {
+  @Inject XtreamClient xtreamClient;
 
   @Override
   protected String getTableName() {
     return "series";
+  }
+
+  @Override
+  public Multi<Map> fetchExternalData(Source source) {
+
+    return xtreamClient.getSeries(source);
   }
 
   @Override
