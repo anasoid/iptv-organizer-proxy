@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.services.streaming;
+package org.anasoid.iptvorganizer.utils.streaming;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;

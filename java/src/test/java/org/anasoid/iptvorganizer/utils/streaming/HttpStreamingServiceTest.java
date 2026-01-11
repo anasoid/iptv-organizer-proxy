@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.services.streaming;
+package org.anasoid.iptvorganizer.utils.streaming;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -66,11 +66,11 @@ public class HttpStreamingServiceTest {
   void testStreamJsonWithValidJson() {
     String jsonResponse =
         """
-            [
-                {"id": 1, "name": "Item 1"},
-                {"id": 2, "name": "Item 2"}
-            ]
-            """;
+        [
+            {"id": 1, "name": "Item 1"},
+            {"id": 2, "name": "Item 2"}
+        ]
+        """;
 
     // Note: This test verifies the API works, actual HTTP test would require mocking
     // or using a real HTTP endpoint

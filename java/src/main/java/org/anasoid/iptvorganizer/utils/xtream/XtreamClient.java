@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.services.xtream;
+package org.anasoid.iptvorganizer.utils.xtream;
 
 import io.smallrye.mutiny.Multi;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -8,7 +8,7 @@ import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
-import org.anasoid.iptvorganizer.services.streaming.HttpStreamingService;
+import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
 
 /**
  * Client for Xtream Codes API interactions.

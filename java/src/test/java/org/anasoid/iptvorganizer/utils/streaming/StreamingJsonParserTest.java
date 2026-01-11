@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.services.streaming;
+package org.anasoid.iptvorganizer.utils.streaming;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,12 +34,12 @@ public class StreamingJsonParserTest {
   void testParseJsonArray() {
     String json =
         """
-            [
-                {"id": 1, "name": "Item 1"},
-                {"id": 2, "name": "Item 2"},
-                {"id": 3, "name": "Item 3"}
-            ]
-            """;
+        [
+            {"id": 1, "name": "Item 1"},
+            {"id": 2, "name": "Item 2"},
+            {"id": 3, "name": "Item 3"}
+        ]
+        """;
 
     InputStream inputStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 
@@ -61,11 +61,11 @@ public class StreamingJsonParserTest {
   void testParseJsonArrayWithTypedClass() {
     String json =
         """
-            [
-                {"id": 1, "name": "Stream 1"},
-                {"id": 2, "name": "Stream 2"}
-            ]
-            """;
+        [
+            {"id": 1, "name": "Stream 1"},
+            {"id": 2, "name": "Stream 2"}
+        ]
+        """;
 
     InputStream inputStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 
@@ -86,11 +86,11 @@ public class StreamingJsonParserTest {
   void testParseJsonStream_Array() {
     String json =
         """
-            [
-                {"id": 1, "name": "Item 1"},
-                {"id": 2, "name": "Item 2"}
-            ]
-            """;
+        [
+            {"id": 1, "name": "Item 1"},
+            {"id": 2, "name": "Item 2"}
+        ]
+        """;
 
     InputStream inputStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 
@@ -105,8 +105,8 @@ public class StreamingJsonParserTest {
   void testParseJsonStream_SingleObject() {
     String json =
         """
-            {"id": 1, "name": "Item 1"}
-            """;
+        {"id": 1, "name": "Item 1"}
+        """;
 
     InputStream inputStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 
@@ -156,8 +156,8 @@ public class StreamingJsonParserTest {
   void testParseJsonArrayNotArray() {
     String json =
         """
-            {"id": 1, "name": "Item 1"}
-            """;
+        {"id": 1, "name": "Item 1"}
+        """;
 
     InputStream inputStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 

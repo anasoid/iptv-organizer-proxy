@@ -30,7 +30,7 @@ import org.anasoid.iptvorganizer.repositories.synch.SyncLogRepository;
 import org.anasoid.iptvorganizer.services.FilterService;
 import org.anasoid.iptvorganizer.services.synch.mapper.SynchMapper;
 import org.anasoid.iptvorganizer.services.synch.mapper.SynchMapper.CategoryMappingResult;
-import org.anasoid.iptvorganizer.services.xtream.XtreamClient;
+import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 
 /**
  * Background sync service using Quarkus Scheduler Syncs live streams, VOD, series, and categories
