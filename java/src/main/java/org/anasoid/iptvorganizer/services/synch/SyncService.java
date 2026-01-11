@@ -28,9 +28,9 @@ import org.anasoid.iptvorganizer.repositories.stream.VodStreamRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SyncLogRepository;
 import org.anasoid.iptvorganizer.services.FilterService;
-import org.anasoid.iptvorganizer.services.streaming.HttpStreamingService;
 import org.anasoid.iptvorganizer.services.synch.mapper.SynchMapper;
 import org.anasoid.iptvorganizer.services.synch.mapper.SynchMapper.CategoryMappingResult;
+import org.anasoid.iptvorganizer.services.xtream.XtreamClient;
 
 /**
  * Background sync service using Quarkus Scheduler Syncs live streams, VOD, series, and categories
@@ -55,7 +55,7 @@ public class SyncService {
 
   @Inject CategoryRepository categoryRepository;
 
-  @Inject HttpStreamingService httpStreamingService;
+  @Inject XtreamClient xtreamClient;
 
   @Inject FilterService filterService;
 
@@ -179,9 +179,14 @@ public class SyncService {
 
   /** Fetch and sync categories for a single type (live/vod/series) */
   private Uni<Void> fetchAndSyncCategoryType(Source source, StreamType type) {
-    String url = buildApiUrl(source, type.getCategoryAction());
-    return httpStreamingService
-        .streamJson(url, Map.class)
+    Multi<Map> categoriesStream =
+        switch (type) {
+          case LIVE -> xtreamClient.getLiveCategories(source);
+          case VOD -> xtreamClient.getVodCategories(source);
+          case SERIES -> xtreamClient.getSeriesCategories(source);
+        };
+
+    return categoriesStream
         .collect()
         .asList()
         .flatMap(categoryMaps -> processCategorySync(source, categoryMaps, type.getCategoryType()))
@@ -308,10 +313,14 @@ public class SyncService {
       BaseRepository<T> repository) {
     LOGGER.info("Syncing " + type.getStreamTypeName() + " for source: " + source.getName());
 
-    String url = buildApiUrl(source, type.getStreamAction());
+    Multi<Map> streamsData =
+        switch (type) {
+          case LIVE -> xtreamClient.getLiveStreams(source);
+          case VOD -> xtreamClient.getVodStreams(source);
+          case SERIES -> xtreamClient.getSeries(source);
+        };
 
-    return httpStreamingService
-        .streamJson(url, Map.class)
+    return streamsData
         .map(mapper::apply)
         .collect()
         .asList()
@@ -480,14 +489,6 @@ public class SyncService {
         .update(syncLog)
         .onItem()
         .transformToUni(v -> sourceRepository.update(source));
-  }
-
-  /** Build Xtream API URL */
-  private String buildApiUrl(Source source, String action) {
-    String baseUrl = source.getUrl().replaceAll("/$", "");
-    return String.format(
-        "%s/player_api.php?action=%s&username=%s&password=%s",
-        baseUrl, action, source.getUsername(), source.getPassword());
   }
 
   /** Trigger manual full sync for a source from admin panel */
