@@ -6,7 +6,7 @@ import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
-import org.anasoid.iptvorganizer.models.entity.SyncLogStatus;
+import org.anasoid.iptvorganizer.models.entity.SyncLog.SyncLogStatus;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
 @ApplicationScoped

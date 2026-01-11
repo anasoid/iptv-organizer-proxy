@@ -16,7 +16,7 @@ import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.entity.BaseEntity;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
-import org.anasoid.iptvorganizer.models.entity.SyncLogStatus;
+import org.anasoid.iptvorganizer.models.entity.SyncLog.SyncLogStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamLike;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
@@ -27,7 +27,6 @@ import org.anasoid.iptvorganizer.repositories.stream.SeriesRepository;
 import org.anasoid.iptvorganizer.repositories.stream.VodStreamRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SyncLogRepository;
-import org.anasoid.iptvorganizer.repositories.synch.SyncScheduleRepository;
 import org.anasoid.iptvorganizer.services.FilterService;
 import org.anasoid.iptvorganizer.services.streaming.HttpStreamingService;
 import org.anasoid.iptvorganizer.services.synch.mapper.SynchMapper;
@@ -45,8 +44,6 @@ public class SyncService {
   private static final int GC_THRESHOLD = 1000;
 
   @Inject SourceRepository sourceRepository;
-
-  @Inject SyncScheduleRepository syncScheduleRepository;
 
   @Inject SyncLogRepository syncLogRepository;
 
