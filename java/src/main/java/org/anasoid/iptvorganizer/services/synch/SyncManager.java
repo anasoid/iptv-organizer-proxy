@@ -42,9 +42,9 @@ import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
  * from Xtream API
  */
 @ApplicationScoped
-public class SyncService {
+public class SyncManager {
 
-  private static final Logger LOGGER = Logger.getLogger(SyncService.class.getName());
+  private static final Logger LOGGER = Logger.getLogger(SyncManager.class.getName());
 
   private static final int GC_THRESHOLD = 1000;
 

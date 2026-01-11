@@ -8,14 +8,14 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import lombok.extern.java.Log;
 import org.anasoid.iptvorganizer.services.synch.SyncLogService;
-import org.anasoid.iptvorganizer.services.synch.SyncService;
+import org.anasoid.iptvorganizer.services.synch.SyncManager;
 
 @ApplicationScoped
 @Log
 @Startup
 public class IpTvOrganizerApplication {
 
-  @Inject SyncService syncService;
+  @Inject SyncManager syncService;
   @Inject SyncLogService syncLogService;
 
   /**

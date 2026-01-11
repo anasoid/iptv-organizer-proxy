@@ -28,7 +28,7 @@ import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.services.SourceService;
 import org.anasoid.iptvorganizer.services.synch.SyncLockManager;
 import org.anasoid.iptvorganizer.services.synch.SyncLogService;
-import org.anasoid.iptvorganizer.services.synch.SyncService;
+import org.anasoid.iptvorganizer.services.synch.SyncManager;
 
 /** Sources controller CRUD operations for sources with sync management */
 @Path("/api/sources")
@@ -41,7 +41,7 @@ public class SourcesController extends BaseController {
 
   @Inject SyncLogService syncLogService;
 
-  @Inject SyncService syncService;
+  @Inject SyncManager syncService;
 
   @Inject SyncLockManager syncLockManager;
 
