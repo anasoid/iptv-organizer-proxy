@@ -7,7 +7,7 @@ import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.inject.Inject;
 import java.util.List;
-import org.anasoid.iptvorganizer.models.BaseEntity;
+import org.anasoid.iptvorganizer.models.entity.BaseEntity;
 
 public abstract class BaseRepository<T extends BaseEntity> {
 

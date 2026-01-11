@@ -4,7 +4,7 @@ import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Tuple;
 import java.util.List;
-import org.anasoid.iptvorganizer.models.stream.BaseStream;
+import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 
 /**
  * Base repository for stream-like entities (LiveStream, VodStream, Series).

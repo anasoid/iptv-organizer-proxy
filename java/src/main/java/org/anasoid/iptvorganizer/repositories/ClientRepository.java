@@ -5,7 +5,7 @@ import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
-import org.anasoid.iptvorganizer.models.Client;
+import org.anasoid.iptvorganizer.models.entity.Client;
 
 @ApplicationScoped
 public class ClientRepository extends BaseRepository<Client> {

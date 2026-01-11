@@ -6,7 +6,7 @@ import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.anasoid.iptvorganizer.models.stream.VodStream;
+import org.anasoid.iptvorganizer.models.entity.stream.VodStream;
 
 @ApplicationScoped
 public class VodStreamRepository extends BaseStreamRepository<VodStream> {

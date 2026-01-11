@@ -5,7 +5,7 @@ import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
-import org.anasoid.iptvorganizer.models.stream.Category;
+import org.anasoid.iptvorganizer.models.entity.stream.Category;
 
 @ApplicationScoped
 public class CategoryRepository extends SourcedEntityRepository<Category> {

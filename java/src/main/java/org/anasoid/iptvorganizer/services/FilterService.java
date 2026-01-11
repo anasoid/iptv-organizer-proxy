@@ -10,7 +10,7 @@ import java.lang.reflect.Method;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import org.anasoid.iptvorganizer.exceptions.FilterException;
-import org.anasoid.iptvorganizer.models.Filter;
+import org.anasoid.iptvorganizer.models.entity.Filter;
 import org.anasoid.iptvorganizer.models.filtering.FilterConfig;
 import org.anasoid.iptvorganizer.models.filtering.FilterRule;
 import org.anasoid.iptvorganizer.repositories.FilterRepository;

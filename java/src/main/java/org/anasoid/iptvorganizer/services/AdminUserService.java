@@ -3,7 +3,7 @@ package org.anasoid.iptvorganizer.services;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.anasoid.iptvorganizer.models.AdminUser;
+import org.anasoid.iptvorganizer.models.entity.AdminUser;
 import org.anasoid.iptvorganizer.repositories.AdminUserRepository;
 
 @ApplicationScoped

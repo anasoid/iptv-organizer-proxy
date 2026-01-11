@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.dto.FilterDTO;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
-import org.anasoid.iptvorganizer.models.Filter;
+import org.anasoid.iptvorganizer.models.entity.Filter;
 import org.anasoid.iptvorganizer.services.FilterService;
 
 /** Filters controller CRUD operations for filters */

@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.models;
+package org.anasoid.iptvorganizer.models.entity.stream;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -11,10 +11,11 @@ import lombok.experimental.SuperBuilder;
 @AllArgsConstructor
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
-public class Filter extends BaseEntity {
+public class Category extends SourcedEntity {
+
   private String name;
-  private String description;
-  private String filterConfig;
-  private Boolean useSourceFilter;
-  private String favoris;
+  private String type;
+  private String allowDeny;
+  private Integer parentId;
+  private String labels;
 }

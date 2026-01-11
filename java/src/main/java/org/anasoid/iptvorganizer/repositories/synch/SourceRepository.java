@@ -6,7 +6,7 @@ import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.time.LocalDateTime;
-import org.anasoid.iptvorganizer.models.Source;
+import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
 @ApplicationScoped

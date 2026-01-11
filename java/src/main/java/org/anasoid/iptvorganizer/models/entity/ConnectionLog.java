@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.models;
+package org.anasoid.iptvorganizer.models.entity;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

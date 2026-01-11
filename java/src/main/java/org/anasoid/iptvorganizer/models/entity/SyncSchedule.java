@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.models;
+package org.anasoid.iptvorganizer.models.entity;
 
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
@@ -12,10 +12,10 @@ import lombok.experimental.SuperBuilder;
 @AllArgsConstructor
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
-public class AdminUser extends BaseEntity {
-  private String username;
-  private String passwordHash;
-  private String email;
-  private Boolean isActive;
-  private LocalDateTime lastLogin;
+public class SyncSchedule extends BaseEntity {
+  private Long sourceId;
+  private String taskType;
+  private LocalDateTime nextSync;
+  private LocalDateTime lastSync;
+  private Integer syncInterval;
 }

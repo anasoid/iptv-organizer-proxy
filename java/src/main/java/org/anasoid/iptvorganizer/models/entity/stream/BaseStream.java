@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.models.stream;
+package org.anasoid.iptvorganizer.models.entity.stream;
 
 import java.time.LocalDate;
 import lombok.AllArgsConstructor;

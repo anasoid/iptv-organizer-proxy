@@ -3,7 +3,7 @@ package org.anasoid.iptvorganizer.services.synch;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.anasoid.iptvorganizer.models.SyncSchedule;
+import org.anasoid.iptvorganizer.models.entity.SyncSchedule;
 import org.anasoid.iptvorganizer.repositories.synch.SyncScheduleRepository;
 import org.anasoid.iptvorganizer.services.BaseService;
 

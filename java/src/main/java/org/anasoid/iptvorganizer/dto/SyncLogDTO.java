@@ -27,7 +27,7 @@ public class SyncLogDTO {
   private Integer durationSeconds;
 
   /** Convert entity to DTO */
-  public static SyncLogDTO fromEntity(org.anasoid.iptvorganizer.models.SyncLog entity) {
+  public static SyncLogDTO fromEntity(org.anasoid.iptvorganizer.models.entity.SyncLog entity) {
     if (entity == null) return null;
 
     return SyncLogDTO.builder()

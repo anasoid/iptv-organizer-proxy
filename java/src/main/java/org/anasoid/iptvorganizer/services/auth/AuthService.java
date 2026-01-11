@@ -4,7 +4,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.LocalDateTime;
-import org.anasoid.iptvorganizer.models.AdminUser;
+import org.anasoid.iptvorganizer.models.entity.AdminUser;
 import org.anasoid.iptvorganizer.repositories.AdminUserRepository;
 
 /** Authentication service for admin user login */

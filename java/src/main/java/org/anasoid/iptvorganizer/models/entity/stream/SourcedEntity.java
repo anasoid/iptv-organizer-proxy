@@ -1,11 +1,11 @@
-package org.anasoid.iptvorganizer.models.stream;
+package org.anasoid.iptvorganizer.models.entity.stream;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
-import org.anasoid.iptvorganizer.models.BaseEntity;
+import org.anasoid.iptvorganizer.models.entity.BaseEntity;
 
 /**
  * Base class for all entities that belong to a source and have ordering. This includes both

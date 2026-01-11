@@ -41,8 +41,8 @@ public class AuthController extends BaseController {
             loginResponse -> {
               // Extract token and user from login response
               String token = (String) loginResponse.get("token");
-              org.anasoid.iptvorganizer.models.AdminUser user =
-                  (org.anasoid.iptvorganizer.models.AdminUser) loginResponse.get("user");
+              org.anasoid.iptvorganizer.models.entity.AdminUser user =
+                  (org.anasoid.iptvorganizer.models.entity.AdminUser) loginResponse.get("user");
 
               // Create response with token and user DTO
               var responseData = new java.util.HashMap<String, Object>();

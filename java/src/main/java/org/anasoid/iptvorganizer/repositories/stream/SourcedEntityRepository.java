@@ -4,7 +4,7 @@ import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Tuple;
 import java.util.Set;
-import org.anasoid.iptvorganizer.models.stream.SourcedEntity;
+import org.anasoid.iptvorganizer.models.entity.stream.SourcedEntity;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
 /**

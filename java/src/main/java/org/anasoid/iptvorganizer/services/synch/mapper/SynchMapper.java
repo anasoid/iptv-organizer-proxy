@@ -10,11 +10,11 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.java.Log;
 import org.anasoid.iptvorganizer.helper.LabelExtractorHelper;
-import org.anasoid.iptvorganizer.models.Source;
-import org.anasoid.iptvorganizer.models.stream.Category;
-import org.anasoid.iptvorganizer.models.stream.LiveStream;
-import org.anasoid.iptvorganizer.models.stream.Series;
-import org.anasoid.iptvorganizer.models.stream.VodStream;
+import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.entity.stream.Category;
+import org.anasoid.iptvorganizer.models.entity.stream.LiveStream;
+import org.anasoid.iptvorganizer.models.entity.stream.Series;
+import org.anasoid.iptvorganizer.models.entity.stream.VodStream;
 
 @ApplicationScoped
 @Log

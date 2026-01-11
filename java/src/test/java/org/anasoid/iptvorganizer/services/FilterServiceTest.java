@@ -3,7 +3,7 @@ package org.anasoid.iptvorganizer.services;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
-import org.anasoid.iptvorganizer.models.Filter;
+import org.anasoid.iptvorganizer.models.entity.Filter;
 import org.anasoid.iptvorganizer.models.filtering.FilterAction;
 import org.anasoid.iptvorganizer.models.filtering.FilterConfig;
 import org.anasoid.iptvorganizer.models.filtering.FilterField;
@@ -24,12 +24,12 @@ public class FilterServiceTest {
   void testParseFilterConfigValidYaml() {
     String yaml =
         """
-            rules:
-              - field: name
-                pattern: ".*Sports.*"
-              - field: isAdult
-                value: true
-            """;
+        rules:
+          - field: name
+            pattern: ".*Sports.*"
+          - field: isAdult
+            value: true
+        """;
 
     FilterConfig config = filterService.parseFilterConfig(yaml);
 
@@ -50,9 +50,9 @@ public class FilterServiceTest {
   void testParseFilterConfigInvalidYaml() {
     String yaml =
         """
-            invalid: [
-                invalid yaml structure
-            """;
+        invalid: [
+            invalid yaml structure
+        """;
 
     assertThrows(Exception.class, () -> filterService.parseFilterConfig(yaml));
   }

@@ -4,7 +4,7 @@ import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.anasoid.iptvorganizer.models.Client;
+import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 
 @ApplicationScoped

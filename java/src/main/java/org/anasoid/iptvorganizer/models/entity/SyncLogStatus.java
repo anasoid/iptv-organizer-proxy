@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.models;
+package org.anasoid.iptvorganizer.models.entity;
 
 /** Enumeration for sync log status values */
 public enum SyncLogStatus {

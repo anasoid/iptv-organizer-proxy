@@ -2,7 +2,7 @@ package org.anasoid.iptvorganizer.services;
 
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
-import org.anasoid.iptvorganizer.models.BaseEntity;
+import org.anasoid.iptvorganizer.models.entity.BaseEntity;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
 public abstract class BaseService<T extends BaseEntity, R extends BaseRepository<T>> {

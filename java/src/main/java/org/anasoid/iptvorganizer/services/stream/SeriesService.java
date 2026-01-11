@@ -3,7 +3,7 @@ package org.anasoid.iptvorganizer.services.stream;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.anasoid.iptvorganizer.models.stream.Series;
+import org.anasoid.iptvorganizer.models.entity.stream.Series;
 import org.anasoid.iptvorganizer.repositories.stream.SeriesRepository;
 import org.anasoid.iptvorganizer.services.BaseService;
 

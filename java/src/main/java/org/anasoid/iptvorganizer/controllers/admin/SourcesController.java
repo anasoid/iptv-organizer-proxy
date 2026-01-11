@@ -24,7 +24,7 @@ import org.anasoid.iptvorganizer.dto.SyncLogDTO;
 import org.anasoid.iptvorganizer.dto.request.CreateSourceRequest;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
-import org.anasoid.iptvorganizer.models.Source;
+import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.services.SourceService;
 import org.anasoid.iptvorganizer.services.synch.SyncLockManager;
 import org.anasoid.iptvorganizer.services.synch.SyncLogService;

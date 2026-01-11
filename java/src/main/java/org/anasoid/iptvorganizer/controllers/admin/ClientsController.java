@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.dto.ClientDTO;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
-import org.anasoid.iptvorganizer.models.Client;
+import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.services.ClientService;
 
 /** Clients controller CRUD operations for clients with search and filtering */

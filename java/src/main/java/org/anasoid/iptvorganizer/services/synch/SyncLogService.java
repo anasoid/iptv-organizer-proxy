@@ -6,8 +6,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.LocalDateTime;
 import java.util.logging.Logger;
-import org.anasoid.iptvorganizer.models.SyncLog;
-import org.anasoid.iptvorganizer.models.SyncLogStatus;
+import org.anasoid.iptvorganizer.models.entity.SyncLog;
+import org.anasoid.iptvorganizer.models.entity.SyncLogStatus;
 import org.anasoid.iptvorganizer.repositories.synch.SyncLogRepository;
 import org.anasoid.iptvorganizer.services.BaseService;
 

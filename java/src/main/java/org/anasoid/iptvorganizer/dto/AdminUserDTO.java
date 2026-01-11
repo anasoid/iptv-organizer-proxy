@@ -9,7 +9,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.anasoid.iptvorganizer.config.BooleanAsIntSerializer;
-import org.anasoid.iptvorganizer.models.AdminUser;
+import org.anasoid.iptvorganizer.models.entity.AdminUser;
 
 /**
  * DTO for AdminUser - excludes password hash from API responses All boolean fields serialize as 0/1
