@@ -5,7 +5,9 @@ import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
+import java.util.Set;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
+import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 
 @ApplicationScoped
 public class CategoryRepository extends SourcedEntityRepository<Category> {
@@ -150,5 +152,35 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
 
               return insert(unknownCategory);
             });
+  }
+
+  /** Find entities by source ID */
+  public Uni<Set<Integer>> findExternalIdsBySourceIdAndType(Long sourceId, StreamType type) {
+    return pool.preparedQuery(
+            "SELECT external_id FROM " + getTableName() + " WHERE source_id = ? AND type = ?")
+        .execute(Tuple.of(sourceId, type.getCategoryType()))
+        .onItem()
+        .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
+        .map(row -> row.getInteger("external_id"))
+        .collect()
+        .asSet();
+  }
+
+  public Uni<Category> findByExternalIdAndType(Integer externalId, Long sourceId, StreamType type) {
+    return pool.preparedQuery(
+            "SELECT * FROM "
+                + getTableName()
+                + " WHERE external_id = ? AND source_id = ? AND type = ?")
+        .execute(Tuple.of(externalId, sourceId, type.getCategoryType()))
+        .map(rowSet -> rowSet.size() == 0 ? null : mapRow(rowSet.iterator().next()));
+  }
+
+  public Uni<Void> deleteByExternalIdAndType(Integer externalId, Long sourceId, StreamType type) {
+    return pool.preparedQuery(
+            "DELETE FROM "
+                + getTableName()
+                + " WHERE external_id = ? AND source_id = ? AND type = ?")
+        .execute(Tuple.of(externalId, sourceId, type.getCategoryType()))
+        .replaceWithVoid();
   }
 }

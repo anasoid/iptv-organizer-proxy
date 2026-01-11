@@ -35,6 +35,20 @@ public abstract class SourcedEntityRepository<T extends SourcedEntity> extends B
         .asSet();
   }
 
+  public Uni<T> findByExternalId(Integer externalId, Long sourceId) {
+    return pool.preparedQuery(
+            "SELECT * FROM " + getTableName() + " WHERE external_id = ? AND source_id = ?")
+        .execute(Tuple.of(externalId, sourceId))
+        .map(rowSet -> rowSet.size() == 0 ? null : mapRow(rowSet.iterator().next()));
+  }
+
+  public Uni<Void> deleteByExternalId(Integer externalId, Long sourceId) {
+    return pool.preparedQuery(
+            "DELETE FROM " + getTableName() + " WHERE external_id = ? AND source_id = ?")
+        .execute(Tuple.of(externalId, sourceId))
+        .replaceWithVoid();
+  }
+
   /** Count entities by source ID */
   public Uni<Long> countBySourceId(Long sourceId) {
     return countWhere("source_id = ?", Tuple.of(sourceId));

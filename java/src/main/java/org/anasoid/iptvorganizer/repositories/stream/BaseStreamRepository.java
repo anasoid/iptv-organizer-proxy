@@ -7,5 +7,5 @@ import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
  *
  * @param <T> The stream type extending BaseStream
  */
-public abstract class BaseStreamRepository<T extends BaseStream>
-    extends SourcedEntityRepository<T> {}
+public abstract class BaseStreamRepository<T extends BaseStream> extends SourcedEntityRepository<T>
+    implements SynchronizedItemRepository<T> {}
