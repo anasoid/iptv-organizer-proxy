@@ -2,10 +2,7 @@ package org.anasoid.iptvorganizer.repositories.stream;
 
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
-import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
-import java.util.List;
-import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.models.entity.stream.Series;
 
 @ApplicationScoped
@@ -82,47 +79,5 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
         .createdAt(row.getLocalDateTime("created_at"))
         .updatedAt(row.getLocalDateTime("updated_at"))
         .build();
-  }
-
-  /**
-   * Batch upsert series (update if exists by external_id, insert if new) Uses ON DUPLICATE KEY
-   * UPDATE for efficient batch processing
-   */
-  @Override
-  public Uni<Void> batchUpsert(List<Series> seriesList) {
-    if (seriesList == null || seriesList.isEmpty()) {
-      return Uni.createFrom().voidItem();
-    }
-
-    // Build INSERT ... ON DUPLICATE KEY UPDATE statement
-    String sql =
-        "INSERT INTO series (source_id, external_id, num, allow_deny, name, category_id,"
-            + " category_ids, is_adult, labels, data, added_date, release_date) VALUES (?, ?, ?, ?,"
-            + " ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE num=VALUES(num),"
-            + " allow_deny=VALUES(allow_deny), name=VALUES(name), category_id=VALUES(category_id),"
-            + " category_ids=VALUES(category_ids), is_adult=VALUES(is_adult),"
-            + " labels=VALUES(labels), data=VALUES(data), added_date=VALUES(added_date),"
-            + " release_date=VALUES(release_date)";
-
-    return pool.preparedQuery(sql)
-        .executeBatch(
-            seriesList.stream()
-                .map(
-                    series ->
-                        Tuple.tuple()
-                            .addLong(series.getSourceId())
-                            .addInteger(series.getExternalId())
-                            .addInteger(series.getNum())
-                            .addString(series.getAllowDeny())
-                            .addString(series.getName())
-                            .addInteger(series.getCategoryId())
-                            .addString(series.getCategoryIds())
-                            .addBoolean(series.getIsAdult())
-                            .addString(series.getLabels())
-                            .addString(series.getData())
-                            .addLocalDate(series.getAddedDate())
-                            .addLocalDate(series.getReleaseDate()))
-                .collect(Collectors.toList()))
-        .replaceWithVoid();
   }
 }
