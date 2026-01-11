@@ -25,5 +25,7 @@ public interface SynchronizedItemRepository<T extends SourcedEntity> {
 
   Uni<Void> deleteByExternalId(Integer externalId, Long sourceId);
 
+  Uni<Void> delete(Long id);
+
   Multi<Map> fetchExternalData(Source source);
 }

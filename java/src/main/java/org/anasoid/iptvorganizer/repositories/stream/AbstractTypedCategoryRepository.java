@@ -67,4 +67,9 @@ public abstract class AbstractTypedCategoryRepository
   public Uni<Void> deleteByExternalId(Integer externalId, Long sourceId) {
     return categoryRepository.deleteByExternalIdAndType(externalId, sourceId, getType());
   }
+
+  @Override
+  public Uni<Void> delete(Long id) {
+    return categoryRepository.delete(id);
+  }
 }

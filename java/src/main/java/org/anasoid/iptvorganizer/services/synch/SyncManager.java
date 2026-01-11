@@ -22,7 +22,6 @@ import org.anasoid.iptvorganizer.models.entity.stream.StreamLike;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.repositories.stream.AbstractTypedCategoryRepository;
 import org.anasoid.iptvorganizer.repositories.stream.BaseStreamRepository;
-import org.anasoid.iptvorganizer.repositories.stream.CategoryRepository;
 import org.anasoid.iptvorganizer.repositories.stream.LiveCategoryRepository;
 import org.anasoid.iptvorganizer.repositories.stream.LiveStreamRepository;
 import org.anasoid.iptvorganizer.repositories.stream.SeriesCategoryRepository;
@@ -58,7 +57,6 @@ public class SyncManager {
 
   @Inject SeriesRepository seriesRepository;
 
-  @Inject CategoryRepository categoryRepository;
   @Inject SeriesCategoryRepository seriesCategoryRepository;
   @Inject VodCategoryRepository vodCategoryRepository;
   @Inject LiveCategoryRepository liveCategoryRepository;
@@ -207,7 +205,7 @@ public class SyncManager {
         synchMapper.mapCategoryData(
             source, categoryMaps, typedCategoryRepository.getType().getCategoryType());
 
-    return categoryRepository
+    return typedCategoryRepository
         .findBySourceId(source.getId())
         .collect()
         .asList()
@@ -242,9 +240,9 @@ public class SyncManager {
             category -> {
               if (existingMap.containsKey(category.getExternalId())) {
                 category.setId(existingMap.get(category.getExternalId()).getId());
-                return categoryRepository.update(category);
+                return typedCategoryRepository.update(category);
               } else {
-                return categoryRepository.insert(category).replaceWithVoid();
+                return typedCategoryRepository.insert(category).replaceWithVoid();
               }
             })
         .collect()
@@ -279,7 +277,7 @@ public class SyncManager {
     return Multi.createFrom()
         .iterable(toDelete)
         .onItem()
-        .transformToUniAndConcatenate(cat -> categoryRepository.delete(cat.getId()))
+        .transformToUniAndConcatenate(cat -> typedCategoryRepository.delete(cat.getId()))
         .collect()
         .asList()
         .replaceWithVoid();
