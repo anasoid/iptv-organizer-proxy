@@ -15,7 +15,7 @@ import org.anasoid.iptvorganizer.services.synch.SyncManager;
 @Startup
 public class IpTvOrganizerApplication {
 
-  @Inject SyncManager syncService;
+  @Inject SyncManager syncManager;
   @Inject SyncLogService syncLogService;
 
   /**
@@ -24,7 +24,7 @@ public class IpTvOrganizerApplication {
    */
   @Scheduled(every = "{sync.check.interval}", identity = "sync-daemon")
   public void scheduledSync() {
-    syncService.scheduledSync();
+    syncManager.scheduledSync();
   }
 
   void onStart(@Observes StartupEvent event) {

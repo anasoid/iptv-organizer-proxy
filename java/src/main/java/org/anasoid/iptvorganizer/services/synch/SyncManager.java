@@ -1,40 +1,19 @@
 package org.anasoid.iptvorganizer.services.synch;
 
-import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
 import org.anasoid.iptvorganizer.models.entity.SyncLog.SyncLogStatus;
-import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
-import org.anasoid.iptvorganizer.models.entity.stream.Category;
-import org.anasoid.iptvorganizer.models.entity.stream.StreamLike;
-import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
-import org.anasoid.iptvorganizer.repositories.stream.AbstractTypedCategoryRepository;
-import org.anasoid.iptvorganizer.repositories.stream.BaseStreamRepository;
-import org.anasoid.iptvorganizer.repositories.stream.LiveCategoryRepository;
-import org.anasoid.iptvorganizer.repositories.stream.LiveStreamRepository;
-import org.anasoid.iptvorganizer.repositories.stream.SeriesCategoryRepository;
-import org.anasoid.iptvorganizer.repositories.stream.SeriesRepository;
-import org.anasoid.iptvorganizer.repositories.stream.SynchronizedItemRepository;
-import org.anasoid.iptvorganizer.repositories.stream.VodCategoryRepository;
-import org.anasoid.iptvorganizer.repositories.stream.VodStreamRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SyncLogRepository;
-import org.anasoid.iptvorganizer.services.FilterService;
-import org.anasoid.iptvorganizer.services.synch.mapper.SynchMapper;
-import org.anasoid.iptvorganizer.services.synch.mapper.SynchMapper.CategoryMappingResult;
-import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
+import org.anasoid.iptvorganizer.services.synch.synchronizer.LiveSynchronizer;
+import org.anasoid.iptvorganizer.services.synch.synchronizer.SeriesSynchronizer;
+import org.anasoid.iptvorganizer.services.synch.synchronizer.VodSynchronizer;
 
 /**
  * Background sync service using Quarkus Scheduler Syncs live streams, VOD, series, and categories
@@ -45,27 +24,13 @@ public class SyncManager {
 
   private static final Logger LOGGER = Logger.getLogger(SyncManager.class.getName());
 
-  private static final int GC_THRESHOLD = 1000;
-
   @Inject SourceRepository sourceRepository;
 
   @Inject SyncLogRepository syncLogRepository;
 
-  @Inject LiveStreamRepository liveStreamRepository;
-
-  @Inject VodStreamRepository vodStreamRepository;
-
-  @Inject SeriesRepository seriesRepository;
-
-  @Inject SeriesCategoryRepository seriesCategoryRepository;
-  @Inject VodCategoryRepository vodCategoryRepository;
-  @Inject LiveCategoryRepository liveCategoryRepository;
-
-  @Inject XtreamClient xtreamClient;
-
-  @Inject FilterService filterService;
-
-  @Inject SynchMapper synchMapper;
+  @Inject LiveSynchronizer liveSynchronizer;
+  @Inject VodSynchronizer vodSynchronizer;
+  @Inject SeriesSynchronizer seriesSynchronizer;
 
   @Inject SyncLockManager syncLockManager;
 
@@ -154,322 +119,27 @@ public class SyncManager {
         .item(source)
         // Sync categories streams
         .onItem()
-        .transformToUni(s -> syncCategories(s, liveCategoryRepository).replaceWith(s))
+        .transformToUni(s -> liveSynchronizer.syncCategories(s).replaceWith(s))
         // Sync categories series
         .onItem()
-        .transformToUni(s -> syncCategories(s, seriesCategoryRepository).replaceWith(s))
+        .transformToUni(s -> seriesSynchronizer.syncCategories(s).replaceWith(s))
         // Sync categories VOD
         .onItem()
-        .transformToUni(s -> syncCategories(s, vodCategoryRepository).replaceWith(s))
+        .transformToUni(s -> vodSynchronizer.syncCategories(s).replaceWith(s))
         // Then sync live streams
         .onItem()
-        .transformToUni(s -> syncLiveStreams(s, syncLog))
+        .transformToUni(s -> liveSynchronizer.syncStreams(s, syncLog).replaceWith(s))
         // Then sync VOD
         .onItem()
-        .transformToUni(s -> syncVod(s, syncLog))
+        .transformToUni(s -> vodSynchronizer.syncStreams(s, syncLog).replaceWith(s))
         // Then sync series
         .onItem()
-        .transformToUni(s -> syncSeries(s, syncLog))
+        .transformToUni(s -> seriesSynchronizer.syncStreams(s, syncLog).replaceWith(s))
         // Finally, update sync status
         .onItem()
         .transformToUni(s -> finalizeSyncLog(source, syncLog, syncStartTime, null))
         .onFailure()
         .recoverWithUni(failure -> finalizeSyncLog(source, syncLog, syncStartTime, failure));
-  }
-
-  /** Fetch and sync categories for a single type (live/vod/series) */
-  private Uni<Void> syncCategories(
-      Source source, AbstractTypedCategoryRepository typedCategoryRepository) {
-    Multi<Map> categoriesStream = typedCategoryRepository.fetchExternalData(source);
-
-    return categoriesStream
-        .collect()
-        .asList()
-        .flatMap(categoryMaps -> processCategorySync(source, categoryMaps, typedCategoryRepository))
-        .onFailure()
-        .invoke(
-            ex ->
-                LOGGER.severe(
-                    "Failed to sync "
-                        + typedCategoryRepository.getType().getCategoryType()
-                        + " categories: "
-                        + ex.getMessage()));
-  }
-
-  /** Process category synchronization: insert/update new, delete obsolete */
-  private Uni<Void> processCategorySync(
-      Source source,
-      List<Map> categoryMaps,
-      AbstractTypedCategoryRepository typedCategoryRepository) {
-    CategoryMappingResult mappingResult =
-        synchMapper.mapCategoryData(
-            source, categoryMaps, typedCategoryRepository.getType().getCategoryType());
-
-    return typedCategoryRepository
-        .findBySourceId(source.getId())
-        .collect()
-        .asList()
-        .flatMap(
-            existingCategories ->
-                syncAndDeleteCategories(
-                    mappingResult.categories,
-                    existingCategories,
-                    typedCategoryRepository,
-                    mappingResult.fetchedIds));
-  }
-
-  /** Sync (insert/update) and delete obsolete categories */
-  private Uni<Void> syncAndDeleteCategories(
-      List<Category> newCategories,
-      List<Category> existingCategories,
-      AbstractTypedCategoryRepository typedCategoryRepository,
-      Set<Integer> fetchedIds) {
-    // Create a map of existing categories by ID for quick lookup
-    Map<Integer, Category> existingMap = new HashMap<>();
-    for (Category cat : existingCategories) {
-      if (cat.getType().equals(typedCategoryRepository.getType().getCategoryType())) {
-        existingMap.put(cat.getExternalId(), cat);
-      }
-    }
-
-    // Insert/update categories
-    return Multi.createFrom()
-        .iterable(newCategories)
-        .onItem()
-        .transformToUniAndConcatenate(
-            category -> {
-              if (existingMap.containsKey(category.getExternalId())) {
-                category.setId(existingMap.get(category.getExternalId()).getId());
-                return typedCategoryRepository.update(category);
-              } else {
-                return typedCategoryRepository.insert(category).replaceWithVoid();
-              }
-            })
-        .collect()
-        .asList()
-        .flatMap(
-            v -> deleteObsoleteCategories(existingCategories, typedCategoryRepository, fetchedIds));
-  }
-
-  /** Delete obsolete categories that are no longer in the API response */
-  private Uni<Void> deleteObsoleteCategories(
-      List<Category> existingCategories,
-      AbstractTypedCategoryRepository typedCategoryRepository,
-      Set<Integer> fetchedIds) {
-    List<Category> toDelete =
-        existingCategories.stream()
-            .filter(
-                c ->
-                    c.getType().equals(typedCategoryRepository.getType().getCategoryType())
-                        && !fetchedIds.contains(c.getExternalId()))
-            .toList();
-
-    if (toDelete.isEmpty()) {
-      return Uni.createFrom().voidItem();
-    }
-
-    LOGGER.info(
-        "Deleting "
-            + toDelete.size()
-            + " obsolete "
-            + typedCategoryRepository.getType().getCategoryType()
-            + " categories");
-    return Multi.createFrom()
-        .iterable(toDelete)
-        .onItem()
-        .transformToUniAndConcatenate(cat -> typedCategoryRepository.delete(cat.getId()))
-        .collect()
-        .asList()
-        .replaceWithVoid();
-  }
-
-  /** Sync live streams for a source with batch upsert and transactions */
-  private Uni<Source> syncLiveStreams(Source source, SyncLog syncLog) {
-    return syncStreams(
-        source,
-        syncLog,
-        StreamType.LIVE,
-        streamData -> synchMapper.mapToLiveStream(source, streamData),
-        liveStreamRepository,
-        liveCategoryRepository);
-  }
-
-  /** Sync VOD streams for a source one-by-one */
-  private Uni<Source> syncVod(Source source, SyncLog syncLog) {
-    return syncStreams(
-        source,
-        syncLog,
-        StreamType.VOD,
-        streamData -> synchMapper.mapToVodStream(source, streamData),
-        vodStreamRepository,
-        vodCategoryRepository);
-  }
-
-  /** Sync series for a source one-by-one */
-  private Uni<Source> syncSeries(Source source, SyncLog syncLog) {
-    return syncStreams(
-        source,
-        syncLog,
-        StreamType.SERIES,
-        streamData -> synchMapper.mapToSeries(source, streamData),
-        seriesRepository,
-        seriesCategoryRepository);
-  }
-
-  /** Generic stream synchronization method for all stream types */
-  private <T extends BaseStream & StreamLike> Uni<Source> syncStreams(
-      Source source,
-      SyncLog syncLog,
-      StreamType type,
-      java.util.function.Function<Map<?, ?>, T> mapper,
-      BaseStreamRepository<T> repository,
-      AbstractTypedCategoryRepository categoryTypedRepository) {
-    LOGGER.info("Syncing " + type.getStreamTypeName() + " for source: " + source.getName());
-
-    Multi<Map> streamsData = repository.fetchExternalData(source);
-
-    return streamsData
-        .map(mapper::apply)
-        .collect()
-        .asList()
-        .flatMap(
-            allStreams -> {
-              LOGGER.info(
-                  "Fetched " + allStreams.size() + " " + type.getStreamTypeName() + " from API");
-
-              // Assign num ordering
-              for (int i = 0; i < allStreams.size(); i++) {
-                allStreams.get(i).setNum(i + 1);
-              }
-
-              // Handle streams without category - get/create Unknown category
-              List<Uni<Void>> categoryProcessing = new ArrayList<>();
-              for (T stream : allStreams) {
-                if (stream.getCategoryId() == null || stream.getCategoryId() == 0) {
-                  categoryProcessing.add(
-                      categoryTypedRepository
-                          .getOrCreateUnknownCategory(source.getId())
-                          .invoke(
-                              unknownCategoryId -> {
-                                stream.setCategoryId(unknownCategoryId.intValue());
-                                LOGGER.info(
-                                    type.getStreamTypeName()
-                                        + " assigned to Unknown category: stream_id="
-                                        + stream.getExternalId());
-                              })
-                          .replaceWithVoid());
-                }
-              }
-
-              // If category processing needed, wait for it; otherwise continue
-              Uni<Void> categoryProcessingDone =
-                  categoryProcessing.isEmpty()
-                      ? Uni.createFrom().voidItem()
-                      : Uni.join().all(categoryProcessing).andFailFast().replaceWithVoid();
-
-              return categoryProcessingDone.flatMap(
-                  categoryReady -> {
-                    Set<Integer> fetchedStreamIds = new HashSet<>();
-                    for (T stream : allStreams) {
-                      fetchedStreamIds.add(stream.getExternalId());
-                    }
-
-                    // Get all existing streams for this source
-                    return repository
-                        .findAll()
-                        .filter(s -> s.getSourceId().equals(source.getId()))
-                        .collect()
-                        .asList()
-                        .flatMap(
-                            existingStreams -> {
-                              // Create a map of existing streams by stream_id for quick lookup
-                              Map<Integer, T> existingMap = new HashMap<>();
-                              for (T stream : existingStreams) {
-                                existingMap.put(stream.getExternalId(), stream);
-                              }
-
-                              // Calculate statistics
-                              AtomicInteger added = new AtomicInteger(0);
-                              AtomicInteger updated = new AtomicInteger(0);
-                              for (T stream : allStreams) {
-                                if (existingMap.containsKey(stream.getExternalId())) {
-                                  updated.incrementAndGet();
-                                } else {
-                                  added.incrementAndGet();
-                                }
-                              }
-
-                              Set<Long> toDeleteIds = new HashSet<>();
-                              for (T stream : existingStreams) {
-                                if (!fetchedStreamIds.contains(stream.getExternalId())) {
-                                  toDeleteIds.add(stream.getId());
-                                }
-                              }
-
-                              syncLog.setItemsAdded(syncLog.getItemsAdded() + added.get());
-                              syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated.get());
-                              syncLog.setItemsDeleted(
-                                  syncLog.getItemsDeleted() + toDeleteIds.size());
-
-                              LOGGER.info(
-                                  String.format(
-                                      "%s - Added: %d, Updated: %d, Deleted: %d",
-                                      type.getStreamTypeName(),
-                                      added.get(),
-                                      updated.get(),
-                                      toDeleteIds.size()));
-
-                              // Insert/update streams one-by-one
-                              return Multi.createFrom()
-                                  .iterable(allStreams)
-                                  .onItem()
-                                  .transformToUniAndConcatenate(
-                                      stream -> {
-                                        if (existingMap.containsKey(stream.getExternalId())) {
-                                          // Update: set the ID from existing and update
-                                          stream.setId(
-                                              existingMap.get(stream.getExternalId()).getId());
-                                          return ((SynchronizedItemRepository<T>) repository)
-                                              .update(stream);
-                                        } else {
-                                          // Insert new stream
-                                          return ((SynchronizedItemRepository<T>) repository)
-                                              .insert(stream)
-                                              .replaceWithVoid();
-                                        }
-                                      })
-                                  .collect()
-                                  .asList()
-                                  .flatMap(
-                                      v -> {
-                                        // Delete obsolete streams
-                                        if (toDeleteIds.isEmpty()) {
-                                          return Uni.createFrom().voidItem();
-                                        }
-                                        return Multi.createFrom()
-                                            .iterable(toDeleteIds)
-                                            .onItem()
-                                            .transformToUniAndConcatenate(repository::delete)
-                                            .collect()
-                                            .asList()
-                                            .replaceWithVoid();
-                                      })
-                                  .invoke(
-                                      v -> {
-                                        // Explicit GC after processing large batches
-                                        if (allStreams.size() >= GC_THRESHOLD) {
-                                          System.gc();
-                                          LOGGER.fine(
-                                              "GC called after "
-                                                  + allStreams.size()
-                                                  + " "
-                                                  + type.getStreamTypeName());
-                                        }
-                                      });
-                            });
-                  });
-            })
-        .replaceWith(source);
   }
 
   /** Finalize sync log and update source */
@@ -604,16 +274,19 @@ public class SyncManager {
                         Uni<Source> taskResult =
                             switch (taskType) {
                               case "live_categories" ->
-                                  syncCategories(source, liveCategoryRepository)
-                                      .replaceWith(source);
+                                  liveSynchronizer.syncCategories(source).replaceWith(source);
                               case "vod_categories" ->
-                                  syncCategories(source, vodCategoryRepository).replaceWith(source);
+                                  vodSynchronizer.syncCategories(source).replaceWith(source);
                               case "series_categories" ->
-                                  syncCategories(source, seriesCategoryRepository)
+                                  seriesSynchronizer.syncCategories(source).replaceWith(source);
+                              case "live_streams" ->
+                                  liveSynchronizer.syncStreams(source, syncLog).replaceWith(source);
+                              case "vod_streams" ->
+                                  vodSynchronizer.syncStreams(source, syncLog).replaceWith(source);
+                              case "series" ->
+                                  seriesSynchronizer
+                                      .syncStreams(source, syncLog)
                                       .replaceWith(source);
-                              case "live_streams" -> syncLiveStreams(source, syncLog);
-                              case "vod_streams" -> syncVod(source, syncLog);
-                              case "series" -> syncSeries(source, syncLog);
                               default ->
                                   Uni.createFrom()
                                       .failure(

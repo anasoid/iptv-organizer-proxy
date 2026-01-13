@@ -41,7 +41,7 @@ public class SourcesController extends BaseController {
 
   @Inject SyncLogService syncLogService;
 
-  @Inject SyncManager syncService;
+  @Inject SyncManager syncManager;
 
   @Inject SyncLockManager syncLockManager;
 
@@ -214,7 +214,7 @@ public class SourcesController extends BaseController {
                             .build());
               }
 
-              return syncService
+              return syncManager
                   .triggerManualSync(source)
                   .map(
                       v ->
@@ -281,7 +281,7 @@ public class SourcesController extends BaseController {
                             .build());
               }
 
-              return syncService
+              return syncManager
                   .triggerManualSyncTask(source, taskType)
                   .map(
                       v ->
@@ -329,7 +329,7 @@ public class SourcesController extends BaseController {
                             .build());
               }
 
-              return syncService
+              return syncManager
                   .triggerFullSync(source)
                   .map(
                       v ->
