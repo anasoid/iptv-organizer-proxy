@@ -150,7 +150,13 @@ public class SyncManager {
     if (error != null) {
       syncLog.setStatus(SyncLogStatus.FAILED);
       syncLog.setErrorMessage(error.getMessage());
-      LOGGER.severe("Sync failed for source " + source.getId() + ": " + error.getMessage());
+      LOGGER.severe(
+          "Sync failed for source "
+              + source.getId()
+              + ": "
+              + error.getClass().getName()
+              + "-> "
+              + error.getMessage());
     } else {
       syncLog.setStatus(SyncLogStatus.COMPLETED);
       LOGGER.info("Sync completed for source " + source.getId());

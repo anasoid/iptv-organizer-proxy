@@ -39,7 +39,7 @@ public class HttpStreamingService {
     }
 
     final HttpOptions finalOptions = options;
-    int maxRetries = finalOptions.getMaxRetries() != null ? finalOptions.getMaxRetries() : 3;
+    int maxRetries = finalOptions.getMaxRetries() != null ? finalOptions.getMaxRetries() : 1;
 
     LOGGER.info("Starting HTTP stream request to: " + url);
 

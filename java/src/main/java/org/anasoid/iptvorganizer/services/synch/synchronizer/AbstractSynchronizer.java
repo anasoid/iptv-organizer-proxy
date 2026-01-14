@@ -173,8 +173,11 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
     StreamType type = getStreamType();
     LOGGER.info("Syncing " + type.getStreamTypeName() + " for source: " + source.getName());
 
-    Uni<Integer> unknownCategoryIdd =
-        typedCategoryRepository.getOrCreateUnknownCategory(source.getId());
+    Integer unknownCategoryIdd = 0;
+    /**
+     * typedCategoryRepository .getOrCreateUnknownCategory(source.getId()) .await()
+     * .atMost(Duration.ofSeconds(10));
+     */
     Multi<Map> streamsData = streamRepository.fetchExternalData(source);
 
     return streamsData

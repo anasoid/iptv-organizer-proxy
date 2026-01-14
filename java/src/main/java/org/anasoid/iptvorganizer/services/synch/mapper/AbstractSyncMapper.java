@@ -75,7 +75,7 @@ public abstract class AbstractSyncMapper<T extends BaseStream & StreamLike> {
     stream.setName(getStringValue(param.getData(), "name"));
     stream.setCategoryId(getIntValue(param.getData(), "category_id"));
     if (stream.getCategoryId() == null) {
-      stream.setCategoryId(param.getUnknownCategoryId().await().indefinitely());
+      stream.setCategoryId(param.getUnknownCategoryId());
     }
     stream.setIsAdult(getBooleanValue(param.getData(), "is_adult"));
     stream.setLabels(labelExtractor.extractLabels(getStringValue(param.getData(), "name")));
