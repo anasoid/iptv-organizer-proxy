@@ -22,8 +22,12 @@ public abstract class AbstractTypedCategoryRepository
   public Uni<Void> update(Category category) {
     if (category.getType() == null) {
       category.setType(getType().getCategoryType());
-    } else if (category.getType().equals(getType().getCategoryType())) {
-      throw new IllegalArgumentException("Category type does not match");
+    } else if (!category.getType().equals(getType().getCategoryType())) {
+      throw new IllegalArgumentException(
+          "Category type does not match : "
+              + category.getType()
+              + "<>"
+              + getType().getCategoryType());
     }
     return categoryRepository.update(category);
   }
