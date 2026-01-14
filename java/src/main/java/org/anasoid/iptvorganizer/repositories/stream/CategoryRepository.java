@@ -5,7 +5,6 @@ import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
-import java.util.Set;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 
@@ -133,12 +132,12 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
    * @param categoryType Category type (live, vod, series)
    * @return Database ID of the Unknown category
    */
-  public Uni<Long> getOrCreateUnknownCategory(Long sourceId, String categoryType) {
+  public Uni<Integer> getOrCreateUnknownCategory(Long sourceId, String categoryType) {
     return findBySourceCategoryType(sourceId, 0, categoryType)
         .flatMap(
             existing -> {
               if (existing != null) {
-                return Uni.createFrom().item(existing.getId());
+                return Uni.createFrom().item(existing.getExternalId());
               }
 
               // Create new Unknown category
@@ -150,20 +149,18 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
               unknownCategory.setParentId(null);
               unknownCategory.setLabels("unknown");
 
-              return insert(unknownCategory);
+              return insert(unknownCategory).replaceWith(0);
             });
   }
 
   /** Find entities by source ID */
-  public Uni<Set<Integer>> findExternalIdsBySourceIdAndType(Long sourceId, StreamType type) {
+  public Multi<Integer> findExternalIdsBySourceIdAndType(Long sourceId, StreamType type) {
     return pool.preparedQuery(
             "SELECT external_id FROM " + getTableName() + " WHERE source_id = ? AND type = ?")
         .execute(Tuple.of(sourceId, type.getCategoryType()))
         .onItem()
         .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
-        .map(row -> row.getInteger("external_id"))
-        .collect()
-        .asSet();
+        .map(row -> row.getInteger("external_id"));
   }
 
   public Uni<Category> findByExternalIdAndType(Integer externalId, Long sourceId, StreamType type) {

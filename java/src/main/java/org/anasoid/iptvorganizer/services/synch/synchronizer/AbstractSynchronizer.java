@@ -3,8 +3,6 @@ package org.anasoid.iptvorganizer.services.synch.synchronizer;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -14,7 +12,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
-import org.anasoid.iptvorganizer.models.entity.SyncLog.SyncLogStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamLike;
@@ -176,6 +173,8 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
     StreamType type = getStreamType();
     LOGGER.info("Syncing " + type.getStreamTypeName() + " for source: " + source.getName());
 
+    Uni<Integer> unknownCategoryIdd =
+        typedCategoryRepository.getOrCreateUnknownCategory(source.getId());
     Multi<Map> streamsData = streamRepository.fetchExternalData(source);
 
     return streamsData
@@ -183,7 +182,11 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
             m ->
                 getMapper()
                     .mapToStream(
-                        SynchronizedItemMapParameter.builder().source(source).data(m).build()))
+                        SynchronizedItemMapParameter.builder()
+                            .unknownCategoryId(unknownCategoryIdd)
+                            .source(source)
+                            .data(m)
+                            .build()))
         .collect()
         .asList()
         .flatMap(
@@ -196,164 +199,100 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
                 allStreams.get(i).setNum(i + 1);
               }
 
-              // Handle streams without category - get/create Unknown category
-              List<Uni<Void>> categoryProcessing = new ArrayList<>();
-              for (T stream : allStreams) {
-                if (stream.getCategoryId() == null || stream.getCategoryId() == 0) {
-                  categoryProcessing.add(
-                      typedCategoryRepository
-                          .getOrCreateUnknownCategory(source.getId())
-                          .invoke(
-                              unknownCategoryId -> {
-                                stream.setCategoryId(unknownCategoryId.intValue());
-                                LOGGER.info(
-                                    type.getStreamTypeName()
-                                        + " assigned to Unknown category: stream_id="
-                                        + stream.getExternalId());
-                              })
-                          .replaceWithVoid());
-                }
-              }
+              return Uni.createFrom()
+                  .voidItem()
+                  .flatMap(
+                      ignored -> {
+                        Set<Integer> fetchedStreamIds = new HashSet<>();
+                        for (T stream : allStreams) {
+                          fetchedStreamIds.add(stream.getExternalId());
+                        }
 
-              // If category processing needed, wait for it; otherwise continue
-              Uni<Void> categoryProcessingDone =
-                  categoryProcessing.isEmpty()
-                      ? Uni.createFrom().voidItem()
-                      : Uni.join().all(categoryProcessing).andFailFast().replaceWithVoid();
+                        // Get all existing streams for this source
+                        return streamRepository
+                            .findExternalIdsBySourceId(source.getId())
+                            .collect()
+                            .asList()
+                            .flatMap(
+                                existingExternalIds -> {
 
-              return categoryProcessingDone.flatMap(
-                  categoryReady -> {
-                    Set<Integer> fetchedStreamIds = new HashSet<>();
-                    for (T stream : allStreams) {
-                      fetchedStreamIds.add(stream.getExternalId());
-                    }
+                                  // Calculate statistics
+                                  AtomicInteger added = new AtomicInteger(0);
+                                  AtomicInteger updated = new AtomicInteger(0);
+                                  for (T stream : allStreams) {
+                                    if (existingExternalIds.contains(stream.getExternalId())) {
+                                      updated.incrementAndGet();
+                                    } else {
+                                      added.incrementAndGet();
+                                    }
+                                  }
 
-                    // Get all existing streams for this source
-                    return streamRepository
-                        .findAll()
-                        .filter(s -> s.getSourceId().equals(source.getId()))
-                        .collect()
-                        .asList()
-                        .flatMap(
-                            existingStreams -> {
-                              // Create a map of existing streams by stream_id for quick lookup
-                              Map<Integer, T> existingMap = new HashMap<>();
-                              for (T stream : existingStreams) {
-                                existingMap.put(stream.getExternalId(), stream);
-                              }
+                                  Set<Integer> toDeleteIds = new HashSet<>();
+                                  for (Integer id : existingExternalIds) {
+                                    if (!fetchedStreamIds.contains(id)) {
+                                      toDeleteIds.add(id);
+                                    }
+                                  }
 
-                              // Calculate statistics
-                              AtomicInteger added = new AtomicInteger(0);
-                              AtomicInteger updated = new AtomicInteger(0);
-                              for (T stream : allStreams) {
-                                if (existingMap.containsKey(stream.getExternalId())) {
-                                  updated.incrementAndGet();
-                                } else {
-                                  added.incrementAndGet();
-                                }
-                              }
+                                  syncLog.setItemsAdded(syncLog.getItemsAdded() + added.get());
+                                  syncLog.setItemsUpdated(
+                                      syncLog.getItemsUpdated() + updated.get());
+                                  syncLog.setItemsDeleted(
+                                      syncLog.getItemsDeleted() + toDeleteIds.size());
 
-                              Set<Long> toDeleteIds = new HashSet<>();
-                              for (T stream : existingStreams) {
-                                if (!fetchedStreamIds.contains(stream.getExternalId())) {
-                                  toDeleteIds.add(stream.getId());
-                                }
-                              }
+                                  LOGGER.info(
+                                      String.format(
+                                          "%s - Added: %d, Updated: %d, Deleted: %d",
+                                          type.getStreamTypeName(),
+                                          added.get(),
+                                          updated.get(),
+                                          toDeleteIds.size()));
 
-                              syncLog.setItemsAdded(syncLog.getItemsAdded() + added.get());
-                              syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated.get());
-                              syncLog.setItemsDeleted(
-                                  syncLog.getItemsDeleted() + toDeleteIds.size());
-
-                              LOGGER.info(
-                                  String.format(
-                                      "%s - Added: %d, Updated: %d, Deleted: %d",
-                                      type.getStreamTypeName(),
-                                      added.get(),
-                                      updated.get(),
-                                      toDeleteIds.size()));
-
-                              // Insert/update streams one-by-one
-                              return Multi.createFrom()
-                                  .iterable(allStreams)
-                                  .onItem()
-                                  .transformToUniAndConcatenate(
-                                      stream -> {
-                                        if (existingMap.containsKey(stream.getExternalId())) {
-                                          // Update: set the ID from existing and update
-                                          stream.setId(
-                                              existingMap.get(stream.getExternalId()).getId());
-                                          return ((SynchronizedItemRepository<T>) streamRepository)
-                                              .update(stream);
-                                        } else {
-                                          // Insert new stream
-                                          return ((SynchronizedItemRepository<T>) streamRepository)
-                                              .insert(stream)
-                                              .replaceWithVoid();
-                                        }
-                                      })
-                                  .collect()
-                                  .asList()
-                                  .flatMap(
-                                      v -> {
-                                        // Delete obsolete streams
-                                        if (toDeleteIds.isEmpty()) {
-                                          return Uni.createFrom().voidItem();
-                                        }
-                                        return Multi.createFrom()
-                                            .iterable(toDeleteIds)
-                                            .onItem()
-                                            .transformToUniAndConcatenate(streamRepository::delete)
-                                            .collect()
-                                            .asList()
-                                            .replaceWithVoid();
-                                      })
-                                  .invoke(
-                                      v -> {
-                                        // Explicit GC after processing large batches
-                                        if (allStreams.size() >= GC_THRESHOLD) {
-                                          System.gc();
-                                          LOGGER.fine(
-                                              "GC called after "
-                                                  + allStreams.size()
-                                                  + " "
-                                                  + type.getStreamTypeName());
-                                        }
-                                      });
-                            });
-                  });
+                                  // Insert/update streams one-by-one
+                                  return Multi.createFrom()
+                                      .iterable(allStreams)
+                                      .onItem()
+                                      .transformToUniAndConcatenate(
+                                          stream -> {
+                                            return ((SynchronizedItemRepository<T>)
+                                                    streamRepository)
+                                                .insertOrUpdateByExternalId(stream);
+                                          })
+                                      .collect()
+                                      .asList()
+                                      .flatMap(
+                                          v -> {
+                                            // Delete obsolete streams
+                                            if (toDeleteIds.isEmpty()) {
+                                              return Uni.createFrom().voidItem();
+                                            }
+                                            return Multi.createFrom()
+                                                .iterable(toDeleteIds)
+                                                .onItem()
+                                                .transformToUniAndConcatenate(
+                                                    id ->
+                                                        streamRepository.deleteByExternalId(
+                                                            id, source.getId()))
+                                                .collect()
+                                                .asList()
+                                                .replaceWithVoid();
+                                          })
+                                      .invoke(
+                                          v -> {
+                                            // Explicit GC after processing large batches
+                                            if (allStreams.size() >= GC_THRESHOLD) {
+                                              System.gc();
+                                              LOGGER.fine(
+                                                  "GC called after "
+                                                      + allStreams.size()
+                                                      + " "
+                                                      + type.getStreamTypeName());
+                                            }
+                                          });
+                                });
+                      });
             })
         .replaceWith(source);
-  }
-
-  /** Finalize sync log and update source */
-  private Uni<Void> finalizeSyncLog(
-      Source source, SyncLog syncLog, LocalDateTime syncStartTime, Throwable error) {
-    LocalDateTime syncEndTime = LocalDateTime.now();
-
-    if (error != null) {
-      syncLog.setStatus(SyncLogStatus.FAILED);
-      syncLog.setErrorMessage(error.getMessage());
-      LOGGER.severe("Sync failed for source " + source.getId() + ": " + error.getMessage());
-    } else {
-      syncLog.setStatus(SyncLogStatus.COMPLETED);
-      LOGGER.info("Sync completed for source " + source.getId());
-    }
-
-    syncLog.setCompletedAt(syncEndTime);
-    long durationSeconds =
-        java.time.temporal.ChronoUnit.SECONDS.between(syncStartTime, syncEndTime);
-    syncLog.setDurationSeconds((int) durationSeconds);
-
-    // Update source with next sync time (lock will be released separately)
-    source.setNextSync(
-        LocalDateTime.now()
-            .plusDays(source.getSyncInterval() != null ? source.getSyncInterval() : 1));
-
-    return syncLogRepository
-        .update(syncLog)
-        .onItem()
-        .transformToUni(v -> sourceRepository.update(source));
   }
 
   abstract AbstractSyncMapper<T> getMapper();

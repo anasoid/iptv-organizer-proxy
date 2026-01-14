@@ -4,7 +4,6 @@ import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.util.Set;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 
@@ -37,7 +36,7 @@ public abstract class AbstractTypedCategoryRepository
    * @param categoryType Category type (live, vod, series)
    * @return Database ID of the Unknown category
    */
-  public Uni<Long> getOrCreateUnknownCategory(Long sourceId) {
+  public Uni<Integer> getOrCreateUnknownCategory(Long sourceId) {
     return categoryRepository.getOrCreateUnknownCategory(sourceId, getType().getCategoryType());
   }
 
@@ -54,7 +53,7 @@ public abstract class AbstractTypedCategoryRepository
   }
 
   @Override
-  public Uni<Set<Integer>> findExternalIdsBySourceId(Long sourceId) {
+  public Multi<Integer> findExternalIdsBySourceId(Long sourceId) {
     return categoryRepository.findExternalIdsBySourceIdAndType(sourceId, getType());
   }
 

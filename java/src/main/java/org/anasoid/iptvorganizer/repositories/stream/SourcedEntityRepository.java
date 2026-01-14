@@ -3,7 +3,6 @@ package org.anasoid.iptvorganizer.repositories.stream;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.sqlclient.Tuple;
-import java.util.Set;
 import org.anasoid.iptvorganizer.models.entity.stream.SourcedEntity;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
@@ -25,14 +24,12 @@ public abstract class SourcedEntityRepository<T extends SourcedEntity> extends B
   }
 
   /** Find entities by source ID */
-  public Uni<Set<Integer>> findExternalIdsBySourceId(Long sourceId) {
+  public Multi<Integer> findExternalIdsBySourceId(Long sourceId) {
     return pool.preparedQuery("SELECT external_id FROM " + getTableName() + " WHERE source_id = ?")
         .execute(Tuple.of(sourceId))
         .onItem()
         .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
-        .map(row -> row.getInteger("external_id"))
-        .collect()
-        .asSet();
+        .map(row -> row.getInteger("external_id"));
   }
 
   public Uni<T> findByExternalId(Integer externalId, Long sourceId) {
