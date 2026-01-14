@@ -173,124 +173,131 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
     StreamType type = getStreamType();
     LOGGER.info("Syncing " + type.getStreamTypeName() + " for source: " + source.getName());
 
-    Integer unknownCategoryIdd = 0;
-    /**
-     * typedCategoryRepository .getOrCreateUnknownCategory(source.getId()) .await()
-     * .atMost(Duration.ofSeconds(10));
-     */
-    Multi<Map> streamsData = streamRepository.fetchExternalData(source);
-
-    return streamsData
-        .map(
-            m ->
-                getMapper()
-                    .mapToStream(
-                        SynchronizedItemMapParameter.builder()
-                            .unknownCategoryId(unknownCategoryIdd)
-                            .source(source)
-                            .data(m)
-                            .build()))
-        .collect()
-        .asList()
+    return typedCategoryRepository
+        .getOrCreateUnknownCategory(source.getId())
         .flatMap(
-            allStreams -> {
-              LOGGER.info(
-                  "Fetched " + allStreams.size() + " " + type.getStreamTypeName() + " from API");
+            unknownCategoryId -> {
+              Multi<Map> streamsData = streamRepository.fetchExternalData(source);
 
-              // Assign num ordering
-              for (int i = 0; i < allStreams.size(); i++) {
-                allStreams.get(i).setNum(i + 1);
-              }
-
-              return Uni.createFrom()
-                  .voidItem()
+              return streamsData
+                  .map(
+                      m ->
+                          getMapper()
+                              .mapToStream(
+                                  SynchronizedItemMapParameter.builder()
+                                      .unknownCategoryId(unknownCategoryId)
+                                      .source(source)
+                                      .data(m)
+                                      .build()))
+                  .collect()
+                  .asList()
                   .flatMap(
-                      ignored -> {
-                        Set<Integer> fetchedStreamIds = new HashSet<>();
-                        for (T stream : allStreams) {
-                          fetchedStreamIds.add(stream.getExternalId());
+                      allStreams -> {
+                        LOGGER.info(
+                            "Fetched "
+                                + allStreams.size()
+                                + " "
+                                + type.getStreamTypeName()
+                                + " from API");
+
+                        // Assign num ordering
+                        for (int i = 0; i < allStreams.size(); i++) {
+                          allStreams.get(i).setNum(i + 1);
                         }
 
-                        // Get all existing streams for this source
-                        return streamRepository
-                            .findExternalIdsBySourceId(source.getId())
-                            .collect()
-                            .asList()
+                        return Uni.createFrom()
+                            .voidItem()
                             .flatMap(
-                                existingExternalIds -> {
-
-                                  // Calculate statistics
-                                  AtomicInteger added = new AtomicInteger(0);
-                                  AtomicInteger updated = new AtomicInteger(0);
+                                ignored -> {
+                                  Set<Integer> fetchedStreamIds = new HashSet<>();
                                   for (T stream : allStreams) {
-                                    if (existingExternalIds.contains(stream.getExternalId())) {
-                                      updated.incrementAndGet();
-                                    } else {
-                                      added.incrementAndGet();
-                                    }
+                                    fetchedStreamIds.add(stream.getExternalId());
                                   }
 
-                                  Set<Integer> toDeleteIds = new HashSet<>();
-                                  for (Integer id : existingExternalIds) {
-                                    if (!fetchedStreamIds.contains(id)) {
-                                      toDeleteIds.add(id);
-                                    }
-                                  }
-
-                                  syncLog.setItemsAdded(syncLog.getItemsAdded() + added.get());
-                                  syncLog.setItemsUpdated(
-                                      syncLog.getItemsUpdated() + updated.get());
-                                  syncLog.setItemsDeleted(
-                                      syncLog.getItemsDeleted() + toDeleteIds.size());
-
-                                  LOGGER.info(
-                                      String.format(
-                                          "%s - Added: %d, Updated: %d, Deleted: %d",
-                                          type.getStreamTypeName(),
-                                          added.get(),
-                                          updated.get(),
-                                          toDeleteIds.size()));
-
-                                  // Insert/update streams one-by-one
-                                  return Multi.createFrom()
-                                      .iterable(allStreams)
-                                      .onItem()
-                                      .transformToUniAndConcatenate(
-                                          stream -> {
-                                            return ((SynchronizedItemRepository<T>)
-                                                    streamRepository)
-                                                .insertOrUpdateByExternalId(stream);
-                                          })
+                                  // Get all existing streams for this source
+                                  return streamRepository
+                                      .findExternalIdsBySourceId(source.getId())
                                       .collect()
                                       .asList()
                                       .flatMap(
-                                          v -> {
-                                            // Delete obsolete streams
-                                            if (toDeleteIds.isEmpty()) {
-                                              return Uni.createFrom().voidItem();
+                                          existingExternalIds -> {
+
+                                            // Calculate statistics
+                                            AtomicInteger added = new AtomicInteger(0);
+                                            AtomicInteger updated = new AtomicInteger(0);
+                                            for (T stream : allStreams) {
+                                              if (existingExternalIds.contains(
+                                                  stream.getExternalId())) {
+                                                updated.incrementAndGet();
+                                              } else {
+                                                added.incrementAndGet();
+                                              }
                                             }
+
+                                            Set<Integer> toDeleteIds = new HashSet<>();
+                                            for (Integer id : existingExternalIds) {
+                                              if (!fetchedStreamIds.contains(id)) {
+                                                toDeleteIds.add(id);
+                                              }
+                                            }
+
+                                            syncLog.setItemsAdded(
+                                                syncLog.getItemsAdded() + added.get());
+                                            syncLog.setItemsUpdated(
+                                                syncLog.getItemsUpdated() + updated.get());
+                                            syncLog.setItemsDeleted(
+                                                syncLog.getItemsDeleted() + toDeleteIds.size());
+
+                                            LOGGER.info(
+                                                String.format(
+                                                    "%s - Added: %d, Updated: %d, Deleted: %d",
+                                                    type.getStreamTypeName(),
+                                                    added.get(),
+                                                    updated.get(),
+                                                    toDeleteIds.size()));
+
+                                            // Insert/update streams one-by-one
                                             return Multi.createFrom()
-                                                .iterable(toDeleteIds)
+                                                .iterable(allStreams)
                                                 .onItem()
                                                 .transformToUniAndConcatenate(
-                                                    id ->
-                                                        streamRepository.deleteByExternalId(
-                                                            id, source.getId()))
+                                                    stream -> {
+                                                      return ((SynchronizedItemRepository<T>)
+                                                              streamRepository)
+                                                          .insertOrUpdateByExternalId(stream);
+                                                    })
                                                 .collect()
                                                 .asList()
-                                                .replaceWithVoid();
-                                          })
-                                      .invoke(
-                                          v -> {
-                                            // Explicit GC after processing large batches
-                                            if (allStreams.size() >= GC_THRESHOLD) {
-                                              System.gc();
-                                              LOGGER.fine(
-                                                  "GC called after "
-                                                      + allStreams.size()
-                                                      + " "
-                                                      + type.getStreamTypeName());
-                                            }
+                                                .flatMap(
+                                                    v -> {
+                                                      // Delete obsolete streams
+                                                      if (toDeleteIds.isEmpty()) {
+                                                        return Uni.createFrom().voidItem();
+                                                      }
+                                                      return Multi.createFrom()
+                                                          .iterable(toDeleteIds)
+                                                          .onItem()
+                                                          .transformToUniAndConcatenate(
+                                                              id ->
+                                                                  streamRepository
+                                                                      .deleteByExternalId(
+                                                                          id, source.getId()))
+                                                          .collect()
+                                                          .asList()
+                                                          .replaceWithVoid();
+                                                    })
+                                                .invoke(
+                                                    v -> {
+                                                      // Explicit GC after processing large batches
+                                                      if (allStreams.size() >= GC_THRESHOLD) {
+                                                        System.gc();
+                                                        LOGGER.fine(
+                                                            "GC called after "
+                                                                + allStreams.size()
+                                                                + " "
+                                                                + type.getStreamTypeName());
+                                                      }
+                                                    });
                                           });
                                 });
                       });

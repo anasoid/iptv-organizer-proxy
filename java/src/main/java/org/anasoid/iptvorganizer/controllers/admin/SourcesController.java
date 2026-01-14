@@ -19,6 +19,8 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.dto.SourceDTO;
 import org.anasoid.iptvorganizer.dto.SyncLogDTO;
 import org.anasoid.iptvorganizer.dto.request.CreateSourceRequest;
@@ -36,6 +38,8 @@ import org.anasoid.iptvorganizer.services.synch.SyncManager;
 @Consumes(MediaType.APPLICATION_JSON)
 @RolesAllowed("admin")
 public class SourcesController extends BaseController {
+
+  private static final Logger LOGGER = Logger.getLogger(SourcesController.class.getName());
 
   @Inject SourceService sourceService;
 
@@ -69,7 +73,11 @@ public class SourcesController extends BaseController {
               return ApiResponse.successWithPagination(sources, pagination);
             })
         .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Failed to fetch sources: " + ex.getMessage()));
+        .recoverWithItem(
+            ex -> {
+              LOGGER.log(Level.SEVERE, "Failed to fetch sources", ex);
+              return ApiResponse.error("Failed to fetch sources: " + ex.getMessage());
+            });
   }
 
   /** Get source by ID GET /api/sources/:id */
@@ -84,7 +92,11 @@ public class SourcesController extends BaseController {
                     ? ApiResponse.success(SourceDTO.fromEntity(source))
                     : ApiResponse.error("Source not found"))
         .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Source not found"));
+        .recoverWithItem(
+            ex -> {
+              LOGGER.log(Level.SEVERE, "Error fetching source: " + id, ex);
+              return ApiResponse.error("Source not found");
+            });
   }
 
   /** Create source POST /api/sources */
@@ -123,7 +135,11 @@ public class SourcesController extends BaseController {
         .save(source)
         .map(s -> ApiResponse.success(SourceDTO.fromEntity(s)))
         .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Failed to create source: " + ex.getMessage()));
+        .recoverWithItem(
+            ex -> {
+              LOGGER.log(Level.SEVERE, "Failed to create source", ex);
+              return ApiResponse.error("Failed to create source: " + ex.getMessage());
+            });
   }
 
   /** Update source PUT /api/sources/:id */
@@ -169,7 +185,11 @@ public class SourcesController extends BaseController {
             })
         .map(source -> ApiResponse.success(SourceDTO.fromEntity(source)))
         .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Failed to update source: " + ex.getMessage()));
+        .recoverWithItem(
+            ex -> {
+              LOGGER.log(Level.SEVERE, "Failed to update source: " + id, ex);
+              return ApiResponse.error("Failed to update source: " + ex.getMessage());
+            });
   }
 
   /** Delete source DELETE /api/sources/:id */
@@ -180,7 +200,11 @@ public class SourcesController extends BaseController {
         .delete(id)
         .map(v -> ApiResponse.success("Source deleted successfully"))
         .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Failed to delete source: " + ex.getMessage()));
+        .recoverWithItem(
+            ex -> {
+              LOGGER.log(Level.SEVERE, "Failed to delete source: " + id, ex);
+              return ApiResponse.error("Failed to delete source: " + ex.getMessage());
+            });
   }
 
   /** Test source connection POST /api/sources/:id/test */
@@ -195,7 +219,11 @@ public class SourcesController extends BaseController {
               return Uni.createFrom().item(ApiResponse.success("Connection test passed"));
             })
         .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Connection test failed: " + ex.getMessage()));
+        .recoverWithItem(
+            ex -> {
+              LOGGER.log(Level.SEVERE, "Connection test failed for source: " + id, ex);
+              return ApiResponse.error("Connection test failed: " + ex.getMessage());
+            });
   }
 
   /** Trigger full manual sync for a source POST /api/sources/:id/sync */
@@ -225,6 +253,7 @@ public class SourcesController extends BaseController {
                   .onFailure()
                   .recoverWithItem(
                       ex -> {
+                        LOGGER.log(Level.SEVERE, "Failed to trigger sync for source: " + id, ex);
                         if (ex.getMessage().contains("already syncing")) {
                           return Response.status(Response.Status.CONFLICT)
                               .entity(ApiResponse.error("Source is already syncing"))
@@ -237,10 +266,12 @@ public class SourcesController extends BaseController {
             })
         .onFailure()
         .recoverWithItem(
-            ex ->
-                Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(ApiResponse.error("Failed to trigger sync: " + ex.getMessage()))
-                    .build());
+            ex -> {
+              LOGGER.log(Level.SEVERE, "Failed to trigger sync for source: " + id, ex);
+              return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                  .entity(ApiResponse.error("Failed to trigger sync: " + ex.getMessage()))
+                  .build();
+            });
   }
 
   /**
@@ -295,6 +326,10 @@ public class SourcesController extends BaseController {
                   .onFailure()
                   .recoverWithItem(
                       ex -> {
+                        LOGGER.log(
+                            Level.SEVERE,
+                            "Failed to trigger sync task " + taskType + " for source: " + id,
+                            ex);
                         if (ex.getMessage().contains("already syncing")) {
                           return Response.status(Response.Status.CONFLICT)
                               .entity(ApiResponse.error("Source is already syncing"))
@@ -307,10 +342,15 @@ public class SourcesController extends BaseController {
             })
         .onFailure()
         .recoverWithItem(
-            ex ->
-                Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(ApiResponse.error("Failed to trigger sync: " + ex.getMessage()))
-                    .build());
+            ex -> {
+              LOGGER.log(
+                  Level.SEVERE,
+                  "Failed to trigger sync task " + taskType + " for source: " + id,
+                  ex);
+              return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                  .entity(ApiResponse.error("Failed to trigger sync: " + ex.getMessage()))
+                  .build();
+            });
   }
 
   /** Trigger full sync for all task types POST /api/sources/:id/sync-all */
@@ -341,6 +381,8 @@ public class SourcesController extends BaseController {
                   .onFailure()
                   .recoverWithItem(
                       ex -> {
+                        LOGGER.log(
+                            Level.SEVERE, "Failed to trigger full sync for source: " + id, ex);
                         if (ex.getMessage().contains("already syncing")) {
                           return Response.status(Response.Status.CONFLICT)
                               .entity(ApiResponse.error("Source is already syncing"))
@@ -355,10 +397,12 @@ public class SourcesController extends BaseController {
             })
         .onFailure()
         .recoverWithItem(
-            ex ->
-                Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(ApiResponse.error("Failed to trigger full sync: " + ex.getMessage()))
-                    .build());
+            ex -> {
+              LOGGER.log(Level.SEVERE, "Failed to trigger full sync for source: " + id, ex);
+              return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                  .entity(ApiResponse.error("Failed to trigger full sync: " + ex.getMessage()))
+                  .build();
+            });
   }
 
   /** Get sync logs for a source GET /api/sources/:id/sync-logs?limit=20 */
@@ -373,7 +417,11 @@ public class SourcesController extends BaseController {
         .asList()
         .map(logs -> ApiResponse.success(logs.stream().limit(limit).toList()))
         .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Failed to fetch sync logs: " + ex.getMessage()));
+        .recoverWithItem(
+            ex -> {
+              LOGGER.log(Level.SEVERE, "Failed to fetch sync logs for source: " + id, ex);
+              return ApiResponse.error("Failed to fetch sync logs: " + ex.getMessage());
+            });
   }
 
   /** Get sync status for all sources GET /api/sync/status */
@@ -416,7 +464,10 @@ public class SourcesController extends BaseController {
         .map(ApiResponse::success)
         .onFailure()
         .recoverWithItem(
-            ex -> ApiResponse.error("Failed to fetch sync status: " + ex.getMessage()));
+            ex -> {
+              LOGGER.log(Level.SEVERE, "Failed to fetch sync status", ex);
+              return ApiResponse.error("Failed to fetch sync status: " + ex.getMessage());
+            });
   }
 
   /** Get currently active sync operations GET /api/sync/active */
