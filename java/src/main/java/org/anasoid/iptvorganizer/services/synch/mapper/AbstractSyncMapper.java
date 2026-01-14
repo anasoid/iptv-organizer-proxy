@@ -2,14 +2,8 @@ package org.anasoid.iptvorganizer.services.synch.mapper;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.anasoid.iptvorganizer.helper.LabelExtractorHelper;
-import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamLike;
@@ -19,40 +13,6 @@ import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 public abstract class AbstractSyncMapper<T extends BaseStream & StreamLike> {
 
   @Inject LabelExtractorHelper labelExtractor;
-
-  /** Map API response data to Category objects */
-  public CategoryMappingResult mapCategoryData(Source source, List<Map> categoryMaps) {
-    List<Category> categories = new ArrayList<>();
-    Set<Integer> fetchedCategoryIds = new HashSet<>();
-    AtomicInteger num = new AtomicInteger(1);
-
-    for (Map catData : categoryMaps) {
-      Category category = new Category();
-      category.setSourceId(source.getId());
-      category.setExternalId(getIntValue(catData, "category_id"));
-      category.setName(getStringValue(catData, "category_name"));
-      category.setType(getStreamType().getCategoryType());
-      category.setNum(num.getAndIncrement());
-      category.setParentId(getIntValue(catData, "parent_id"));
-      category.setLabels(labelExtractor.extractLabels(category.getName()));
-
-      categories.add(category);
-      fetchedCategoryIds.add(category.getExternalId());
-    }
-
-    return new CategoryMappingResult(categories, fetchedCategoryIds);
-  }
-
-  /** Helper class to hold category mapping results */
-  public static class CategoryMappingResult {
-    public List<Category> categories;
-    public Set<Integer> fetchedIds;
-
-    public CategoryMappingResult(List<Category> categories, Set<Integer> fetchedIds) {
-      this.categories = categories;
-      this.fetchedIds = fetchedIds;
-    }
-  }
 
   public Category mapToCategory(SynchronizedItemMapParameter param) {
 

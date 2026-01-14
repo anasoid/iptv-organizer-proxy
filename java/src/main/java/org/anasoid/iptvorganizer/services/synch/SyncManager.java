@@ -119,22 +119,22 @@ public class SyncManager {
         .item(source)
         // Sync categories streams
         .onItem()
-        .transformToUni(s -> liveSynchronizer.syncCategories(s).replaceWith(s))
+        .transformToUni(s -> liveSynchronizer.syncCategories(s, syncLog))
         // Sync categories series
         .onItem()
-        .transformToUni(s -> seriesSynchronizer.syncCategories(s).replaceWith(s))
+        .transformToUni(s -> seriesSynchronizer.syncCategories(s, syncLog))
         // Sync categories VOD
         .onItem()
-        .transformToUni(s -> vodSynchronizer.syncCategories(s).replaceWith(s))
+        .transformToUni(s -> vodSynchronizer.syncCategories(s, syncLog))
         // Then sync live streams
         .onItem()
-        .transformToUni(s -> liveSynchronizer.syncStreams(s, syncLog).replaceWith(s))
+        .transformToUni(s -> liveSynchronizer.syncStreams(s, syncLog))
         // Then sync VOD
         .onItem()
-        .transformToUni(s -> vodSynchronizer.syncStreams(s, syncLog).replaceWith(s))
+        .transformToUni(s -> vodSynchronizer.syncStreams(s, syncLog))
         // Then sync series
         .onItem()
-        .transformToUni(s -> seriesSynchronizer.syncStreams(s, syncLog).replaceWith(s))
+        .transformToUni(s -> seriesSynchronizer.syncStreams(s, syncLog))
         // Finally, update sync status
         .onItem()
         .transformToUni(s -> finalizeSyncLog(source, syncLog, syncStartTime, null))
@@ -280,19 +280,14 @@ public class SyncManager {
                         Uni<Source> taskResult =
                             switch (taskType) {
                               case "live_categories" ->
-                                  liveSynchronizer.syncCategories(source).replaceWith(source);
+                                  liveSynchronizer.syncCategories(source, syncLog);
                               case "vod_categories" ->
-                                  vodSynchronizer.syncCategories(source).replaceWith(source);
+                                  vodSynchronizer.syncCategories(source, syncLog);
                               case "series_categories" ->
-                                  seriesSynchronizer.syncCategories(source).replaceWith(source);
-                              case "live_streams" ->
-                                  liveSynchronizer.syncStreams(source, syncLog).replaceWith(source);
-                              case "vod_streams" ->
-                                  vodSynchronizer.syncStreams(source, syncLog).replaceWith(source);
-                              case "series" ->
-                                  seriesSynchronizer
-                                      .syncStreams(source, syncLog)
-                                      .replaceWith(source);
+                                  seriesSynchronizer.syncCategories(source, syncLog);
+                              case "live_streams" -> liveSynchronizer.syncStreams(source, syncLog);
+                              case "vod_streams" -> vodSynchronizer.syncStreams(source, syncLog);
+                              case "series" -> seriesSynchronizer.syncStreams(source, syncLog);
                               default ->
                                   Uni.createFrom()
                                       .failure(

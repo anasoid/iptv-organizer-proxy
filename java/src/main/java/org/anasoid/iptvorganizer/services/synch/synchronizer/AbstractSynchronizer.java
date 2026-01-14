@@ -3,17 +3,16 @@ package org.anasoid.iptvorganizer.services.synch.synchronizer;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
-import org.anasoid.iptvorganizer.models.entity.stream.Category;
+import org.anasoid.iptvorganizer.models.entity.stream.SourcedEntity;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamLike;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.repositories.stream.AbstractTypedCategoryRepository;
@@ -25,7 +24,6 @@ import org.anasoid.iptvorganizer.services.FilterService;
 import org.anasoid.iptvorganizer.services.synch.SyncLockManager;
 import org.anasoid.iptvorganizer.services.synch.mapper.AbstractSyncMapper;
 import org.anasoid.iptvorganizer.services.synch.mapper.SynchMapper;
-import org.anasoid.iptvorganizer.services.synch.mapper.SynchMapper.CategoryMappingResult;
 import org.anasoid.iptvorganizer.services.synch.mapper.SynchronizedItemMapParameter;
 import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 
@@ -64,112 +62,24 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
   }
 
   /** Fetch and sync categories for a single type (live/vod/series) */
-  public Uni<Void> syncCategories(Source source) {
+  public Uni<Source> syncCategories(Source source, SyncLog syncLog) {
     Multi<Map> categoriesStream = typedCategoryRepository.fetchExternalData(source);
 
-    return categoriesStream
-        .collect()
-        .asList()
-        .flatMap(categoryMaps -> processCategorySync(source, categoryMaps, typedCategoryRepository))
-        .onFailure()
-        .invoke(
-            ex ->
-                LOGGER.severe(
-                    "Failed to sync "
-                        + typedCategoryRepository.getType().getCategoryType()
-                        + " categories: "
-                        + ex.getMessage()));
+    return syncItem(source, syncLog, typedCategoryRepository, getMapper()::mapToCategory, "stream");
   }
 
-  /** Process category synchronization: insert/update new, delete obsolete */
-  private Uni<Void> processCategorySync(
-      Source source,
-      List<Map> categoryMaps,
-      AbstractTypedCategoryRepository typedCategoryRepository) {
-    CategoryMappingResult mappingResult =
-        synchMapper.mapCategoryData(
-            source, categoryMaps, typedCategoryRepository.getType().getCategoryType());
+  public Uni<Source> syncStreams(Source source, SyncLog syncLog) {
 
-    return typedCategoryRepository
-        .findBySourceId(source.getId())
-        .collect()
-        .asList()
-        .flatMap(
-            existingCategories ->
-                syncAndDeleteCategories(
-                    mappingResult.categories,
-                    existingCategories,
-                    typedCategoryRepository,
-                    mappingResult.fetchedIds));
-  }
-
-  /** Sync (insert/update) and delete obsolete categories */
-  private Uni<Void> syncAndDeleteCategories(
-      List<Category> newCategories,
-      List<Category> existingCategories,
-      AbstractTypedCategoryRepository typedCategoryRepository,
-      Set<Integer> fetchedIds) {
-    // Create a map of existing categories by ID for quick lookup
-    Map<Integer, Category> existingMap = new HashMap<>();
-    for (Category cat : existingCategories) {
-      if (cat.getType().equals(typedCategoryRepository.getType().getCategoryType())) {
-        existingMap.put(cat.getExternalId(), cat);
-      }
-    }
-
-    // Insert/update categories
-    return Multi.createFrom()
-        .iterable(newCategories)
-        .onItem()
-        .transformToUniAndConcatenate(
-            category -> {
-              if (existingMap.containsKey(category.getExternalId())) {
-                category.setId(existingMap.get(category.getExternalId()).getId());
-                return typedCategoryRepository.update(category);
-              } else {
-                return typedCategoryRepository.insert(category).replaceWithVoid();
-              }
-            })
-        .collect()
-        .asList()
-        .flatMap(
-            v -> deleteObsoleteCategories(existingCategories, typedCategoryRepository, fetchedIds));
-  }
-
-  /** Delete obsolete categories that are no longer in the API response */
-  private Uni<Void> deleteObsoleteCategories(
-      List<Category> existingCategories,
-      AbstractTypedCategoryRepository typedCategoryRepository,
-      Set<Integer> fetchedIds) {
-    List<Category> toDelete =
-        existingCategories.stream()
-            .filter(
-                c ->
-                    c.getType().equals(typedCategoryRepository.getType().getCategoryType())
-                        && !fetchedIds.contains(c.getExternalId()))
-            .toList();
-
-    if (toDelete.isEmpty()) {
-      return Uni.createFrom().voidItem();
-    }
-
-    LOGGER.info(
-        "Deleting "
-            + toDelete.size()
-            + " obsolete "
-            + typedCategoryRepository.getType().getCategoryType()
-            + " categories");
-    return Multi.createFrom()
-        .iterable(toDelete)
-        .onItem()
-        .transformToUniAndConcatenate(cat -> typedCategoryRepository.delete(cat.getId()))
-        .collect()
-        .asList()
-        .replaceWithVoid();
+    return syncItem(source, syncLog, streamRepository, getMapper()::mapToStream, "stream");
   }
 
   /** Generic stream synchronization method for all stream types */
-  public Uni<Source> syncStreams(Source source, SyncLog syncLog) {
+  public <R extends SourcedEntity> Uni<Source> syncItem(
+      Source source,
+      SyncLog syncLog,
+      SynchronizedItemRepository<R> synchronizedItemRepository,
+      Function<SynchronizedItemMapParameter, R> mapper,
+      String itemType) {
     StreamType type = getStreamType();
     LOGGER.info("Syncing " + type.getStreamTypeName() + " for source: " + source.getName());
 
@@ -177,18 +87,17 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
         .getOrCreateUnknownCategory(source.getId())
         .flatMap(
             unknownCategoryId -> {
-              Multi<Map> streamsData = streamRepository.fetchExternalData(source);
+              Multi<Map> streamsData = synchronizedItemRepository.fetchExternalData(source);
 
               return streamsData
                   .map(
                       m ->
-                          getMapper()
-                              .mapToStream(
-                                  SynchronizedItemMapParameter.builder()
-                                      .unknownCategoryId(unknownCategoryId)
-                                      .source(source)
-                                      .data(m)
-                                      .build()))
+                          mapper.apply(
+                              SynchronizedItemMapParameter.builder()
+                                  .unknownCategoryId(unknownCategoryId)
+                                  .source(source)
+                                  .data(m)
+                                  .build()))
                   .collect()
                   .asList()
                   .flatMap(
@@ -210,12 +119,12 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
                             .flatMap(
                                 ignored -> {
                                   Set<Integer> fetchedStreamIds = new HashSet<>();
-                                  for (T stream : allStreams) {
+                                  for (R stream : allStreams) {
                                     fetchedStreamIds.add(stream.getExternalId());
                                   }
 
                                   // Get all existing streams for this source
-                                  return streamRepository
+                                  return synchronizedItemRepository
                                       .findExternalIdsBySourceId(source.getId())
                                       .collect()
                                       .asList()
@@ -225,7 +134,7 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
                                             // Calculate statistics
                                             AtomicInteger added = new AtomicInteger(0);
                                             AtomicInteger updated = new AtomicInteger(0);
-                                            for (T stream : allStreams) {
+                                            for (R stream : allStreams) {
                                               if (existingExternalIds.contains(
                                                   stream.getExternalId())) {
                                                 updated.incrementAndGet();
@@ -262,8 +171,8 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
                                                 .onItem()
                                                 .transformToUniAndConcatenate(
                                                     stream -> {
-                                                      return ((SynchronizedItemRepository<T>)
-                                                              streamRepository)
+                                                      return ((SynchronizedItemRepository<R>)
+                                                              synchronizedItemRepository)
                                                           .insertOrUpdateByExternalId(stream);
                                                     })
                                                 .collect()
@@ -279,7 +188,7 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
                                                           .onItem()
                                                           .transformToUniAndConcatenate(
                                                               id ->
-                                                                  streamRepository
+                                                                  synchronizedItemRepository
                                                                       .deleteByExternalId(
                                                                           id, source.getId()))
                                                           .collect()
