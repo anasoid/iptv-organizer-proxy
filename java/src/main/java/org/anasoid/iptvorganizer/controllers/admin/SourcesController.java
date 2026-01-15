@@ -330,7 +330,8 @@ public class SourcesController extends BaseController {
                             Level.SEVERE,
                             "Failed to trigger sync task " + taskType + " for source: " + id,
                             ex);
-                        if (ex.getMessage().contains("already syncing")) {
+                        if (ex.getMessage() != null
+                            && ex.getMessage().contains("already syncing")) {
                           return Response.status(Response.Status.CONFLICT)
                               .entity(ApiResponse.error("Source is already syncing"))
                               .build();
