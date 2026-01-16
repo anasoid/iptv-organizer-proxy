@@ -11,8 +11,6 @@ import io.vertx.ext.web.client.HttpRequest;
 import io.vertx.ext.web.client.WebClient;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.net.URI;
 import java.util.Base64;
 import java.util.logging.Logger;
@@ -96,60 +94,17 @@ public class HttpStreamingService {
         .deferred(
             () -> {
               try {
-                // Create piped streams for streaming JSON parsing
-                PipedOutputStream out = new PipedOutputStream();
-                PipedInputStream in = new PipedInputStream(out);
-
-                // Stream HTTP buffers directly without collecting to memory
-                streamHttp(finalUrl, finalOptions)
-                    .subscribe()
-                    .with(
-                        buffer -> {
-                          try {
-                            out.write(buffer.getBytes());
-                            LOGGER.fine(
-                                "Streamed buffer of "
-                                    + buffer.length()
-                                    + " bytes from: "
-                                    + finalUrl);
-                          } catch (Exception e) {
-                            LOGGER.severe(
-                                "Failed to write buffer to stream from: "
-                                    + finalUrl
-                                    + ", error: "
-                                    + e.getMessage());
-                            throw new StreamingException("Failed to write buffer to stream", e);
-                          }
-                        },
-                        failure -> {
-                          LOGGER.severe(
-                              "HTTP streaming failed from: "
-                                  + finalUrl
-                                  + ", error: "
-                                  + failure.getMessage());
-                          try {
-                            out.close();
-                          } catch (Exception e) {
-                            // Ignore close errors
-                          }
-                        },
-                        () -> {
-                          try {
-                            out.close();
-                            LOGGER.info("Completed streaming from: " + finalUrl);
-                          } catch (Exception e) {
-                            LOGGER.warning(
-                                "Error closing stream for: "
-                                    + finalUrl
-                                    + ", error: "
-                                    + e.getMessage());
-                          }
-                        });
+                // Create reactive input stream with proper backpressure support
+                // Memory-efficient: Only ONE buffer (8-32KB) in memory at a time
+                ReactiveInputStream reactiveInputStream =
+                    new ReactiveInputStream(streamHttp(finalUrl, finalOptions));
 
                 // Offload blocking JSON parsing to worker thread to avoid blocking event loop
-                // PipedInputStream.read() is blocking and must not run on event loop thread
+                // ReactiveInputStream.read() is blocking and must not run on event loop thread
+                // Backpressure flow: JSON parsing speed -> ReactiveInputStream.read() ->
+                // Multi<Buffer> demand -> HTTP fetch speed
                 return Uni.createFrom()
-                    .item(in)
+                    .item(reactiveInputStream)
                     .emitOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultExecutor())
                     .onItem()
                     .transformToMulti(

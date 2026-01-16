@@ -20,107 +20,185 @@ public class StreamingJsonParser {
   @Inject ObjectMapper objectMapper;
 
   /**
-   * Parse JSON array from input stream and emit items as Multi<T> Processes in 128KB chunks with
-   * explicit GC every 1000 items
+   * Parse JSON array from input stream and emit items as Multi<T> with proper backpressure.
+   *
+   * <p>CRITICAL: Uses custom Iterable with iterator-based pull semantics. Each item is parsed
+   * on-demand when downstream requests it via iterator.next(), preventing memory accumulation.
+   *
+   * <p>Memory profile: O(1) - only one parsed object in memory at a time (released after downstream
+   * processes it)
    */
   public <T> Multi<T> parseJsonArray(InputStream inputStream, Class<T> targetClass) {
-    return Multi.createFrom()
-        .emitter(
-            emitter -> {
-              try {
-                JsonFactory factory = objectMapper.getFactory();
-                JsonParser parser = factory.createParser(inputStream);
+    try {
+      JsonFactory factory = objectMapper.getFactory();
+      JsonParser parser = factory.createParser(inputStream);
 
-                // Verify we have a JSON array
-                if (parser.nextToken() != JsonToken.START_ARRAY) {
-                  emitter.fail(new StreamingException("Expected JSON array at start of stream"));
-                  return;
-                }
+      // Verify we have a JSON array
+      if (parser.nextToken() != JsonToken.START_ARRAY) {
+        parser.close();
+        throw new StreamingException("Expected JSON array at start of stream");
+      }
 
-                AtomicInteger itemCounter = new AtomicInteger(0);
+      AtomicInteger itemCounter = new AtomicInteger(0);
 
-                // Parse each array element
-                while (parser.nextToken() != JsonToken.END_ARRAY) {
+      // Create iterable that provides pull-based iteration
+      // Iterator.next() is called on-demand by downstream, providing backpressure
+      Iterable<T> iterable =
+          () ->
+              new java.util.Iterator<T>() {
+                private T nextItem = null;
+                private boolean finished = false;
+
+                @Override
+                public boolean hasNext() {
+                  if (finished) {
+                    return false;
+                  }
+
+                  if (nextItem != null) {
+                    return true;
+                  }
+
                   try {
-                    T item = objectMapper.readValue(parser, targetClass);
-                    emitter.emit(item);
+                    JsonToken token = parser.nextToken();
+                    if (token == JsonToken.END_ARRAY || token == null) {
+                      parser.close();
+                      finished = true;
+                      return false;
+                    }
+
+                    nextItem = objectMapper.readValue(parser, targetClass);
 
                     // Trigger explicit GC every 1000 items
                     int count = itemCounter.incrementAndGet();
                     if (count % GC_THRESHOLD == 0) {
                       System.gc();
                     }
+
+                    return true;
                   } catch (Exception e) {
-                    emitter.fail(
-                        new StreamingException(
-                            "Failed to parse array element at index: " + itemCounter.get(), e));
-                    return;
+                    finished = true;
+                    try {
+                      parser.close();
+                    } catch (Exception closeEx) {
+                      // Ignore
+                    }
+                    throw new StreamingException(
+                        "Failed to parse array element at index: " + itemCounter.get(), e);
                   }
                 }
 
-                parser.close();
-                emitter.complete();
+                @Override
+                public T next() {
+                  if (!hasNext()) {
+                    throw new java.util.NoSuchElementException();
+                  }
+                  T result = nextItem;
+                  nextItem = null;
+                  return result;
+                }
+              };
 
-              } catch (Exception e) {
-                emitter.fail(new StreamingException("JSON parsing failed", e));
-              }
-            });
+      return Multi.createFrom().iterable(iterable);
+
+    } catch (Exception e) {
+      return Multi.createFrom().failure(new StreamingException("JSON parsing failed", e));
+    }
   }
 
   /**
-   * Parse JSON stream (array or single object) and emit as JsonNode More flexible than
-   * parseJsonArray - handles various JSON structures
+   * Parse JSON stream (array or single object) and emit as JsonNode with proper backpressure.
+   *
+   * <p>More flexible than parseJsonArray - handles various JSON structures
+   *
+   * <p>CRITICAL: Respects backpressure from downstream consumers to prevent memory accumulation
    */
   public Multi<JsonNode> parseJsonStream(InputStream inputStream) {
-    return Multi.createFrom()
-        .emitter(
-            emitter -> {
-              try {
-                JsonFactory factory = objectMapper.getFactory();
-                JsonParser parser = factory.createParser(inputStream);
+    try {
+      JsonFactory factory = objectMapper.getFactory();
+      JsonParser parser = factory.createParser(inputStream);
 
-                JsonToken token = parser.nextToken();
+      JsonToken token = parser.nextToken();
 
-                // Handle JSON array
-                if (token == JsonToken.START_ARRAY) {
-                  AtomicInteger itemCounter = new AtomicInteger(0);
-                  while (parser.nextToken() != JsonToken.END_ARRAY) {
+      // Handle JSON array with pull-based iterator
+      if (token == JsonToken.START_ARRAY) {
+        AtomicInteger itemCounter = new AtomicInteger(0);
+
+        Iterable<JsonNode> iterable =
+            () ->
+                new java.util.Iterator<JsonNode>() {
+                  private JsonNode nextItem = null;
+                  private boolean finished = false;
+
+                  @Override
+                  public boolean hasNext() {
+                    if (finished) {
+                      return false;
+                    }
+
+                    if (nextItem != null) {
+                      return true;
+                    }
+
                     try {
-                      JsonNode node = objectMapper.readTree(parser);
-                      emitter.emit(node);
+                      JsonToken nextToken = parser.nextToken();
+                      if (nextToken == JsonToken.END_ARRAY || nextToken == null) {
+                        parser.close();
+                        finished = true;
+                        return false;
+                      }
+
+                      nextItem = objectMapper.readTree(parser);
 
                       // Trigger explicit GC every 1000 items
                       int count = itemCounter.incrementAndGet();
                       if (count % GC_THRESHOLD == 0) {
                         System.gc();
                       }
+
+                      return true;
                     } catch (Exception e) {
-                      emitter.fail(
-                          new StreamingException(
-                              "Failed to parse array element at index: " + itemCounter.get(), e));
-                      return;
+                      finished = true;
+                      try {
+                        parser.close();
+                      } catch (Exception closeEx) {
+                        // Ignore
+                      }
+                      throw new StreamingException(
+                          "Failed to parse array element at index: " + itemCounter.get(), e);
                     }
                   }
-                  emitter.complete();
-                }
-                // Handle single JSON object
-                else if (token == JsonToken.START_OBJECT) {
-                  JsonNode node = objectMapper.readTree(parser);
-                  emitter.emit(node);
-                  emitter.complete();
-                }
-                // Handle other cases (null, primitives, etc.)
-                else {
-                  emitter.fail(
-                      new StreamingException(
-                          "Unexpected JSON token: " + token + ". Expected array or object"));
-                }
 
-                parser.close();
+                  @Override
+                  public JsonNode next() {
+                    if (!hasNext()) {
+                      throw new java.util.NoSuchElementException();
+                    }
+                    JsonNode result = nextItem;
+                    nextItem = null;
+                    return result;
+                  }
+                };
 
-              } catch (Exception e) {
-                emitter.fail(new StreamingException("JSON stream parsing failed", e));
-              }
-            });
+        return Multi.createFrom().iterable(iterable);
+      }
+      // Handle single JSON object
+      else if (token == JsonToken.START_OBJECT) {
+        JsonNode node = objectMapper.readTree(parser);
+        parser.close();
+        return Multi.createFrom().item(node);
+      }
+      // Handle other cases (null, primitives, etc.)
+      else {
+        parser.close();
+        return Multi.createFrom()
+            .failure(
+                new StreamingException(
+                    "Unexpected JSON token: " + token + ". Expected array or object"));
+      }
+
+    } catch (Exception e) {
+      return Multi.createFrom().failure(new StreamingException("JSON stream parsing failed", e));
+    }
   }
 }
