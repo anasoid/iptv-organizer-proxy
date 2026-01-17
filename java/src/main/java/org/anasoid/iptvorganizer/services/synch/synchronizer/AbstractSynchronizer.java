@@ -5,6 +5,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.logging.Logger;
@@ -85,7 +86,7 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
     AtomicInteger count = new AtomicInteger(0);
     AtomicInteger added = new AtomicInteger(0);
     AtomicInteger updated = new AtomicInteger(0);
-
+    AtomicLong startTime = new AtomicLong(System.currentTimeMillis());
     // Thread-safe set to accumulate external IDs incrementally during processing
     // This prevents holding all BaseStream objects in memory until collection completes
     AtomicReference<Set<Integer>> fetchedStreamIds =
@@ -186,11 +187,12 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
 
                                   LOGGER.info(
                                       String.format(
-                                          "%s - Added: %d, Updated: %d, Deleted: %d",
+                                          "%s - Added: %d, Updated: %d, Deleted: %d, Duration(s): %d",
                                           type.getStreamTypeName(),
                                           added.get(),
                                           updated.get(),
-                                          toDeleteIds.size()));
+                                          toDeleteIds.size(),
+                                          ((System.currentTimeMillis() - startTime.get())) / 1000));
 
                                   syncLog.setItemsAdded(syncLog.getItemsAdded() + added.get());
                                   syncLog.setItemsUpdated(

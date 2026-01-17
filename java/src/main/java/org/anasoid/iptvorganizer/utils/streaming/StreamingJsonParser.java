@@ -44,6 +44,7 @@ public class StreamingJsonParser {
 
       AtomicInteger itemCounter = new AtomicInteger(0);
       AtomicLong startTime = new AtomicLong(System.currentTimeMillis());
+      AtomicLong readByte = new AtomicLong(0);
       // Create iterable that provides pull-based iteration
       // Iterator.next() is called on-demand by downstream, providing backpressure
       Iterable<T> iterable =
@@ -75,13 +76,18 @@ public class StreamingJsonParser {
                     // Trigger explicit GC every 1000 items
                     int count = itemCounter.incrementAndGet();
                     if (count % 1000 == 0) {
+                      long location = parser.currentLocation().getByteOffset();
+                      readByte.set(location - readByte.get());
+                      long duration = System.currentTimeMillis() - startTime.get();
                       log.info(
                           "Reading item count: "
                               + count
                               + " location bytes "
-                              + parser.currentLocation().getByteOffset()
-                              + " Elapsed time (ms): "
-                              + (System.currentTimeMillis() - startTime.get()));
+                              + (location / 1000)
+                              + "k Elapsed time (s): "
+                              + (System.currentTimeMillis() - startTime.get())
+                              + " Read KB/s: "
+                              + (readByte.get() / (duration == 0 ? 1 : duration)));
                       startTime.set(System.currentTimeMillis());
                     }
 
