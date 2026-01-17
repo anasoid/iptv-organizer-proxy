@@ -10,6 +10,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.io.InputStream;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.java.Log;
 import org.anasoid.iptvorganizer.exceptions.StreamingException;
 
@@ -42,7 +43,7 @@ public class StreamingJsonParser {
       }
 
       AtomicInteger itemCounter = new AtomicInteger(0);
-
+      AtomicLong startTime = new AtomicLong(System.currentTimeMillis());
       // Create iterable that provides pull-based iteration
       // Iterator.next() is called on-demand by downstream, providing backpressure
       Iterable<T> iterable =
@@ -78,10 +79,10 @@ public class StreamingJsonParser {
                           "Reading item count: "
                               + count
                               + " location bytes "
-                              + parser.getCurrentLocation().getByteOffset());
-                    }
-                    if (count % GC_THRESHOLD == 0) {
-                      System.gc();
+                              + parser.currentLocation().getByteOffset()
+                              + " Elapsed time (ms): "
+                              + (System.currentTimeMillis() - startTime.get()));
+                      startTime.set(System.currentTimeMillis());
                     }
 
                     return true;

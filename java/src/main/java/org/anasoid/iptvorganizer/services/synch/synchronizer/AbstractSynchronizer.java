@@ -136,9 +136,9 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
                                       .invoke(
                                           inserted -> {
                                             if (inserted) {
-                                              updated.incrementAndGet();
-                                            } else {
                                               added.incrementAndGet();
+                                            } else {
+                                              updated.incrementAndGet();
                                             }
                                           });
                                 });
