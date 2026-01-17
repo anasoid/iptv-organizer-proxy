@@ -5,7 +5,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.anasoid.iptvorganizer.models.entity.stream.SourcedEntity;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
@@ -65,6 +68,52 @@ public abstract class SourcedEntityRepository<T extends SourcedEntity> extends B
     } catch (SQLException e) {
       throw new RuntimeException("Failed to find by external id", e);
     }
+  }
+
+  /**
+   * Find entities by external IDs in bulk using IN clause. Much more efficient than individual
+   * queries for batch operations.
+   *
+   * @param externalIds List of external IDs to find
+   * @param sourceId Source ID to filter by
+   * @return Map of external_id -> entity for quick lookup
+   */
+  public Map<Integer, T> findByExternalIds(List<Integer> externalIds, Long sourceId) {
+    if (externalIds.isEmpty()) {
+      return Map.of();
+    }
+
+    Map<Integer, T> results = new HashMap<>();
+
+    // Build IN clause with placeholders
+    String placeholders = String.join(",", Collections.nCopies(externalIds.size(), "?"));
+    String sql =
+        "SELECT * FROM "
+            + getTableName()
+            + " WHERE source_id = ? AND external_id IN ("
+            + placeholders
+            + ")";
+
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+
+      // Bind external IDs
+      for (int i = 0; i < externalIds.size(); i++) {
+        stmt.setInt(i + 2, externalIds.get(i));
+      }
+
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          T entity = mapRow(rs);
+          results.put(entity.getExternalId(), entity);
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to bulk find by external ids", e);
+    }
+
+    return results;
   }
 
   public void deleteByExternalId(Integer externalId, Long sourceId) {

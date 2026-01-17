@@ -4,7 +4,9 @@ import jakarta.inject.Inject;
 import java.io.IOException;
 import java.util.*;
 import java.util.function.Function;
+import java.util.logging.Level;
 import lombok.extern.java.Log;
+import org.anasoid.iptvorganizer.config.SyncConfig;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
@@ -44,6 +46,8 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
   @Inject SynchMapper synchMapper;
 
   @Inject SyncLockManager syncLockManager;
+
+  @Inject SyncConfig syncConfig;
 
   protected BaseStreamRepository<T> streamRepository;
   protected AbstractTypedCategoryRepository typedCategoryRepository;
@@ -90,12 +94,15 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
           typedCategoryRepository.getOrCreateUnknownCategory(source.getId());
       long startStep = System.currentTimeMillis();
       long startByteStep = 0;
+      int batchSize = syncConfig.getBatchSize();
+      List<R> batch = new ArrayList<>(batchSize);
+
       // Fetch external data using lazy Iterator-based streaming
       try (JsonStreamResult<Map> streamResult =
           synchronizedItemRepository.fetchExternalData(source)) {
         Iterator<Map> iterator = streamResult.iterator();
 
-        // Process items one by one as they're parsed using batch transactions
+        // Process items in batches using transactional batching
         while (iterator.hasNext()) {
           Map data = iterator.next();
 
@@ -118,36 +125,45 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
 
           log.fine(() -> "Processing " + type.getStreamTypeName() + " ID: " + item.getExternalId());
 
-          // Insert or update item directly with autocommit (no transaction overhead)
-          boolean wasInserted = synchronizedItemRepository.insertOrUpdateByExternalId(item);
-          if (wasInserted) {
-            added++;
-          } else {
-            updated++;
-          }
+          batch.add(item);
 
-          // Trigger explicit GC every 1000 items
-          if (count % LOG_THRESHOLD == 0) {
-            long duration = System.currentTimeMillis() - startStep;
-            long currentByte = streamResult.getBytesRead();
-            long bytesReadStep = currentByte - startByteStep;
-            startByteStep = currentByte;
-            long bandwidthKb = bytesReadStep / (duration == 0 ? 1 : duration);
-            startStep = System.currentTimeMillis();
-            log.info(
-                "Processed "
-                    + count
-                    + " items in "
-                    + (duration)
-                    + "ms for "
-                    + type.getStreamTypeName()
-                    + ", received:"
-                    + currentByte / 1000
-                    + "kb"
-                    + ", bandwidth:"
-                    + bandwidthKb
-                    + "kb/s");
+          // Flush batch when full (one transaction per batch)
+          if (batch.size() >= batchSize) {
+            int insertedCount = synchronizedItemRepository.insertOrUpdateByExternalId(batch);
+            added += insertedCount;
+            updated += (batch.size() - insertedCount);
+            batch.clear();
+
+            // Log progress every LOG_THRESHOLD items
+            if (count % LOG_THRESHOLD == 0) {
+              long duration = System.currentTimeMillis() - startStep;
+              long currentByte = streamResult.getBytesRead();
+              long bytesReadStep = currentByte - startByteStep;
+              startByteStep = currentByte;
+              long bandwidthKb = bytesReadStep / (duration == 0 ? 1 : duration);
+              startStep = System.currentTimeMillis();
+              log.info(
+                  "Processed "
+                      + count
+                      + " items in "
+                      + (duration)
+                      + "ms for "
+                      + type.getStreamTypeName()
+                      + ", received:"
+                      + currentByte / 1000
+                      + "kb"
+                      + ", bandwidth:"
+                      + bandwidthKb
+                      + "kb/s");
+            }
           }
+        }
+
+        // Flush remaining items in the batch
+        if (!batch.isEmpty()) {
+          int insertedCount = synchronizedItemRepository.insertOrUpdateByExternalId(batch);
+          added += insertedCount;
+          updated += (batch.size() - insertedCount);
         }
 
         bytesRead = streamResult.getBytesRead();
@@ -192,7 +208,7 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
       syncLog.setItemsDeleted(syncLog.getItemsDeleted() + toDeleteIds.size());
 
     } catch (Exception e) {
-      log.severe("Error syncing " + type.getStreamTypeName() + ": " + e.getMessage());
+      log.log(Level.SEVERE, "Error syncing " + type.getStreamTypeName() + ": ", e);
       throw e;
     }
 

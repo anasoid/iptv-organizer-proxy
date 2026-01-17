@@ -3,6 +3,7 @@ package org.anasoid.iptvorganizer.repositories.stream;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.List;
+import java.util.Map;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 
@@ -72,5 +73,18 @@ public abstract class AbstractTypedCategoryRepository
   @Override
   public void delete(Long id) {
     categoryRepository.delete(id);
+  }
+
+  @Override
+  public Map<Integer, Category> findByExternalIds(List<Integer> externalIds, Long sourceId) {
+    // Use the bulk find method from CategoryRepository, then filter by type
+    Map<Integer, Category> allFound = categoryRepository.findByExternalIds(externalIds, sourceId);
+
+    // Filter to only include categories of this type
+    return allFound.entrySet().stream()
+        .filter(e -> e.getValue().getType().equals(getType().getCategoryType()))
+        .collect(
+            java.util.stream.Collectors.toMap(
+                java.util.Map.Entry::getKey, java.util.Map.Entry::getValue));
   }
 }
