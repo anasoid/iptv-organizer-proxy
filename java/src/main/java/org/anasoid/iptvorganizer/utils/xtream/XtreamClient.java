@@ -1,8 +1,8 @@
 package org.anasoid.iptvorganizer.utils.xtream;
 
-import io.smallrye.mutiny.Multi;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.entity.Source;
@@ -13,7 +13,7 @@ import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
 /**
  * Client for Xtream Codes API interactions.
  *
- * <p>Encapsulates all Xtream Codes API endpoint calls and URL construction logic. Provides reactive
+ * <p>Encapsulates all Xtream Codes API endpoint calls and URL construction logic. Provides
  * streaming support for categories and streams. All HTTP calls are delegated to
  * HttpStreamingService.
  */
@@ -31,9 +31,9 @@ public class XtreamClient {
    * Fetch live categories from Xtream API.
    *
    * @param source The source configuration containing credentials and URL
-   * @return Multi stream of category data maps
+   * @return List of category data maps
    */
-  public Multi<Map> getLiveCategories(Source source) {
+  public List<Map> getLiveCategories(Source source) {
     return fetchCategories(source, StreamType.LIVE);
   }
 
@@ -41,9 +41,9 @@ public class XtreamClient {
    * Fetch VOD categories from Xtream API.
    *
    * @param source The source configuration containing credentials and URL
-   * @return Multi stream of category data maps
+   * @return List of category data maps
    */
-  public Multi<Map> getVodCategories(Source source) {
+  public List<Map> getVodCategories(Source source) {
     return fetchCategories(source, StreamType.VOD);
   }
 
@@ -51,9 +51,9 @@ public class XtreamClient {
    * Fetch series categories from Xtream API.
    *
    * @param source The source configuration containing credentials and URL
-   * @return Multi stream of category data maps
+   * @return List of category data maps
    */
-  public Multi<Map> getSeriesCategories(Source source) {
+  public List<Map> getSeriesCategories(Source source) {
     return fetchCategories(source, StreamType.SERIES);
   }
 
@@ -61,9 +61,9 @@ public class XtreamClient {
    * Fetch live streams from Xtream API.
    *
    * @param source The source configuration containing credentials and URL
-   * @return Multi stream of live stream data maps
+   * @return List of live stream data maps
    */
-  public Multi<Map> getLiveStreams(Source source) {
+  public List<Map> getLiveStreams(Source source) {
     return fetchStreams(source, StreamType.LIVE);
   }
 
@@ -71,9 +71,9 @@ public class XtreamClient {
    * Fetch VOD streams from Xtream API.
    *
    * @param source The source configuration containing credentials and URL
-   * @return Multi stream of VOD stream data maps
+   * @return List of VOD stream data maps
    */
-  public Multi<Map> getVodStreams(Source source) {
+  public List<Map> getVodStreams(Source source) {
     return fetchStreams(source, StreamType.VOD);
   }
 
@@ -81,9 +81,9 @@ public class XtreamClient {
    * Fetch series from Xtream API.
    *
    * @param source The source configuration containing credentials and URL
-   * @return Multi stream of series data maps
+   * @return List of series data maps
    */
-  public Multi<Map> getSeries(Source source) {
+  public List<Map> getSeries(Source source) {
     return fetchStreams(source, StreamType.SERIES);
   }
 
@@ -92,9 +92,9 @@ public class XtreamClient {
    *
    * @param source The source configuration
    * @param type The stream type (LIVE, VOD, SERIES)
-   * @return Multi stream of category data maps
+   * @return List of category data maps
    */
-  private Multi<Map> fetchCategories(Source source, StreamType type) {
+  private List<Map> fetchCategories(Source source, StreamType type) {
     String action = type.getCategoryAction();
     String url = buildApiUrl(source, action);
 
@@ -102,15 +102,15 @@ public class XtreamClient {
         String.format(
             "Fetching %s categories for source: %s", type.getStreamTypeName(), source.getName()));
 
-    return httpStreamingService
-        .streamJson(url, Map.class, createDefaultHttpOptions())
-        .onFailure()
-        .invoke(
-            ex ->
-                LOGGER.severe(
-                    String.format(
-                        "Failed to fetch %s categories from source %s: %s",
-                        type.getStreamTypeName(), source.getName(), ex.getMessage())));
+    try {
+      return httpStreamingService.streamJson(url, Map.class, createDefaultHttpOptions());
+    } catch (Exception ex) {
+      LOGGER.severe(
+          String.format(
+              "Failed to fetch %s categories from source %s: %s",
+              type.getStreamTypeName(), source.getName(), ex.getMessage()));
+      throw ex;
+    }
   }
 
   /**
@@ -118,24 +118,24 @@ public class XtreamClient {
    *
    * @param source The source configuration
    * @param type The stream type (LIVE, VOD, SERIES)
-   * @return Multi stream of stream data maps
+   * @return List of stream data maps
    */
-  private Multi<Map> fetchStreams(Source source, StreamType type) {
+  private List<Map> fetchStreams(Source source, StreamType type) {
     String action = type.getStreamAction();
     String url = buildApiUrl(source, action);
 
     LOGGER.info(
         String.format("Fetching %s for source: %s", type.getStreamTypeName(), source.getName()));
 
-    return httpStreamingService
-        .streamJson(url, Map.class, createDefaultHttpOptions())
-        .onFailure()
-        .invoke(
-            ex ->
-                LOGGER.severe(
-                    String.format(
-                        "Failed to fetch %s from source %s: %s",
-                        type.getStreamTypeName(), source.getName(), ex.getMessage())));
+    try {
+      return httpStreamingService.streamJson(url, Map.class, createDefaultHttpOptions());
+    } catch (Exception ex) {
+      LOGGER.severe(
+          String.format(
+              "Failed to fetch %s from source %s: %s",
+              type.getStreamTypeName(), source.getName(), ex.getMessage()));
+      throw ex;
+    }
   }
 
   /**

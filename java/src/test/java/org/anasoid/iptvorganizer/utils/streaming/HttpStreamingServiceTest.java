@@ -2,8 +2,6 @@ package org.anasoid.iptvorganizer.utils.streaming;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import io.smallrye.mutiny.Multi;
-import io.vertx.core.buffer.Buffer;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,17 +19,18 @@ public class HttpStreamingServiceTest {
   void testStreamHttpNullOptions() {
     // Test that null options are handled gracefully
     // This will attempt to stream from invalid URL, so we expect failure
-    Multi<Buffer> stream = httpStreamingService.streamHttp("http://invalid-url-12345.test", null);
-    assertNotNull(stream);
+    assertThrows(
+        Exception.class,
+        () -> httpStreamingService.streamHttp("http://invalid-url-12345.test", null));
   }
 
   @Test
   void testStreamHttpWithOptions() {
     HttpOptions options = HttpOptions.builder().timeout(10000L).maxRetries(1).build();
 
-    Multi<Buffer> stream =
-        httpStreamingService.streamHttp("http://invalid-url-12345.test", options);
-    assertNotNull(stream);
+    assertThrows(
+        Exception.class,
+        () -> httpStreamingService.streamHttp("http://invalid-url-12345.test", options));
   }
 
   @Test

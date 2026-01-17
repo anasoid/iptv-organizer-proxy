@@ -1,18 +1,19 @@
 package org.anasoid.iptvorganizer.migrations;
 
 import io.quarkus.runtime.StartupEvent;
-import io.smallrye.mutiny.Uni;
-import io.vertx.mutiny.sqlclient.Pool;
-import io.vertx.mutiny.sqlclient.Row;
-import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import javax.sql.DataSource;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -20,7 +21,7 @@ import org.jboss.logging.Logger;
 public class SimpleMigrator {
   private static final Logger LOG = Logger.getLogger(SimpleMigrator.class);
 
-  @Inject Pool client;
+  @Inject DataSource dataSource;
 
   @Inject
   @ConfigProperty(name = "quarkus.datasource.db-kind")
@@ -45,37 +46,37 @@ public class SimpleMigrator {
 
   void onStart(@Observes StartupEvent event) {
     LOG.info("Starting database migrations for: " + dbKind);
-    runMigrations().await().indefinitely();
+    try {
+      runMigrations();
+    } catch (Exception e) {
+      LOG.error("Migration failed", e);
+      throw new RuntimeException("Database migration failed", e);
+    }
   }
 
-  private Uni<Void> runMigrations() {
-    return ensureSchemaVersionTable()
-        .flatMap(v -> getAppliedMigrations())
-        .flatMap(
-            appliedVersions -> {
-              List<String> pendingMigrations = new ArrayList<>();
-              for (String migration : MIGRATIONS) {
-                String version = getVersion(migration);
-                if (!appliedVersions.contains(version)) {
-                  pendingMigrations.add(migration);
-                }
-              }
+  private void runMigrations() throws Exception {
+    ensureSchemaVersionTable();
+    List<String> appliedVersions = getAppliedMigrations();
 
-              if (pendingMigrations.isEmpty()) {
-                LOG.info("No pending migrations");
-                return Uni.createFrom().voidItem();
-              }
+    List<String> pendingMigrations = new ArrayList<>();
+    for (String migration : MIGRATIONS) {
+      String version = getVersion(migration);
+      if (!appliedVersions.contains(version)) {
+        pendingMigrations.add(migration);
+      }
+    }
 
-              List<Uni<Void>> migrationUnis = new ArrayList<>();
-              for (String migration : pendingMigrations) {
-                migrationUnis.add(applyMigration(migration));
-              }
+    if (pendingMigrations.isEmpty()) {
+      LOG.info("No pending migrations");
+      return;
+    }
 
-              return Uni.join().all(migrationUnis).andFailFast().replaceWithVoid();
-            });
+    for (String migration : pendingMigrations) {
+      applyMigration(migration);
+    }
   }
 
-  private Uni<Void> ensureSchemaVersionTable() {
+  private void ensureSchemaVersionTable() throws Exception {
     String createTableSql;
     if ("sqlite".equalsIgnoreCase(dbKind)) {
       createTableSql =
@@ -119,82 +120,66 @@ public class SimpleMigrator {
           """;
     }
 
-    return client
-        .query(createTableSql)
-        .execute()
-        .invoke(() -> LOG.debug("schema_version table ensured"))
-        .replaceWithVoid();
+    try (Connection conn = dataSource.getConnection();
+        Statement stmt = conn.createStatement()) {
+      stmt.execute(createTableSql);
+      LOG.debug("schema_version table ensured");
+    }
   }
 
-  private Uni<List<String>> getAppliedMigrations() {
-    return client
-        .query("SELECT version FROM schema_version")
-        .execute()
-        .map(
-            rowSet -> {
-              List<String> versions = new ArrayList<>();
-              for (Row row : rowSet) {
-                versions.add(row.getString("version"));
-              }
-              return versions;
-            })
-        .onFailure(
-            throwable -> {
-              LOG.debug("schema_version table does not exist yet, treating as empty");
-              return true;
-            })
-        .recoverWithItem(new ArrayList<>());
+  private List<String> getAppliedMigrations() {
+    List<String> versions = new ArrayList<>();
+    try (Connection conn = dataSource.getConnection();
+        Statement stmt = conn.createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT version FROM schema_version")) {
+      while (rs.next()) {
+        versions.add(rs.getString("version"));
+      }
+      return versions;
+    } catch (Exception e) {
+      LOG.debug("schema_version table does not exist yet, treating as empty");
+      return new ArrayList<>();
+    }
   }
 
-  private Uni<Void> applyMigration(String filename) {
+  private void applyMigration(String filename) throws Exception {
     String version = getVersion(filename);
     String description = getDescription(filename);
+    String sql = loadSqlFile(filename);
+    String checksum = calculateChecksum(sql);
 
-    return Uni.createFrom()
-        .item(
-            () -> {
-              String sql = loadSqlFile(filename);
-              return calculateChecksum(sql);
-            })
-        .flatMap(
-            checksum -> {
-              String sql = loadSqlFile(filename);
+    try (Connection conn = dataSource.getConnection()) {
+      conn.setAutoCommit(false);
+      try {
+        // Split SQL by semicolon and execute each statement
+        String[] sqlStatements = sql.split(";");
+        Statement stmt = conn.createStatement();
 
-              return client.withTransaction(
-                  conn -> {
-                    // Split SQL by semicolon and execute each statement
-                    List<Uni<Void>> statements = new ArrayList<>();
-                    String[] sqlStatements = sql.split(";");
+        for (String statement : sqlStatements) {
+          String trimmed = statement.trim();
+          if (!trimmed.isEmpty()) {
+            stmt.execute(trimmed);
+          }
+        }
+        stmt.close();
 
-                    for (String statement : sqlStatements) {
-                      String trimmed = statement.trim();
-                      if (!trimmed.isEmpty()) {
-                        statements.add(conn.query(trimmed).execute().replaceWithVoid());
-                      }
-                    }
+        // Record migration in schema_version
+        String insertSql =
+            "INSERT INTO schema_version (version, description, checksum) VALUES (?, ?, ?)";
+        try (PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
+          pstmt.setString(1, version);
+          pstmt.setString(2, description);
+          pstmt.setString(3, checksum);
+          pstmt.executeUpdate();
+        }
 
-                    // Execute all statements sequentially
-                    if (statements.isEmpty()) {
-                      return Uni.createFrom().voidItem();
-                    }
-
-                    return Uni.join()
-                        .all(statements)
-                        .andFailFast()
-                        .replaceWithVoid()
-                        .flatMap(
-                            v -> {
-                              // Record migration in schema_version
-                              String insertSql =
-                                  "INSERT INTO schema_version (version, description, checksum)"
-                                      + " VALUES (?, ?, ?)";
-                              return conn.preparedQuery(insertSql)
-                                  .execute(Tuple.of(version, description, checksum));
-                            })
-                        .invoke(() -> LOG.info("Applied migration: " + filename))
-                        .replaceWithVoid();
-                  });
-            });
+        conn.commit();
+        LOG.info("Applied migration: " + filename);
+      } catch (Exception e) {
+        conn.rollback();
+        throw e;
+      }
+    }
   }
 
   private String loadSqlFile(String filename) {

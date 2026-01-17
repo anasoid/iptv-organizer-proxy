@@ -2,11 +2,11 @@ package org.anasoid.iptvorganizer.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import org.anasoid.iptvorganizer.exceptions.FilterException;
@@ -34,20 +34,19 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
   }
 
   @Override
-  public Uni<Long> create(Filter filter) {
+  public Long create(Filter filter) {
     if (filter.getName() == null || filter.getName().isBlank()) {
-      return Uni.createFrom().failure(new IllegalArgumentException("Name is required"));
+      throw new IllegalArgumentException("Name is required");
     }
     if (filter.getFilterConfig() == null || filter.getFilterConfig().isBlank()) {
-      return Uni.createFrom().failure(new IllegalArgumentException("Filter config is required"));
+      throw new IllegalArgumentException("Filter config is required");
     }
 
     // Validate YAML on creation
     try {
       parseFilterConfig(filter.getFilterConfig());
     } catch (Exception e) {
-      return Uni.createFrom()
-          .failure(new FilterException("Invalid filter configuration: " + e.getMessage(), e));
+      throw new FilterException("Invalid filter configuration: " + e.getMessage(), e);
     }
 
     return repository.insert(filter);
@@ -81,10 +80,16 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
     configCache.remove(filterId);
   }
 
-  /** Apply filter to a stream of items */
-  public <T> Multi<T> applyFilter(Filter filter, Multi<T> items) {
+  /** Apply filter to a list of items */
+  public <T> List<T> applyFilter(Filter filter, List<T> items) {
     FilterConfig config = getCachedFilterConfig(filter);
-    return items.filter(item -> matches(config, item));
+    List<T> filtered = new ArrayList<>();
+    for (T item : items) {
+      if (matches(config, item)) {
+        filtered.add(item);
+      }
+    }
+    return filtered;
   }
 
   /** Check if an item matches the filter configuration */

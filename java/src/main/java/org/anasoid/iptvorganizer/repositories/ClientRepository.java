@@ -1,10 +1,14 @@
 package org.anasoid.iptvorganizer.repositories;
 
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import io.vertx.mutiny.sqlclient.Row;
-import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 import org.anasoid.iptvorganizer.models.entity.Client;
 
 @ApplicationScoped
@@ -16,84 +20,85 @@ public class ClientRepository extends BaseRepository<Client> {
   }
 
   @Override
-  public Uni<Long> insert(Client client) {
+  public Long insert(Client client) {
     String sql =
-        "INSERT INTO clients (source_id, filter_id, username, password, name, email, expiry_date,"
-            + " is_active, hide_adult_content, max_connections, notes) VALUES (?, ?, ?, ?, ?, ?, ?,"
-            + " ?, ?, ?, ?)";
-    io.vertx.mutiny.sqlclient.Tuple tuple =
-        io.vertx.mutiny.sqlclient.Tuple.tuple()
-            .addLong(client.getSourceId())
-            .addLong(client.getFilterId())
-            .addString(client.getUsername())
-            .addString(client.getPassword())
-            .addString(client.getName())
-            .addString(client.getEmail())
-            .addLocalDate(client.getExpiryDate())
-            .addBoolean(client.getIsActive())
-            .addBoolean(client.getHideAdultContent())
-            .addInteger(client.getMaxConnections())
-            .addString(client.getNotes());
-    return pool.preparedQuery(sql).execute(tuple).map(this::getInsertedId);
+        "INSERT INTO clients (source_id, filter_id, username, password, name, email, expiry_date, is_active, hide_adult_content, max_connections, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+      stmt.setLong(1, client.getSourceId());
+      stmt.setLong(2, client.getFilterId());
+      stmt.setString(3, client.getUsername());
+      stmt.setString(4, client.getPassword());
+      stmt.setString(5, client.getName());
+      stmt.setString(6, client.getEmail());
+      stmt.setObject(7, client.getExpiryDate());
+      stmt.setBoolean(8, client.getIsActive());
+      stmt.setBoolean(9, client.getHideAdultContent());
+      stmt.setInt(10, client.getMaxConnections());
+      stmt.setString(11, client.getNotes());
+      stmt.executeUpdate();
+      return getGeneratedId(stmt);
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to insert client", e);
+    }
   }
 
   @Override
-  public Uni<Void> update(Client client) {
+  public void update(Client client) {
     String sql =
-        "UPDATE clients SET source_id = ?, filter_id = ?, username = ?, password = ?, name = ?,"
-            + " email = ?, expiry_date = ?, is_active = ?, hide_adult_content = ?, max_connections"
-            + " = ?, notes = ? WHERE id = ?";
-    io.vertx.mutiny.sqlclient.Tuple tuple =
-        io.vertx.mutiny.sqlclient.Tuple.tuple()
-            .addLong(client.getSourceId())
-            .addLong(client.getFilterId())
-            .addString(client.getUsername())
-            .addString(client.getPassword())
-            .addString(client.getName())
-            .addString(client.getEmail())
-            .addLocalDate(client.getExpiryDate())
-            .addBoolean(client.getIsActive())
-            .addBoolean(client.getHideAdultContent())
-            .addInteger(client.getMaxConnections())
-            .addString(client.getNotes())
-            .addLong(client.getId());
-    return pool.preparedQuery(sql).execute(tuple).replaceWithVoid();
+        "UPDATE clients SET source_id = ?, filter_id = ?, username = ?, password = ?, name = ?, email = ?, expiry_date = ?, is_active = ?, hide_adult_content = ?, max_connections = ?, notes = ? WHERE id = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, client.getSourceId());
+      stmt.setLong(2, client.getFilterId());
+      stmt.setString(3, client.getUsername());
+      stmt.setString(4, client.getPassword());
+      stmt.setString(5, client.getName());
+      stmt.setString(6, client.getEmail());
+      stmt.setObject(7, client.getExpiryDate());
+      stmt.setBoolean(8, client.getIsActive());
+      stmt.setBoolean(9, client.getHideAdultContent());
+      stmt.setInt(10, client.getMaxConnections());
+      stmt.setString(11, client.getNotes());
+      stmt.setLong(12, client.getId());
+      stmt.executeUpdate();
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to update client", e);
+    }
   }
 
   @Override
-  protected Client mapRow(Row row) {
+  protected Client mapRow(ResultSet rs) throws SQLException {
     return Client.builder()
-        .id(row.getLong("id"))
-        .sourceId(row.getLong("source_id"))
-        .filterId(row.getLong("filter_id"))
-        .username(row.getString("username"))
-        .password(row.getString("password"))
-        .name(row.getString("name"))
-        .email(row.getString("email"))
-        .expiryDate(row.getLocalDate("expiry_date"))
-        .isActive(row.getBoolean("is_active"))
-        .hideAdultContent(row.getBoolean("hide_adult_content"))
-        .maxConnections(row.getInteger("max_connections"))
-        .notes(row.getString("notes"))
-        .createdAt(row.getLocalDateTime("created_at"))
-        .updatedAt(row.getLocalDateTime("updated_at"))
-        .lastLogin(row.getLocalDateTime("last_login"))
+        .id(rs.getLong("id"))
+        .sourceId(rs.getLong("source_id"))
+        .filterId(rs.getLong("filter_id"))
+        .username(rs.getString("username"))
+        .password(rs.getString("password"))
+        .name(rs.getString("name"))
+        .email(rs.getString("email"))
+        .expiryDate(rs.getObject("expiry_date", LocalDate.class))
+        .isActive(rs.getBoolean("is_active"))
+        .hideAdultContent(rs.getBoolean("hide_adult_content"))
+        .maxConnections(rs.getInt("max_connections"))
+        .notes(rs.getString("notes"))
+        .createdAt(rs.getObject("created_at", LocalDateTime.class))
+        .updatedAt(rs.getObject("updated_at", LocalDateTime.class))
+        .lastLogin(rs.getObject("last_login", LocalDateTime.class))
         .build();
   }
 
   /** Search clients by username, name, or email with pagination */
-  public Multi<Client> searchClients(String search, int page, int limit) {
+  public List<Client> searchClients(String search, int page, int limit) {
     String whereClause = "(username LIKE ? OR name LIKE ? OR email LIKE ?)";
     String searchTerm = "%" + search + "%";
-    Tuple params = Tuple.of(searchTerm, searchTerm, searchTerm);
-    return findWherePaged(whereClause, params, page, limit, "id DESC");
+    return findWherePaged(whereClause, page, limit, "id DESC", searchTerm, searchTerm, searchTerm);
   }
 
   /** Count clients matching search criteria */
-  public Uni<Long> countSearchClients(String search) {
+  public Long countSearchClients(String search) {
     String whereClause = "(username LIKE ? OR name LIKE ? OR email LIKE ?)";
     String searchTerm = "%" + search + "%";
-    Tuple params = Tuple.of(searchTerm, searchTerm, searchTerm);
-    return countWhere(whereClause, params);
+    return countWhere(whereClause, searchTerm, searchTerm, searchTerm);
   }
 }

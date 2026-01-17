@@ -1,74 +1,118 @@
 package org.anasoid.iptvorganizer.repositories;
 
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import io.vertx.mutiny.sqlclient.Pool;
-import io.vertx.mutiny.sqlclient.Row;
-import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.inject.Inject;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import javax.sql.DataSource;
 import org.anasoid.iptvorganizer.models.entity.BaseEntity;
 
 public abstract class BaseRepository<T extends BaseEntity> {
 
-  @Inject protected Pool pool;
+  @Inject protected DataSource dataSource;
 
   protected abstract String getTableName();
 
-  protected abstract T mapRow(Row row);
+  protected abstract T mapRow(ResultSet rs) throws SQLException;
 
-  public Uni<T> findById(Long id) {
-    return pool.preparedQuery("SELECT * FROM " + getTableName() + " WHERE id = ?")
-        .execute(Tuple.of(id))
-        .map(rowSet -> rowSet.size() == 0 ? null : mapRow(rowSet.iterator().next()));
+  public T findById(Long id) {
+    String sql = "SELECT * FROM " + getTableName() + " WHERE id = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, id);
+      try (ResultSet rs = stmt.executeQuery()) {
+        return rs.next() ? mapRow(rs) : null;
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find by id: " + id, e);
+    }
   }
 
-  public Multi<T> findAll() {
-    return pool.query("SELECT * FROM " + getTableName())
-        .execute()
-        .onItem()
-        .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
-        .map(this::mapRow);
+  public List<T> findAll() {
+    List<T> results = new ArrayList<>();
+    String sql = "SELECT * FROM " + getTableName();
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql);
+        ResultSet rs = stmt.executeQuery()) {
+      while (rs.next()) {
+        results.add(mapRow(rs));
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find all", e);
+    }
+    return results;
   }
 
-  public abstract Uni<Long> insert(T entity);
+  public abstract Long insert(T entity);
 
-  public abstract Uni<Void> update(T entity);
+  public abstract void update(T entity);
 
-  public Uni<Void> delete(Long id) {
-    return pool.preparedQuery("DELETE FROM " + getTableName() + " WHERE id = ?")
-        .execute(Tuple.of(id))
-        .replaceWithVoid();
+  public void delete(Long id) {
+    String sql = "DELETE FROM " + getTableName() + " WHERE id = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, id);
+      stmt.executeUpdate();
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to delete by id: " + id, e);
+    }
   }
 
   /** Get total count of records in the table */
-  public Uni<Long> count() {
-    return pool.query("SELECT COUNT(*) as cnt FROM " + getTableName())
-        .execute()
-        .map(rowSet -> rowSet.iterator().hasNext() ? rowSet.iterator().next().getLong("cnt") : 0L);
+  public Long count() {
+    String sql = "SELECT COUNT(*) as cnt FROM " + getTableName();
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql);
+        ResultSet rs = stmt.executeQuery()) {
+      return rs.next() ? rs.getLong("cnt") : 0L;
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to count records", e);
+    }
   }
 
   /** Get paginated results */
-  public Multi<T> findAllPaged(int page, int limit) {
+  public List<T> findAllPaged(int page, int limit) {
+    List<T> results = new ArrayList<>();
     int offset = (page - 1) * limit;
     String sql = "SELECT * FROM " + getTableName() + " LIMIT ? OFFSET ?";
-    return pool.preparedQuery(sql)
-        .execute(Tuple.of(limit, offset))
-        .onItem()
-        .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
-        .map(this::mapRow);
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setInt(1, limit);
+      stmt.setInt(2, offset);
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          results.add(mapRow(rs));
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find paged results", e);
+    }
+    return results;
   }
 
   /** Count records matching a where clause */
-  protected Uni<Long> countWhere(String whereClause, Tuple params) {
+  protected Long countWhere(String whereClause, Object... params) {
     String sql = "SELECT COUNT(*) as cnt FROM " + getTableName() + " WHERE " + whereClause;
-    return pool.preparedQuery(sql)
-        .execute(params)
-        .map(rowSet -> rowSet.iterator().hasNext() ? rowSet.iterator().next().getLong("cnt") : 0L);
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      for (int i = 0; i < params.length; i++) {
+        stmt.setObject(i + 1, params[i]);
+      }
+      try (ResultSet rs = stmt.executeQuery()) {
+        return rs.next() ? rs.getLong("cnt") : 0L;
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to count with where clause", e);
+    }
   }
 
   /** Find records with where clause and pagination */
-  protected Multi<T> findWherePaged(
-      String whereClause, Tuple params, int page, int limit, String orderBy) {
+  protected List<T> findWherePaged(
+      String whereClause, int page, int limit, String orderBy, Object... params) {
+    List<T> results = new ArrayList<>();
     int offset = (page - 1) * limit;
     StringBuilder sql =
         new StringBuilder("SELECT * FROM ")
@@ -80,56 +124,60 @@ public abstract class BaseRepository<T extends BaseEntity> {
     }
     sql.append(" LIMIT ? OFFSET ?");
 
-    // Add limit and offset to params
-    Tuple finalParams = params.addInteger(limit).addInteger(offset);
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql.toString())) {
+      // Set where clause parameters
+      for (int i = 0; i < params.length; i++) {
+        stmt.setObject(i + 1, params[i]);
+      }
+      // Set limit and offset
+      stmt.setInt(params.length + 1, limit);
+      stmt.setInt(params.length + 2, offset);
 
-    return pool.preparedQuery(sql.toString())
-        .execute(finalParams)
-        .onItem()
-        .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
-        .map(this::mapRow);
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          results.add(mapRow(rs));
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find paged results with where clause", e);
+    }
+    return results;
   }
 
   /**
-   * Get the inserted ID from a RowSet in a database-agnostic way. Handles both reactive
-   * MySQL/PostgreSQL (via LAST_INSERTED_ID property) and JDBC/H2 databases.
+   * Get the inserted ID from a generated key. Must be called after an INSERT.
+   *
+   * @param stmt the PreparedStatement that was used for insertion
+   * @return the generated ID
    */
-  protected Long getInsertedId(io.vertx.mutiny.sqlclient.RowSet<Row> rowSet) {
-    try {
-      // Try MySQL-specific property first (for reactive MySQL/PostgreSQL drivers)
-      Object lastInsertedId =
-          rowSet.property(io.vertx.mutiny.mysqlclient.MySQLClient.LAST_INSERTED_ID);
-      if (lastInsertedId != null) {
-        return (Long) lastInsertedId;
-      }
-    } catch (Exception e) {
-      // MySQLClient not available or property doesn't exist, fall through to JDBC approach
-    }
-
-    // For JDBC-based databases (H2), try to get generated key from first row
-    if (rowSet.iterator().hasNext()) {
-      Row row = rowSet.iterator().next();
-      try {
-        // Try to get the first column which should be the generated ID
-        return row.getLong(0);
-      } catch (Exception e) {
-        // Fall through
+  protected Long getGeneratedId(PreparedStatement stmt) throws SQLException {
+    try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+      if (generatedKeys.next()) {
+        return generatedKeys.getLong(1);
       }
     }
-
-    throw new IllegalStateException("Unable to retrieve inserted ID from RowSet");
+    throw new IllegalStateException("Unable to retrieve inserted ID");
   }
 
   /**
    * Find IDs only for a specific source_id (lightweight query) Used for delete detection in sync
    * operations
    */
-  public Multi<Long> findIdsBySourceId(Long sourceId) {
+  public List<Long> findIdsBySourceId(Long sourceId) {
+    List<Long> ids = new ArrayList<>();
     String sql = "SELECT id FROM " + getTableName() + " WHERE source_id = ?";
-    return pool.preparedQuery(sql)
-        .execute(Tuple.of(sourceId))
-        .onItem()
-        .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
-        .map(row -> row.getLong("id"));
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          ids.add(rs.getLong("id"));
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find ids by source id: " + sourceId, e);
+    }
+    return ids;
   }
 }

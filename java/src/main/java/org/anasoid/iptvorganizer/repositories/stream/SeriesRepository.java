@@ -1,10 +1,15 @@
 package org.anasoid.iptvorganizer.repositories.stream;
 
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import io.vertx.mutiny.sqlclient.Row;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.Series;
@@ -20,76 +25,80 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
   }
 
   @Override
-  public Multi<Map> fetchExternalData(Source source) {
-
+  public List<Map> fetchExternalData(Source source) {
     return xtreamClient.getSeries(source);
   }
 
   @Override
-  public Uni<Long> insert(Series series) {
+  public Long insert(Series series) {
     String sql =
-        "INSERT INTO series (source_id, external_id, num, allow_deny, name, category_id,"
-            + " category_ids, is_adult, labels, data, added_date, release_date) VALUES (?, ?, ?, ?,"
-            + " ?, ?, ?, ?, ?, ?, ?, ?)";
-    io.vertx.mutiny.sqlclient.Tuple tuple =
-        io.vertx.mutiny.sqlclient.Tuple.tuple()
-            .addLong(series.getSourceId())
-            .addInteger(series.getExternalId())
-            .addInteger(series.getNum())
-            .addString(series.getAllowDeny())
-            .addString(series.getName())
-            .addInteger(series.getCategoryId())
-            .addString(series.getCategoryIds())
-            .addBoolean(series.getIsAdult())
-            .addString(series.getLabels())
-            .addString(series.getData())
-            .addLocalDate(series.getAddedDate())
-            .addLocalDate(series.getReleaseDate());
-    return pool.preparedQuery(sql).execute(tuple).map(this::getInsertedId);
+        "INSERT INTO series (source_id, external_id, num, allow_deny, name, category_id, category_ids, is_adult, labels, data, added_date, release_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+      stmt.setLong(1, series.getSourceId());
+      stmt.setInt(2, series.getExternalId());
+      stmt.setObject(3, series.getNum());
+      stmt.setString(4, series.getAllowDeny());
+      stmt.setString(5, series.getName());
+      stmt.setObject(6, series.getCategoryId());
+      stmt.setString(7, series.getCategoryIds());
+      stmt.setBoolean(8, series.getIsAdult());
+      stmt.setString(9, series.getLabels());
+      stmt.setString(10, series.getData());
+      stmt.setObject(11, series.getAddedDate());
+      stmt.setObject(12, series.getReleaseDate());
+      stmt.executeUpdate();
+      Long id = getGeneratedId(stmt);
+      series.setId(id);
+      return id;
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to insert series", e);
+    }
   }
 
   @Override
-  public Uni<Void> update(Series series) {
+  public void update(Series series) {
     String sql =
-        "UPDATE series SET source_id = ?, external_id = ?, num = ?, allow_deny = ?, name = ?,"
-            + " category_id = ?, category_ids = ?, is_adult = ?, labels = ?, data = ?, added_date ="
-            + " ?, release_date = ? WHERE id = ?";
-    io.vertx.mutiny.sqlclient.Tuple tuple =
-        io.vertx.mutiny.sqlclient.Tuple.tuple()
-            .addLong(series.getSourceId())
-            .addInteger(series.getExternalId())
-            .addInteger(series.getNum())
-            .addString(series.getAllowDeny())
-            .addString(series.getName())
-            .addInteger(series.getCategoryId())
-            .addString(series.getCategoryIds())
-            .addBoolean(series.getIsAdult())
-            .addString(series.getLabels())
-            .addString(series.getData())
-            .addLocalDate(series.getAddedDate())
-            .addLocalDate(series.getReleaseDate())
-            .addLong(series.getId());
-    return pool.preparedQuery(sql).execute(tuple).replaceWithVoid();
+        "UPDATE series SET source_id = ?, external_id = ?, num = ?, allow_deny = ?, name = ?, category_id = ?, category_ids = ?, is_adult = ?, labels = ?, data = ?, added_date = ?, release_date = ? WHERE id = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, series.getSourceId());
+      stmt.setInt(2, series.getExternalId());
+      stmt.setInt(3, series.getNum());
+      stmt.setString(4, series.getAllowDeny());
+      stmt.setString(5, series.getName());
+      stmt.setInt(6, series.getCategoryId());
+      stmt.setString(7, series.getCategoryIds());
+      stmt.setBoolean(8, series.getIsAdult());
+      stmt.setString(9, series.getLabels());
+      stmt.setString(10, series.getData());
+      stmt.setObject(11, series.getAddedDate());
+      stmt.setObject(12, series.getReleaseDate());
+      stmt.setLong(13, series.getId());
+      stmt.executeUpdate();
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to update series", e);
+    }
   }
 
   @Override
-  protected Series mapRow(Row row) {
+  protected Series mapRow(ResultSet rs) throws SQLException {
     return Series.builder()
-        .id(row.getLong("id"))
-        .sourceId(row.getLong("source_id"))
-        .externalId(row.getInteger("external_id"))
-        .num(row.getInteger("num"))
-        .allowDeny(row.getString("allow_deny"))
-        .name(row.getString("name"))
-        .categoryId(row.getInteger("category_id"))
-        .categoryIds(row.getString("category_ids"))
-        .isAdult(row.getBoolean("is_adult"))
-        .labels(row.getString("labels"))
-        .data(row.getString("data"))
-        .addedDate(row.getLocalDate("added_date"))
-        .releaseDate(row.getLocalDate("release_date"))
-        .createdAt(row.getLocalDateTime("created_at"))
-        .updatedAt(row.getLocalDateTime("updated_at"))
+        .id(rs.getLong("id"))
+        .sourceId(rs.getLong("source_id"))
+        .externalId(rs.getInt("external_id"))
+        .num(rs.getInt("num"))
+        .allowDeny(rs.getString("allow_deny"))
+        .name(rs.getString("name"))
+        .categoryId(rs.getInt("category_id"))
+        .categoryIds(rs.getString("category_ids"))
+        .isAdult(rs.getBoolean("is_adult"))
+        .labels(rs.getString("labels"))
+        .data(rs.getString("data"))
+        .addedDate(rs.getObject("added_date", LocalDate.class))
+        .releaseDate(rs.getObject("release_date", LocalDate.class))
+        .createdAt(rs.getObject("created_at", LocalDateTime.class))
+        .updatedAt(rs.getObject("updated_at", LocalDateTime.class))
         .build();
   }
 }

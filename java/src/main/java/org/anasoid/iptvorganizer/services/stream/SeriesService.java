@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.services.stream;
 
-import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.anasoid.iptvorganizer.models.entity.stream.Series;
@@ -18,12 +17,12 @@ public class SeriesService extends BaseService<Series, SeriesRepository> {
   }
 
   @Override
-  public Uni<Long> create(Series series) {
+  public Long create(Series series) {
     if (series.getSourceId() == null) {
-      return Uni.createFrom().failure(new IllegalArgumentException("Source ID is required"));
+      throw new IllegalArgumentException("Source ID is required");
     }
     if (series.getName() == null || series.getName().isBlank()) {
-      return Uni.createFrom().failure(new IllegalArgumentException("Name is required"));
+      throw new IllegalArgumentException("Name is required");
     }
     return repository.insert(series);
   }

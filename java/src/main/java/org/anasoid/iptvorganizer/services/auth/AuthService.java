@@ -1,9 +1,10 @@
 package org.anasoid.iptvorganizer.services.auth;
 
-import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import org.anasoid.iptvorganizer.models.entity.AdminUser;
 import org.anasoid.iptvorganizer.repositories.AdminUserRepository;
 
@@ -24,55 +25,43 @@ public class AuthService {
    * @param password Plain text password
    * @return Map with token and user object
    */
-  public Uni<java.util.Map<String, Object>> login(String username, String password) {
+  public Map<String, Object> login(String username, String password) {
     if (username == null || username.isBlank() || password == null || password.isBlank()) {
-      return Uni.createFrom().failure(new SecurityException("Username and password are required"));
+      throw new SecurityException("Username and password are required");
     }
 
-    return adminUserRepository
-        .findByUsername(username)
-        .onItem()
-        .ifNull()
-        .failWith(new SecurityException("Invalid username or password"))
-        .onItem()
-        .transform(
-            user -> {
-              // Check if user is active
-              if (!Boolean.TRUE.equals(user.getIsActive())) {
-                throw new SecurityException("Account is inactive");
-              }
+    // Find user by username
+    AdminUser user = adminUserRepository.findByUsername(username);
+    if (user == null) {
+      throw new SecurityException("Invalid username or password");
+    }
 
-              // Verify password
-              if (!passwordService.verifyPassword(password, user.getPasswordHash())) {
-                throw new SecurityException("Invalid username or password");
-              }
+    // Check if user is active
+    if (!Boolean.TRUE.equals(user.getIsActive())) {
+      throw new SecurityException("Account is inactive");
+    }
 
-              return user;
-            })
-        .onItem()
-        .transformToUni(
-            user -> {
-              // Update last login timestamp
-              user.setLastLogin(LocalDateTime.now());
-              return adminUserRepository
-                  .updateLastLogin(user.getId(), user.getLastLogin())
-                  .replaceWith(user);
-            })
-        .onItem()
-        .transform(
-            user -> {
-              String token = jwtService.generateToken(user);
-              java.util.Map<String, Object> response = new java.util.HashMap<>();
-              response.put("token", token);
-              response.put("user", user);
-              return response;
-            });
+    // Verify password
+    if (!passwordService.verifyPassword(password, user.getPasswordHash())) {
+      throw new SecurityException("Invalid username or password");
+    }
+
+    // Update last login timestamp
+    user.setLastLogin(LocalDateTime.now());
+    adminUserRepository.updateLastLogin(user.getId(), user.getLastLogin());
+
+    // Generate JWT token
+    String token = jwtService.generateToken(user);
+    Map<String, Object> response = new HashMap<>();
+    response.put("token", token);
+    response.put("user", user);
+    return response;
   }
 
   /** Get current user info from database */
-  public Uni<AdminUser> getCurrentUser(Long userId) {
+  public AdminUser getCurrentUser(Long userId) {
     if (userId == null) {
-      return Uni.createFrom().failure(new IllegalArgumentException("User ID is required"));
+      throw new IllegalArgumentException("User ID is required");
     }
     return adminUserRepository.findById(userId);
   }

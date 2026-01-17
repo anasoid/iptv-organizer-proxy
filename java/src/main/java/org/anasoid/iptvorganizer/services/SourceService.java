@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.services;
 
-import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.anasoid.iptvorganizer.models.entity.Source;
@@ -17,12 +16,12 @@ public class SourceService extends BaseService<Source, SourceRepository> {
   }
 
   @Override
-  public Uni<Long> create(Source source) {
+  public Long create(Source source) {
     if (source.getName() == null || source.getName().isBlank()) {
-      return Uni.createFrom().failure(new IllegalArgumentException("Name is required"));
+      throw new IllegalArgumentException("Name is required");
     }
     if (source.getUrl() == null || source.getUrl().isBlank()) {
-      return Uni.createFrom().failure(new IllegalArgumentException("URL is required"));
+      throw new IllegalArgumentException("URL is required");
     }
     if (source.getIsActive() == null) {
       source.setIsActive(true);

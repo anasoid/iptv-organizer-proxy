@@ -1,10 +1,15 @@
 package org.anasoid.iptvorganizer.repositories.stream;
 
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import io.vertx.mutiny.sqlclient.Row;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.LiveStream;
@@ -21,76 +26,80 @@ public class LiveStreamRepository extends BaseStreamRepository<LiveStream> {
   }
 
   @Override
-  public Multi<Map> fetchExternalData(Source source) {
-
+  public List<Map> fetchExternalData(Source source) {
     return xtreamClient.getLiveStreams(source);
   }
 
   @Override
-  public Uni<Long> insert(LiveStream stream) {
+  public Long insert(LiveStream stream) {
     String sql =
-        "INSERT INTO live_streams (source_id, external_id, num, allow_deny, name, category_id,"
-            + " category_ids, is_adult, labels, data, added_date, release_date) VALUES (?, ?, ?, ?,"
-            + " ?, ?, ?, ?, ?, ?, ?, ?)";
-    io.vertx.mutiny.sqlclient.Tuple tuple =
-        io.vertx.mutiny.sqlclient.Tuple.tuple()
-            .addLong(stream.getSourceId())
-            .addInteger(stream.getExternalId())
-            .addInteger(stream.getNum())
-            .addString(stream.getAllowDeny())
-            .addString(stream.getName())
-            .addInteger(stream.getCategoryId())
-            .addString(stream.getCategoryIds())
-            .addBoolean(stream.getIsAdult())
-            .addString(stream.getLabels())
-            .addString(stream.getData())
-            .addLocalDate(stream.getAddedDate())
-            .addLocalDate(stream.getReleaseDate());
-    return pool.preparedQuery(sql).execute(tuple).map(this::getInsertedId);
+        "INSERT INTO live_streams (source_id, external_id, num, allow_deny, name, category_id, category_ids, is_adult, labels, data, added_date, release_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+      stmt.setLong(1, stream.getSourceId());
+      stmt.setInt(2, stream.getExternalId());
+      stmt.setObject(3, stream.getNum());
+      stmt.setString(4, stream.getAllowDeny());
+      stmt.setString(5, stream.getName());
+      stmt.setObject(6, stream.getCategoryId());
+      stmt.setString(7, stream.getCategoryIds());
+      stmt.setBoolean(8, stream.getIsAdult());
+      stmt.setString(9, stream.getLabels());
+      stmt.setString(10, stream.getData());
+      stmt.setObject(11, stream.getAddedDate());
+      stmt.setObject(12, stream.getReleaseDate());
+      stmt.executeUpdate();
+      Long id = getGeneratedId(stmt);
+      stream.setId(id);
+      return id;
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to insert live stream", e);
+    }
   }
 
   @Override
-  public Uni<Void> update(LiveStream stream) {
+  public void update(LiveStream stream) {
     String sql =
-        "UPDATE live_streams SET source_id = ?, external_id = ?, num = ?, allow_deny = ?, name = ?,"
-            + " category_id = ?, category_ids = ?, is_adult = ?, labels = ?, data = ?, added_date ="
-            + " ?, release_date = ? WHERE id = ?";
-    io.vertx.mutiny.sqlclient.Tuple tuple =
-        io.vertx.mutiny.sqlclient.Tuple.tuple()
-            .addLong(stream.getSourceId())
-            .addInteger(stream.getExternalId())
-            .addInteger(stream.getNum())
-            .addString(stream.getAllowDeny())
-            .addString(stream.getName())
-            .addInteger(stream.getCategoryId())
-            .addString(stream.getCategoryIds())
-            .addBoolean(stream.getIsAdult())
-            .addString(stream.getLabels())
-            .addString(stream.getData())
-            .addLocalDate(stream.getAddedDate())
-            .addLocalDate(stream.getReleaseDate())
-            .addLong(stream.getId());
-    return pool.preparedQuery(sql).execute(tuple).replaceWithVoid();
+        "UPDATE live_streams SET source_id = ?, external_id = ?, num = ?, allow_deny = ?, name = ?, category_id = ?, category_ids = ?, is_adult = ?, labels = ?, data = ?, added_date = ?, release_date = ? WHERE id = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, stream.getSourceId());
+      stmt.setInt(2, stream.getExternalId());
+      stmt.setInt(3, stream.getNum());
+      stmt.setString(4, stream.getAllowDeny());
+      stmt.setString(5, stream.getName());
+      stmt.setInt(6, stream.getCategoryId());
+      stmt.setString(7, stream.getCategoryIds());
+      stmt.setBoolean(8, stream.getIsAdult());
+      stmt.setString(9, stream.getLabels());
+      stmt.setString(10, stream.getData());
+      stmt.setObject(11, stream.getAddedDate());
+      stmt.setObject(12, stream.getReleaseDate());
+      stmt.setLong(13, stream.getId());
+      stmt.executeUpdate();
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to update live stream", e);
+    }
   }
 
   @Override
-  protected LiveStream mapRow(Row row) {
+  protected LiveStream mapRow(ResultSet rs) throws SQLException {
     return LiveStream.builder()
-        .id(row.getLong("id"))
-        .sourceId(row.getLong("source_id"))
-        .externalId(row.getInteger("external_id"))
-        .num(row.getInteger("num"))
-        .allowDeny(row.getString("allow_deny"))
-        .name(row.getString("name"))
-        .categoryId(row.getInteger("category_id"))
-        .categoryIds(row.getString("category_ids"))
-        .isAdult(row.getBoolean("is_adult"))
-        .labels(row.getString("labels"))
-        .data(row.getString("data"))
-        .addedDate(row.getLocalDate("added_date"))
-        .releaseDate(row.getLocalDate("release_date"))
-        .createdAt(row.getLocalDateTime("created_at"))
-        .updatedAt(row.getLocalDateTime("updated_at"))
+        .id(rs.getLong("id"))
+        .sourceId(rs.getLong("source_id"))
+        .externalId(rs.getInt("external_id"))
+        .num(rs.getInt("num"))
+        .allowDeny(rs.getString("allow_deny"))
+        .name(rs.getString("name"))
+        .categoryId(rs.getInt("category_id"))
+        .categoryIds(rs.getString("category_ids"))
+        .isAdult(rs.getBoolean("is_adult"))
+        .labels(rs.getString("labels"))
+        .data(rs.getString("data"))
+        .addedDate(rs.getObject("added_date", LocalDate.class))
+        .releaseDate(rs.getObject("release_date", LocalDate.class))
+        .createdAt(rs.getObject("created_at", LocalDateTime.class))
+        .updatedAt(rs.getObject("updated_at", LocalDateTime.class))
         .build();
   }
 }

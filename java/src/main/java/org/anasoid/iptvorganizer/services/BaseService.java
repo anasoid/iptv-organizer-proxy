@@ -1,7 +1,7 @@
 package org.anasoid.iptvorganizer.services;
 
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
+import jakarta.transaction.Transactional;
+import java.util.List;
 import org.anasoid.iptvorganizer.models.entity.BaseEntity;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
@@ -9,45 +9,44 @@ public abstract class BaseService<T extends BaseEntity, R extends BaseRepository
 
   protected abstract R getRepository();
 
-  public Uni<T> getById(Long id) {
+  public T getById(Long id) {
     return getRepository().findById(id);
   }
 
-  public Multi<T> getAll() {
+  public List<T> getAll() {
     return getRepository().findAll();
   }
 
-  public abstract Uni<Long> create(T entity);
+  public abstract Long create(T entity);
 
-  public Uni<Void> update(T entity) {
+  public void update(T entity) {
     if (entity.getId() == null) {
-      return Uni.createFrom().failure(new IllegalArgumentException("ID is required for update"));
+      throw new IllegalArgumentException("ID is required for update");
     }
-    return getRepository().update(entity);
+    getRepository().update(entity);
   }
 
-  public Uni<Void> delete(Long id) {
-    return getRepository().delete(id);
+  public void delete(Long id) {
+    getRepository().delete(id);
   }
 
-  public Uni<Long> count() {
+  public Long count() {
     return getRepository().count();
   }
 
-  public Multi<T> getAllPaged(int page, int limit) {
+  public List<T> getAllPaged(int page, int limit) {
     return getRepository().findAllPaged(page, limit);
   }
 
-  public Uni<T> save(T entity) {
+  @Transactional
+  public T save(T entity) {
     if (entity.getId() == null) {
-      return create(entity)
-          .flatMap(
-              id -> {
-                entity.setId(id);
-                return Uni.createFrom().item(entity);
-              });
+      Long id = create(entity);
+      entity.setId(id);
+      return entity;
     } else {
-      return update(entity).map(v -> entity);
+      update(entity);
+      return entity;
     }
   }
 }

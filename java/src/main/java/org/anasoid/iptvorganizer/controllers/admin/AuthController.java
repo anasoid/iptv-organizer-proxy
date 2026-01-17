@@ -1,13 +1,16 @@
 package org.anasoid.iptvorganizer.controllers.admin;
 
-import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import java.util.HashMap;
+import java.util.Map;
 import org.anasoid.iptvorganizer.dto.AdminUserDTO;
 import org.anasoid.iptvorganizer.dto.request.LoginRequest;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
+import org.anasoid.iptvorganizer.models.entity.AdminUser;
 import org.anasoid.iptvorganizer.services.AdminUserService;
 import org.anasoid.iptvorganizer.services.auth.AuthService;
 
@@ -27,53 +30,59 @@ public class AuthController extends BaseController {
   /** Login endpoint - PUBLIC (no @RolesAllowed) POST /api/auth/login */
   @POST
   @Path("/login")
-  public Uni<?> login(LoginRequest request) {
-    if (request.getUsername() == null
-        || request.getUsername().isBlank()
-        || request.getPassword() == null
-        || request.getPassword().isBlank()) {
-      return Uni.createFrom().item(ApiResponse.error("Username and password are required"));
+  public Response login(LoginRequest request) {
+    try {
+      if (request.getUsername() == null
+          || request.getUsername().isBlank()
+          || request.getPassword() == null
+          || request.getPassword().isBlank()) {
+        return Response.status(Response.Status.BAD_REQUEST)
+            .entity(ApiResponse.error("Username and password are required"))
+            .build();
+      }
+
+      Map<String, Object> loginResponse =
+          authService.login(request.getUsername(), request.getPassword());
+
+      // Extract token and user from login response
+      String token = (String) loginResponse.get("token");
+      AdminUser user = (AdminUser) loginResponse.get("user");
+
+      // Create response with token and user DTO
+      Map<String, Object> responseData = new HashMap<>();
+      responseData.put("token", token);
+      responseData.put("user", AdminUserDTO.fromEntity(user));
+
+      return Response.ok(responseData).build();
+    } catch (Exception ex) {
+      return Response.status(Response.Status.UNAUTHORIZED)
+          .entity(ApiResponse.error(ex.getMessage()))
+          .build();
     }
-
-    return authService
-        .login(request.getUsername(), request.getPassword())
-        .map(
-            loginResponse -> {
-              // Extract token and user from login response
-              String token = (String) loginResponse.get("token");
-              org.anasoid.iptvorganizer.models.entity.AdminUser user =
-                  (org.anasoid.iptvorganizer.models.entity.AdminUser) loginResponse.get("user");
-
-              // Create response with token and user DTO
-              var responseData = new java.util.HashMap<String, Object>();
-              responseData.put("token", token);
-              responseData.put("user", AdminUserDTO.fromEntity(user));
-              return (Object) responseData;
-            })
-        .onFailure()
-        .recoverWithItem(ex -> (Object) ApiResponse.error(ex.getMessage()));
   }
 
   /** Get current user info - PROTECTED GET /api/auth/me */
   @GET
   @Path("/me")
   @RolesAllowed("admin")
-  public Uni<?> getCurrentUser() {
-    Long userId = getCurrentUserId();
-    return adminUserService
-        .getById(userId)
-        .map(user -> ApiResponse.success(AdminUserDTO.fromEntity(user)))
-        .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Failed to get user info: " + ex.getMessage()));
+  public Response getCurrentUser() {
+    try {
+      Long userId = getCurrentUserId();
+      AdminUser user = adminUserService.getById(userId);
+      return Response.ok(ApiResponse.success(AdminUserDTO.fromEntity(user))).build();
+    } catch (Exception ex) {
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity(ApiResponse.error("Failed to get user info: " + ex.getMessage()))
+          .build();
+    }
   }
 
   /** Logout endpoint - PROTECTED POST /api/auth/logout */
   @POST
   @Path("/logout")
   @RolesAllowed("admin")
-  public Uni<?> logout() {
+  public Response logout() {
     // JWT is stateless, logout is just a client-side action
-    // But we can return success response
-    return Uni.createFrom().item(ApiResponse.success("Logged out successfully"));
+    return Response.ok(ApiResponse.success("Logged out successfully")).build();
   }
 }

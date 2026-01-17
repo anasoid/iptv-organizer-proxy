@@ -1,9 +1,12 @@
 package org.anasoid.iptvorganizer.repositories;
 
-import io.smallrye.mutiny.Uni;
-import io.vertx.mutiny.sqlclient.Row;
-import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.models.entity.ConnectionLog;
 
 @ApplicationScoped
@@ -15,41 +18,48 @@ public class ConnectionLogRepository extends BaseRepository<ConnectionLog> {
   }
 
   @Override
-  public Uni<Long> insert(ConnectionLog log) {
+  public Long insert(ConnectionLog log) {
     String sql =
-        "INSERT INTO connection_logs (client_id, action, ip_address, user_agent) VALUES (?, ?, ?,"
-            + " ?)";
-    return pool.preparedQuery(sql)
-        .execute(
-            Tuple.of(log.getClientId(), log.getAction(), log.getIpAddress(), log.getUserAgent()))
-        .map(this::getInsertedId);
+        "INSERT INTO connection_logs (client_id, action, ip_address, user_agent) VALUES (?, ?, ?, ?)";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+      stmt.setLong(1, log.getClientId());
+      stmt.setString(2, log.getAction());
+      stmt.setString(3, log.getIpAddress());
+      stmt.setString(4, log.getUserAgent());
+      stmt.executeUpdate();
+      return getGeneratedId(stmt);
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to insert connection log", e);
+    }
   }
 
   @Override
-  public Uni<Void> update(ConnectionLog log) {
+  public void update(ConnectionLog log) {
     String sql =
-        "UPDATE connection_logs SET client_id = ?, action = ?, ip_address = ?, user_agent = ? WHERE"
-            + " id = ?";
-    return pool.preparedQuery(sql)
-        .execute(
-            Tuple.of(
-                log.getClientId(),
-                log.getAction(),
-                log.getIpAddress(),
-                log.getUserAgent(),
-                log.getId()))
-        .replaceWithVoid();
+        "UPDATE connection_logs SET client_id = ?, action = ?, ip_address = ?, user_agent = ? WHERE id = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, log.getClientId());
+      stmt.setString(2, log.getAction());
+      stmt.setString(3, log.getIpAddress());
+      stmt.setString(4, log.getUserAgent());
+      stmt.setLong(5, log.getId());
+      stmt.executeUpdate();
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to update connection log", e);
+    }
   }
 
   @Override
-  protected ConnectionLog mapRow(Row row) {
+  protected ConnectionLog mapRow(ResultSet rs) throws SQLException {
     return ConnectionLog.builder()
-        .id(row.getLong("id"))
-        .clientId(row.getLong("client_id"))
-        .action(row.getString("action"))
-        .ipAddress(row.getString("ip_address"))
-        .userAgent(row.getString("user_agent"))
-        .createdAt(row.getLocalDateTime("created_at"))
+        .id(rs.getLong("id"))
+        .clientId(rs.getLong("client_id"))
+        .action(rs.getString("action"))
+        .ipAddress(rs.getString("ip_address"))
+        .userAgent(rs.getString("user_agent"))
+        .createdAt(rs.getObject("created_at", LocalDateTime.class))
         .build();
   }
 }

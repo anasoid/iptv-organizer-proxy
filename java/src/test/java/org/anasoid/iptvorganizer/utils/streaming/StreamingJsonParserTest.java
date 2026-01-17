@@ -43,13 +43,7 @@ public class StreamingJsonParserTest {
 
     InputStream inputStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 
-    List<JsonNode> results =
-        jsonParser
-            .parseJsonArray(inputStream, JsonNode.class)
-            .collect()
-            .asList()
-            .await()
-            .indefinitely();
+    List<JsonNode> results = jsonParser.parseJsonArray(inputStream, JsonNode.class);
 
     assertEquals(3, results.size());
     assertEquals(1, results.get(0).get("id").asInt());
@@ -69,13 +63,7 @@ public class StreamingJsonParserTest {
 
     InputStream inputStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 
-    List<TestItem> results =
-        jsonParser
-            .parseJsonArray(inputStream, TestItem.class)
-            .collect()
-            .asList()
-            .await()
-            .indefinitely();
+    List<TestItem> results = jsonParser.parseJsonArray(inputStream, TestItem.class);
 
     assertEquals(2, results.size());
     assertEquals(1, results.get(0).id);
@@ -94,8 +82,7 @@ public class StreamingJsonParserTest {
 
     InputStream inputStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 
-    List<JsonNode> results =
-        jsonParser.parseJsonStream(inputStream).collect().asList().await().indefinitely();
+    List<JsonNode> results = jsonParser.parseJsonStream(inputStream);
 
     assertEquals(2, results.size());
     assertEquals(1, results.get(0).get("id").asInt());
@@ -110,8 +97,7 @@ public class StreamingJsonParserTest {
 
     InputStream inputStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 
-    List<JsonNode> results =
-        jsonParser.parseJsonStream(inputStream).collect().asList().await().indefinitely();
+    List<JsonNode> results = jsonParser.parseJsonStream(inputStream);
 
     assertEquals(1, results.size());
     assertEquals(1, results.get(0).get("id").asInt());
@@ -123,13 +109,7 @@ public class StreamingJsonParserTest {
 
     InputStream inputStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 
-    List<JsonNode> results =
-        jsonParser
-            .parseJsonArray(inputStream, JsonNode.class)
-            .collect()
-            .asList()
-            .await()
-            .indefinitely();
+    List<JsonNode> results = jsonParser.parseJsonArray(inputStream, JsonNode.class);
 
     assertEquals(0, results.size());
   }
@@ -143,12 +123,7 @@ public class StreamingJsonParserTest {
     assertThrows(
         Exception.class,
         () -> {
-          jsonParser
-              .parseJsonArray(inputStream, JsonNode.class)
-              .collect()
-              .asList()
-              .await()
-              .indefinitely();
+          jsonParser.parseJsonArray(inputStream, JsonNode.class);
         });
   }
 
@@ -164,12 +139,7 @@ public class StreamingJsonParserTest {
     assertThrows(
         Exception.class,
         () -> {
-          jsonParser
-              .parseJsonArray(inputStream, JsonNode.class)
-              .collect()
-              .asList()
-              .await()
-              .indefinitely();
+          jsonParser.parseJsonArray(inputStream, JsonNode.class);
         });
   }
 
@@ -182,7 +152,7 @@ public class StreamingJsonParserTest {
     assertThrows(
         Exception.class,
         () -> {
-          jsonParser.parseJsonStream(inputStream).collect().asList().await().indefinitely();
+          jsonParser.parseJsonStream(inputStream);
         });
   }
 
@@ -204,13 +174,7 @@ public class StreamingJsonParserTest {
     InputStream inputStream =
         new ByteArrayInputStream(jsonBuilder.toString().getBytes(StandardCharsets.UTF_8));
 
-    List<JsonNode> results =
-        jsonParser
-            .parseJsonArray(inputStream, JsonNode.class)
-            .collect()
-            .asList()
-            .await()
-            .indefinitely();
+    List<JsonNode> results = jsonParser.parseJsonArray(inputStream, JsonNode.class);
 
     assertEquals(1000, results.size());
     assertEquals(1, results.get(0).get("id").asInt());

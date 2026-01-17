@@ -13,15 +13,16 @@ dependencies {
     // Quarkus Platform BOM
     implementation platform("io.quarkus.platform:quarkus-bom:${quarkusVersion}")
 
-    // Reactive REST Framework
-    implementation 'io.quarkus:quarkus-rest-jackson'
-    implementation 'io.quarkus:quarkus-vertx'
-    implementation 'io.vertx:vertx-web-client'
+    // REST Framework (blocking)
+    implementation 'io.quarkus:quarkus-resteasy-jackson'
 
-    // Datasource and Reactive Database Clients
+    // Datasource and JDBC Database Clients
     implementation 'io.quarkus:quarkus-datasource'
-    implementation 'io.quarkus:quarkus-reactive-mysql-client'
-    implementation 'io.quarkus:quarkus-reactive-pg-client'
+    implementation 'io.quarkus:quarkus-jdbc-mysql'
+    implementation 'io.quarkus:quarkus-jdbc-postgresql'
+
+    // Transaction Management
+    implementation 'io.quarkus:quarkus-narayana-jta'
 
     // JSON/YAML Processing
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'

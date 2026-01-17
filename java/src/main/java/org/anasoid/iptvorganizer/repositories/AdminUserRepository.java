@@ -1,9 +1,11 @@
 package org.anasoid.iptvorganizer.repositories;
 
-import io.smallrye.mutiny.Uni;
-import io.vertx.mutiny.sqlclient.Row;
-import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.models.entity.AdminUser;
 
@@ -16,65 +18,91 @@ public class AdminUserRepository extends BaseRepository<AdminUser> {
   }
 
   @Override
-  public Uni<Long> insert(AdminUser user) {
+  public Long insert(AdminUser user) {
     String sql =
         "INSERT INTO admin_users (username, password_hash, email, is_active) VALUES (?, ?, ?, ?)";
-    return pool.preparedQuery(sql)
-        .execute(
-            Tuple.of(
-                user.getUsername(), user.getPasswordHash(), user.getEmail(), user.getIsActive()))
-        .map(this::getInsertedId);
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+      stmt.setString(1, user.getUsername());
+      stmt.setString(2, user.getPasswordHash());
+      stmt.setString(3, user.getEmail());
+      stmt.setBoolean(4, user.getIsActive());
+      stmt.executeUpdate();
+      return getGeneratedId(stmt);
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to insert admin user", e);
+    }
   }
 
   @Override
-  public Uni<Void> update(AdminUser user) {
+  public void update(AdminUser user) {
     String sql =
-        "UPDATE admin_users SET username = ?, password_hash = ?, email = ?, is_active = ? WHERE id"
-            + " = ?";
-    return pool.preparedQuery(sql)
-        .execute(
-            Tuple.of(
-                user.getUsername(),
-                user.getPasswordHash(),
-                user.getEmail(),
-                user.getIsActive(),
-                user.getId()))
-        .replaceWithVoid();
+        "UPDATE admin_users SET username = ?, password_hash = ?, email = ?, is_active = ? WHERE id = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setString(1, user.getUsername());
+      stmt.setString(2, user.getPasswordHash());
+      stmt.setString(3, user.getEmail());
+      stmt.setBoolean(4, user.getIsActive());
+      stmt.setLong(5, user.getId());
+      stmt.executeUpdate();
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to update admin user", e);
+    }
   }
 
   @Override
-  protected AdminUser mapRow(Row row) {
+  protected AdminUser mapRow(ResultSet rs) throws SQLException {
     return AdminUser.builder()
-        .id(row.getLong("id"))
-        .username(row.getString("username"))
-        .passwordHash(row.getString("password_hash"))
-        .email(row.getString("email"))
-        .isActive(row.getBoolean("is_active"))
-        .createdAt(row.getLocalDateTime("created_at"))
-        .updatedAt(row.getLocalDateTime("updated_at"))
-        .lastLogin(row.getLocalDateTime("last_login"))
+        .id(rs.getLong("id"))
+        .username(rs.getString("username"))
+        .passwordHash(rs.getString("password_hash"))
+        .email(rs.getString("email"))
+        .isActive(rs.getBoolean("is_active"))
+        .createdAt(rs.getObject("created_at", LocalDateTime.class))
+        .updatedAt(rs.getObject("updated_at", LocalDateTime.class))
+        .lastLogin(rs.getObject("last_login", LocalDateTime.class))
         .build();
   }
 
   /** Find admin user by username */
-  public Uni<AdminUser> findByUsername(String username) {
+  public AdminUser findByUsername(String username) {
     String sql = "SELECT * FROM admin_users WHERE username = ?";
-    return pool.preparedQuery(sql)
-        .execute(Tuple.of(username))
-        .map(rowSet -> rowSet.size() == 0 ? null : mapRow(rowSet.iterator().next()));
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setString(1, username);
+      try (ResultSet rs = stmt.executeQuery()) {
+        return rs.next() ? mapRow(rs) : null;
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find admin user by username", e);
+    }
   }
 
   /** Update last login timestamp */
-  public Uni<Void> updateLastLogin(Long userId, LocalDateTime lastLogin) {
+  public void updateLastLogin(Long userId, LocalDateTime lastLogin) {
     String sql = "UPDATE admin_users SET last_login = ? WHERE id = ?";
-    return pool.preparedQuery(sql).execute(Tuple.of(lastLogin, userId)).replaceWithVoid();
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setObject(1, lastLogin);
+      stmt.setLong(2, userId);
+      stmt.executeUpdate();
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to update last login", e);
+    }
   }
 
   /** Check if username exists */
-  public Uni<Boolean> usernameExists(String username) {
+  public Boolean usernameExists(String username) {
     String sql = "SELECT COUNT(*) as count FROM admin_users WHERE username = ?";
-    return pool.preparedQuery(sql)
-        .execute(Tuple.of(username))
-        .map(rowSet -> rowSet.iterator().next().getInteger("count") > 0);
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setString(1, username);
+      try (ResultSet rs = stmt.executeQuery()) {
+        return rs.next() && rs.getInt("count") > 0;
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to check if username exists", e);
+    }
   }
 }

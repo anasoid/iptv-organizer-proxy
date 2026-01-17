@@ -1,10 +1,9 @@
 package org.anasoid.iptvorganizer.services.synch;
 
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
 import org.anasoid.iptvorganizer.models.entity.SyncLog.SyncLogStatus;
@@ -23,12 +22,12 @@ public class SyncLogService extends BaseService<SyncLog, SyncLogRepository> {
   }
 
   @Override
-  public Uni<Long> create(SyncLog syncLog) {
+  public Long create(SyncLog syncLog) {
     if (syncLog.getSourceId() == null) {
-      return Uni.createFrom().failure(new IllegalArgumentException("Source ID is required"));
+      throw new IllegalArgumentException("Source ID is required");
     }
     if (syncLog.getSyncType() == null || syncLog.getSyncType().isBlank()) {
-      return Uni.createFrom().failure(new IllegalArgumentException("Sync type is required"));
+      throw new IllegalArgumentException("Sync type is required");
     }
     if (syncLog.getStatus() == null) {
       syncLog.setStatus(SyncLogStatus.RUNNING);
@@ -37,48 +36,40 @@ public class SyncLogService extends BaseService<SyncLog, SyncLogRepository> {
   }
 
   /** Find sync logs by source ID */
-  public Multi<SyncLog> findBySourceId(Long sourceId) {
+  public List<SyncLog> findBySourceId(Long sourceId) {
     return repository.findBySourceId(sourceId);
   }
 
   public void fixInterruptedSyncs() {
     LOGGER.info("Checking for interrupted syncs from previous shutdown...");
 
-    repository
-        .findByStatus(SyncLogStatus.RUNNING)
-        .collect()
-        .asList()
-        .subscribe()
-        .with(
-            runningLogs -> {
-              if (!runningLogs.isEmpty()) {
-                LOGGER.warning(
-                    "Found "
-                        + runningLogs.size()
-                        + " syncs interrupted by shutdown, marking as interrupted");
+    try {
+      List<SyncLog> runningLogs = repository.findByStatus(SyncLogStatus.RUNNING);
 
-                for (SyncLog log : runningLogs) {
-                  log.setStatus(SyncLogStatus.INTERRUPTED);
-                  log.setCompletedAt(LocalDateTime.now());
-                  log.setErrorMessage("Application restarted during sync");
+      if (!runningLogs.isEmpty()) {
+        LOGGER.warning(
+            "Found "
+                + runningLogs.size()
+                + " syncs interrupted by shutdown, marking as interrupted");
 
-                  repository
-                      .update(log)
-                      .subscribe()
-                      .with(
-                          v -> LOGGER.info("Marked sync log " + log.getId() + " as interrupted"),
-                          failure ->
-                              LOGGER.severe(
-                                  "Failed to mark sync log "
-                                      + log.getId()
-                                      + " as interrupted: "
-                                      + failure.getMessage()));
-                }
-              } else {
-                LOGGER.info("No interrupted syncs found");
-              }
-            },
-            failure ->
-                LOGGER.severe("Failed to check for interrupted syncs: " + failure.getMessage()));
+        for (SyncLog log : runningLogs) {
+          try {
+            log.setStatus(SyncLogStatus.INTERRUPTED);
+            log.setCompletedAt(LocalDateTime.now());
+            log.setErrorMessage("Application restarted during sync");
+
+            repository.update(log);
+            LOGGER.info("Marked sync log " + log.getId() + " as interrupted");
+          } catch (Exception e) {
+            LOGGER.severe(
+                "Failed to mark sync log " + log.getId() + " as interrupted: " + e.getMessage());
+          }
+        }
+      } else {
+        LOGGER.info("No interrupted syncs found");
+      }
+    } catch (Exception e) {
+      LOGGER.severe("Failed to check for interrupted syncs: " + e.getMessage());
+    }
   }
 }

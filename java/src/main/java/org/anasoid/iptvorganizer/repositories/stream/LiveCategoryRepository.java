@@ -1,8 +1,8 @@
 package org.anasoid.iptvorganizer.repositories.stream;
 
-import io.smallrye.mutiny.Multi;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.util.List;
 import java.util.Map;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
@@ -19,8 +19,7 @@ public class LiveCategoryRepository extends AbstractTypedCategoryRepository {
   }
 
   @Override
-  public Multi<Map> fetchExternalData(Source source) {
-
+  public List<Map> fetchExternalData(Source source) {
     return xtreamClient.getLiveCategories(source);
   }
 }

@@ -1,11 +1,14 @@
 package org.anasoid.iptvorganizer.repositories.synch;
 
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import io.vertx.mutiny.sqlclient.Row;
-import io.vertx.mutiny.sqlclient.Tuple;
 import jakarta.enterprise.context.ApplicationScoped;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
@@ -18,75 +21,96 @@ public class SourceRepository extends BaseRepository<Source> {
   }
 
   /** Find all sources that need syncing (next_sync_time <= now and is_active = true) */
-  public Multi<Source> findSourcesNeedingSync() {
+  public List<Source> findSourcesNeedingSync() {
+    List<Source> results = new ArrayList<>();
     String sql =
         "SELECT * FROM sources WHERE next_sync <= ? AND is_active = true ORDER BY next_sync ASC";
-    return pool.preparedQuery(sql)
-        .execute(Tuple.of(LocalDateTime.now()))
-        .onItem()
-        .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
-        .map(this::mapRow);
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setObject(1, LocalDateTime.now());
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          results.add(mapRow(rs));
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find sources needing sync", e);
+    }
+    return results;
   }
 
   @Override
-  public Uni<Long> insert(Source source) {
+  public Long insert(Source source) {
     String sql =
-        "INSERT INTO sources (name, url, username, password, sync_interval, is_active, enableproxy,"
-            + " disablestreamproxy, stream_follow_location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    Tuple tuple =
-        Tuple.tuple()
-            .addString(source.getName())
-            .addString(source.getUrl())
-            .addString(source.getUsername())
-            .addString(source.getPassword())
-            .addInteger(source.getSyncInterval())
-            .addBoolean(source.getIsActive())
-            .addBoolean(source.getEnableProxy())
-            .addBoolean(source.getDisableStreamProxy())
-            .addBoolean(source.getStreamFollowLocation());
-    return pool.preparedQuery(sql).execute(tuple).map(this::getInsertedId);
+        "INSERT INTO sources (name, url, username, password, sync_interval, is_active, enableproxy, disablestreamproxy, stream_follow_location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+      stmt.setString(1, source.getName());
+      stmt.setString(2, source.getUrl());
+      stmt.setString(3, source.getUsername());
+      stmt.setString(4, source.getPassword());
+      stmt.setInt(5, source.getSyncInterval());
+      stmt.setBoolean(6, source.getIsActive());
+      stmt.setBoolean(7, source.getEnableProxy());
+      stmt.setBoolean(8, source.getDisableStreamProxy());
+      stmt.setBoolean(9, source.getStreamFollowLocation());
+      stmt.executeUpdate();
+
+      // Get generated key using standard JDBC approach - works with MySQL, H2, SQLite
+      try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+        if (generatedKeys.next()) {
+          Long id = generatedKeys.getLong(1);
+          source.setId(id);
+          return id;
+        }
+      }
+      throw new IllegalStateException("Unable to retrieve inserted ID for source");
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to insert source", e);
+    }
   }
 
   @Override
-  public Uni<Void> update(Source source) {
+  public void update(Source source) {
     String sql =
-        "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?,"
-            + " last_sync = ?, next_sync = ?, is_active = ?, enableproxy = ?, disablestreamproxy ="
-            + " ?, stream_follow_location = ? WHERE id = ?";
-    Tuple tuple =
-        Tuple.tuple()
-            .addString(source.getName())
-            .addString(source.getUrl())
-            .addString(source.getUsername())
-            .addString(source.getPassword())
-            .addInteger(source.getSyncInterval())
-            .addLocalDateTime(source.getLastSync())
-            .addLocalDateTime(source.getNextSync())
-            .addBoolean(source.getIsActive())
-            .addBoolean(source.getEnableProxy())
-            .addBoolean(source.getDisableStreamProxy())
-            .addBoolean(source.getStreamFollowLocation())
-            .addLong(source.getId());
-    return pool.preparedQuery(sql).execute(tuple).replaceWithVoid();
+        "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, enableproxy = ?, disablestreamproxy = ?, stream_follow_location = ? WHERE id = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setString(1, source.getName());
+      stmt.setString(2, source.getUrl());
+      stmt.setString(3, source.getUsername());
+      stmt.setString(4, source.getPassword());
+      stmt.setInt(5, source.getSyncInterval());
+      stmt.setObject(6, source.getLastSync());
+      stmt.setObject(7, source.getNextSync());
+      stmt.setBoolean(8, source.getIsActive());
+      stmt.setBoolean(9, source.getEnableProxy());
+      stmt.setBoolean(10, source.getDisableStreamProxy());
+      stmt.setBoolean(11, source.getStreamFollowLocation());
+      stmt.setLong(12, source.getId());
+      stmt.executeUpdate();
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to update source", e);
+    }
   }
 
   @Override
-  protected Source mapRow(Row row) {
+  protected Source mapRow(ResultSet rs) throws SQLException {
     return Source.builder()
-        .id(row.getLong("id"))
-        .name(row.getString("name"))
-        .url(row.getString("url"))
-        .username(row.getString("username"))
-        .password(row.getString("password"))
-        .syncInterval(row.getInteger("sync_interval"))
-        .lastSync(row.getLocalDateTime("last_sync"))
-        .nextSync(row.getLocalDateTime("next_sync"))
-        .isActive(row.getBoolean("is_active"))
-        .enableProxy(row.getBoolean("enableproxy"))
-        .disableStreamProxy(row.getBoolean("disablestreamproxy"))
-        .streamFollowLocation(row.getBoolean("stream_follow_location"))
-        .createdAt(row.getLocalDateTime("created_at"))
-        .updatedAt(row.getLocalDateTime("updated_at"))
+        .id(rs.getLong("id"))
+        .name(rs.getString("name"))
+        .url(rs.getString("url"))
+        .username(rs.getString("username"))
+        .password(rs.getString("password"))
+        .syncInterval(rs.getInt("sync_interval"))
+        .lastSync(rs.getObject("last_sync", LocalDateTime.class))
+        .nextSync(rs.getObject("next_sync", LocalDateTime.class))
+        .isActive(rs.getBoolean("is_active"))
+        .enableProxy(rs.getBoolean("enableproxy"))
+        .disableStreamProxy(rs.getBoolean("disablestreamproxy"))
+        .streamFollowLocation(rs.getBoolean("stream_follow_location"))
+        .createdAt(rs.getObject("created_at", LocalDateTime.class))
+        .updatedAt(rs.getObject("updated_at", LocalDateTime.class))
         .build();
   }
 }

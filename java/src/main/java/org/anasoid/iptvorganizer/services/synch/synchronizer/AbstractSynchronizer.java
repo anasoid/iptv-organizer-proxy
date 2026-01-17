@@ -1,12 +1,8 @@
 package org.anasoid.iptvorganizer.services.synch.synchronizer;
 
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.entity.Source;
@@ -62,19 +58,18 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
   }
 
   /** Fetch and sync categories for a single type (live/vod/series) */
-  public Uni<Source> syncCategories(Source source, SyncLog syncLog) {
-    Multi<Map> categoriesStream = typedCategoryRepository.fetchExternalData(source);
-
+  @Transactional
+  public Source syncCategories(Source source, SyncLog syncLog) {
     return syncItem(source, syncLog, typedCategoryRepository, getMapper()::mapToCategory, "stream");
   }
 
-  public Uni<Source> syncStreams(Source source, SyncLog syncLog) {
-
+  @Transactional
+  public Source syncStreams(Source source, SyncLog syncLog) {
     return syncItem(source, syncLog, streamRepository, getMapper()::mapToStream, "stream");
   }
 
   /** Generic stream synchronization method for all stream types */
-  public <R extends SourcedEntity> Uni<Source> syncItem(
+  public <R extends SourcedEntity> Source syncItem(
       Source source,
       SyncLog syncLog,
       SynchronizedItemRepository<R> synchronizedItemRepository,
@@ -83,142 +78,108 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
     StreamType type = getStreamType();
     LOGGER.info("Syncing " + type.getStreamTypeName() + " for source: " + source.getName());
 
-    AtomicInteger count = new AtomicInteger(0);
-    AtomicInteger added = new AtomicInteger(0);
-    AtomicInteger updated = new AtomicInteger(0);
-    AtomicLong startTime = new AtomicLong(System.currentTimeMillis());
-    // Thread-safe set to accumulate external IDs incrementally during processing
-    // This prevents holding all BaseStream objects in memory until collection completes
-    AtomicReference<Set<Integer>> fetchedStreamIds =
-        new AtomicReference<>(Collections.synchronizedSet(new HashSet<>()));
+    int count = 0;
+    int added = 0;
+    int updated = 0;
+    long startTime = System.currentTimeMillis();
 
-    return typedCategoryRepository
-        .getOrCreateUnknownCategory(source.getId())
-        .flatMap(
-            unknownCategoryId -> {
-              Multi<Map> streamsData = synchronizedItemRepository.fetchExternalData(source);
-              return streamsData
-                  .map(
-                      m ->
-                          mapper.apply(
-                              SynchronizedItemMapParameter.builder()
-                                  .unknownCategoryId(unknownCategoryId)
-                                  .source(source)
-                                  .data(m)
-                                  .build()))
-                  .onItem()
-                  .call(
-                      item -> {
-                        // Assign num ordering
-                        item.setNum(count.incrementAndGet());
+    Set<Integer> fetchedIds = new HashSet<>();
 
-                        // Capture external ID immediately for deletion comparison
-                        // This happens DURING processing, not AFTER, preventing memory accumulation
-                        Integer externalId = item.getExternalId();
-                        if (externalId != null) {
-                          fetchedStreamIds.get().add(externalId);
-                        }
+    try {
+      // Get or create unknown category
+      Integer unknownCategoryId =
+          typedCategoryRepository.getOrCreateUnknownCategory(source.getId());
+      long startStep = System.currentTimeMillis();
+      // Fetch external data
+      List<Map> streamsData = synchronizedItemRepository.fetchExternalData(source);
 
-                        // Process the item with database operations
-                        return Uni.createFrom()
-                            .item(item)
-                            .onItem()
-                            .call(
-                                stream -> {
-                                  LOGGER.fine(
-                                      () ->
-                                          "Processing "
-                                              + type.getStreamTypeName()
-                                              + " ID: "
-                                              + stream.getExternalId());
-                                  return synchronizedItemRepository
-                                      .insertOrUpdateByExternalId(stream)
-                                      .onItem()
-                                      .invoke(
-                                          inserted -> {
-                                            if (inserted) {
-                                              added.incrementAndGet();
-                                            } else {
-                                              updated.incrementAndGet();
-                                            }
-                                          });
-                                });
-                      })
-                  // Collect to complete - this waits for all items to be processed
-                  // Objects are released for GC immediately after processing (no retention)
-                  // Memory: Only the Set<Integer> of IDs is retained (~800KB for 100K items)
-                  .collect()
-                  .last()
-                  .onItem()
-                  .ifNull()
-                  .continueWith(() -> null)
-                  .onItem()
-                  .transformToUni(
-                      ignored -> {
-                        // All items processed, all IDs captured in the Set
-                        Set<Integer> fetchedIds = fetchedStreamIds.get();
+      // Process items one by one
+      for (Map data : streamsData) {
+        R item =
+            mapper.apply(
+                SynchronizedItemMapParameter.builder()
+                    .unknownCategoryId(unknownCategoryId)
+                    .source(source)
+                    .data(data)
+                    .build());
 
-                        LOGGER.info(
-                            String.format(
-                                "%s - Fetched %d items from source %s",
-                                type.getStreamTypeName(), fetchedIds.size(), source.getName()));
+        // Assign num ordering
+        item.setNum(++count);
 
-                        // Find items to delete by comparing with existing database IDs
-                        return synchronizedItemRepository
-                            .findExternalIdsBySourceId(source.getId())
-                            .collect()
-                            .asList()
-                            .flatMap(
-                                existingExternalIds -> {
-                                  Set<Integer> toDeleteIds = new HashSet<>();
-                                  for (Integer id : existingExternalIds) {
-                                    if (!fetchedIds.contains(id) && id != 0) {
-                                      toDeleteIds.add(id);
-                                    }
-                                  }
+        // Capture external ID for deletion comparison
+        Integer externalId = item.getExternalId();
+        if (externalId != null) {
+          fetchedIds.add(externalId);
+        }
 
-                                  if (!toDeleteIds.isEmpty()) {
-                                    LOGGER.info(
-                                        "Deleting "
-                                            + toDeleteIds.size()
-                                            + " items, first ID: "
-                                            + toDeleteIds.iterator().next());
-                                  }
+        LOGGER.fine(
+            () -> "Processing " + type.getStreamTypeName() + " ID: " + item.getExternalId());
 
-                                  LOGGER.info(
-                                      String.format(
-                                          "%s - Added: %d, Updated: %d, Deleted: %d, Duration(s): %d",
-                                          type.getStreamTypeName(),
-                                          added.get(),
-                                          updated.get(),
-                                          toDeleteIds.size(),
-                                          ((System.currentTimeMillis() - startTime.get())) / 1000));
+        // Insert or update item
+        boolean wasInserted = synchronizedItemRepository.insertOrUpdateByExternalId(item);
+        if (wasInserted) {
+          added++;
+        } else {
+          updated++;
+        }
 
-                                  syncLog.setItemsAdded(syncLog.getItemsAdded() + added.get());
-                                  syncLog.setItemsUpdated(
-                                      syncLog.getItemsUpdated() + updated.get());
-                                  syncLog.setItemsDeleted(
-                                      syncLog.getItemsDeleted() + toDeleteIds.size());
+        // Trigger explicit GC every 1000 items
+        if (count % GC_THRESHOLD == 0) {
+          long duration = System.currentTimeMillis() - startStep;
+          startStep = System.currentTimeMillis();
+          LOGGER.info(
+              "Processed "
+                  + count
+                  + " items in "
+                  + (duration)
+                  + "ms for "
+                  + type.getStreamTypeName());
+          System.gc();
+        }
+      }
 
-                                  if (toDeleteIds.isEmpty()) {
-                                    return Uni.createFrom().item(Collections.emptyList());
-                                  }
+      LOGGER.info(
+          String.format(
+              "%s - Fetched %d items from source %s",
+              type.getStreamTypeName(), fetchedIds.size(), source.getName()));
 
-                                  // Delete obsolete items
-                                  return Multi.createFrom()
-                                      .iterable(toDeleteIds)
-                                      .onItem()
-                                      .transformToUni(
-                                          toDeleteId ->
-                                              synchronizedItemRepository.deleteByExternalId(
-                                                  toDeleteId, source.getId()))
-                                      .merge()
-                                      .collect()
-                                      .asList();
-                                });
-                      });
-            })
-        .replaceWith(source);
+      // Find items to delete
+      List<Integer> existingExternalIds =
+          synchronizedItemRepository.findExternalIdsBySourceId(source.getId());
+      Set<Integer> toDeleteIds = new HashSet<>();
+      for (Integer id : existingExternalIds) {
+        if (!fetchedIds.contains(id) && id != 0) {
+          toDeleteIds.add(id);
+        }
+      }
+
+      if (!toDeleteIds.isEmpty()) {
+        LOGGER.info(
+            "Deleting "
+                + toDeleteIds.size()
+                + " items, first ID: "
+                + toDeleteIds.iterator().next());
+        for (Integer toDeleteId : toDeleteIds) {
+          synchronizedItemRepository.deleteByExternalId(toDeleteId, source.getId());
+        }
+      }
+
+      long duration = (System.currentTimeMillis() - startTime) / 1000;
+      LOGGER.info(
+          String.format(
+              "%s - Added: %d, Updated: %d, Deleted: %d, Duration(s): %d",
+              type.getStreamTypeName(), added, updated, toDeleteIds.size(), duration));
+
+      syncLog.setItemsAdded(syncLog.getItemsAdded() + added);
+      syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated);
+      syncLog.setItemsDeleted(syncLog.getItemsDeleted() + toDeleteIds.size());
+
+    } catch (Exception e) {
+      LOGGER.severe("Error syncing " + type.getStreamTypeName() + ": " + e.getMessage());
+      throw e;
+    }
+
+    return source;
   }
 
   abstract AbstractSyncMapper<T> getMapper();

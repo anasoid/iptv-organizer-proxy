@@ -1,11 +1,12 @@
 package org.anasoid.iptvorganizer.controllers.admin;
 
-import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
+import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.dto.FilterDTO;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
@@ -23,125 +24,126 @@ public class FiltersController extends BaseController {
 
   /** Get all filters with pagination GET /api/filters?page=1&limit=20 */
   @GET
-  public Uni<?> getAllFilters(
+  public Response getAllFilters(
       @QueryParam("page") @DefaultValue("1") int page,
       @QueryParam("limit") @DefaultValue("20") int limit) {
 
     if (page < 1 || limit < 1) {
-      return Uni.createFrom().item(ApiResponse.error("Page and limit must be greater than 0"));
+      return Response.ok(ApiResponse.error("Page and limit must be greater than 0")).build();
     }
 
-    return Uni.combine()
-        .all()
-        .unis(
-            filterService.getAllPaged(page, limit).map(FilterDTO::fromEntity).collect().asList(),
-            filterService.count())
-        .asTuple()
-        .map(
-            tuple -> {
-              var filters = tuple.getItem1();
-              long total = tuple.getItem2();
-              var pagination = PaginationMeta.of(page, limit, total);
-              return ApiResponse.successWithPagination(filters, pagination);
-            })
-        .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Failed to fetch filters: " + ex.getMessage()));
+    try {
+      var filters =
+          filterService.getAllPaged(page, limit).stream()
+              .map(FilterDTO::fromEntity)
+              .collect(Collectors.toList());
+      long total = filterService.count();
+      var pagination = PaginationMeta.of(page, limit, total);
+      return Response.ok(ApiResponse.successWithPagination(filters, pagination)).build();
+    } catch (Exception ex) {
+      return Response.ok(ApiResponse.error("Failed to fetch filters: " + ex.getMessage())).build();
+    }
   }
 
   /** Get filter by ID GET /api/filters/:id */
   @GET
   @Path("/{id}")
-  public Uni<?> getFilter(@PathParam("id") Long id) {
-    return filterService
-        .getById(id)
-        .map(
-            filter ->
-                filter != null
-                    ? ApiResponse.success(FilterDTO.fromEntity(filter))
-                    : ApiResponse.error("Filter not found"))
-        .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Filter not found"));
+  public Response getFilter(@PathParam("id") Long id) {
+    try {
+      Filter filter = filterService.getById(id);
+      if (filter != null) {
+        return Response.ok(ApiResponse.success(FilterDTO.fromEntity(filter))).build();
+      } else {
+        return Response.ok(ApiResponse.error("Filter not found")).build();
+      }
+    } catch (Exception ex) {
+      return Response.ok(ApiResponse.error("Filter not found")).build();
+    }
   }
 
   /** Create filter POST /api/filters */
   @POST
-  public Uni<?> createFilter(Filter request) {
+  public Response createFilter(Filter request) {
     if (request.getName() == null || request.getName().isBlank()) {
-      return Uni.createFrom().item(ApiResponse.error("Name is required"));
+      return Response.ok(ApiResponse.error("Name is required")).build();
     }
 
-    Filter filter =
-        Filter.builder()
-            .name(request.getName())
-            .description(request.getDescription())
-            .filterConfig(request.getFilterConfig())
-            .useSourceFilter(
-                request.getUseSourceFilter() != null ? request.getUseSourceFilter() : false)
-            .favoris(request.getFavoris())
-            .createdAt(LocalDateTime.now())
-            .updatedAt(LocalDateTime.now())
-            .build();
+    try {
+      Filter filter =
+          Filter.builder()
+              .name(request.getName())
+              .description(request.getDescription())
+              .filterConfig(request.getFilterConfig())
+              .useSourceFilter(
+                  request.getUseSourceFilter() != null ? request.getUseSourceFilter() : false)
+              .favoris(request.getFavoris())
+              .createdAt(LocalDateTime.now())
+              .updatedAt(LocalDateTime.now())
+              .build();
 
-    return filterService
-        .save(filter)
-        .map(f -> ApiResponse.success(FilterDTO.fromEntity(f)))
-        .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Failed to create filter: " + ex.getMessage()));
+      Filter savedFilter = filterService.save(filter);
+      return Response.ok(ApiResponse.success(FilterDTO.fromEntity(savedFilter))).build();
+    } catch (Exception ex) {
+      return Response.ok(ApiResponse.error("Failed to create filter: " + ex.getMessage())).build();
+    }
   }
 
   /** Update filter PUT /api/filters/:id */
   @PUT
   @Path("/{id}")
-  public Uni<?> updateFilter(@PathParam("id") Long id, Filter request) {
-    return filterService
-        .getById(id)
-        .flatMap(
-            filter -> {
-              if (request.getName() != null) filter.setName(request.getName());
-              if (request.getDescription() != null) filter.setDescription(request.getDescription());
-              if (request.getFilterConfig() != null)
-                filter.setFilterConfig(request.getFilterConfig());
-              if (request.getUseSourceFilter() != null)
-                filter.setUseSourceFilter(request.getUseSourceFilter());
-              if (request.getFavoris() != null) filter.setFavoris(request.getFavoris());
-              filter.setUpdatedAt(LocalDateTime.now());
+  public Response updateFilter(@PathParam("id") Long id, Filter request) {
+    try {
+      Filter filter = filterService.getById(id);
+      if (filter == null) {
+        return Response.ok(ApiResponse.error("Filter not found")).build();
+      }
 
-              return filterService.update(filter).map(v -> filter);
-            })
-        .map(filter -> ApiResponse.success(FilterDTO.fromEntity(filter)))
-        .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Failed to update filter: " + ex.getMessage()));
+      if (request.getName() != null) filter.setName(request.getName());
+      if (request.getDescription() != null) filter.setDescription(request.getDescription());
+      if (request.getFilterConfig() != null) filter.setFilterConfig(request.getFilterConfig());
+      if (request.getUseSourceFilter() != null)
+        filter.setUseSourceFilter(request.getUseSourceFilter());
+      if (request.getFavoris() != null) filter.setFavoris(request.getFavoris());
+      filter.setUpdatedAt(LocalDateTime.now());
+
+      filterService.update(filter);
+      return Response.ok(ApiResponse.success(FilterDTO.fromEntity(filter))).build();
+    } catch (Exception ex) {
+      return Response.ok(ApiResponse.error("Failed to update filter: " + ex.getMessage())).build();
+    }
   }
 
   /** Delete filter DELETE /api/filters/:id */
   @DELETE
   @Path("/{id}")
-  public Uni<?> deleteFilter(@PathParam("id") Long id) {
-    return filterService
-        .delete(id)
-        .map(v -> ApiResponse.success("Filter deleted successfully"))
-        .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Failed to delete filter: " + ex.getMessage()));
+  public Response deleteFilter(@PathParam("id") Long id) {
+    try {
+      filterService.delete(id);
+      return Response.ok(ApiResponse.success("Filter deleted successfully")).build();
+    } catch (Exception ex) {
+      return Response.ok(ApiResponse.error("Failed to delete filter: " + ex.getMessage())).build();
+    }
   }
 
   /** Toggle use source filter flag PATCH /api/filters/:id/use-source-filter */
   @PATCH
   @Path("/{id}/use-source-filter")
-  public Uni<?> toggleUseSourceFilter(
+  public Response toggleUseSourceFilter(
       @PathParam("id") Long id, java.util.Map<String, Boolean> request) {
-    return filterService
-        .getById(id)
-        .flatMap(
-            filter -> {
-              if (request != null && request.get("useSourceFilter") != null) {
-                filter.setUseSourceFilter(request.get("useSourceFilter"));
-                filter.setUpdatedAt(LocalDateTime.now());
-                return filterService.update(filter).map(v -> filter);
-              }
-              return Uni.createFrom().item(filter);
-            })
-        .map(filter -> ApiResponse.success(FilterDTO.fromEntity(filter)))
-        .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Failed to update filter: " + ex.getMessage()));
+    try {
+      Filter filter = filterService.getById(id);
+      if (filter == null) {
+        return Response.ok(ApiResponse.error("Filter not found")).build();
+      }
+
+      if (request != null && request.get("useSourceFilter") != null) {
+        filter.setUseSourceFilter(request.get("useSourceFilter"));
+        filter.setUpdatedAt(LocalDateTime.now());
+        filterService.update(filter);
+      }
+      return Response.ok(ApiResponse.success(FilterDTO.fromEntity(filter))).build();
+    } catch (Exception ex) {
+      return Response.ok(ApiResponse.error("Failed to update filter: " + ex.getMessage())).build();
+    }
   }
 }

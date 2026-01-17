@@ -1,11 +1,12 @@
 package org.anasoid.iptvorganizer.controllers.admin;
 
-import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
+import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.dto.AdminUserDTO;
 import org.anasoid.iptvorganizer.dto.request.CreateAdminUserRequest;
 import org.anasoid.iptvorganizer.dto.request.UpdateAdminUserRequest;
@@ -29,142 +30,133 @@ public class AdminUsersController extends BaseController {
 
   /** Get all admin users with pagination GET /api/admin-users?page=1&limit=20 */
   @GET
-  public Uni<?> getAllAdminUsers(
+  public Response getAllAdminUsers(
       @QueryParam("page") @DefaultValue("1") int page,
       @QueryParam("limit") @DefaultValue("20") int limit) {
 
     if (page < 1 || limit < 1) {
-      return Uni.createFrom().item(ApiResponse.error("Page and limit must be greater than 0"));
+      return Response.ok(ApiResponse.error("Page and limit must be greater than 0")).build();
     }
 
-    return Uni.combine()
-        .all()
-        .unis(
-            adminUserService
-                .getAllPaged(page, limit)
-                .map(AdminUserDTO::fromEntity)
-                .collect()
-                .asList(),
-            adminUserService.count())
-        .asTuple()
-        .map(
-            tuple -> {
-              var users = tuple.getItem1();
-              long total = tuple.getItem2();
-              var pagination = PaginationMeta.of(page, limit, total);
-              return ApiResponse.successWithPagination(users, pagination);
-            })
-        .onFailure()
-        .recoverWithItem(
-            ex -> ApiResponse.error("Failed to fetch admin users: " + ex.getMessage()));
+    try {
+      var users =
+          adminUserService.getAllPaged(page, limit).stream()
+              .map(AdminUserDTO::fromEntity)
+              .collect(Collectors.toList());
+      long total = adminUserService.count();
+      var pagination = PaginationMeta.of(page, limit, total);
+      return Response.ok(ApiResponse.successWithPagination(users, pagination)).build();
+    } catch (Exception ex) {
+      return Response.ok(ApiResponse.error("Failed to fetch admin users: " + ex.getMessage()))
+          .build();
+    }
   }
 
   /** Get admin user by ID GET /api/admin-users/:id */
   @GET
   @Path("/{id}")
-  public Uni<?> getAdminUser(@PathParam("id") Long id) {
-    return adminUserService
-        .getById(id)
-        .map(
-            user ->
-                user != null
-                    ? ApiResponse.success(AdminUserDTO.fromEntity(user))
-                    : ApiResponse.error("Admin user not found"))
-        .onFailure()
-        .recoverWithItem(ex -> ApiResponse.error("Admin user not found"));
+  public Response getAdminUser(@PathParam("id") Long id) {
+    try {
+      AdminUser user = adminUserService.getById(id);
+      if (user != null) {
+        return Response.ok(ApiResponse.success(AdminUserDTO.fromEntity(user))).build();
+      } else {
+        return Response.ok(ApiResponse.error("Admin user not found")).build();
+      }
+    } catch (Exception ex) {
+      return Response.ok(ApiResponse.error("Admin user not found")).build();
+    }
   }
 
   /** Create admin user POST /api/admin-users */
   @POST
-  public Uni<?> createAdminUser(CreateAdminUserRequest request) {
+  public Response createAdminUser(CreateAdminUserRequest request) {
     if (request.getUsername() == null || request.getUsername().isBlank()) {
-      return Uni.createFrom().item(ApiResponse.error("Username is required"));
+      return Response.ok(ApiResponse.error("Username is required")).build();
     }
     if (request.getPassword() == null || request.getPassword().isBlank()) {
-      return Uni.createFrom().item(ApiResponse.error("Password is required"));
+      return Response.ok(ApiResponse.error("Password is required")).build();
     }
     if (request.getEmail() == null || request.getEmail().isBlank()) {
-      return Uni.createFrom().item(ApiResponse.error("Email is required"));
+      return Response.ok(ApiResponse.error("Email is required")).build();
     }
 
-    // Check if username already exists
-    return adminUserService
-        .existsByUsername(request.getUsername())
-        .flatMap(
-            exists -> {
-              if (exists) {
-                return Uni.createFrom().failure(new ValidationException("Username already exists"));
-              }
+    try {
+      // Check if username already exists
+      if (adminUserService.existsByUsername(request.getUsername())) {
+        throw new ValidationException("Username already exists");
+      }
 
-              String hashedPassword = passwordService.hashPassword(request.getPassword());
-              AdminUser user =
-                  AdminUser.builder()
-                      .username(request.getUsername())
-                      .passwordHash(hashedPassword)
-                      .email(request.getEmail())
-                      .isActive(request.getIsActive() != null ? request.getIsActive() : true)
-                      .createdAt(LocalDateTime.now())
-                      .updatedAt(LocalDateTime.now())
-                      .build();
+      String hashedPassword = passwordService.hashPassword(request.getPassword());
+      AdminUser user =
+          AdminUser.builder()
+              .username(request.getUsername())
+              .passwordHash(hashedPassword)
+              .email(request.getEmail())
+              .isActive(request.getIsActive() != null ? request.getIsActive() : true)
+              .createdAt(LocalDateTime.now())
+              .updatedAt(LocalDateTime.now())
+              .build();
 
-              return adminUserService.save(user);
-            })
-        .map(user -> ApiResponse.success(AdminUserDTO.fromEntity(user)))
-        .onFailure()
-        .recoverWithItem(
-            ex -> ApiResponse.error("Failed to create admin user: " + ex.getMessage()));
+      AdminUser savedUser = adminUserService.save(user);
+      return Response.ok(ApiResponse.success(AdminUserDTO.fromEntity(savedUser))).build();
+    } catch (Exception ex) {
+      return Response.ok(ApiResponse.error("Failed to create admin user: " + ex.getMessage()))
+          .build();
+    }
   }
 
   /** Update admin user PUT /api/admin-users/:id */
   @PUT
   @Path("/{id}")
-  public Uni<?> updateAdminUser(@PathParam("id") Long id, UpdateAdminUserRequest request) {
+  public Response updateAdminUser(@PathParam("id") Long id, UpdateAdminUserRequest request) {
     Long currentUserId = getCurrentUserId();
 
-    return adminUserService
-        .getById(id)
-        .flatMap(
-            user -> {
-              if (request.getEmail() != null && !request.getEmail().isBlank()) {
-                user.setEmail(request.getEmail());
-              }
+    try {
+      AdminUser user = adminUserService.getById(id);
+      if (user == null) {
+        return Response.ok(ApiResponse.error("Admin user not found")).build();
+      }
 
-              if (request.getIsActive() != null) {
-                user.setIsActive(request.getIsActive());
-              }
+      if (request.getEmail() != null && !request.getEmail().isBlank()) {
+        user.setEmail(request.getEmail());
+      }
 
-              if (request.getPassword() != null && !request.getPassword().isBlank()) {
-                String hashedPassword = passwordService.hashPassword(request.getPassword());
-                user.setPasswordHash(hashedPassword);
-              }
+      if (request.getIsActive() != null) {
+        user.setIsActive(request.getIsActive());
+      }
 
-              user.setUpdatedAt(LocalDateTime.now());
-              return adminUserService
-                  .update(user)
-                  .map(v -> user); // Return the updated user after successful update
-            })
-        .map(user -> ApiResponse.success(AdminUserDTO.fromEntity(user)))
-        .onFailure()
-        .recoverWithItem(
-            ex -> ApiResponse.error("Failed to update admin user: " + ex.getMessage()));
+      if (request.getPassword() != null && !request.getPassword().isBlank()) {
+        String hashedPassword = passwordService.hashPassword(request.getPassword());
+        user.setPasswordHash(hashedPassword);
+      }
+
+      user.setUpdatedAt(LocalDateTime.now());
+      adminUserService.update(user);
+      return Response.ok(ApiResponse.success(AdminUserDTO.fromEntity(user))).build();
+    } catch (Exception ex) {
+      return Response.ok(ApiResponse.error("Failed to update admin user: " + ex.getMessage()))
+          .build();
+    }
   }
 
   /** Delete admin user DELETE /api/admin-users/:id */
   @DELETE
   @Path("/{id}")
-  public Uni<?> deleteAdminUser(@PathParam("id") Long id) {
+  public Response deleteAdminUser(@PathParam("id") Long id) {
     Long currentUserId = getCurrentUserId();
 
     // Prevent self-deletion
     if (id.equals(currentUserId)) {
-      return Uni.createFrom().item(ApiResponse.error("Cannot delete your own user account"));
+      return Response.ok(ApiResponse.error("Cannot delete your own user account")).build();
     }
 
-    return adminUserService
-        .delete(id)
-        .map(v -> ApiResponse.success("Admin user deleted successfully"))
-        .onFailure()
-        .recoverWithItem(
-            ex -> ApiResponse.error("Failed to delete admin user: " + ex.getMessage()));
+    try {
+      adminUserService.delete(id);
+      return Response.ok(ApiResponse.success("Admin user deleted successfully")).build();
+    } catch (Exception ex) {
+      return Response.ok(ApiResponse.error("Failed to delete admin user: " + ex.getMessage()))
+          .build();
+    }
   }
 }

@@ -1,8 +1,11 @@
 package org.anasoid.iptvorganizer.repositories.stream;
 
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import io.vertx.mutiny.sqlclient.Tuple;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import org.anasoid.iptvorganizer.models.entity.stream.SourcedEntity;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
@@ -14,40 +17,70 @@ import org.anasoid.iptvorganizer.repositories.BaseRepository;
 public abstract class SourcedEntityRepository<T extends SourcedEntity> extends BaseRepository<T> {
 
   /** Find entities by source ID */
-  public Multi<T> findBySourceId(Long sourceId) {
-    return pool.preparedQuery(
-            "SELECT * FROM " + getTableName() + " WHERE source_id = ? ORDER BY num ASC, id DESC")
-        .execute(Tuple.of(sourceId))
-        .onItem()
-        .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
-        .map(this::mapRow);
+  public List<T> findBySourceId(Long sourceId) {
+    List<T> results = new ArrayList<>();
+    String sql =
+        "SELECT * FROM " + getTableName() + " WHERE source_id = ? ORDER BY num ASC, id DESC";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          results.add(mapRow(rs));
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find by source id", e);
+    }
+    return results;
   }
 
-  /** Find entities by source ID */
-  public Multi<Integer> findExternalIdsBySourceId(Long sourceId) {
-    return pool.preparedQuery("SELECT external_id FROM " + getTableName() + " WHERE source_id = ?")
-        .execute(Tuple.of(sourceId))
-        .onItem()
-        .transformToMulti(rowSet -> Multi.createFrom().iterable(rowSet))
-        .map(row -> row.getInteger("external_id"));
+  /** Find external IDs by source ID */
+  public List<Integer> findExternalIdsBySourceId(Long sourceId) {
+    List<Integer> ids = new ArrayList<>();
+    String sql = "SELECT external_id FROM " + getTableName() + " WHERE source_id = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          ids.add(rs.getInt("external_id"));
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find external ids by source id", e);
+    }
+    return ids;
   }
 
-  public Uni<T> findByExternalId(Integer externalId, Long sourceId) {
-    return pool.preparedQuery(
-            "SELECT * FROM " + getTableName() + " WHERE external_id = ? AND source_id = ?")
-        .execute(Tuple.of(externalId, sourceId))
-        .map(rowSet -> rowSet.size() == 0 ? null : mapRow(rowSet.iterator().next()));
+  public T findByExternalId(Integer externalId, Long sourceId) {
+    String sql = "SELECT * FROM " + getTableName() + " WHERE external_id = ? AND source_id = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setInt(1, externalId);
+      stmt.setLong(2, sourceId);
+      try (ResultSet rs = stmt.executeQuery()) {
+        return rs.next() ? mapRow(rs) : null;
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find by external id", e);
+    }
   }
 
-  public Uni<Void> deleteByExternalId(Integer externalId, Long sourceId) {
-    return pool.preparedQuery(
-            "DELETE FROM " + getTableName() + " WHERE external_id = ? AND source_id = ?")
-        .execute(Tuple.of(externalId, sourceId))
-        .replaceWithVoid();
+  public void deleteByExternalId(Integer externalId, Long sourceId) {
+    String sql = "DELETE FROM " + getTableName() + " WHERE external_id = ? AND source_id = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setInt(1, externalId);
+      stmt.setLong(2, sourceId);
+      stmt.executeUpdate();
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to delete by external id", e);
+    }
   }
 
   /** Count entities by source ID */
-  public Uni<Long> countBySourceId(Long sourceId) {
-    return countWhere("source_id = ?", Tuple.of(sourceId));
+  public Long countBySourceId(Long sourceId) {
+    return countWhere("source_id = ?", sourceId);
   }
 }

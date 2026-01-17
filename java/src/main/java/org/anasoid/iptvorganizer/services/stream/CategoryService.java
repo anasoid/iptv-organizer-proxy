@@ -1,9 +1,8 @@
 package org.anasoid.iptvorganizer.services.stream;
 
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.util.List;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.repositories.stream.CategoryRepository;
 import org.anasoid.iptvorganizer.services.BaseService;
@@ -19,27 +18,27 @@ public class CategoryService extends BaseService<Category, CategoryRepository> {
   }
 
   @Override
-  public Uni<Long> create(Category category) {
+  public Long create(Category category) {
     if (category.getSourceId() == null) {
-      return Uni.createFrom().failure(new IllegalArgumentException("Source ID is required"));
+      throw new IllegalArgumentException("Source ID is required");
     }
     if (category.getName() == null || category.getName().isBlank()) {
-      return Uni.createFrom().failure(new IllegalArgumentException("Category name is required"));
+      throw new IllegalArgumentException("Category name is required");
     }
     if (category.getType() == null || category.getType().isBlank()) {
-      return Uni.createFrom().failure(new IllegalArgumentException("Category type is required"));
+      throw new IllegalArgumentException("Category type is required");
     }
     return repository.insert(category);
   }
 
   /** Find categories by source ID with optional filters */
-  public Multi<Category> findBySourceIdFiltered(
+  public List<Category> findBySourceIdFiltered(
       Long sourceId, String categoryType, String search, int page, int limit) {
     return repository.findBySourceIdFiltered(sourceId, categoryType, search, page, limit);
   }
 
   /** Count categories by source ID with optional filters */
-  public Uni<Long> countBySourceIdFiltered(Long sourceId, String categoryType, String search) {
+  public Long countBySourceIdFiltered(Long sourceId, String categoryType, String search) {
     return repository.countBySourceIdFiltered(sourceId, categoryType, search);
   }
 }

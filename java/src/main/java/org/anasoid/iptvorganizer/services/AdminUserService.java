@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.services;
 
-import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.anasoid.iptvorganizer.models.entity.AdminUser;
@@ -17,12 +16,12 @@ public class AdminUserService extends BaseService<AdminUser, AdminUserRepository
   }
 
   @Override
-  public Uni<Long> create(AdminUser user) {
+  public Long create(AdminUser user) {
     if (user.getUsername() == null || user.getUsername().isBlank()) {
-      return Uni.createFrom().failure(new IllegalArgumentException("Username is required"));
+      throw new IllegalArgumentException("Username is required");
     }
     if (user.getPasswordHash() == null || user.getPasswordHash().isBlank()) {
-      return Uni.createFrom().failure(new IllegalArgumentException("Password hash is required"));
+      throw new IllegalArgumentException("Password hash is required");
     }
     if (user.getIsActive() == null) {
       user.setIsActive(true);
@@ -31,7 +30,7 @@ public class AdminUserService extends BaseService<AdminUser, AdminUserRepository
   }
 
   /** Check if username exists */
-  public Uni<Boolean> existsByUsername(String username) {
+  public Boolean existsByUsername(String username) {
     return repository.usernameExists(username);
   }
 }
