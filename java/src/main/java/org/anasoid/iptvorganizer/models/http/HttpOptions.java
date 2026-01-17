@@ -11,10 +11,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class HttpOptions {
-  private String username;
-  private String password;
   private Boolean followRedirects;
-  private Integer timeout;
+  private Long timeout;
   private Map<String, String> headers;
   private Integer maxRetries;
 }

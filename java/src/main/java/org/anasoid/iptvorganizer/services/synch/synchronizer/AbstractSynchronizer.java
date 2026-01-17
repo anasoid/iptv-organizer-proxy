@@ -5,6 +5,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.entity.Source;
@@ -84,6 +85,12 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
     AtomicInteger count = new AtomicInteger(0);
     AtomicInteger added = new AtomicInteger(0);
     AtomicInteger updated = new AtomicInteger(0);
+
+    // Thread-safe set to accumulate external IDs incrementally during processing
+    // This prevents holding all BaseStream objects in memory until collection completes
+    AtomicReference<Set<Integer>> fetchedStreamIds =
+        new AtomicReference<>(Collections.synchronizedSet(new HashSet<>()));
+
     return typedCategoryRepository
         .getOrCreateUnknownCategory(source.getId())
         .flatMap(
@@ -102,10 +109,16 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
                   .call(
                       item -> {
                         // Assign num ordering
-
                         item.setNum(count.incrementAndGet());
 
-                        // Get all existing streams for this source
+                        // Capture external ID immediately for deletion comparison
+                        // This happens DURING processing, not AFTER, preventing memory accumulation
+                        Integer externalId = item.getExternalId();
+                        if (externalId != null) {
+                          fetchedStreamIds.get().add(externalId);
+                        }
+
+                        // Process the item with database operations
                         return Uni.createFrom()
                             .item(item)
                             .onItem()
@@ -130,18 +143,26 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
                                           });
                                 });
                       })
-                  .map(item -> item.getExternalId())
+                  // Collect to complete - this waits for all items to be processed
+                  // Objects are released for GC immediately after processing (no retention)
+                  // Memory: Only the Set<Integer> of IDs is retained (~800KB for 100K items)
                   .collect()
-                  .asList()
+                  .last()
                   .onItem()
-                  .call(
-                      fetchedStreamIds -> {
+                  .ifNull()
+                  .continueWith(() -> null)
+                  .onItem()
+                  .transformToUni(
+                      ignored -> {
+                        // All items processed, all IDs captured in the Set
+                        Set<Integer> fetchedIds = fetchedStreamIds.get();
+
                         LOGGER.info(
                             String.format(
                                 "%s - Fetched %d items from source %s",
-                                type.getStreamTypeName(),
-                                fetchedStreamIds.size(),
-                                source.getName()));
+                                type.getStreamTypeName(), fetchedIds.size(), source.getName()));
+
+                        // Find items to delete by comparing with existing database IDs
                         return synchronizedItemRepository
                             .findExternalIdsBySourceId(source.getId())
                             .collect()
@@ -150,13 +171,19 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
                                 existingExternalIds -> {
                                   Set<Integer> toDeleteIds = new HashSet<>();
                                   for (Integer id : existingExternalIds) {
-                                    if (!fetchedStreamIds.contains(id) && id != 0) {
+                                    if (!fetchedIds.contains(id) && id != 0) {
                                       toDeleteIds.add(id);
                                     }
                                   }
-                                  if (toDeleteIds.size() > 0) {
-                                    LOGGER.info("IDs to delete: " + toDeleteIds.iterator().next());
+
+                                  if (!toDeleteIds.isEmpty()) {
+                                    LOGGER.info(
+                                        "Deleting "
+                                            + toDeleteIds.size()
+                                            + " items, first ID: "
+                                            + toDeleteIds.iterator().next());
                                   }
+
                                   LOGGER.info(
                                       String.format(
                                           "%s - Added: %d, Updated: %d, Deleted: %d",
@@ -164,12 +191,18 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
                                           added.get(),
                                           updated.get(),
                                           toDeleteIds.size()));
+
                                   syncLog.setItemsAdded(syncLog.getItemsAdded() + added.get());
                                   syncLog.setItemsUpdated(
                                       syncLog.getItemsUpdated() + updated.get());
                                   syncLog.setItemsDeleted(
                                       syncLog.getItemsDeleted() + toDeleteIds.size());
-                                  // Insert/update streams one-by-one
+
+                                  if (toDeleteIds.isEmpty()) {
+                                    return Uni.createFrom().item(Collections.emptyList());
+                                  }
+
+                                  // Delete obsolete items
                                   return Multi.createFrom()
                                       .iterable(toDeleteIds)
                                       .onItem()

@@ -10,9 +10,11 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.io.InputStream;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.extern.java.Log;
 import org.anasoid.iptvorganizer.exceptions.StreamingException;
 
 @ApplicationScoped
+@Log
 public class StreamingJsonParser {
 
   private static final int GC_THRESHOLD = 1000;
@@ -68,9 +70,16 @@ public class StreamingJsonParser {
                     }
 
                     nextItem = objectMapper.readValue(parser, targetClass);
-
+                    log.fine(() -> "Reading nextItem: " + nextItem.getClass().getName());
                     // Trigger explicit GC every 1000 items
                     int count = itemCounter.incrementAndGet();
+                    if (count % 1000 == 0) {
+                      log.info(
+                          "Reading item count: "
+                              + count
+                              + " location bytes "
+                              + parser.getCurrentLocation().getByteOffset());
+                    }
                     if (count % GC_THRESHOLD == 0) {
                       System.gc();
                     }

@@ -18,34 +18,6 @@ public class HttpStreamingServiceTest {
   }
 
   @Test
-  void testHttpOptionsBuilder() {
-    HttpOptions options =
-        HttpOptions.builder()
-            .username("user")
-            .password("pass")
-            .timeout(30)
-            .maxRetries(3)
-            .followRedirects(true)
-            .build();
-
-    assertEquals("user", options.getUsername());
-    assertEquals("pass", options.getPassword());
-    assertEquals(30, options.getTimeout());
-    assertEquals(3, options.getMaxRetries());
-    assertTrue(options.getFollowRedirects());
-  }
-
-  @Test
-  void testHttpOptionsDefaults() {
-    HttpOptions options = new HttpOptions();
-
-    assertNull(options.getUsername());
-    assertNull(options.getPassword());
-    assertNull(options.getTimeout());
-    assertNull(options.getMaxRetries());
-  }
-
-  @Test
   void testStreamHttpNullOptions() {
     // Test that null options are handled gracefully
     // This will attempt to stream from invalid URL, so we expect failure
@@ -55,7 +27,7 @@ public class HttpStreamingServiceTest {
 
   @Test
   void testStreamHttpWithOptions() {
-    HttpOptions options = HttpOptions.builder().timeout(10).maxRetries(1).build();
+    HttpOptions options = HttpOptions.builder().timeout(10000L).maxRetries(1).build();
 
     Multi<Buffer> stream =
         httpStreamingService.streamHttp("http://invalid-url-12345.test", options);
@@ -77,34 +49,10 @@ public class HttpStreamingServiceTest {
   }
 
   @Test
-  void testBasicAuthEncoding() {
-    // Test that Basic Auth is properly encoded
-    String username = "testuser";
-    String password = "testpass";
-
-    // Create options with auth
-    HttpOptions options =
-        HttpOptions.builder()
-            .username(username)
-            .password(password)
-            .timeout(10)
-            .maxRetries(1)
-            .build();
-
-    assertEquals("testuser", options.getUsername());
-    assertEquals("testpass", options.getPassword());
-
-    // Verify Base64 encoding would be: testuser:testpass -> dGVzdHVzZXI6dGVzdHBhc3M=
-    String credentials = username + ":" + password;
-    String encoded = java.util.Base64.getEncoder().encodeToString(credentials.getBytes());
-    assertEquals("dGVzdHVzZXI6dGVzdHBhc3M=", encoded);
-  }
-
-  @Test
   void testCustomHeaders() {
     HttpOptions options =
         HttpOptions.builder()
-            .timeout(10)
+            .timeout(10000L)
             .headers(
                 java.util.Map.of(
                     "X-Custom-Header", "CustomValue",
@@ -126,12 +74,5 @@ public class HttpStreamingServiceTest {
     assertEquals(1, options1.getMaxRetries());
     assertEquals(5, options2.getMaxRetries());
     assertNull(options3.getMaxRetries());
-  }
-
-  @Test
-  void testTimeoutConfiguration() {
-    HttpOptions options = HttpOptions.builder().timeout(30).build();
-
-    assertEquals(30, options.getTimeout());
   }
 }

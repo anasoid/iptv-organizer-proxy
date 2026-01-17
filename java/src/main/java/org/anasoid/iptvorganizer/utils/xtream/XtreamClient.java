@@ -22,8 +22,8 @@ public class XtreamClient {
 
   private static final Logger LOGGER = Logger.getLogger(XtreamClient.class.getName());
 
-  private static final int DEFAULT_TIMEOUT_SECONDS = 30;
-  private static final int DEFAULT_MAX_RETRIES = 3;
+  private static final long DEFAULT_TIMEOUT_MS = 30000;
+  private static final int DEFAULT_MAX_RETRIES = 1;
 
   @Inject HttpStreamingService httpStreamingService;
 
@@ -161,7 +161,7 @@ public class XtreamClient {
    */
   private HttpOptions createDefaultHttpOptions() {
     return HttpOptions.builder()
-        .timeout(DEFAULT_TIMEOUT_SECONDS)
+        .timeout(DEFAULT_TIMEOUT_MS)
         .maxRetries(DEFAULT_MAX_RETRIES)
         .build();
   }
