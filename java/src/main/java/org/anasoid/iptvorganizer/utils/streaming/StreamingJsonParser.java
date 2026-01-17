@@ -29,7 +29,7 @@ public class StreamingJsonParser {
   public <T> List<T> parseJsonArray(InputStream inputStream, Class<T> targetClass) {
     List<T> results = new ArrayList<>();
     int itemCount = 0;
-    long startTime = System.currentTimeMillis();
+    long startStep = System.currentTimeMillis();
     long previousByteOffset = 0;
 
     try {
@@ -54,17 +54,18 @@ public class StreamingJsonParser {
           long location = parser.currentLocation().getByteOffset();
           long bytesRead = location - previousByteOffset;
           previousByteOffset = location;
-          long duration = System.currentTimeMillis() - startTime;
+          long duration = System.currentTimeMillis() - startStep;
+          startStep = System.currentTimeMillis();
           log.info(
               "Parsed item count: "
                   + itemCount
                   + " location bytes: "
                   + (location / 1000)
-                  + "k Elapsed time (s): "
-                  + (duration / 1000)
+                  + "k Elapsed time (ms): "
+                  + (duration)
                   + " Read KB/s: "
                   + (bytesRead / (duration == 0 ? 1 : duration)));
-          startTime = System.currentTimeMillis();
+
           System.gc();
         }
       }
