@@ -5,8 +5,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +34,7 @@ public class StreamingJsonParserTest {
   }
 
   @Test
-  void testParseJsonArray() {
+  void testParseJsonArray() throws IOException {
     String json =
         """
         [
@@ -43,16 +46,24 @@ public class StreamingJsonParserTest {
 
     InputStream inputStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 
-    List<JsonNode> results = jsonParser.parseJsonArray(inputStream, JsonNode.class);
+    // Use the new streaming API with try-with-resources
+    try (JsonStreamResult<JsonNode> streamResult =
+        jsonParser.parseJsonArray(inputStream, JsonNode.class)) {
+      List<JsonNode> results = new ArrayList<>();
+      Iterator<JsonNode> iterator = streamResult.iterator();
+      while (iterator.hasNext()) {
+        results.add(iterator.next());
+      }
 
-    assertEquals(3, results.size());
-    assertEquals(1, results.get(0).get("id").asInt());
-    assertEquals("Item 1", results.get(0).get("name").asText());
-    assertEquals(3, results.get(2).get("id").asInt());
+      assertEquals(3, results.size());
+      assertEquals(1, results.get(0).get("id").asInt());
+      assertEquals("Item 1", results.get(0).get("name").asText());
+      assertEquals(3, results.get(2).get("id").asInt());
+    }
   }
 
   @Test
-  void testParseJsonArrayWithTypedClass() {
+  void testParseJsonArrayWithTypedClass() throws IOException {
     String json =
         """
         [
@@ -63,11 +74,19 @@ public class StreamingJsonParserTest {
 
     InputStream inputStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 
-    List<TestItem> results = jsonParser.parseJsonArray(inputStream, TestItem.class);
+    // Use the new streaming API with try-with-resources
+    try (JsonStreamResult<TestItem> streamResult =
+        jsonParser.parseJsonArray(inputStream, TestItem.class)) {
+      List<TestItem> results = new ArrayList<>();
+      Iterator<TestItem> iterator = streamResult.iterator();
+      while (iterator.hasNext()) {
+        results.add(iterator.next());
+      }
 
-    assertEquals(2, results.size());
-    assertEquals(1, results.get(0).id);
-    assertEquals("Stream 1", results.get(0).name);
+      assertEquals(2, results.size());
+      assertEquals(1, results.get(0).id);
+      assertEquals("Stream 1", results.get(0).name);
+    }
   }
 
   @Test
@@ -104,14 +123,22 @@ public class StreamingJsonParserTest {
   }
 
   @Test
-  void testParseJsonArrayEmptyArray() {
+  void testParseJsonArrayEmptyArray() throws IOException {
     String json = "[]";
 
     InputStream inputStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 
-    List<JsonNode> results = jsonParser.parseJsonArray(inputStream, JsonNode.class);
+    // Use the new streaming API with try-with-resources
+    try (JsonStreamResult<JsonNode> streamResult =
+        jsonParser.parseJsonArray(inputStream, JsonNode.class)) {
+      List<JsonNode> results = new ArrayList<>();
+      Iterator<JsonNode> iterator = streamResult.iterator();
+      while (iterator.hasNext()) {
+        results.add(iterator.next());
+      }
 
-    assertEquals(0, results.size());
+      assertEquals(0, results.size());
+    }
   }
 
   @Test
@@ -123,7 +150,13 @@ public class StreamingJsonParserTest {
     assertThrows(
         Exception.class,
         () -> {
-          jsonParser.parseJsonArray(inputStream, JsonNode.class);
+          try (JsonStreamResult<JsonNode> streamResult =
+              jsonParser.parseJsonArray(inputStream, JsonNode.class)) {
+            Iterator<JsonNode> iterator = streamResult.iterator();
+            if (iterator.hasNext()) {
+              iterator.next();
+            }
+          }
         });
   }
 
@@ -139,7 +172,11 @@ public class StreamingJsonParserTest {
     assertThrows(
         Exception.class,
         () -> {
-          jsonParser.parseJsonArray(inputStream, JsonNode.class);
+          try (JsonStreamResult<JsonNode> streamResult =
+              jsonParser.parseJsonArray(inputStream, JsonNode.class)) {
+            // Exception should be thrown on first hasNext() call
+            streamResult.iterator().hasNext();
+          }
         });
   }
 
@@ -157,7 +194,7 @@ public class StreamingJsonParserTest {
   }
 
   @Test
-  void testParseJsonArrayLargeArray() {
+  void testParseJsonArrayLargeArray() throws IOException {
     // Create a large JSON array with 1000 items
     StringBuilder jsonBuilder = new StringBuilder("[");
     for (int i = 1; i <= 1000; i++) {
@@ -174,11 +211,37 @@ public class StreamingJsonParserTest {
     InputStream inputStream =
         new ByteArrayInputStream(jsonBuilder.toString().getBytes(StandardCharsets.UTF_8));
 
-    List<JsonNode> results = jsonParser.parseJsonArray(inputStream, JsonNode.class);
+    // Use the new streaming API - demonstrating lazy evaluation
+    try (JsonStreamResult<JsonNode> streamResult =
+        jsonParser.parseJsonArray(inputStream, JsonNode.class)) {
+      List<JsonNode> results = new ArrayList<>();
+      Iterator<JsonNode> iterator = streamResult.iterator();
 
-    assertEquals(1000, results.size());
-    assertEquals(1, results.get(0).get("id").asInt());
-    assertEquals(1000, results.get(999).get("id").asInt());
+      int count = 0;
+      // Only collect first, middle, and last items for verification
+      // This demonstrates that we don't need to hold all items in memory
+      JsonNode firstItem = null;
+      JsonNode lastItem = null;
+
+      while (iterator.hasNext()) {
+        JsonNode item = iterator.next();
+        count++;
+
+        if (count == 1) {
+          firstItem = item;
+          results.add(item);
+        } else if (count == 1000) {
+          lastItem = item;
+          results.add(item);
+        }
+      }
+
+      // Verify count and values
+      assertEquals(1000, count);
+      assertEquals(1, firstItem.get("id").asInt());
+      assertEquals(1000, lastItem.get("id").asInt());
+      assertEquals(2, results.size()); // We only stored first and last
+    }
   }
 
   // Test POJO for typed parsing

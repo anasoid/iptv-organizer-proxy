@@ -9,10 +9,10 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Map;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.Series;
+import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
 import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 
 @ApplicationScoped
@@ -25,7 +25,7 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
   }
 
   @Override
-  public List<Map> fetchExternalData(Source source) {
+  public JsonStreamResult<Map> fetchExternalData(Source source) {
     return xtreamClient.getSeries(source);
   }
 

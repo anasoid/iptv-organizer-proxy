@@ -2,6 +2,8 @@ package org.anasoid.iptvorganizer.utils.xtream;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -9,6 +11,7 @@ import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
+import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
 
 /**
  * Client for Xtream Codes API interactions.
@@ -28,73 +31,124 @@ public class XtreamClient {
   @Inject HttpStreamingService httpStreamingService;
 
   /**
-   * Fetch live categories from Xtream API.
+   * Fetch live categories from Xtream API using lazy Iterator-based streaming.
    *
    * @param source The source configuration containing credentials and URL
-   * @return List of category data maps
+   * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  public List<Map> getLiveCategories(Source source) {
+  public JsonStreamResult<Map> getLiveCategories(Source source) {
     return fetchCategories(source, StreamType.LIVE);
   }
 
   /**
-   * Fetch VOD categories from Xtream API.
+   * Fetch VOD categories from Xtream API using lazy Iterator-based streaming.
    *
    * @param source The source configuration containing credentials and URL
-   * @return List of category data maps
+   * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  public List<Map> getVodCategories(Source source) {
+  public JsonStreamResult<Map> getVodCategories(Source source) {
     return fetchCategories(source, StreamType.VOD);
   }
 
   /**
-   * Fetch series categories from Xtream API.
+   * Fetch series categories from Xtream API using lazy Iterator-based streaming.
    *
    * @param source The source configuration containing credentials and URL
-   * @return List of category data maps
+   * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  public List<Map> getSeriesCategories(Source source) {
+  public JsonStreamResult<Map> getSeriesCategories(Source source) {
     return fetchCategories(source, StreamType.SERIES);
   }
 
   /**
-   * Fetch live streams from Xtream API.
+   * Fetch live streams from Xtream API using lazy Iterator-based streaming.
    *
    * @param source The source configuration containing credentials and URL
-   * @return List of live stream data maps
+   * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  public List<Map> getLiveStreams(Source source) {
+  public JsonStreamResult<Map> getLiveStreams(Source source) {
     return fetchStreams(source, StreamType.LIVE);
   }
 
   /**
-   * Fetch VOD streams from Xtream API.
+   * Fetch VOD streams from Xtream API using lazy Iterator-based streaming.
    *
    * @param source The source configuration containing credentials and URL
-   * @return List of VOD stream data maps
+   * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  public List<Map> getVodStreams(Source source) {
+  public JsonStreamResult<Map> getVodStreams(Source source) {
     return fetchStreams(source, StreamType.VOD);
   }
 
   /**
-   * Fetch series from Xtream API.
+   * Fetch series from Xtream API using lazy Iterator-based streaming.
    *
    * @param source The source configuration containing credentials and URL
-   * @return List of series data maps
+   * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  public List<Map> getSeries(Source source) {
+  public JsonStreamResult<Map> getSeries(Source source) {
     return fetchStreams(source, StreamType.SERIES);
   }
 
   /**
-   * Generic method to fetch categories for a given stream type.
+   * Backward-compatible method for tests. Fetch live streams as List.
+   *
+   * @deprecated Use getLiveStreams() with try-with-resources instead for true streaming
+   */
+  @Deprecated
+  public List<Map> getLiveStreamsAsList(Source source) {
+    try (JsonStreamResult<Map> result = getLiveStreams(source)) {
+      List<Map> list = new ArrayList<>();
+      result.iterator().forEachRemaining(list::add);
+      LOGGER.info("Loaded " + list.size() + " streams (" + result.getBytesRead() + " bytes)");
+      return list;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to get live streams", e);
+    }
+  }
+
+  /**
+   * Backward-compatible method for tests. Fetch VOD streams as List.
+   *
+   * @deprecated Use getVodStreams() with try-with-resources instead for true streaming
+   */
+  @Deprecated
+  public List<Map> getVodStreamsAsList(Source source) {
+    try (JsonStreamResult<Map> result = getVodStreams(source)) {
+      List<Map> list = new ArrayList<>();
+      result.iterator().forEachRemaining(list::add);
+      LOGGER.info("Loaded " + list.size() + " streams (" + result.getBytesRead() + " bytes)");
+      return list;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to get VOD streams", e);
+    }
+  }
+
+  /**
+   * Backward-compatible method for tests. Fetch series as List.
+   *
+   * @deprecated Use getSeries() with try-with-resources instead for true streaming
+   */
+  @Deprecated
+  public List<Map> getSeriesAsList(Source source) {
+    try (JsonStreamResult<Map> result = getSeries(source)) {
+      List<Map> list = new ArrayList<>();
+      result.iterator().forEachRemaining(list::add);
+      LOGGER.info("Loaded " + list.size() + " series (" + result.getBytesRead() + " bytes)");
+      return list;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to get series", e);
+    }
+  }
+
+  /**
+   * Generic method to fetch categories for a given stream type using lazy streaming.
    *
    * @param source The source configuration
    * @param type The stream type (LIVE, VOD, SERIES)
-   * @return List of category data maps
+   * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  private List<Map> fetchCategories(Source source, StreamType type) {
+  private JsonStreamResult<Map> fetchCategories(Source source, StreamType type) {
     String action = type.getCategoryAction();
     String url = buildApiUrl(source, action);
 
@@ -114,13 +168,13 @@ public class XtreamClient {
   }
 
   /**
-   * Generic method to fetch streams for a given stream type.
+   * Generic method to fetch streams for a given stream type using lazy streaming.
    *
    * @param source The source configuration
    * @param type The stream type (LIVE, VOD, SERIES)
-   * @return List of stream data maps
+   * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  private List<Map> fetchStreams(Source source, StreamType type) {
+  private JsonStreamResult<Map> fetchStreams(Source source, StreamType type) {
     String action = type.getStreamAction();
     String url = buildApiUrl(source, action);
 

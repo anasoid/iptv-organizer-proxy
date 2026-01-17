@@ -7,9 +7,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import lombok.extern.java.Log;
 import org.anasoid.iptvorganizer.exceptions.StreamingException;
 
@@ -22,19 +25,24 @@ public class StreamingJsonParser {
   @Inject ObjectMapper objectMapper;
 
   /**
-   * Parse JSON array from input stream and return items as List<T>.
+   * Parse JSON array from input stream using lazy Iterator.
    *
-   * <p>Memory profile: O(1) per item - parses one object at a time and adds to result list
+   * <p>Returns JsonStreamResult with Iterator for true streaming - items are only parsed when
+   * requested via Iterator.next(). Memory profile: O(1) constant memory usage regardless of total
+   * array size. Try-with-resources should be used to ensure proper resource cleanup.
+   *
+   * @param inputStream The input stream to parse
+   * @param targetClass The class to deserialize each array element into
+   * @param <T> The type of items being parsed
+   * @return JsonStreamResult containing Iterator and metadata (bytes read)
    */
-  public <T> List<T> parseJsonArray(InputStream inputStream, Class<T> targetClass) {
-    List<T> results = new ArrayList<>();
-    int itemCount = 0;
-    long startStep = System.currentTimeMillis();
-    long previousByteOffset = 0;
+  public <T> JsonStreamResult<T> parseJsonArray(InputStream inputStream, Class<T> targetClass) {
+    // Wrap with counting stream to track bytes read
+    CountingInputStream countingStream = new CountingInputStream(inputStream);
 
     try {
       JsonFactory factory = objectMapper.getFactory();
-      JsonParser parser = factory.createParser(inputStream);
+      JsonParser parser = factory.createParser(countingStream);
 
       // Verify we have a JSON array
       if (parser.nextToken() != JsonToken.START_ARRAY) {
@@ -42,41 +50,112 @@ public class StreamingJsonParser {
         throw new StreamingException("Expected JSON array at start of stream");
       }
 
-      // Parse items one by one
-      while (parser.nextToken() != JsonToken.END_ARRAY) {
-        T item = objectMapper.readValue(parser, targetClass);
-        results.add(item);
-        log.fine(() -> "Parsed item: " + item.getClass().getName());
+      // Create lazy iterator
+      Iterator<T> iterator =
+          new Iterator<T>() {
+            private T nextItem = null;
+            private boolean hasNextCached = false;
+            private boolean finished = false;
+            private int count = 0;
+            private long startStep = System.currentTimeMillis();
+            private long previousByteOffset = 0;
 
-        // Trigger explicit GC every 1000 items
-        itemCount++;
-        if (itemCount % 1000 == 0) {
-          long location = parser.currentLocation().getByteOffset();
-          long bytesRead = location - previousByteOffset;
-          previousByteOffset = location;
-          long duration = System.currentTimeMillis() - startStep;
-          startStep = System.currentTimeMillis();
-          log.info(
-              "Parsed item count: "
-                  + itemCount
-                  + " location bytes: "
-                  + (location / 1000)
-                  + "k Elapsed time (ms): "
-                  + (duration)
-                  + " Read KB/s: "
-                  + (bytesRead / (duration == 0 ? 1 : duration)));
+            @Override
+            public boolean hasNext() {
+              if (hasNextCached) {
+                return true; // Already cached
+              }
+              if (finished) {
+                return false; // Already finished
+              }
 
-          System.gc();
-        }
-      }
+              try {
+                JsonToken token = parser.nextToken();
+                if (token == JsonToken.END_ARRAY) {
+                  finished = true;
+                  parser.close();
+                  log.info(
+                      "Stream completed: "
+                          + count
+                          + " items, "
+                          + countingStream.getBytesRead()
+                          + " bytes read");
+                  return false;
+                }
 
-      parser.close();
-      log.info("Successfully parsed " + itemCount + " items from JSON array");
-      return results;
+                nextItem = objectMapper.readValue(parser, targetClass);
+                count++;
+                log.fine(() -> "Parsed item: " + nextItem.getClass().getName());
 
-    } catch (Exception e) {
+                // Log progress every 1000 items
+                if (count % 1000 == 0) {
+                  long location = parser.currentLocation().getByteOffset();
+                  long bytesRead = location - previousByteOffset;
+                  previousByteOffset = location;
+                  long duration = System.currentTimeMillis() - startStep;
+                  startStep = System.currentTimeMillis();
+                  log.fine(
+                      "Parsed item count: "
+                          + count
+                          + " location bytes: "
+                          + (location / 1000)
+                          + "k Elapsed time (ms): "
+                          + (duration)
+                          + " Read KB/s: "
+                          + (bytesRead / (duration == 0 ? 1 : duration)));
+
+                  System.gc();
+                }
+
+                hasNextCached = true;
+                return true;
+              } catch (IOException e) {
+                throw new StreamingException("Failed to parse next item", e);
+              }
+            }
+
+            @Override
+            public T next() {
+              if (!hasNextCached) {
+                throw new NoSuchElementException();
+              }
+              T item = nextItem;
+              hasNextCached = false;
+              nextItem = null; // Help GC
+              return item;
+            }
+          };
+
+      return new JsonStreamResult<>(iterator, countingStream.getBytesReadAtomic(), parser);
+
+    } catch (IOException e) {
       throw new StreamingException("JSON parsing failed", e);
     }
+  }
+
+  /**
+   * Backward-compatible method for tests. Loads entire stream into a list.
+   *
+   * @deprecated Use parseJsonArray() with try-with-resources instead for true streaming
+   */
+  @Deprecated
+  public <T> List<T> parseJsonArrayToList(InputStream inputStream, Class<T> targetClass) {
+    List<T> results = new ArrayList<>();
+    try (JsonStreamResult<T> streamResult = parseJsonArray(inputStream, targetClass)) {
+      Iterator<T> iterator = streamResult.iterator();
+      while (iterator.hasNext()) {
+        results.add(iterator.next());
+      }
+      log.info(
+          "Loaded "
+              + results.size()
+              + " items into list ("
+              + streamResult.getBytesRead()
+              + " bytes)");
+    } catch (IOException e) {
+      throw new StreamingException("Failed to parse JSON array", e);
+    }
+    return results;
   }
 
   /**

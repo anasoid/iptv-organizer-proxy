@@ -2,7 +2,6 @@ package org.anasoid.iptvorganizer.services.synch;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -58,7 +57,6 @@ public class SyncManager {
   }
 
   /** Sync a single source with concurrent sync prevention */
-  @Transactional
   protected void syncSource(Source source) {
     // Try to acquire lock first
     boolean lockAcquired = syncLockManager.tryAcquireLock(source.getId(), "full");
@@ -150,7 +148,6 @@ public class SyncManager {
   }
 
   /** Trigger manual full sync for a source from admin panel */
-  @Transactional
   public void triggerManualSync(Source source) {
     LOGGER.info("Manual sync triggered for source: " + source.getName());
 
@@ -187,7 +184,6 @@ public class SyncManager {
    * Trigger sync for a specific task type (granular sync) Valid task types: live_categories,
    * live_streams, vod_categories, vod_streams, series_categories, series
    */
-  @Transactional
   public void triggerManualSyncTask(Source source, String taskType) {
     LOGGER.info(
         "Manual sync triggered for source: " + source.getName() + ", task type: " + taskType);

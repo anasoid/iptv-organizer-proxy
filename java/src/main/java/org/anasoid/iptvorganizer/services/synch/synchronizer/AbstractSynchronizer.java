@@ -1,10 +1,10 @@
 package org.anasoid.iptvorganizer.services.synch.synchronizer;
 
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
+import java.io.IOException;
 import java.util.*;
 import java.util.function.Function;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
@@ -21,17 +21,17 @@ import org.anasoid.iptvorganizer.services.synch.SyncLockManager;
 import org.anasoid.iptvorganizer.services.synch.mapper.AbstractSyncMapper;
 import org.anasoid.iptvorganizer.services.synch.mapper.SynchMapper;
 import org.anasoid.iptvorganizer.services.synch.mapper.SynchronizedItemMapParameter;
+import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
 import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 
 /**
  * Background sync service using Quarkus Scheduler Syncs live streams, VOD, series, and categories
  * from Xtream API
  */
+@Log
 public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
 
-  private static final Logger LOGGER = Logger.getLogger(AbstractSynchronizer.class.getName());
-
-  private static final int GC_THRESHOLD = 1000;
+  private static final int LOG_THRESHOLD = 1000;
 
   @Inject SourceRepository sourceRepository;
 
@@ -58,12 +58,10 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
   }
 
   /** Fetch and sync categories for a single type (live/vod/series) */
-  @Transactional
   public Source syncCategories(Source source, SyncLog syncLog) {
     return syncItem(source, syncLog, typedCategoryRepository, getMapper()::mapToCategory, "stream");
   }
 
-  @Transactional
   public Source syncStreams(Source source, SyncLog syncLog) {
     return syncItem(source, syncLog, streamRepository, getMapper()::mapToStream, "stream");
   }
@@ -76,12 +74,13 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
       Function<SynchronizedItemMapParameter, R> mapper,
       String itemType) {
     StreamType type = getStreamType();
-    LOGGER.info("Syncing " + type.getStreamTypeName() + " for source: " + source.getName());
+    log.info("Syncing " + type.getStreamTypeName() + " for source: " + source.getName());
 
     int count = 0;
     int added = 0;
     int updated = 0;
     long startTime = System.currentTimeMillis();
+    long bytesRead = 0;
 
     Set<Integer> fetchedIds = new HashSet<>();
 
@@ -90,58 +89,76 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
       Integer unknownCategoryId =
           typedCategoryRepository.getOrCreateUnknownCategory(source.getId());
       long startStep = System.currentTimeMillis();
-      // Fetch external data
-      List<Map> streamsData = synchronizedItemRepository.fetchExternalData(source);
+      long startByteStep = 0;
+      // Fetch external data using lazy Iterator-based streaming
+      try (JsonStreamResult<Map> streamResult =
+          synchronizedItemRepository.fetchExternalData(source)) {
+        Iterator<Map> iterator = streamResult.iterator();
 
-      // Process items one by one
-      for (Map data : streamsData) {
-        R item =
-            mapper.apply(
-                SynchronizedItemMapParameter.builder()
-                    .unknownCategoryId(unknownCategoryId)
-                    .source(source)
-                    .data(data)
-                    .build());
+        // Process items one by one as they're parsed using batch transactions
+        while (iterator.hasNext()) {
+          Map data = iterator.next();
 
-        // Assign num ordering
-        item.setNum(++count);
+          R item =
+              mapper.apply(
+                  SynchronizedItemMapParameter.builder()
+                      .unknownCategoryId(unknownCategoryId)
+                      .source(source)
+                      .data(data)
+                      .build());
 
-        // Capture external ID for deletion comparison
-        Integer externalId = item.getExternalId();
-        if (externalId != null) {
-          fetchedIds.add(externalId);
+          // Assign num ordering
+          item.setNum(++count);
+
+          // Capture external ID for deletion comparison
+          Integer externalId = item.getExternalId();
+          if (externalId != null) {
+            fetchedIds.add(externalId);
+          }
+
+          log.fine(() -> "Processing " + type.getStreamTypeName() + " ID: " + item.getExternalId());
+
+          // Insert or update item directly with autocommit (no transaction overhead)
+          boolean wasInserted = synchronizedItemRepository.insertOrUpdateByExternalId(item);
+          if (wasInserted) {
+            added++;
+          } else {
+            updated++;
+          }
+
+          // Trigger explicit GC every 1000 items
+          if (count % LOG_THRESHOLD == 0) {
+            long duration = System.currentTimeMillis() - startStep;
+            long currentByte = streamResult.getBytesRead();
+            long bytesReadStep = currentByte - startByteStep;
+            startByteStep = currentByte;
+            long bandwidthKb = bytesReadStep / (duration == 0 ? 1 : duration);
+            startStep = System.currentTimeMillis();
+            log.info(
+                "Processed "
+                    + count
+                    + " items in "
+                    + (duration)
+                    + "ms for "
+                    + type.getStreamTypeName()
+                    + ", received:"
+                    + currentByte / 1000
+                    + "kb"
+                    + ", bandwidth:"
+                    + bandwidthKb
+                    + "kb/s");
+          }
         }
 
-        LOGGER.fine(
-            () -> "Processing " + type.getStreamTypeName() + " ID: " + item.getExternalId());
-
-        // Insert or update item
-        boolean wasInserted = synchronizedItemRepository.insertOrUpdateByExternalId(item);
-        if (wasInserted) {
-          added++;
-        } else {
-          updated++;
-        }
-
-        // Trigger explicit GC every 1000 items
-        if (count % GC_THRESHOLD == 0) {
-          long duration = System.currentTimeMillis() - startStep;
-          startStep = System.currentTimeMillis();
-          LOGGER.info(
-              "Processed "
-                  + count
-                  + " items in "
-                  + (duration)
-                  + "ms for "
-                  + type.getStreamTypeName());
-          System.gc();
-        }
+        bytesRead = streamResult.getBytesRead();
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to process stream data", e);
       }
 
-      LOGGER.info(
+      log.info(
           String.format(
-              "%s - Fetched %d items from source %s",
-              type.getStreamTypeName(), fetchedIds.size(), source.getName()));
+              "%s - Fetched %d items from source %s (%d bytes read)",
+              type.getStreamTypeName(), fetchedIds.size(), source.getName(), bytesRead));
 
       // Find items to delete
       List<Integer> existingExternalIds =
@@ -154,7 +171,7 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
       }
 
       if (!toDeleteIds.isEmpty()) {
-        LOGGER.info(
+        log.info(
             "Deleting "
                 + toDeleteIds.size()
                 + " items, first ID: "
@@ -165,17 +182,17 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
       }
 
       long duration = (System.currentTimeMillis() - startTime) / 1000;
-      LOGGER.info(
+      log.info(
           String.format(
-              "%s - Added: %d, Updated: %d, Deleted: %d, Duration(s): %d",
-              type.getStreamTypeName(), added, updated, toDeleteIds.size(), duration));
+              "%s - Added: %d, Updated: %d, Deleted: %d, Duration(s): %d, Bytes read: %d",
+              type.getStreamTypeName(), added, updated, toDeleteIds.size(), duration, bytesRead));
 
       syncLog.setItemsAdded(syncLog.getItemsAdded() + added);
       syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated);
       syncLog.setItemsDeleted(syncLog.getItemsDeleted() + toDeleteIds.size());
 
     } catch (Exception e) {
-      LOGGER.severe("Error syncing " + type.getStreamTypeName() + ": " + e.getMessage());
+      log.severe("Error syncing " + type.getStreamTypeName() + ": " + e.getMessage());
       throw e;
     }
 
