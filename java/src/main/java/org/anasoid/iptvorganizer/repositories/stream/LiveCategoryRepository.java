@@ -19,7 +19,7 @@ public class LiveCategoryRepository extends AbstractTypedCategoryRepository {
   }
 
   @Override
-  public JsonStreamResult<Map> fetchExternalData(Source source) {
+  public JsonStreamResult<Map<?, ?>> fetchExternalData(Source source) {
     return xtreamClient.getLiveCategories(source);
   }
 }

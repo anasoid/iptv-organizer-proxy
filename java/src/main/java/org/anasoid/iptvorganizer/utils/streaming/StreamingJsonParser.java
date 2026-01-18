@@ -134,31 +134,6 @@ public class StreamingJsonParser {
   }
 
   /**
-   * Backward-compatible method for tests. Loads entire stream into a list.
-   *
-   * @deprecated Use parseJsonArray() with try-with-resources instead for true streaming
-   */
-  @Deprecated
-  public <T> List<T> parseJsonArrayToList(InputStream inputStream, Class<T> targetClass) {
-    List<T> results = new ArrayList<>();
-    try (JsonStreamResult<T> streamResult = parseJsonArray(inputStream, targetClass)) {
-      Iterator<T> iterator = streamResult.iterator();
-      while (iterator.hasNext()) {
-        results.add(iterator.next());
-      }
-      log.info(
-          "Loaded "
-              + results.size()
-              + " items into list ("
-              + streamResult.getBytesRead()
-              + " bytes)");
-    } catch (IOException e) {
-      throw new StreamingException("Failed to parse JSON array", e);
-    }
-    return results;
-  }
-
-  /**
    * Parse JSON stream (array or single object) and return as List of JsonNodes.
    *
    * <p>More flexible than parseJsonArray - handles various JSON structures

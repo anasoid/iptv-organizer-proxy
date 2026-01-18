@@ -2,9 +2,6 @@ package org.anasoid.iptvorganizer.utils.xtream;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.entity.Source;
@@ -36,7 +33,7 @@ public class XtreamClient {
    * @param source The source configuration containing credentials and URL
    * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  public JsonStreamResult<Map> getLiveCategories(Source source) {
+  public JsonStreamResult<Map<?, ?>> getLiveCategories(Source source) {
     return fetchCategories(source, StreamType.LIVE);
   }
 
@@ -46,7 +43,7 @@ public class XtreamClient {
    * @param source The source configuration containing credentials and URL
    * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  public JsonStreamResult<Map> getVodCategories(Source source) {
+  public JsonStreamResult<Map<?, ?>> getVodCategories(Source source) {
     return fetchCategories(source, StreamType.VOD);
   }
 
@@ -56,7 +53,7 @@ public class XtreamClient {
    * @param source The source configuration containing credentials and URL
    * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  public JsonStreamResult<Map> getSeriesCategories(Source source) {
+  public JsonStreamResult<Map<?, ?>> getSeriesCategories(Source source) {
     return fetchCategories(source, StreamType.SERIES);
   }
 
@@ -66,7 +63,7 @@ public class XtreamClient {
    * @param source The source configuration containing credentials and URL
    * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  public JsonStreamResult<Map> getLiveStreams(Source source) {
+  public JsonStreamResult<Map<?, ?>> getLiveStreams(Source source) {
     return fetchStreams(source, StreamType.LIVE);
   }
 
@@ -76,7 +73,7 @@ public class XtreamClient {
    * @param source The source configuration containing credentials and URL
    * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  public JsonStreamResult<Map> getVodStreams(Source source) {
+  public JsonStreamResult<Map<?, ?>> getVodStreams(Source source) {
     return fetchStreams(source, StreamType.VOD);
   }
 
@@ -86,59 +83,8 @@ public class XtreamClient {
    * @param source The source configuration containing credentials and URL
    * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  public JsonStreamResult<Map> getSeries(Source source) {
+  public JsonStreamResult<Map<?, ?>> getSeries(Source source) {
     return fetchStreams(source, StreamType.SERIES);
-  }
-
-  /**
-   * Backward-compatible method for tests. Fetch live streams as List.
-   *
-   * @deprecated Use getLiveStreams() with try-with-resources instead for true streaming
-   */
-  @Deprecated
-  public List<Map> getLiveStreamsAsList(Source source) {
-    try (JsonStreamResult<Map> result = getLiveStreams(source)) {
-      List<Map> list = new ArrayList<>();
-      result.iterator().forEachRemaining(list::add);
-      LOGGER.info("Loaded " + list.size() + " streams (" + result.getBytesRead() + " bytes)");
-      return list;
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to get live streams", e);
-    }
-  }
-
-  /**
-   * Backward-compatible method for tests. Fetch VOD streams as List.
-   *
-   * @deprecated Use getVodStreams() with try-with-resources instead for true streaming
-   */
-  @Deprecated
-  public List<Map> getVodStreamsAsList(Source source) {
-    try (JsonStreamResult<Map> result = getVodStreams(source)) {
-      List<Map> list = new ArrayList<>();
-      result.iterator().forEachRemaining(list::add);
-      LOGGER.info("Loaded " + list.size() + " streams (" + result.getBytesRead() + " bytes)");
-      return list;
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to get VOD streams", e);
-    }
-  }
-
-  /**
-   * Backward-compatible method for tests. Fetch series as List.
-   *
-   * @deprecated Use getSeries() with try-with-resources instead for true streaming
-   */
-  @Deprecated
-  public List<Map> getSeriesAsList(Source source) {
-    try (JsonStreamResult<Map> result = getSeries(source)) {
-      List<Map> list = new ArrayList<>();
-      result.iterator().forEachRemaining(list::add);
-      LOGGER.info("Loaded " + list.size() + " series (" + result.getBytesRead() + " bytes)");
-      return list;
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to get series", e);
-    }
   }
 
   /**
@@ -148,7 +94,7 @@ public class XtreamClient {
    * @param type The stream type (LIVE, VOD, SERIES)
    * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  private JsonStreamResult<Map> fetchCategories(Source source, StreamType type) {
+  private JsonStreamResult<Map<?, ?>> fetchCategories(Source source, StreamType type) {
     String action = type.getCategoryAction();
     String url = buildApiUrl(source, action);
 
@@ -157,7 +103,7 @@ public class XtreamClient {
             "Fetching %s categories for source: %s", type.getStreamTypeName(), source.getName()));
 
     try {
-      return httpStreamingService.streamJson(url, Map.class, createDefaultHttpOptions());
+      return httpStreamingService.streamJsonArray(url, createDefaultHttpOptions());
     } catch (Exception ex) {
       LOGGER.severe(
           String.format(
@@ -174,7 +120,7 @@ public class XtreamClient {
    * @param type The stream type (LIVE, VOD, SERIES)
    * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  private JsonStreamResult<Map> fetchStreams(Source source, StreamType type) {
+  private JsonStreamResult<Map<?, ?>> fetchStreams(Source source, StreamType type) {
     String action = type.getStreamAction();
     String url = buildApiUrl(source, action);
 
@@ -182,7 +128,7 @@ public class XtreamClient {
         String.format("Fetching %s for source: %s", type.getStreamTypeName(), source.getName()));
 
     try {
-      return httpStreamingService.streamJson(url, Map.class, createDefaultHttpOptions());
+      return httpStreamingService.streamJsonArray(url, createDefaultHttpOptions());
     } catch (Exception ex) {
       LOGGER.severe(
           String.format(

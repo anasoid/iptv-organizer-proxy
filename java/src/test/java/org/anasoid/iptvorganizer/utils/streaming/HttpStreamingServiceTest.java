@@ -34,7 +34,7 @@ public class HttpStreamingServiceTest {
   }
 
   @Test
-  void testStreamJsonWithValidJson() {
+  void testStreamJsonWithValidJsonArray() {
     String jsonResponse =
         """
         [

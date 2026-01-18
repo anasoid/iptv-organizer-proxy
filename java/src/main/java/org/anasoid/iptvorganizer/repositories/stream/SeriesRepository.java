@@ -25,7 +25,7 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
   }
 
   @Override
-  public JsonStreamResult<Map> fetchExternalData(Source source) {
+  public JsonStreamResult<Map<?, ?>> fetchExternalData(Source source) {
     return xtreamClient.getSeries(source);
   }
 

@@ -26,7 +26,7 @@ public class VodStreamRepository extends BaseStreamRepository<VodStream> {
   }
 
   @Override
-  public JsonStreamResult<Map> fetchExternalData(Source source) {
+  public JsonStreamResult<Map<?, ?>> fetchExternalData(Source source) {
     return xtreamClient.getVodStreams(source);
   }
 

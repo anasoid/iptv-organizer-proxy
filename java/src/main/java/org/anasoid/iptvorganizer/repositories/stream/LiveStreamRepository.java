@@ -26,7 +26,7 @@ public class LiveStreamRepository extends BaseStreamRepository<LiveStream> {
   }
 
   @Override
-  public JsonStreamResult<Map> fetchExternalData(Source source) {
+  public JsonStreamResult<Map<?, ?>> fetchExternalData(Source source) {
     return xtreamClient.getLiveStreams(source);
   }
 

@@ -3,16 +3,13 @@ package org.anasoid.iptvorganizer.utils.streaming;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.exceptions.StreamingException;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
@@ -91,17 +88,6 @@ public class HttpStreamingService {
     }
   }
 
-  /**
-   * Stream HTTP response as JSON objects with automatic parsing (memory efficient true streaming).
-   *
-   * @param url The URL to stream from
-   * @param targetClass The class to deserialize each array element into
-   * @return JsonStreamResult with lazy Iterator for streaming items
-   */
-  public <T> JsonStreamResult<T> streamJson(String url, Class<T> targetClass) {
-    return streamJson(url, targetClass, null);
-  }
-
   private HttpOptions createHttpOptions() {
     HttpOptions httpOptions = new HttpOptions();
     httpOptions.setTimeout(30000L);
@@ -113,11 +99,10 @@ public class HttpStreamingService {
    * Stream HTTP response as JSON objects with automatic parsing (memory efficient true streaming).
    *
    * @param url The URL to stream from
-   * @param targetClass The class to deserialize each array element into
    * @param options HTTP options (timeout, retries, headers)
    * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  public <T> JsonStreamResult<T> streamJson(String url, Class<T> targetClass, HttpOptions options) {
+  public JsonStreamResult<Map<?, ?>> streamJsonArray(String url, HttpOptions options) {
     if (options == null) {
       options = createHttpOptions();
     }
@@ -129,50 +114,16 @@ public class HttpStreamingService {
       InputStream is = streamHttp(url, options);
 
       // Parse JSON array from InputStream using Iterator-based streaming
-      JsonStreamResult<T> result = jsonParser.parseJsonArray(is, targetClass);
+      @SuppressWarnings("unchecked")
+      JsonStreamResult<Map<?, ?>> result =
+          (JsonStreamResult<Map<?, ?>>)
+              (JsonStreamResult<?>) jsonParser.parseJsonArray(is, Map.class);
 
       LOGGER.info("Successfully starting JSON stream from: " + url);
       return result;
     } catch (Exception e) {
       LOGGER.severe("Failed to parse JSON stream from: " + url + ", error: " + e.getMessage());
       throw new StreamingException("Failed to parse JSON stream", e);
-    }
-  }
-
-  /**
-   * Backward-compatible method for tests. Loads entire JSON stream into a list.
-   *
-   * @deprecated Use streamJson() with try-with-resources instead for true streaming
-   */
-  @Deprecated
-  public <T> List<T> streamJsonToList(String url, Class<T> targetClass) {
-    return streamJsonToList(url, targetClass, null);
-  }
-
-  /**
-   * Backward-compatible method for tests. Loads entire JSON stream into a list.
-   *
-   * @deprecated Use streamJson() with try-with-resources instead for true streaming
-   */
-  @Deprecated
-  public <T> List<T> streamJsonToList(String url, Class<T> targetClass, HttpOptions options) {
-    try (JsonStreamResult<T> result = streamJson(url, targetClass, options)) {
-      List<T> list = new ArrayList<>();
-      Iterator<T> iterator = result.iterator();
-      while (iterator.hasNext()) {
-        list.add(iterator.next());
-      }
-      LOGGER.info(
-          "Loaded "
-              + list.size()
-              + " items from "
-              + url
-              + " ("
-              + result.getBytesRead()
-              + " bytes)");
-      return list;
-    } catch (IOException e) {
-      throw new StreamingException("Failed to stream JSON to list", e);
     }
   }
 }

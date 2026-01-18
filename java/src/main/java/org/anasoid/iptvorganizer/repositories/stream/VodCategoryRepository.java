@@ -19,7 +19,7 @@ public class VodCategoryRepository extends AbstractTypedCategoryRepository {
   }
 
   @Override
-  public JsonStreamResult<Map> fetchExternalData(Source source) {
+  public JsonStreamResult<Map<?, ?>> fetchExternalData(Source source) {
     return xtreamClient.getVodCategories(source);
   }
 }

@@ -34,7 +34,7 @@ public interface SynchronizedItemRepository<T extends SourcedEntity> {
    * @param source The source to fetch data from
    * @return JsonStreamResult with lazy Iterator for streaming items
    */
-  JsonStreamResult<Map> fetchExternalData(Source source);
+  JsonStreamResult<Map<?, ?>> fetchExternalData(Source source);
 
   /**
    * Find existing entities by external IDs in bulk using IN clause. Returns a map of external_id ->

@@ -21,7 +21,6 @@ import org.anasoid.iptvorganizer.repositories.synch.SyncLogRepository;
 import org.anasoid.iptvorganizer.services.FilterService;
 import org.anasoid.iptvorganizer.services.synch.SyncLockManager;
 import org.anasoid.iptvorganizer.services.synch.mapper.AbstractSyncMapper;
-import org.anasoid.iptvorganizer.services.synch.mapper.SynchMapper;
 import org.anasoid.iptvorganizer.services.synch.mapper.SynchronizedItemMapParameter;
 import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
 import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
@@ -42,8 +41,6 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
   @Inject XtreamClient xtreamClient;
 
   @Inject FilterService filterService;
-
-  @Inject SynchMapper synchMapper;
 
   @Inject SyncLockManager syncLockManager;
 
@@ -98,9 +95,9 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
       List<R> batch = new ArrayList<>(batchSize);
 
       // Fetch external data using lazy Iterator-based streaming
-      try (JsonStreamResult<Map> streamResult =
+      try (JsonStreamResult<Map<?, ?>> streamResult =
           synchronizedItemRepository.fetchExternalData(source)) {
-        Iterator<Map> iterator = streamResult.iterator();
+        Iterator<Map<?, ?>> iterator = streamResult.iterator();
 
         // Process items in batches using transactional batching
         while (iterator.hasNext()) {
