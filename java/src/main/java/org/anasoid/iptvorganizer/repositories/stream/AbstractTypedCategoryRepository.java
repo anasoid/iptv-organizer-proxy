@@ -84,6 +84,25 @@ public abstract class AbstractTypedCategoryRepository
   }
 
   @Override
+  public Map<Integer, Category> findEntitiesByExternalIds(
+      List<Integer> externalIds, Long sourceId) {
+    // Use the bulk find method from CategoryRepository and filter by type
+    Map<Integer, Category> entities =
+        categoryRepository.findEntitiesByExternalIds(externalIds, sourceId);
+    // Filter by type to maintain consistency with findIdsByExternalIds
+    String typeFilter = getType().getCategoryType();
+    return entities.entrySet().stream()
+        .filter(e -> typeFilter.equals(e.getValue().getType()))
+        .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  @Override
+  public boolean hasFunctionalChanges(Category newEntity, Category existingEntity) {
+    // Delegate to CategoryRepository's implementation
+    return categoryRepository.hasFunctionalChanges(newEntity, existingEntity);
+  }
+
+  @Override
   @Transactional
   public int insertOrUpdateByExternalId(List<Category> entities) {
     return internalInsertOrUpdateByExternalId(entities);

@@ -9,6 +9,7 @@ import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 
@@ -212,5 +213,30 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
     } catch (SQLException e) {
       throw new RuntimeException("Failed to delete by external id and type", e);
     }
+  }
+
+  /**
+   * Check if Category has any functional field changes compared to existing. Compares base
+   * SourcedEntity fields plus Category-specific fields (name, type, allowDeny, parentId, labels).
+   *
+   * @param newEntity Category with new data
+   * @param existingEntity Category from database
+   * @return true if any functional field has changed, false otherwise
+   */
+  @Override
+  public boolean hasFunctionalChanges(Category newEntity, Category existingEntity) {
+    // First check base SourcedEntity fields
+    if (super.hasFunctionalChanges(newEntity, existingEntity)) {
+      return true;
+    }
+
+    // Check Category-specific fields
+    if (!Objects.equals(newEntity.getName(), existingEntity.getName())) return true;
+    if (!Objects.equals(newEntity.getType(), existingEntity.getType())) return true;
+    if (!Objects.equals(newEntity.getAllowDeny(), existingEntity.getAllowDeny())) return true;
+    if (!Objects.equals(newEntity.getParentId(), existingEntity.getParentId())) return true;
+    if (!Objects.equals(newEntity.getLabels(), existingEntity.getLabels())) return true;
+
+    return false;
   }
 }

@@ -4,11 +4,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import org.anasoid.iptvorganizer.models.entity.stream.SourcedEntity;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
@@ -121,6 +117,75 @@ public abstract class SourcedEntityRepository<T extends SourcedEntity> extends B
     }
 
     return results;
+  }
+
+  /**
+   * Find full entities by external IDs in bulk using IN clause. Much more efficient than individual
+   * queries for batch operations with change detection.
+   *
+   * @param externalIds List of external IDs to find
+   * @param sourceId Source ID to filter by
+   * @return Map of external_id -> entity for quick lookup and change detection
+   */
+  public Map<Integer, T> findEntitiesByExternalIds(List<Integer> externalIds, Long sourceId) {
+    if (externalIds.isEmpty()) {
+      return Map.of();
+    }
+
+    Map<Integer, T> results = new HashMap<>();
+
+    // Build IN clause with placeholders
+    String placeholders = String.join(",", Collections.nCopies(externalIds.size(), "?"));
+    String sql =
+        "SELECT * FROM "
+            + getTableName()
+            + " WHERE source_id = ? AND external_id IN ("
+            + placeholders
+            + ")";
+
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+
+      // Bind external IDs
+      for (int i = 0; i < externalIds.size(); i++) {
+        stmt.setInt(i + 2, externalIds.get(i));
+      }
+
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          T entity = mapRow(rs);
+          results.put(entity.getExternalId(), entity);
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException(
+          "Failed to bulk find entities by external ids in " + getTableName() + "->" + sql, e);
+    }
+
+    return results;
+  }
+
+  /**
+   * Check if entity has any functional field changes compared to existing. Compares SourcedEntity
+   * base fields (sourceId, externalId, num). Subclasses should override to add their own field
+   * comparisons.
+   *
+   * @param newEntity Entity with new data
+   * @param existingEntity Entity from database
+   * @return true if any base field has changed, false otherwise
+   */
+  public boolean hasFunctionalChanges(T newEntity, T existingEntity) {
+    if (existingEntity == null) {
+      return true;
+    }
+
+    // Check SourcedEntity base fields
+    if (!Objects.equals(newEntity.getSourceId(), existingEntity.getSourceId())) return true;
+    if (!Objects.equals(newEntity.getExternalId(), existingEntity.getExternalId())) return true;
+    if (!Objects.equals(newEntity.getNum(), existingEntity.getNum())) return true;
+
+    return false;
   }
 
   public void deleteByExternalId(Integer externalId, Long sourceId) {
