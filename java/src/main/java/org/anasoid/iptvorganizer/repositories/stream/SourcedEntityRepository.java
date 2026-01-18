@@ -33,7 +33,7 @@ public abstract class SourcedEntityRepository<T extends SourcedEntity> extends B
         }
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to find by source id", e);
+      throw new RuntimeException("Failed to find by source id in " + getTableName(), e);
     }
     return results;
   }
@@ -51,7 +51,8 @@ public abstract class SourcedEntityRepository<T extends SourcedEntity> extends B
         }
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to find external ids by source id", e);
+      throw new RuntimeException(
+          "Failed to find external ids by source id  in " + getTableName(), e);
     }
     return ids;
   }
@@ -66,7 +67,7 @@ public abstract class SourcedEntityRepository<T extends SourcedEntity> extends B
         return rs.next() ? mapRow(rs) : null;
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to find by external id", e);
+      throw new RuntimeException("Failed to find by external id  in " + getTableName(), e);
     }
   }
 
@@ -78,21 +79,27 @@ public abstract class SourcedEntityRepository<T extends SourcedEntity> extends B
    * @param sourceId Source ID to filter by
    * @return Map of external_id -> entity for quick lookup
    */
-  public Map<Integer, T> findByExternalIds(List<Integer> externalIds, Long sourceId) {
+  public Map<Integer, Long> findIdsByExternalIds(List<Integer> externalIds, Long sourceId) {
+    return findIdsByExternalIds(externalIds, sourceId, "");
+  }
+
+  protected Map<Integer, Long> findIdsByExternalIds(
+      List<Integer> externalIds, Long sourceId, String prefilter) {
     if (externalIds.isEmpty()) {
       return Map.of();
     }
 
-    Map<Integer, T> results = new HashMap<>();
+    Map<Integer, Long> results = new HashMap<>();
 
     // Build IN clause with placeholders
     String placeholders = String.join(",", Collections.nCopies(externalIds.size(), "?"));
     String sql =
-        "SELECT * FROM "
+        "SELECT id, external_id FROM "
             + getTableName()
             + " WHERE source_id = ? AND external_id IN ("
             + placeholders
-            + ")";
+            + ")"
+            + prefilter;
 
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -105,12 +112,12 @@ public abstract class SourcedEntityRepository<T extends SourcedEntity> extends B
 
       try (ResultSet rs = stmt.executeQuery()) {
         while (rs.next()) {
-          T entity = mapRow(rs);
-          results.put(entity.getExternalId(), entity);
+          results.put(rs.getInt("external_id"), rs.getLong("id"));
         }
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to bulk find by external ids", e);
+      throw new RuntimeException(
+          "Failed to bulk find by external ids in " + getTableName() + "->" + sql, e);
     }
 
     return results;
@@ -124,12 +131,7 @@ public abstract class SourcedEntityRepository<T extends SourcedEntity> extends B
       stmt.setLong(2, sourceId);
       stmt.executeUpdate();
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to delete by external id", e);
+      throw new RuntimeException("Failed to delete by external id  in " + getTableName(), e);
     }
-  }
-
-  /** Count entities by source ID */
-  public Long countBySourceId(Long sourceId) {
-    return countWhere("source_id = ?", sourceId);
   }
 }

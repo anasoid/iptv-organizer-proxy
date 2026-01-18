@@ -1,5 +1,6 @@
 package org.anasoid.iptvorganizer.repositories.stream;
 
+import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -40,9 +41,7 @@ public interface SynchronizedItemRepository<T extends SourcedEntity> {
    * entity for quick lookup. This method should be implemented by subclasses that extend
    * SourcedEntityRepository or provide their own bulk lookup implementation.
    */
-  default Map<Integer, T> findByExternalIds(List<Integer> externalIds, Long sourceId) {
-    throw new UnsupportedOperationException("findByExternalIds must be implemented by subclass");
-  }
+  Map<Integer, Long> findIdsByExternalIds(List<Integer> externalIds, Long sourceId);
 
   default Boolean insertOrUpdateByExternalId(T entity) {
     T existing = findByExternalId(entity.getExternalId(), entity.getSourceId());
@@ -56,6 +55,8 @@ public interface SynchronizedItemRepository<T extends SourcedEntity> {
     }
   }
 
+  int insertOrUpdateByExternalId(List<T> entities);
+
   /**
    * Insert or update multiple entities in a single transaction. Uses bulk SELECT to find existing
    * records, then inserts or updates each one. Much more efficient than calling
@@ -64,7 +65,8 @@ public interface SynchronizedItemRepository<T extends SourcedEntity> {
    * @param entities List of entities to save
    * @return Number of entities that were inserted (not updated)
    */
-  default int insertOrUpdateByExternalId(List<T> entities) {
+  @Transactional
+  default int internalInsertOrUpdateByExternalId(List<T> entities) {
     if (entities.isEmpty()) {
       return 0;
     }
@@ -76,16 +78,16 @@ public interface SynchronizedItemRepository<T extends SourcedEntity> {
     List<Integer> externalIds =
         entities.stream().map(SourcedEntity::getExternalId).filter(Objects::nonNull).toList();
 
-    Map<Integer, T> existingMap = findByExternalIds(externalIds, sourceId);
+    Map<Integer, Long> existingMap = findIdsByExternalIds(externalIds, sourceId);
 
     int insertCount = 0;
 
     // Process each entity within this transaction
     for (T entity : entities) {
-      T existing = existingMap.get(entity.getExternalId());
-      if (existing != null) {
+      Long existingId = existingMap.get(entity.getExternalId());
+      if (existingId != null) {
         // Update existing
-        entity.setId(existing.getId());
+        entity.setId(existingId);
         update(entity);
       } else {
         // Insert new

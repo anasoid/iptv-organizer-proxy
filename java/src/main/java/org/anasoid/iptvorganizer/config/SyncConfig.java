@@ -10,7 +10,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 @ApplicationScoped
 public class SyncConfig {
 
-  @ConfigProperty(name = "sync.batch.size", defaultValue = "1000")
+  @ConfigProperty(name = "sync.batch.size", defaultValue = "100")
   Integer batchSize;
 
   public Integer getBatchSize() {
