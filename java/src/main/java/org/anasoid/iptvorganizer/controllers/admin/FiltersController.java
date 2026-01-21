@@ -8,6 +8,7 @@ import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.dto.FilterDTO;
+import org.anasoid.iptvorganizer.dto.request.CreateFilterRequest;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.entity.Filter;
 import org.anasoid.iptvorganizer.services.FilterService;
@@ -63,7 +64,7 @@ public class FiltersController extends BaseController {
 
   /** Create filter POST /api/filters */
   @POST
-  public Response createFilter(Filter request) {
+  public Response createFilter(CreateFilterRequest request) {
     if (request.getName() == null || request.getName().isBlank()) {
       return ResponseUtils.badRequest("Name is required");
     }
@@ -91,7 +92,7 @@ public class FiltersController extends BaseController {
   /** Update filter PUT /api/filters/:id */
   @PUT
   @Path("/{id}")
-  public Response updateFilter(@PathParam("id") Long id, Filter request) {
+  public Response updateFilter(@PathParam("id") Long id, CreateFilterRequest request) {
     try {
       Filter filter = filterService.getById(id);
       if (filter == null) {
@@ -136,8 +137,8 @@ public class FiltersController extends BaseController {
         return ResponseUtils.notFound("Filter not found");
       }
 
-      if (request != null && request.get("useSourceFilter") != null) {
-        filter.setUseSourceFilter(request.get("useSourceFilter"));
+      if (request != null && request.get("use_source_filter") != null) {
+        filter.setUseSourceFilter(request.get("use_source_filter"));
         filter.setUpdatedAt(LocalDateTime.now());
         filterService.update(filter);
       }

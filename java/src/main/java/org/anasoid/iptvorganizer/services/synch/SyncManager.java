@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
@@ -43,13 +44,13 @@ public class SyncManager {
           syncSource(source);
           processed++;
         } catch (Exception e) {
-          LOGGER.severe("Failed to sync source " + source.getId() + ": " + e.getMessage());
+          LOGGER.log(Level.SEVERE, "Failed to sync source " + source.getId(), e);
         }
       }
 
       LOGGER.info("Scheduled sync completed: " + processed + " sources processed");
     } catch (Exception e) {
-      LOGGER.severe("Scheduled sync failed: " + e.getMessage());
+      LOGGER.log(Level.SEVERE, "Scheduled sync failed: ", e);
     }
   }
 
