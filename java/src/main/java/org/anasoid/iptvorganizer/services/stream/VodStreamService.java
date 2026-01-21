@@ -26,4 +26,15 @@ public class VodStreamService extends BaseService<VodStream, VodStreamRepository
     }
     return repository.insert(stream);
   }
+
+  /** Find streams by source and category - stub for future database query implementation */
+  public java.util.List<VodStream> findBySourceAndCategory(
+      Long sourceId, Integer categoryId, int limit) {
+    return java.util.Collections.emptyList();
+  }
+
+  /** Find stream by source and stream_id - stub for future database query implementation */
+  public VodStream findBySourceAndStreamId(Long sourceId, Integer streamId) {
+    return null;
+  }
 }

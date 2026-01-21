@@ -51,6 +51,10 @@ dependencies {
     testImplementation 'io.quarkus:quarkus-jdbc-h2'
     testImplementation 'com.h2database:h2'
 
+    // Mockito for mocking in tests
+    testImplementation 'org.mockito:mockito-core'
+    testImplementation 'org.mockito:mockito-junit-jupiter'
+
     // JaCoCo for code coverage with Quarkus
     testImplementation 'io.quarkus:quarkus-jacoco'
 }

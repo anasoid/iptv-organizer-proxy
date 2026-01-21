@@ -6,13 +6,23 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.exceptions.FilterException;
 import org.anasoid.iptvorganizer.models.entity.Filter;
+import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
+import org.anasoid.iptvorganizer.models.entity.stream.Category;
+import org.anasoid.iptvorganizer.models.filtering.CategoryMatch;
+import org.anasoid.iptvorganizer.models.filtering.ChannelMatch;
+import org.anasoid.iptvorganizer.models.filtering.FilterAction;
 import org.anasoid.iptvorganizer.models.filtering.FilterConfig;
 import org.anasoid.iptvorganizer.models.filtering.FilterRule;
+import org.anasoid.iptvorganizer.models.filtering.MatchCriteria;
 import org.anasoid.iptvorganizer.repositories.FilterRepository;
 
 @ApplicationScoped
@@ -158,5 +168,461 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
       return str;
     }
     return str.substring(0, 1).toUpperCase() + str.substring(1);
+  }
+
+  // ==================== NEW PHP-COMPATIBLE FILTERING METHODS ====================
+
+  /**
+   * Pattern matching with wildcard support (* and ? characters). Falls back to case-insensitive
+   * substring matching if no wildcards.
+   *
+   * @param text Text to match against
+   * @param pattern Pattern with optional wildcards (* = any chars, ? = single char)
+   * @return true if text matches pattern
+   */
+  protected boolean matchesPattern(String text, String pattern) {
+    // If pattern is null or empty, no filter criteria = always matches
+    if (pattern == null || pattern.isEmpty()) {
+      return true;
+    }
+
+    // If text is null or empty, no text to filter = always matches
+    // (represents "no filtering criteria")
+    if (text == null || text.isEmpty()) {
+      return true;
+    }
+
+    text = text.toLowerCase();
+    pattern = pattern.toLowerCase();
+
+    // Check if pattern contains wildcards
+    if (pattern.contains("*") || pattern.contains("?")) {
+      // Convert wildcard pattern to regex
+      String regex =
+          pattern
+              .replace(".", "\\.") // Escape dots
+              .replace("*", ".*") // Replace * with .*
+              .replace("?", "."); // Replace ? with .
+      return text.matches(regex);
+    }
+
+    // Substring matching (case-insensitive)
+    return text.contains(pattern);
+  }
+
+  /**
+   * Check if text matches ANY pattern in list (OR logic).
+   *
+   * @param text Text to match
+   * @param patterns List of patterns
+   * @return true if text matches any pattern, false if patterns is empty
+   */
+  protected boolean matchesAnyPattern(String text, List<String> patterns) {
+    if (patterns == null || patterns.isEmpty()) {
+      return false;
+    }
+    return patterns.stream().anyMatch(p -> matchesPattern(text, p));
+  }
+
+  /**
+   * Parse comma-separated labels into lowercase list.
+   *
+   * @param labelString Comma-separated label string
+   * @return List of lowercase labels
+   */
+  protected List<String> parseLabels(String labelString) {
+    if (labelString == null || labelString.isEmpty()) {
+      return Collections.emptyList();
+    }
+    return Arrays.stream(labelString.split(","))
+        .map(s -> s.trim().toLowerCase())
+        .filter(s -> !s.isEmpty())
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Helper to check if list is empty.
+   *
+   * @param list List to check
+   * @return true if list is null or empty
+   */
+  protected boolean isEmpty(List<String> list) {
+    return list == null || list.isEmpty();
+  }
+
+  /**
+   * Check if stream matches channel criteria.
+   *
+   * <p>Matching Rules: - by_name: ANY pattern matches (OR logic) - by_labels: ANY pattern matches
+   * ANY label (OR logic) - Both name and labels criteria must match if both specified (AND)
+   *
+   * @param channelName Stream name
+   * @param channelLabelsStr Comma-separated channel labels
+   * @param criteria Channel matching criteria
+   * @return true if stream matches criteria
+   */
+  protected boolean matchesChannelCriteria(
+      String channelName, String channelLabelsStr, ChannelMatch criteria) {
+    channelName = channelName != null ? channelName.toLowerCase() : "";
+    List<String> channelLabels = parseLabels(channelLabelsStr);
+
+    // Check by_name: ANY pattern matches (OR logic)
+    boolean nameMatches = true; // No name criteria = matches
+    if (!isEmpty(criteria.getByName())) {
+      nameMatches = matchesAnyPattern(channelName, criteria.getByName());
+    }
+
+    // Check by_labels: ANY pattern matches ANY label (OR logic)
+    boolean labelsMatch = true; // No label criteria = matches
+    if (!isEmpty(criteria.getByLabels())) {
+      labelsMatch = false;
+      for (String pattern : criteria.getByLabels()) {
+        for (String label : channelLabels) {
+          if (matchesPattern(label, pattern)) {
+            labelsMatch = true;
+            break;
+          }
+        }
+        if (labelsMatch) break;
+      }
+    }
+
+    // Both criteria must match (AND)
+    return nameMatches && labelsMatch;
+  }
+
+  /**
+   * Check if category matches criteria.
+   *
+   * <p>Matching Rules: - by_name: ANY pattern matches (OR logic) - by_labels: ANY pattern matches
+   * ANY label (OR logic) - Both name and labels criteria must match if both specified (AND)
+   *
+   * @param categoryName Category name
+   * @param categoryLabelsStr Comma-separated category labels
+   * @param criteria Category matching criteria
+   * @return true if category matches criteria
+   */
+  protected boolean matchesCategoryCriteria(
+      String categoryName, String categoryLabelsStr, CategoryMatch criteria) {
+    categoryName = categoryName != null ? categoryName.toLowerCase() : "";
+    List<String> categoryLabels = parseLabels(categoryLabelsStr);
+
+    // Check by_name: ANY pattern matches (OR logic)
+    boolean nameMatches = true; // No name criteria = matches
+    if (!isEmpty(criteria.getByName())) {
+      nameMatches = matchesAnyPattern(categoryName, criteria.getByName());
+    }
+
+    // Check by_labels: ANY pattern matches ANY label (OR logic)
+    boolean labelsMatch = true; // No label criteria = matches
+    if (!isEmpty(criteria.getByLabels())) {
+      labelsMatch = false;
+      for (String pattern : criteria.getByLabels()) {
+        for (String label : categoryLabels) {
+          if (matchesPattern(label, pattern)) {
+            labelsMatch = true;
+            break;
+          }
+        }
+        if (labelsMatch) break;
+      }
+    }
+
+    // Both criteria must match (AND)
+    return nameMatches && labelsMatch;
+  }
+
+  /**
+   * Check if stream matches rule criteria (for STREAM filtering).
+   *
+   * <p>Logic (PHP-compatible): - If rule has BOTH channel and category criteria → BOTH must match
+   * (AND) - If rule has only channel criteria → only channel must match - If rule has only category
+   * criteria → only category must match - If rule has neither → false (doesn't match)
+   *
+   * @param stream Stream to check
+   * @param category Category of the stream
+   * @param match Match criteria
+   * @return true if stream matches rule
+   */
+  protected boolean matchStream(BaseStream stream, Category category, MatchCriteria match) {
+    boolean hasChannelCriteria =
+        (match.getChannels() != null)
+            && (!isEmpty(match.getChannels().getByName())
+                || !isEmpty(match.getChannels().getByLabels()));
+
+    boolean hasCategoryCriteria =
+        (match.getCategories() != null)
+            && (!isEmpty(match.getCategories().getByName())
+                || !isEmpty(match.getCategories().getByLabels()));
+
+    // Evaluate channel criteria
+    boolean channelMatches = false;
+    if (hasChannelCriteria) {
+      channelMatches =
+          matchesChannelCriteria(stream.getName(), stream.getLabels(), match.getChannels());
+    }
+
+    // Evaluate category criteria
+    boolean categoryMatches = false;
+    if (hasCategoryCriteria && category != null) {
+      categoryMatches =
+          matchesCategoryCriteria(category.getName(), category.getLabels(), match.getCategories());
+    }
+
+    // If both channel and category criteria exist, both must match (AND)
+    // If only one type exists, that one must match
+    if (hasChannelCriteria && hasCategoryCriteria) {
+      return channelMatches && categoryMatches;
+    } else if (hasChannelCriteria) {
+      return channelMatches;
+    } else if (hasCategoryCriteria) {
+      return categoryMatches;
+    }
+
+    return false;
+  }
+
+  /**
+   * Apply priority-based filtering to streams (PHP-compatible).
+   *
+   * <p>Priority Order (highest to lowest): 1. Stream allow_deny='allow' → ALWAYS INCLUDE 2. Stream
+   * allow_deny='deny' → ALWAYS EXCLUDE 3. Category allow_deny='allow' → INCLUDE (unless stream has
+   * deny) 4. Category allow_deny='deny' → EXCLUDE (unless stream has allow) 5. Adult content filter
+   * (if hideAdultContent=true) 6. Filter rules (first-match-wins)
+   *
+   * @param streams Array of streams
+   * @param categoryCache Map of category ID → Category
+   * @param hideAdultContent Whether to hide adult content
+   * @return Filtered streams
+   */
+  public List<BaseStream> applyToStreams(
+      List<BaseStream> streams, Map<Integer, Category> categoryCache, boolean hideAdultContent) {
+    List<BaseStream> allowed = new ArrayList<>();
+    List<BaseStream> toFilter = new ArrayList<>();
+
+    // Phase 1: Separate streams by allow_deny priority
+    for (BaseStream stream : streams) {
+      String streamAllowDeny = stream.getAllowDeny();
+      Category category = categoryCache.get(stream.getCategoryId());
+      String categoryAllowDeny = category != null ? category.getAllowDeny() : null;
+
+      // Priority 1: Stream allow_deny='allow' - ALWAYS INCLUDE
+      if ("allow".equalsIgnoreCase(streamAllowDeny)) {
+        allowed.add(stream);
+        continue;
+      }
+
+      // Priority 2: Stream allow_deny='deny' - ALWAYS EXCLUDE
+      if ("deny".equalsIgnoreCase(streamAllowDeny)) {
+        continue; // Skip this stream
+      }
+
+      // Priority 3: Category allow_deny='allow' - INCLUDE STREAM
+      if ("allow".equalsIgnoreCase(categoryAllowDeny)) {
+        allowed.add(stream);
+        continue;
+      }
+
+      // Priority 4: Category allow_deny='deny' - EXCLUDE STREAM
+      if ("deny".equalsIgnoreCase(categoryAllowDeny)) {
+        continue; // Skip this stream
+      }
+
+      // No explicit override - needs filtering
+      toFilter.add(stream);
+    }
+
+    // Phase 2: Apply adult content filter
+    List<BaseStream> filtered = filterAdultContent(toFilter, hideAdultContent);
+
+    // Phase 3: Apply include/exclude rules
+    filtered = applyFilterRules(filtered, categoryCache);
+
+    // Combine: explicitly allowed streams + filter-passed streams
+    allowed.addAll(filtered);
+    return allowed;
+  }
+
+  /**
+   * Filter out adult content streams.
+   *
+   * @param streams Streams to filter
+   * @param hideAdultContent Whether to hide adult content
+   * @return Filtered streams
+   */
+  protected List<BaseStream> filterAdultContent(
+      List<BaseStream> streams, boolean hideAdultContent) {
+    if (!hideAdultContent) {
+      return streams;
+    }
+    return streams.stream()
+        .filter(s -> !Boolean.TRUE.equals(s.getIsAdult()))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Apply include/exclude rules (PHP-compatible).
+   *
+   * <p>First matching rule wins: - If type is "include": if stream matches → ACCEPT and STOP - If
+   * type is "exclude": if stream matches → REJECT and STOP
+   *
+   * <p>If stream doesn't match ANY rule: - If there are include rules → REJECT (must match an
+   * include rule) - If only exclude rules → ACCEPT (not explicitly excluded)
+   *
+   * @param streams Streams to filter
+   * @param categoryCache Map of category ID → Category
+   * @return Filtered streams
+   */
+  protected List<BaseStream> applyFilterRules(
+      List<BaseStream> streams, Map<Integer, Category> categoryCache) {
+    // This requires the filter config - for now, return as-is
+    // It will be called from a context that has access to filter
+    return streams;
+  }
+
+  /**
+   * Check if a single stream should be included based on filters.
+   *
+   * <p>Used for efficient filtering of individual streams or small batches.
+   *
+   * @param stream Stream to check
+   * @param category Stream's category
+   * @param config Filter configuration (null = no filtering)
+   * @param hideAdultContent Whether to hide adult content
+   * @return true if stream should be included
+   */
+  public boolean shouldIncludeStream(
+      BaseStream stream, Category category, FilterConfig config, boolean hideAdultContent) {
+    // Priority 1: Stream allow_deny='allow' - ALWAYS INCLUDE
+    if ("allow".equalsIgnoreCase(stream.getAllowDeny())) {
+      return true;
+    }
+
+    // Priority 2: Stream allow_deny='deny' - ALWAYS EXCLUDE
+    if ("deny".equalsIgnoreCase(stream.getAllowDeny())) {
+      return false;
+    }
+
+    // Priority 3: Category allow_deny='allow' - INCLUDE
+    if (category != null && "allow".equalsIgnoreCase(category.getAllowDeny())) {
+      return true;
+    }
+
+    // Priority 4: Category allow_deny='deny' - EXCLUDE
+    if (category != null && "deny".equalsIgnoreCase(category.getAllowDeny())) {
+      return false;
+    }
+
+    // Priority 5: Adult content filter
+    if (hideAdultContent && Boolean.TRUE.equals(stream.getIsAdult())) {
+      return false;
+    }
+
+    // Priority 6: Filter rules
+    if (config != null && config.getRules() != null && !config.getRules().isEmpty()) {
+      List<FilterRule> rules = config.getRules();
+
+      // Check if there are any include rules
+      boolean hasIncludeRules = rules.stream().anyMatch(r -> r.getType() == FilterAction.INCLUDE);
+
+      // Process rules in order - first matching rule wins
+      for (FilterRule rule : rules) {
+        MatchCriteria match = rule.getMatch();
+        if (match != null && matchStream(stream, category, match)) {
+          // First matching rule wins
+          return rule.getType() == FilterAction.INCLUDE;
+        }
+      }
+
+      // No rule matched - apply default behavior
+      // If there are include rules, reject (must match an include rule)
+      // If only exclude rules, accept (not explicitly excluded)
+      return !hasIncludeRules;
+    }
+
+    // No filters applied - include by default
+    return true;
+  }
+
+  /**
+   * Filter categories using rules (PHP-compatible).
+   *
+   * <p>KEY DIFFERENCES FROM STREAM FILTERING: 1. Only uses rules that have match.categories
+   * (ignores channel-only rules) 2. Filters by stream_type if specified in rule 3. DEFAULT
+   * BEHAVIOR: Categories are KEPT unless explicitly excluded (Unlike streams where default depends
+   * on hasIncludeRules)
+   *
+   * @param categories Array of categories
+   * @param type Stream type (live, vod, series)
+   * @param config Filter configuration (null = no filtering)
+   * @return Filtered categories
+   */
+  public List<Category> filterCategories(
+      List<Category> categories, String type, FilterConfig config) {
+    if (config == null || config.getRules() == null || config.getRules().isEmpty()) {
+      return categories;
+    }
+
+    List<FilterRule> rules = config.getRules();
+
+    // Filter rules to only those matching the category stream type and with category criteria
+    List<FilterRule> typeRules =
+        rules.stream()
+            .filter(
+                rule -> {
+                  MatchCriteria match = rule.getMatch();
+                  if (match == null) {
+                    return false;
+                  }
+
+                  // Skip if rule has stream type requirement that doesn't match
+                  if (type != null
+                      && match.getStreamType() != null
+                      && !match.getStreamType().isEmpty()) {
+                    if (!match.getStreamType().contains(type)) {
+                      return false;
+                    }
+                  }
+
+                  // Only include rules that have category criteria
+                  return match.getCategories() != null
+                      && (!isEmpty(match.getCategories().getByName())
+                          || !isEmpty(match.getCategories().getByLabels()));
+                })
+            .collect(Collectors.toList());
+
+    // If no matching rules, return all categories
+    if (typeRules.isEmpty()) {
+      return categories;
+    }
+
+    // Filter categories respecting rule order
+    return categories.stream()
+        .filter(
+            category -> {
+              // Process rules in order
+              for (FilterRule rule : typeRules) {
+                MatchCriteria match = rule.getMatch();
+
+                // Check if category matches this rule
+                if (matchesCategoryCriteria(
+                    category.getName(), category.getLabels(), match.getCategories())) {
+                  // If matches and type is include → ACCEPT
+                  if (rule.getType() == FilterAction.INCLUDE) {
+                    return true;
+                  }
+                  // If matches and type is exclude → REJECT
+                  if (rule.getType() == FilterAction.EXCLUDE) {
+                    return false;
+                  }
+                }
+              }
+
+              // Category didn't match any rule → KEEP
+              // THIS IS DIFFERENT FROM STREAM FILTERING!
+              // Categories are always visible unless explicitly excluded
+              return true;
+            })
+        .collect(Collectors.toList());
   }
 }

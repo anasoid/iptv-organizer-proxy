@@ -41,4 +41,22 @@ public class CategoryService extends BaseService<Category, CategoryRepository> {
   public Long countBySourceIdFiltered(Long sourceId, String categoryType, String search) {
     return repository.countBySourceIdFiltered(sourceId, categoryType, search);
   }
+
+  /** Find all categories by source and type */
+  public List<Category> findBySourceAndType(Long sourceId, String type) {
+    return findBySourceIdFiltered(sourceId, type, null, 0, Integer.MAX_VALUE);
+  }
+
+  /** Find categories by source and type with pagination */
+  public List<Category> findBySourceAndTypePaged(
+      Long sourceId, String type, int limit, int offset) {
+    // Convert offset to page number: page = (offset / limit) + 1
+    int page = offset > 0 ? (offset / limit) + 1 : 1;
+    return findBySourceIdFiltered(sourceId, type, null, page, limit);
+  }
+
+  /** Find category by source, external category_id, and type */
+  public Category findBySourceAndCategoryId(Long sourceId, Integer categoryId, String type) {
+    return repository.findBySourceCategoryType(sourceId, categoryId, type);
+  }
 }

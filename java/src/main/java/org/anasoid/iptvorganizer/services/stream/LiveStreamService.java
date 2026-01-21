@@ -26,4 +26,15 @@ public class LiveStreamService extends BaseService<LiveStream, LiveStreamReposit
     }
     return repository.insert(stream);
   }
+
+  /** Find streams by source and category - stub for future database query implementation */
+  public java.util.List<LiveStream> findBySourceAndCategory(
+      Long sourceId, Integer categoryId, int limit) {
+    return java.util.Collections.emptyList();
+  }
+
+  /** Find stream by source and stream_id - stub for future database query implementation */
+  public LiveStream findBySourceAndStreamId(Long sourceId, Integer streamId) {
+    return null;
+  }
 }

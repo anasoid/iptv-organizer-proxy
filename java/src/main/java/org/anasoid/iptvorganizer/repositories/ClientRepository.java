@@ -101,4 +101,18 @@ public class ClientRepository extends BaseRepository<Client> {
     String searchTerm = "%" + search + "%";
     return countWhere(whereClause, searchTerm, searchTerm, searchTerm);
   }
+
+  /** Find client by username */
+  public Client findByUsername(String username) {
+    String sql = "SELECT * FROM clients WHERE username = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setString(1, username);
+      try (ResultSet rs = stmt.executeQuery()) {
+        return rs.next() ? mapRow(rs) : null;
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find client by username: " + username, e);
+    }
+  }
 }
