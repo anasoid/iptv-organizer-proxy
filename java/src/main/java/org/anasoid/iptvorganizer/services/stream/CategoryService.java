@@ -44,7 +44,7 @@ public class CategoryService extends BaseService<Category, CategoryRepository> {
 
   /** Find all categories by source and type */
   public List<Category> findBySourceAndType(Long sourceId, String type) {
-    return findBySourceIdFiltered(sourceId, type, null, 0, Integer.MAX_VALUE);
+    return findBySourceIdFiltered(sourceId, type, null, 1, Integer.MAX_VALUE);
   }
 
   /** Find categories by source and type with pagination */
