@@ -2,6 +2,8 @@ package org.anasoid.iptvorganizer.services.synch.synchronizer;
 
 import jakarta.inject.Inject;
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -59,23 +61,33 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
   }
 
   /** Fetch and sync categories for a single type (live/vod/series) */
-  public Source syncCategories(Source source, SyncLog syncLog) {
-    return syncItem(source, syncLog, typedCategoryRepository, getMapper()::mapToCategory, "stream");
+  public List<SyncLog> syncAll(Source source) {
+    List<SyncLog> result = new ArrayList<>();
+    result.add(syncCategories(source));
+    result.add(syncStreams(source));
+    return result;
   }
 
-  public Source syncStreams(Source source, SyncLog syncLog) {
-    return syncItem(source, syncLog, streamRepository, getMapper()::mapToStream, "stream");
+  /** Fetch and sync categories for a single type (live/vod/series) */
+  public SyncLog syncCategories(Source source) {
+    return syncItem(source, typedCategoryRepository, getMapper()::mapToCategory, "categories");
+  }
+
+  public SyncLog syncStreams(Source source) {
+    return syncItem(source, streamRepository, getMapper()::mapToStream, "streams");
   }
 
   /** Generic stream synchronization method for all stream types */
-  public <R extends SourcedEntity> Source syncItem(
+  public <R extends SourcedEntity> SyncLog syncItem(
       Source source,
-      SyncLog syncLog,
       SynchronizedItemRepository<R> synchronizedItemRepository,
       Function<SynchronizedItemMapParameter, R> mapper,
       String itemType) {
     StreamType type = getStreamType();
     log.info("Syncing " + type.getStreamTypeName() + " for source: " + source.getName());
+
+    LocalDateTime syncStartTime = LocalDateTime.now();
+    SyncLog syncLog = initializeSyncLog(source.getId(), type.getCategoryType(), itemType);
 
     int count = 0;
     int added = 0;
@@ -204,12 +216,53 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
       syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated);
       syncLog.setItemsDeleted(syncLog.getItemsDeleted() + toDeleteIds.size());
 
+      finalizeSyncLog(syncLog, syncStartTime, null);
     } catch (Exception e) {
       log.log(Level.SEVERE, "Error syncing " + type.getStreamTypeName() + ": ", e);
+      finalizeSyncLog(syncLog, syncStartTime, e);
       throw e;
     }
 
-    return source;
+    return syncLog;
+  }
+
+  /** Initialize SyncLog for a sync operation with synchronizer type */
+  private SyncLog initializeSyncLog(Long sourceId, String synchronizerType, String itemType) {
+    SyncLog syncLog =
+        SyncLog.builder()
+            .sourceId(sourceId)
+            .syncType(synchronizerType + "_" + itemType)
+            .startedAt(LocalDateTime.now())
+            .status(SyncLog.SyncLogStatus.RUNNING)
+            .itemsAdded(0)
+            .itemsUpdated(0)
+            .itemsDeleted(0)
+            .build();
+
+    syncLogRepository.insert(syncLog);
+    return syncLog;
+  }
+
+  /** Finalize SyncLog after sync operation */
+  private void finalizeSyncLog(SyncLog syncLog, LocalDateTime syncStartTime, Throwable error) {
+    if (syncLog == null) {
+      return;
+    }
+
+    LocalDateTime syncEndTime = LocalDateTime.now();
+
+    if (error != null) {
+      syncLog.setStatus(SyncLog.SyncLogStatus.FAILED);
+      syncLog.setErrorMessage(error.getMessage());
+    } else {
+      syncLog.setStatus(SyncLog.SyncLogStatus.COMPLETED);
+    }
+
+    syncLog.setCompletedAt(syncEndTime);
+    long durationSeconds = ChronoUnit.SECONDS.between(syncStartTime, syncEndTime);
+    syncLog.setDurationSeconds((int) durationSeconds);
+
+    syncLogRepository.update(syncLog);
   }
 
   abstract AbstractSyncMapper<T> getMapper();

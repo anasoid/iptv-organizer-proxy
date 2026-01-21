@@ -3,14 +3,13 @@ package org.anasoid.iptvorganizer.services.synch;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
-import org.anasoid.iptvorganizer.models.entity.SyncLog.SyncLogStatus;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
-import org.anasoid.iptvorganizer.repositories.synch.SyncLogRepository;
 import org.anasoid.iptvorganizer.services.synch.synchronizer.LiveSynchronizer;
 import org.anasoid.iptvorganizer.services.synch.synchronizer.SeriesSynchronizer;
 import org.anasoid.iptvorganizer.services.synch.synchronizer.VodSynchronizer;
@@ -25,8 +24,6 @@ public class SyncManager {
   private static final Logger LOGGER = Logger.getLogger(SyncManager.class.getName());
 
   @Inject SourceRepository sourceRepository;
-
-  @Inject SyncLogRepository syncLogRepository;
 
   @Inject LiveSynchronizer liveSynchronizer;
   @Inject VodSynchronizer vodSynchronizer;
@@ -57,94 +54,41 @@ public class SyncManager {
   }
 
   /** Sync a single source with concurrent sync prevention */
-  protected void syncSource(Source source) {
+  protected List<SyncLog> syncSource(Source source) {
     // Try to acquire lock first
     boolean lockAcquired = syncLockManager.tryAcquireLock(source.getId(), "full");
     if (!lockAcquired) {
       LOGGER.info("Source " + source.getId() + " is already being synced, skipping");
-      return;
+      return new ArrayList<>();
     }
 
     LocalDateTime syncStartTime = LocalDateTime.now();
-    SyncLog syncLog =
-        SyncLog.builder()
-            .sourceId(source.getId())
-            .syncType("full")
-            .startedAt(syncStartTime)
-            .status(SyncLogStatus.RUNNING)
-            .itemsAdded(0)
-            .itemsUpdated(0)
-            .itemsDeleted(0)
-            .build();
+    source.setLastSync(syncStartTime);
 
     try {
-      Long logId = syncLogRepository.insert(syncLog);
-      syncLog.setId(logId);
-      source.setLastSync(syncStartTime);
-
-      performFullSync(source, syncLog, syncStartTime);
+      return performFullSync(source);
     } catch (Exception e) {
       LOGGER.severe("Error during sync for source " + source.getId() + ": " + e.getMessage());
       throw e;
     } finally {
       syncLockManager.releaseLock(source.getId());
+      sourceRepository.update(source);
     }
   }
 
   /** Perform full sync of a source: categories, live streams, VOD, series */
-  private void performFullSync(Source source, SyncLog syncLog, LocalDateTime syncStartTime) {
-    try {
-      // Sync categories for all types (sequential)
-      source = liveSynchronizer.syncCategories(source, syncLog);
-      source = seriesSynchronizer.syncCategories(source, syncLog);
-      source = vodSynchronizer.syncCategories(source, syncLog);
-
-      // Sync streams for all types (sequential)
-      source = liveSynchronizer.syncStreams(source, syncLog);
-      source = vodSynchronizer.syncStreams(source, syncLog);
-      source = seriesSynchronizer.syncStreams(source, syncLog);
-
-      // Finalize with success
-      finalizeSyncLog(source, syncLog, syncStartTime, null);
-    } catch (Exception failure) {
-      // Finalize with error
-      finalizeSyncLog(source, syncLog, syncStartTime, failure);
-      throw failure;
-    }
-  }
-
-  /** Finalize sync log and update source */
-  private void finalizeSyncLog(
-      Source source, SyncLog syncLog, LocalDateTime syncStartTime, Throwable error) {
-    LocalDateTime syncEndTime = LocalDateTime.now();
-
-    if (error != null) {
-      syncLog.setStatus(SyncLogStatus.FAILED);
-      syncLog.setErrorMessage(error.getMessage());
-      LOGGER.severe(
-          "Sync failed for source "
-              + source.getId()
-              + ": "
-              + error.getClass().getName()
-              + "-> "
-              + error.getMessage());
-    } else {
-      syncLog.setStatus(SyncLogStatus.COMPLETED);
-      LOGGER.info("Sync completed for source " + source.getId());
-    }
-
-    syncLog.setCompletedAt(syncEndTime);
-    long durationSeconds =
-        java.time.temporal.ChronoUnit.SECONDS.between(syncStartTime, syncEndTime);
-    syncLog.setDurationSeconds((int) durationSeconds);
+  private List<SyncLog> performFullSync(Source source) {
+    // Sync categories for all types (sequential)
+    List<SyncLog> result = new ArrayList<>();
+    result.addAll(liveSynchronizer.syncAll(source));
+    result.addAll(seriesSynchronizer.syncAll(source));
+    result.addAll(vodSynchronizer.syncAll(source));
 
     // Update source with next sync time
     source.setNextSync(
         LocalDateTime.now()
             .plusDays(source.getSyncInterval() != null ? source.getSyncInterval() : 1));
-
-    syncLogRepository.update(syncLog);
-    sourceRepository.update(source);
+    return result;
   }
 
   /** Trigger manual full sync for a source from admin panel */
@@ -158,25 +102,13 @@ public class SyncManager {
     }
 
     LocalDateTime syncStartTime = LocalDateTime.now();
-    SyncLog syncLog =
-        SyncLog.builder()
-            .sourceId(source.getId())
-            .syncType("manual_full")
-            .startedAt(syncStartTime)
-            .status(SyncLogStatus.RUNNING)
-            .itemsAdded(0)
-            .itemsUpdated(0)
-            .itemsDeleted(0)
-            .build();
+    source.setLastSync(syncStartTime);
 
     try {
-      Long logId = syncLogRepository.insert(syncLog);
-      syncLog.setId(logId);
-      source.setLastSync(syncStartTime);
-
-      performFullSync(source, syncLog, syncStartTime);
+      performFullSync(source);
     } finally {
       syncLockManager.releaseLock(source.getId());
+      sourceRepository.update(source);
     }
   }
 
@@ -184,7 +116,7 @@ public class SyncManager {
    * Trigger sync for a specific task type (granular sync) Valid task types: live_categories,
    * live_streams, vod_categories, vod_streams, series_categories, series
    */
-  public void triggerManualSyncTask(Source source, String taskType) {
+  public SyncLog triggerManualSyncTask(Source source, String taskType) {
     LOGGER.info(
         "Manual sync triggered for source: " + source.getName() + ", task type: " + taskType);
 
@@ -206,53 +138,38 @@ public class SyncManager {
     }
 
     LocalDateTime syncStartTime = LocalDateTime.now();
-    SyncLog syncLog =
-        SyncLog.builder()
-            .sourceId(source.getId())
-            .syncType("manual_" + taskType)
-            .startedAt(syncStartTime)
-            .status(SyncLogStatus.RUNNING)
-            .itemsAdded(0)
-            .itemsUpdated(0)
-            .itemsDeleted(0)
-            .build();
+    source.setLastSync(syncStartTime);
+    SyncLog syncLog = null;
 
     try {
-      Long logId = syncLogRepository.insert(syncLog);
-      syncLog.setId(logId);
-      source.setLastSync(syncStartTime);
-
       // Execute the specific task
       switch (taskType) {
         case "live_categories":
-          liveSynchronizer.syncCategories(source, syncLog);
+          syncLog = liveSynchronizer.syncCategories(source);
           break;
         case "vod_categories":
-          vodSynchronizer.syncCategories(source, syncLog);
+          syncLog = vodSynchronizer.syncCategories(source);
           break;
         case "series_categories":
-          seriesSynchronizer.syncCategories(source, syncLog);
+          syncLog = seriesSynchronizer.syncCategories(source);
           break;
         case "live_streams":
-          liveSynchronizer.syncStreams(source, syncLog);
+          syncLog = liveSynchronizer.syncStreams(source);
           break;
         case "vod_streams":
-          vodSynchronizer.syncStreams(source, syncLog);
+          syncLog = vodSynchronizer.syncStreams(source);
           break;
         case "series":
-          seriesSynchronizer.syncStreams(source, syncLog);
+          syncLog = seriesSynchronizer.syncStreams(source);
           break;
         default:
           throw new IllegalArgumentException("Unknown task type: " + taskType);
       }
-
-      finalizeSyncLog(source, syncLog, syncStartTime, null);
-    } catch (Exception failure) {
-      finalizeSyncLog(source, syncLog, syncStartTime, failure);
-      throw failure;
     } finally {
       syncLockManager.releaseLock(source.getId());
+      sourceRepository.update(source);
     }
+    return syncLog;
   }
 
   /** Trigger full sync (alias for triggerManualSync) */
