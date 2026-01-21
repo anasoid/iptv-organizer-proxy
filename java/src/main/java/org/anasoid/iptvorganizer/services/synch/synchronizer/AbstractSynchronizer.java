@@ -182,8 +182,8 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
 
       log.info(
           String.format(
-              "%s - Fetched %d items from source %s (%d bytes read)",
-              type.getStreamTypeName(), fetchedIds.size(), source.getName(), bytesRead));
+              "%s - Fetched %d items from source %s (%dkb read)",
+              type.getStreamTypeName(), fetchedIds.size(), source.getName(), bytesRead / 1000));
 
       // Find items to delete
       List<Integer> existingExternalIds =
@@ -209,8 +209,13 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
       long duration = (System.currentTimeMillis() - startTime) / 1000;
       log.info(
           String.format(
-              "%s - Added: %d, Updated: %d, Deleted: %d, Duration(s): %d, Bytes read: %d",
-              type.getStreamTypeName(), added, updated, toDeleteIds.size(), duration, bytesRead));
+              "%s - Added: %d, Updated: %d, Deleted: %d, Duration(s): %d, Bytes read: %dkb",
+              type.getStreamTypeName(),
+              added,
+              updated,
+              toDeleteIds.size(),
+              duration,
+              bytesRead / 1000));
 
       syncLog.setItemsAdded(syncLog.getItemsAdded() + added);
       syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated);
