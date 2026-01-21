@@ -8,10 +8,10 @@ import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.dto.FilterDTO;
-import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.entity.Filter;
 import org.anasoid.iptvorganizer.services.FilterService;
+import org.anasoid.iptvorganizer.utils.ResponseUtils;
 
 /** Filters controller CRUD operations for filters */
 @Path("/api/filters")
@@ -29,7 +29,7 @@ public class FiltersController extends BaseController {
       @QueryParam("limit") @DefaultValue("20") int limit) {
 
     if (page < 1 || limit < 1) {
-      return Response.ok(ApiResponse.error("Page and limit must be greater than 0")).build();
+      return ResponseUtils.badRequest("Page and limit must be greater than 0");
     }
 
     try {
@@ -39,9 +39,9 @@ public class FiltersController extends BaseController {
               .collect(Collectors.toList());
       long total = filterService.count();
       var pagination = PaginationMeta.of(page, limit, total);
-      return Response.ok(ApiResponse.successWithPagination(filters, pagination)).build();
+      return ResponseUtils.okWithPagination(filters, pagination);
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to fetch filters: " + ex.getMessage())).build();
+      return ResponseUtils.serverError("Failed to fetch filters: " + ex.getMessage());
     }
   }
 
@@ -52,12 +52,12 @@ public class FiltersController extends BaseController {
     try {
       Filter filter = filterService.getById(id);
       if (filter != null) {
-        return Response.ok(ApiResponse.success(FilterDTO.fromEntity(filter))).build();
+        return ResponseUtils.ok(FilterDTO.fromEntity(filter));
       } else {
-        return Response.ok(ApiResponse.error("Filter not found")).build();
+        return ResponseUtils.notFound("Filter not found");
       }
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Filter not found")).build();
+      return ResponseUtils.notFound("Filter not found");
     }
   }
 
@@ -65,7 +65,7 @@ public class FiltersController extends BaseController {
   @POST
   public Response createFilter(Filter request) {
     if (request.getName() == null || request.getName().isBlank()) {
-      return Response.ok(ApiResponse.error("Name is required")).build();
+      return ResponseUtils.badRequest("Name is required");
     }
 
     try {
@@ -82,9 +82,9 @@ public class FiltersController extends BaseController {
               .build();
 
       Filter savedFilter = filterService.save(filter);
-      return Response.ok(ApiResponse.success(FilterDTO.fromEntity(savedFilter))).build();
+      return ResponseUtils.created(FilterDTO.fromEntity(savedFilter));
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to create filter: " + ex.getMessage())).build();
+      return ResponseUtils.serverError("Failed to create filter: " + ex.getMessage());
     }
   }
 
@@ -95,7 +95,7 @@ public class FiltersController extends BaseController {
     try {
       Filter filter = filterService.getById(id);
       if (filter == null) {
-        return Response.ok(ApiResponse.error("Filter not found")).build();
+        return ResponseUtils.notFound("Filter not found");
       }
 
       if (request.getName() != null) filter.setName(request.getName());
@@ -107,9 +107,9 @@ public class FiltersController extends BaseController {
       filter.setUpdatedAt(LocalDateTime.now());
 
       filterService.update(filter);
-      return Response.ok(ApiResponse.success(FilterDTO.fromEntity(filter))).build();
+      return ResponseUtils.ok(FilterDTO.fromEntity(filter));
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to update filter: " + ex.getMessage())).build();
+      return ResponseUtils.serverError("Failed to update filter: " + ex.getMessage());
     }
   }
 
@@ -119,9 +119,9 @@ public class FiltersController extends BaseController {
   public Response deleteFilter(@PathParam("id") Long id) {
     try {
       filterService.delete(id);
-      return Response.ok(ApiResponse.success("Filter deleted successfully")).build();
+      return ResponseUtils.okMessage("Filter deleted successfully");
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to delete filter: " + ex.getMessage())).build();
+      return ResponseUtils.serverError("Failed to delete filter: " + ex.getMessage());
     }
   }
 
@@ -133,7 +133,7 @@ public class FiltersController extends BaseController {
     try {
       Filter filter = filterService.getById(id);
       if (filter == null) {
-        return Response.ok(ApiResponse.error("Filter not found")).build();
+        return ResponseUtils.notFound("Filter not found");
       }
 
       if (request != null && request.get("useSourceFilter") != null) {
@@ -141,9 +141,9 @@ public class FiltersController extends BaseController {
         filter.setUpdatedAt(LocalDateTime.now());
         filterService.update(filter);
       }
-      return Response.ok(ApiResponse.success(FilterDTO.fromEntity(filter))).build();
+      return ResponseUtils.ok(FilterDTO.fromEntity(filter));
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to update filter: " + ex.getMessage())).build();
+      return ResponseUtils.serverError("Failed to update filter: " + ex.getMessage());
     }
   }
 }

@@ -7,9 +7,9 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.dto.SyncLogDTO;
-import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.services.synch.SyncLogService;
+import org.anasoid.iptvorganizer.utils.ResponseUtils;
 
 /** Sync Logs controller */
 @Path("/api/sync-logs")
@@ -30,11 +30,11 @@ public class SyncLogsController extends BaseController {
       @QueryParam("limit") @DefaultValue("20") int limit) {
 
     if (page < 1 || limit < 1) {
-      return Response.ok(ApiResponse.error("Page and limit must be greater than 0")).build();
+      return ResponseUtils.badRequest("Page and limit must be greater than 0");
     }
 
     if (sourceId == null) {
-      return Response.ok(ApiResponse.error("source_id is required")).build();
+      return ResponseUtils.badRequest("source_id is required");
     }
 
     try {
@@ -44,12 +44,9 @@ public class SyncLogsController extends BaseController {
               .limit(limit)
               .collect(Collectors.toList());
       long total = syncLogService.count();
-      return Response.ok(
-              ApiResponse.successWithPagination(logs, PaginationMeta.of(page, limit, total)))
-          .build();
+      return ResponseUtils.okWithPagination(logs, PaginationMeta.of(page, limit, total));
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to fetch sync logs: " + ex.getMessage()))
-          .build();
+      return ResponseUtils.serverError("Failed to fetch sync logs: " + ex.getMessage());
     }
   }
 
@@ -60,12 +57,12 @@ public class SyncLogsController extends BaseController {
     try {
       var log = syncLogService.getById(id);
       if (log != null) {
-        return Response.ok(ApiResponse.success(SyncLogDTO.fromEntity(log))).build();
+        return ResponseUtils.ok(SyncLogDTO.fromEntity(log));
       } else {
-        return Response.ok(ApiResponse.error("Sync log not found")).build();
+        return ResponseUtils.notFound("Sync log not found");
       }
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Sync log not found")).build();
+      return ResponseUtils.notFound("Sync log not found");
     }
   }
 
@@ -75,10 +72,9 @@ public class SyncLogsController extends BaseController {
   public Response deleteSyncLog(@PathParam("id") Long id) {
     try {
       syncLogService.delete(id);
-      return Response.ok(ApiResponse.success("Sync log deleted successfully")).build();
+      return ResponseUtils.okMessage("Sync log deleted successfully");
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to delete sync log: " + ex.getMessage()))
-          .build();
+      return ResponseUtils.serverError("Failed to delete sync log: " + ex.getMessage());
     }
   }
 
@@ -92,6 +88,6 @@ public class SyncLogsController extends BaseController {
     stats.put("totalSyncs", 0);
     stats.put("successfulSyncs", 0);
     stats.put("failedSyncs", 0);
-    return Response.ok(ApiResponse.success(stats)).build();
+    return ResponseUtils.ok(stats);
   }
 }

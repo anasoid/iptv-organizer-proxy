@@ -10,12 +10,12 @@ import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.dto.AdminUserDTO;
 import org.anasoid.iptvorganizer.dto.request.CreateAdminUserRequest;
 import org.anasoid.iptvorganizer.dto.request.UpdateAdminUserRequest;
-import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.exceptions.ValidationException;
 import org.anasoid.iptvorganizer.models.entity.AdminUser;
 import org.anasoid.iptvorganizer.services.AdminUserService;
 import org.anasoid.iptvorganizer.services.auth.PasswordService;
+import org.anasoid.iptvorganizer.utils.ResponseUtils;
 
 /** Admin Users controller CRUD operations for admin users */
 @Path("/api/admin-users")
@@ -35,7 +35,7 @@ public class AdminUsersController extends BaseController {
       @QueryParam("limit") @DefaultValue("20") int limit) {
 
     if (page < 1 || limit < 1) {
-      return Response.ok(ApiResponse.error("Page and limit must be greater than 0")).build();
+      return ResponseUtils.badRequest("Page and limit must be greater than 0");
     }
 
     try {
@@ -45,10 +45,9 @@ public class AdminUsersController extends BaseController {
               .collect(Collectors.toList());
       long total = adminUserService.count();
       var pagination = PaginationMeta.of(page, limit, total);
-      return Response.ok(ApiResponse.successWithPagination(users, pagination)).build();
+      return ResponseUtils.okWithPagination(users, pagination);
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to fetch admin users: " + ex.getMessage()))
-          .build();
+      return ResponseUtils.serverError("Failed to fetch admin users: " + ex.getMessage());
     }
   }
 
@@ -59,12 +58,12 @@ public class AdminUsersController extends BaseController {
     try {
       AdminUser user = adminUserService.getById(id);
       if (user != null) {
-        return Response.ok(ApiResponse.success(AdminUserDTO.fromEntity(user))).build();
+        return ResponseUtils.ok(AdminUserDTO.fromEntity(user));
       } else {
-        return Response.ok(ApiResponse.error("Admin user not found")).build();
+        return ResponseUtils.notFound("Admin user not found");
       }
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Admin user not found")).build();
+      return ResponseUtils.notFound("Admin user not found");
     }
   }
 
@@ -72,13 +71,13 @@ public class AdminUsersController extends BaseController {
   @POST
   public Response createAdminUser(CreateAdminUserRequest request) {
     if (request.getUsername() == null || request.getUsername().isBlank()) {
-      return Response.ok(ApiResponse.error("Username is required")).build();
+      return ResponseUtils.badRequest("Username is required");
     }
     if (request.getPassword() == null || request.getPassword().isBlank()) {
-      return Response.ok(ApiResponse.error("Password is required")).build();
+      return ResponseUtils.badRequest("Password is required");
     }
     if (request.getEmail() == null || request.getEmail().isBlank()) {
-      return Response.ok(ApiResponse.error("Email is required")).build();
+      return ResponseUtils.badRequest("Email is required");
     }
 
     try {
@@ -99,10 +98,11 @@ public class AdminUsersController extends BaseController {
               .build();
 
       AdminUser savedUser = adminUserService.save(user);
-      return Response.ok(ApiResponse.success(AdminUserDTO.fromEntity(savedUser))).build();
+      return ResponseUtils.created(AdminUserDTO.fromEntity(savedUser));
+    } catch (ValidationException ex) {
+      return ResponseUtils.badRequest(ex.getMessage());
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to create admin user: " + ex.getMessage()))
-          .build();
+      return ResponseUtils.serverError("Failed to create admin user: " + ex.getMessage());
     }
   }
 
@@ -115,7 +115,7 @@ public class AdminUsersController extends BaseController {
     try {
       AdminUser user = adminUserService.getById(id);
       if (user == null) {
-        return Response.ok(ApiResponse.error("Admin user not found")).build();
+        return ResponseUtils.notFound("Admin user not found");
       }
 
       if (request.getEmail() != null && !request.getEmail().isBlank()) {
@@ -133,10 +133,9 @@ public class AdminUsersController extends BaseController {
 
       user.setUpdatedAt(LocalDateTime.now());
       adminUserService.update(user);
-      return Response.ok(ApiResponse.success(AdminUserDTO.fromEntity(user))).build();
+      return ResponseUtils.ok(AdminUserDTO.fromEntity(user));
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to update admin user: " + ex.getMessage()))
-          .build();
+      return ResponseUtils.serverError("Failed to update admin user: " + ex.getMessage());
     }
   }
 
@@ -148,15 +147,14 @@ public class AdminUsersController extends BaseController {
 
     // Prevent self-deletion
     if (id.equals(currentUserId)) {
-      return Response.ok(ApiResponse.error("Cannot delete your own user account")).build();
+      return ResponseUtils.badRequest("Cannot delete your own user account");
     }
 
     try {
       adminUserService.delete(id);
-      return Response.ok(ApiResponse.success("Admin user deleted successfully")).build();
+      return ResponseUtils.okMessage("Admin user deleted successfully");
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to delete admin user: " + ex.getMessage()))
-          .build();
+      return ResponseUtils.serverError("Failed to delete admin user: " + ex.getMessage());
     }
   }
 }

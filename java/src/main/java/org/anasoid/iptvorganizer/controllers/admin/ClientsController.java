@@ -8,10 +8,10 @@ import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.dto.ClientDTO;
-import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.services.ClientService;
+import org.anasoid.iptvorganizer.utils.ResponseUtils;
 
 /** Clients controller CRUD operations for clients with search and filtering */
 @Path("/api/clients")
@@ -30,7 +30,7 @@ public class ClientsController extends BaseController {
       @QueryParam("search") String search) {
 
     if (page < 1 || limit < 1) {
-      return Response.ok(ApiResponse.error("Page and limit must be greater than 0")).build();
+      return ResponseUtils.badRequest("Page and limit must be greater than 0");
     }
 
     try {
@@ -41,7 +41,7 @@ public class ClientsController extends BaseController {
                 .collect(Collectors.toList());
         long total = clientService.countSearchClients(search);
         var pagination = PaginationMeta.of(page, limit, total);
-        return Response.ok(ApiResponse.successWithPagination(clients, pagination)).build();
+        return ResponseUtils.okWithPagination(clients, pagination);
       } else {
         var clients =
             clientService.getAllPaged(page, limit).stream()
@@ -49,10 +49,10 @@ public class ClientsController extends BaseController {
                 .collect(Collectors.toList());
         long total = clientService.count();
         var pagination = PaginationMeta.of(page, limit, total);
-        return Response.ok(ApiResponse.successWithPagination(clients, pagination)).build();
+        return ResponseUtils.okWithPagination(clients, pagination);
       }
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to fetch clients: " + ex.getMessage())).build();
+      return ResponseUtils.serverError("Failed to fetch clients: " + ex.getMessage());
     }
   }
 
@@ -63,12 +63,12 @@ public class ClientsController extends BaseController {
     try {
       Client client = clientService.getById(id);
       if (client != null) {
-        return Response.ok(ApiResponse.success(ClientDTO.fromEntity(client))).build();
+        return ResponseUtils.ok(ClientDTO.fromEntity(client));
       } else {
-        return Response.ok(ApiResponse.error("Client not found")).build();
+        return ResponseUtils.notFound("Client not found");
       }
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Client not found")).build();
+      return ResponseUtils.notFound("Client not found");
     }
   }
 
@@ -76,7 +76,7 @@ public class ClientsController extends BaseController {
   @POST
   public Response createClient(Client request) {
     if (request.getUsername() == null || request.getUsername().isBlank()) {
-      return Response.ok(ApiResponse.error("Username is required")).build();
+      return ResponseUtils.badRequest("Username is required");
     }
 
     try {
@@ -99,9 +99,9 @@ public class ClientsController extends BaseController {
               .build();
 
       Client savedClient = clientService.save(client);
-      return Response.ok(ApiResponse.success(ClientDTO.fromEntity(savedClient))).build();
+      return ResponseUtils.created(ClientDTO.fromEntity(savedClient));
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to create client: " + ex.getMessage())).build();
+      return ResponseUtils.serverError("Failed to create client: " + ex.getMessage());
     }
   }
 
@@ -112,7 +112,7 @@ public class ClientsController extends BaseController {
     try {
       Client client = clientService.getById(id);
       if (client == null) {
-        return Response.ok(ApiResponse.error("Client not found")).build();
+        return ResponseUtils.notFound("Client not found");
       }
 
       if (request.getUsername() != null) client.setUsername(request.getUsername());
@@ -129,9 +129,9 @@ public class ClientsController extends BaseController {
       client.setUpdatedAt(LocalDateTime.now());
 
       clientService.update(client);
-      return Response.ok(ApiResponse.success(ClientDTO.fromEntity(client))).build();
+      return ResponseUtils.ok(ClientDTO.fromEntity(client));
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to update client: " + ex.getMessage())).build();
+      return ResponseUtils.serverError("Failed to update client: " + ex.getMessage());
     }
   }
 
@@ -141,9 +141,9 @@ public class ClientsController extends BaseController {
   public Response deleteClient(@PathParam("id") Long id) {
     try {
       clientService.delete(id);
-      return Response.ok(ApiResponse.success("Client deleted successfully")).build();
+      return ResponseUtils.okMessage("Client deleted successfully");
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to delete client: " + ex.getMessage())).build();
+      return ResponseUtils.serverError("Failed to delete client: " + ex.getMessage());
     }
   }
 
@@ -153,6 +153,6 @@ public class ClientsController extends BaseController {
   public Response getClientLogs(
       @PathParam("id") Long id, @QueryParam("limit") @DefaultValue("20") int limit) {
     // TODO: Implement client logs retrieval
-    return Response.ok(ApiResponse.success("Client logs retrieved")).build();
+    return ResponseUtils.okMessage("Client logs retrieved");
   }
 }

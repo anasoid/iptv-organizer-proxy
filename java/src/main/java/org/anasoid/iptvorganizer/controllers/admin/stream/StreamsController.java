@@ -6,8 +6,8 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.anasoid.iptvorganizer.controllers.admin.BaseController;
 import org.anasoid.iptvorganizer.dto.StreamDTO;
-import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
+import org.anasoid.iptvorganizer.utils.ResponseUtils;
 
 /** Streams controller Handles Live, VOD, and Series streams */
 @Path("/api/streams")
@@ -31,17 +31,15 @@ public class StreamsController extends BaseController {
       @QueryParam("limit") @DefaultValue("20") int limit) {
 
     if (sourceId == null) {
-      return Response.ok(ApiResponse.error("source_id is required")).build();
+      return ResponseUtils.badRequest("source_id is required");
     }
 
     try {
       // TODO: Implement stream filtering across Live, VOD, Series
-      return Response.ok(
-              ApiResponse.successWithPagination(
-                  java.util.Collections.emptyList(), PaginationMeta.of(page, limit, 0)))
-          .build();
+      return ResponseUtils.okWithPagination(
+          java.util.Collections.emptyList(), PaginationMeta.of(page, limit, 0));
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to fetch streams: " + ex.getMessage())).build();
+      return ResponseUtils.serverError("Failed to fetch streams: " + ex.getMessage());
     }
   }
 
@@ -51,9 +49,9 @@ public class StreamsController extends BaseController {
   public Response getStream(@PathParam("id") Long id, @QueryParam("type") String type) {
     try {
       // TODO: Implement stream retrieval by type
-      return Response.ok(ApiResponse.success(new StreamDTO())).build();
+      return ResponseUtils.ok(new StreamDTO());
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to fetch stream: " + ex.getMessage())).build();
+      return ResponseUtils.serverError("Failed to fetch stream: " + ex.getMessage());
     }
   }
 
@@ -66,9 +64,9 @@ public class StreamsController extends BaseController {
       java.util.Map<String, String> request) {
     try {
       // TODO: Implement stream allow-deny update
-      return Response.ok(ApiResponse.success("Stream updated")).build();
+      return ResponseUtils.okMessage("Stream updated");
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to update stream: " + ex.getMessage())).build();
+      return ResponseUtils.serverError("Failed to update stream: " + ex.getMessage());
     }
   }
 }

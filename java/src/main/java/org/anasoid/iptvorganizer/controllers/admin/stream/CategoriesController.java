@@ -15,9 +15,9 @@ import jakarta.ws.rs.core.Response;
 import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.controllers.admin.BaseController;
 import org.anasoid.iptvorganizer.dto.CategoryDTO;
-import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
+import org.anasoid.iptvorganizer.utils.ResponseUtils;
 
 /** Categories controller */
 @Path("/api/categories")
@@ -41,7 +41,7 @@ public class CategoriesController extends BaseController {
       @QueryParam("limit") @DefaultValue("20") int limit) {
 
     if (sourceId == null) {
-      return Response.ok(ApiResponse.error("source_id is required")).build();
+      return ResponseUtils.badRequest("source_id is required");
     }
 
     try {
@@ -52,12 +52,9 @@ public class CategoriesController extends BaseController {
               .map(CategoryDTO::fromEntity)
               .collect(Collectors.toList());
       long total = categoryService.countBySourceIdFiltered(sourceId, categoryType, search);
-      return Response.ok(
-              ApiResponse.successWithPagination(categories, PaginationMeta.of(page, limit, total)))
-          .build();
+      return ResponseUtils.okWithPagination(categories, PaginationMeta.of(page, limit, total));
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to fetch categories: " + ex.getMessage()))
-          .build();
+      return ResponseUtils.serverError("Failed to fetch categories: " + ex.getMessage());
     }
   }
 
@@ -68,12 +65,12 @@ public class CategoriesController extends BaseController {
     try {
       var cat = categoryService.getById(id);
       if (cat != null) {
-        return Response.ok(ApiResponse.success(CategoryDTO.fromEntity(cat))).build();
+        return ResponseUtils.ok(CategoryDTO.fromEntity(cat));
       } else {
-        return Response.ok(ApiResponse.error("Category not found")).build();
+        return ResponseUtils.notFound("Category not found");
       }
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Category not found")).build();
+      return ResponseUtils.notFound("Category not found");
     }
   }
 
@@ -84,17 +81,16 @@ public class CategoriesController extends BaseController {
     try {
       var cat = categoryService.getById(id);
       if (cat == null) {
-        return Response.ok(ApiResponse.error("Category not found")).build();
+        return ResponseUtils.notFound("Category not found");
       }
 
       if (request != null && request.get("allowDeny") != null) {
         cat.setAllowDeny(request.get("allowDeny"));
         categoryService.update(cat);
       }
-      return Response.ok(ApiResponse.success(CategoryDTO.fromEntity(cat))).build();
+      return ResponseUtils.ok(CategoryDTO.fromEntity(cat));
     } catch (Exception ex) {
-      return Response.ok(ApiResponse.error("Failed to update category: " + ex.getMessage()))
-          .build();
+      return ResponseUtils.serverError("Failed to update category: " + ex.getMessage());
     }
   }
 }
