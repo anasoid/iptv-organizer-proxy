@@ -8,6 +8,7 @@ import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.dto.ClientDTO;
+import org.anasoid.iptvorganizer.dto.request.CreateClientRequest;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.services.ClientService;
@@ -74,7 +75,7 @@ public class ClientsController extends BaseController {
 
   /** Create client POST /api/clients */
   @POST
-  public Response createClient(Client request) {
+  public Response createClient(CreateClientRequest request) {
     if (request.getUsername() == null || request.getUsername().isBlank()) {
       return ResponseUtils.badRequest("Username is required");
     }
@@ -92,7 +93,6 @@ public class ClientsController extends BaseController {
               .isActive(request.getIsActive() != null ? request.getIsActive() : true)
               .hideAdultContent(
                   request.getHideAdultContent() != null ? request.getHideAdultContent() : false)
-              .maxConnections(request.getMaxConnections())
               .notes(request.getNotes())
               .createdAt(LocalDateTime.now())
               .updatedAt(LocalDateTime.now())
@@ -123,8 +123,6 @@ public class ClientsController extends BaseController {
       if (request.getIsActive() != null) client.setIsActive(request.getIsActive());
       if (request.getHideAdultContent() != null)
         client.setHideAdultContent(request.getHideAdultContent());
-      if (request.getMaxConnections() != null)
-        client.setMaxConnections(request.getMaxConnections());
       if (request.getNotes() != null) client.setNotes(request.getNotes());
       client.setUpdatedAt(LocalDateTime.now());
 

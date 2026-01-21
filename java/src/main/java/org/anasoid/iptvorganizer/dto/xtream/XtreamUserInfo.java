@@ -33,9 +33,6 @@ public class XtreamUserInfo {
   @JsonProperty("created_at")
   private Long createdAt;
 
-  @JsonProperty("max_connections")
-  private String maxConnections;
-
   @JsonProperty("allowed_output_formats")
   private List<String> allowedOutputFormats;
 }

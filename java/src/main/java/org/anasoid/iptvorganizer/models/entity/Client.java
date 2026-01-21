@@ -2,10 +2,7 @@ package org.anasoid.iptvorganizer.models.entity;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 @Data
@@ -23,7 +20,6 @@ public class Client extends BaseEntity {
   private LocalDate expiryDate;
   private Boolean isActive;
   private Boolean hideAdultContent;
-  private Integer maxConnections;
   private String notes;
   private LocalDateTime lastLogin;
 }

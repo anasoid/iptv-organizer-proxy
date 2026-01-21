@@ -36,8 +36,5 @@ public class CreateClientRequest {
   @JsonProperty("hide_adult_content")
   private Boolean hideAdultContent;
 
-  @JsonProperty("max_connections")
-  private Integer maxConnections;
-
   private String notes;
 }

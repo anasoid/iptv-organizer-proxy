@@ -32,7 +32,6 @@ public class ClientDTO {
   @JsonSerialize(using = BooleanAsIntSerializer.class)
   private Boolean hideAdultContent;
 
-  private Integer maxConnections;
   private LocalDateTime lastLogin;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
@@ -51,7 +50,6 @@ public class ClientDTO {
         .expiryDate(entity.getExpiryDate())
         .isActive(entity.getIsActive())
         .hideAdultContent(entity.getHideAdultContent())
-        .maxConnections(entity.getMaxConnections())
         .lastLogin(entity.getLastLogin())
         .createdAt(entity.getCreatedAt())
         .updatedAt(entity.getUpdatedAt())

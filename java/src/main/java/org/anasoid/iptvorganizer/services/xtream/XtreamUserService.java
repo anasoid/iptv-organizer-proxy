@@ -309,8 +309,6 @@ public class XtreamUserService {
             .isTrial("0")
             .activeConnections("0")
             .createdAt(System.currentTimeMillis() / 1000)
-            .maxConnections(
-                String.valueOf(client.getMaxConnections() != null ? client.getMaxConnections() : 1))
             .allowedOutputFormats(List.of("m3u8", "ts", "rtmp"))
             .build();
 

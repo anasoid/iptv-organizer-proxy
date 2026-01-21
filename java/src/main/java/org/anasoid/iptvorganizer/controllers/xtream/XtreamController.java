@@ -16,7 +16,8 @@ import jakarta.ws.rs.core.UriInfo;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.logging.Logger;
+import java.util.logging.Level;
+import lombok.extern.java.Log;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
@@ -42,9 +43,8 @@ import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
  */
 @Path("/player_api.php")
 @ApplicationScoped
+@Log
 public class XtreamController {
-
-  private static final Logger LOGGER = Logger.getLogger(XtreamController.class.getName());
 
   @Inject XtreamUserService xtreamUserService;
   @Inject ClientRepository clientRepository;
@@ -87,19 +87,19 @@ public class XtreamController {
       return handleAction(action, client, source, categoryId);
 
     } catch (UnauthorizedException ex) {
-      LOGGER.warning("Unauthorized Xtream API request: " + ex.getMessage());
+      log.warning("Unauthorized Xtream API request: " + ex.getMessage());
       return Response.status(Response.Status.UNAUTHORIZED)
           .entity("{\"error\":\"" + ex.getMessage() + "\"}")
           .header("Content-Type", MediaType.APPLICATION_JSON)
           .build();
     } catch (ForbiddenException ex) {
-      LOGGER.warning("Forbidden Xtream API request: " + ex.getMessage());
+      log.warning("Forbidden Xtream API request: " + ex.getMessage());
       return Response.status(Response.Status.FORBIDDEN)
           .entity("{\"error\":\"" + ex.getMessage() + "\"}")
           .header("Content-Type", MediaType.APPLICATION_JSON)
           .build();
     } catch (Exception ex) {
-      LOGGER.severe("Error in Xtream API request: " + ex.getMessage());
+      log.log(Level.SEVERE, "Error in Xtream API request: ", ex);
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity("{\"error\":\"Internal server error\"}")
           .header("Content-Type", MediaType.APPLICATION_JSON)
@@ -126,7 +126,7 @@ public class XtreamController {
       return Response.ok(authResponse).header("Content-Type", MediaType.APPLICATION_JSON).build();
 
     } catch (RuntimeException ex) {
-      LOGGER.warning("Authentication failed: " + ex.getMessage());
+      log.warning("Authentication failed: " + ex.getMessage());
       return Response.status(Response.Status.UNAUTHORIZED)
           .entity("{\"error\":\"" + ex.getMessage() + "\"}")
           .header("Content-Type", MediaType.APPLICATION_JSON)
@@ -165,14 +165,14 @@ public class XtreamController {
           return streamJsonArray(xtreamUserService.getSeries(client, source, categoryId));
 
         default:
-          LOGGER.warning("Unknown Xtream API action: " + action);
+          log.warning("Unknown Xtream API action: " + action);
           return Response.status(Response.Status.BAD_REQUEST)
               .entity("{\"error\":\"Unknown action\"}")
               .header("Content-Type", MediaType.APPLICATION_JSON)
               .build();
       }
     } catch (Exception ex) {
-      LOGGER.severe("Error handling Xtream action " + action + ": " + ex.getMessage());
+      log.log(Level.SEVERE, "Error handling Xtream action " + action, ex);
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity("{\"error\":\"Internal server error\"}")
           .header("Content-Type", MediaType.APPLICATION_JSON)
@@ -207,12 +207,12 @@ public class XtreamController {
                     os.write(']');
                     os.flush();
                   } catch (IOException ex) {
-                    LOGGER.severe("Error streaming JSON: " + ex.getMessage());
+                    log.log(Level.SEVERE, "Error streaming JSON: ", ex);
                   } finally {
                     try {
                       jsonStreamResult.close();
                     } catch (IOException ex) {
-                      LOGGER.warning("Error closing stream: " + ex.getMessage());
+                      log.warning("Error closing stream: " + ex.getMessage());
                     }
                   }
                 })
