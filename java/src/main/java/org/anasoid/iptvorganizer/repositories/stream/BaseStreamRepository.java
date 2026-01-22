@@ -2,6 +2,7 @@ package org.anasoid.iptvorganizer.repositories.stream;
 
 import jakarta.transaction.Transactional;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
@@ -48,6 +49,19 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
       throw new RuntimeException("Failed to find by source and category in " + getTableName(), e);
     }
     return results;
+  }
+
+  /**
+   * Stream entities by source ID using lazy iterator for O(1) memory usage.
+   *
+   * <p>Returns a JdbcStreamIterator that fetches rows one at a time from the database instead of
+   * loading all into memory. This is the streaming equivalent of findBySourceId().
+   *
+   * @param sourceId The source ID to filter by
+   * @return Iterator that streams rows from the database
+   */
+  public Iterator<T> streamBySourceId(Long sourceId) {
+    return super.streamBySourceId(sourceId);
   }
 
   /**

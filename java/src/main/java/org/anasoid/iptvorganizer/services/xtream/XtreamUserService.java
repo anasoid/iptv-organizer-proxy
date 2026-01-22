@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -237,11 +237,11 @@ public class XtreamUserService {
     try {
       JsonStreamResult<Map<?, ?>> result =
           getFilteredStreamsByType(client, source, StreamType.LIVE, categoryId);
-      // Materialize all streams to Maps BEFORE clearing context
-      List<Map<?, ?>> materialized = new ArrayList<>();
-      result.iterator().forEachRemaining(materialized::add);
-      return new JsonStreamResult<>(materialized.iterator(), new AtomicLong(0), null);
+      // Wrap iterator to clear context after iteration completes
+      return wrapWithContextCleanup(result, contentFilterService);
     } finally {
+      // Note: clearContext will be called again by the wrapped iterator when iteration completes
+      // Explicit clear here handles early return/exception cases
       contentFilterService.clearContext();
     }
   }
@@ -259,11 +259,11 @@ public class XtreamUserService {
     try {
       JsonStreamResult<Map<?, ?>> result =
           getFilteredStreamsByType(client, source, StreamType.VOD, categoryId);
-      // Materialize all streams to Maps BEFORE clearing context
-      List<Map<?, ?>> materialized = new ArrayList<>();
-      result.iterator().forEachRemaining(materialized::add);
-      return new JsonStreamResult<>(materialized.iterator(), new AtomicLong(0), null);
+      // Wrap iterator to clear context after iteration completes
+      return wrapWithContextCleanup(result, contentFilterService);
     } finally {
+      // Note: clearContext will be called again by the wrapped iterator when iteration completes
+      // Explicit clear here handles early return/exception cases
       contentFilterService.clearContext();
     }
   }
@@ -281,11 +281,11 @@ public class XtreamUserService {
     try {
       JsonStreamResult<Map<?, ?>> result =
           getFilteredStreamsByType(client, source, StreamType.SERIES, categoryId);
-      // Materialize all series to Maps BEFORE clearing context
-      List<Map<?, ?>> materialized = new ArrayList<>();
-      result.iterator().forEachRemaining(materialized::add);
-      return new JsonStreamResult<>(materialized.iterator(), new AtomicLong(0), null);
+      // Wrap iterator to clear context after iteration completes
+      return wrapWithContextCleanup(result, contentFilterService);
     } finally {
+      // Note: clearContext will be called again by the wrapped iterator when iteration completes
+      // Explicit clear here handles early return/exception cases
       contentFilterService.clearContext();
     }
   }
@@ -384,6 +384,86 @@ public class XtreamUserService {
         .timestampNow(System.currentTimeMillis() / 1000)
         .timeNow(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date()))
         .build();
+  }
+
+  /**
+   * Convert a single stream to Xtream Map format (lazy conversion).
+   *
+   * <p>Maps a BaseStream entity to a Map<String, Object> with Xtream API fields. This is called
+   * once per item during iteration, not for all items upfront.
+   *
+   * @param stream The stream entity to convert
+   * @return Map with Xtream API format fields
+   */
+  private Map<?, ?> convertStreamToMap(BaseStream stream) {
+    Map<String, Object> map = new HashMap<>();
+    // Materialize properties one at a time for this stream
+    map.put("num", stream.getNum());
+    map.put("name", stream.getName());
+    map.put("stream_id", stream.getExternalId());
+    map.put("stream_icon", "");
+    map.put("category_id", stream.getCategoryId());
+    map.put("added", stream.getAddedDate() != null ? stream.getAddedDate().toString() : "");
+    map.put("is_adult", stream.getIsAdult() ? "1" : "0");
+    map.put("category_ids", stream.getCategoryIds());
+
+    // Include raw JSON data if available
+    if (stream.getData() != null && !stream.getData().isEmpty()) {
+      try {
+        Map<String, Object> rawData = objectMapper.readValue(stream.getData(), Map.class);
+        // Merge raw data with our standardized fields
+        rawData.forEach(
+            (key, value) -> {
+              if (!map.containsKey(key)) {
+                map.put(key, value);
+              }
+            });
+      } catch (Exception e) {
+        LOGGER.warning(
+            "Failed to parse stream data for stream "
+                + stream.getExternalId()
+                + ": "
+                + e.getMessage());
+      }
+    }
+
+    return (Map<?, ?>) (Object) map;
+  }
+
+  /**
+   * Wrap a JsonStreamResult iterator to automatically clear ContentFilterService context after
+   * iteration completes.
+   *
+   * <p>Useful for ensuring context cleanup happens when iteration ends (either normally or via
+   * exception).
+   *
+   * @param result The stream result with items
+   * @param filterService The filter service to clear
+   * @return Wrapped stream result with context cleanup
+   */
+  private JsonStreamResult<Map<?, ?>> wrapWithContextCleanup(
+      JsonStreamResult<Map<?, ?>> result, ContentFilterService filterService) {
+
+    Iterator<Map<?, ?>> wrapped =
+        new Iterator<Map<?, ?>>() {
+          private final Iterator<Map<?, ?>> delegate = result.iterator();
+
+          @Override
+          public boolean hasNext() {
+            boolean has = delegate.hasNext();
+            if (!has) {
+              filterService.clearContext(); // Auto-clear when iteration complete
+            }
+            return has;
+          }
+
+          @Override
+          public Map<?, ?> next() {
+            return delegate.next();
+          }
+        };
+
+    return new JsonStreamResult<>(wrapped, new AtomicLong(0), result);
   }
 
   /**
@@ -533,7 +613,7 @@ public class XtreamUserService {
 
   /**
    * Get streams by type from local database (synchronized from Xtream API). Streams are loaded
-   * on-demand from database instead of making real-time calls to upstream API.
+   * on-demand from database using lazy iterator instead of loading all into memory.
    *
    * @param source The source
    * @param type The stream type
@@ -542,23 +622,66 @@ public class XtreamUserService {
    */
   private JsonStreamResult<Map<?, ?>> getStreamsByType(
       Source source, StreamType type, Long categoryId) {
-    List<? extends BaseStream> streams = null;
+    final Iterator<? extends BaseStream> streamIterator;
 
     switch (type) {
       case LIVE:
-        streams = liveStreamService.findBySourceId(source.getId());
+        streamIterator = liveStreamService.streamBySourceId(source.getId());
         break;
       case VOD:
-        streams = vodStreamService.findBySourceId(source.getId());
+        streamIterator = vodStreamService.streamBySourceId(source.getId());
         break;
       case SERIES:
-        streams = seriesService.findBySourceId(source.getId());
+        streamIterator = seriesService.streamBySourceId(source.getId());
         break;
       default:
         throw new IllegalArgumentException("Unknown stream type: " + type);
     }
 
-    // Convert stream entities to Xtream API format and wrap in JsonStreamResult
-    return convertStreamsToJsonStream(streams);
+    // Wrap with lazy Map conversion (single item at a time)
+    Iterator<Map<?, ?>> mapIterator = new MappingIterator(streamIterator);
+
+    return new JsonStreamResult<>(
+        mapIterator, new AtomicLong(0), () -> closeIterator(streamIterator));
+  }
+
+  /**
+   * Close iterator if it implements Closeable
+   *
+   * @param iterator The iterator to close
+   */
+  private void closeIterator(Iterator<?> iterator) {
+    if (iterator instanceof AutoCloseable) {
+      try {
+        ((AutoCloseable) iterator).close();
+      } catch (Exception e) {
+        LOGGER.warning("Failed to close iterator: " + e.getMessage());
+      }
+    }
+  }
+
+  /**
+   * Lazy mapping iterator that converts BaseStream to Map on-demand.
+   *
+   * <p>Single item conversion only - materializes one stream to Map at a time while
+   * ContentFilterService context is active.
+   */
+  private class MappingIterator implements Iterator<Map<?, ?>> {
+    private final Iterator<? extends BaseStream> delegate;
+
+    MappingIterator(Iterator<? extends BaseStream> delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public boolean hasNext() {
+      return delegate.hasNext();
+    }
+
+    @Override
+    public Map<?, ?> next() {
+      BaseStream stream = delegate.next();
+      return convertStreamToMap(stream); // Single item conversion
+    }
   }
 }

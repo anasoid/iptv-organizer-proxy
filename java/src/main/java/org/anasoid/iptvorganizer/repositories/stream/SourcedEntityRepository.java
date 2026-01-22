@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import java.util.*;
 import org.anasoid.iptvorganizer.models.entity.stream.SourcedEntity;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
+import org.anasoid.iptvorganizer.utils.streaming.JdbcStreamIterator;
 
 /**
  * Base repository for entities that belong to a source and have ordering.
@@ -32,6 +33,33 @@ public abstract class SourcedEntityRepository<T extends SourcedEntity> extends B
       throw new RuntimeException("Failed to find by source id in " + getTableName(), e);
     }
     return results;
+  }
+
+  /**
+   * Stream entities by source ID using lazy iterator for O(1) memory usage.
+   *
+   * <p>Returns a JdbcStreamIterator that fetches rows one at a time from the database instead of
+   * loading all into memory. The iterator manages its own Connection/Statement/ResultSet lifecycle
+   * and closes them automatically when iteration completes or when close() is called.
+   *
+   * @param sourceId The source ID to filter by
+   * @return Iterator that streams rows from the database
+   */
+  public Iterator<T> streamBySourceId(Long sourceId) {
+    String sql =
+        "SELECT * FROM " + getTableName() + " WHERE source_id = ? ORDER BY num ASC, id DESC";
+    try {
+      Connection conn = dataSource.getConnection();
+      PreparedStatement stmt = conn.prepareStatement(sql);
+      stmt.setLong(1, sourceId);
+      ResultSet rs = stmt.executeQuery();
+
+      // Return lazy iterator (resources closed when iteration completes)
+      return new JdbcStreamIterator<>(conn, stmt, rs, this::mapRow);
+
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to stream by source id in " + getTableName(), e);
+    }
   }
 
   /** Find external IDs by source ID */
