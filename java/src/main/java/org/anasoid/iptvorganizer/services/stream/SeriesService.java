@@ -27,14 +27,19 @@ public class SeriesService extends BaseService<Series, SeriesRepository> {
     return repository.insert(series);
   }
 
-  /** Find streams by source and category - stub for future database query implementation */
-  public java.util.List<Series> findBySourceAndCategory(
-      Long sourceId, Integer categoryId, int limit) {
-    return java.util.Collections.emptyList();
+  /** Find all streams by source ID from database */
+  public java.util.List<Series> findBySourceId(Long sourceId) {
+    return repository.findBySourceId(sourceId);
   }
 
-  /** Find stream by source and stream_id - stub for future database query implementation */
+  /** Find streams by source and category from database */
+  public java.util.List<Series> findBySourceAndCategory(
+      Long sourceId, Integer categoryId, int limit) {
+    return repository.findBySourceAndCategory(sourceId, categoryId, limit);
+  }
+
+  /** Find stream by source and external stream ID from database */
   public Series findBySourceAndStreamId(Long sourceId, Integer streamId) {
-    return null;
+    return repository.findBySourceAndStreamId(sourceId, streamId);
   }
 }

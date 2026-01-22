@@ -190,6 +190,7 @@ public class XtreamController {
     return Response.ok(
             (StreamingOutput)
                 os -> {
+                  int itemCount = 0;
                   try {
                     os.write('[');
                     Iterator<Map<?, ?>> iterator = jsonStreamResult.iterator();
@@ -200,14 +201,26 @@ public class XtreamController {
                         os.write(',');
                       }
                       Map<?, ?> item = iterator.next();
-                      objectMapper.writeValue(os, item);
+                      // writeValueAsBytes instead of writeValue to avoid closing the stream
+                      byte[] jsonBytes = objectMapper.writeValueAsBytes(item);
+                      os.write(jsonBytes);
+                      itemCount++;
                       isFirst = false;
                     }
 
+                    log.fine("Completed streaming JSON array. Total items: " + itemCount);
                     os.write(']');
                     os.flush();
                   } catch (IOException ex) {
-                    log.log(Level.SEVERE, "Error streaming JSON: ", ex);
+                    // Log but don't throw - response is already being sent
+                    if (ex.getMessage() != null && !ex.getMessage().contains("Stream is closed")) {
+                      log.log(
+                          Level.SEVERE,
+                          "Error streaming JSON (items written: " + itemCount + "): ",
+                          ex);
+                    } else {
+                      log.fine("Stream closed during JSON output: " + ex.getMessage());
+                    }
                   } finally {
                     try {
                       jsonStreamResult.close();

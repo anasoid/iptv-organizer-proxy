@@ -1,6 +1,7 @@
 package org.anasoid.iptvorganizer.repositories.stream;
 
 import jakarta.transaction.Transactional;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
@@ -17,6 +18,47 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
   @Transactional
   public int insertOrUpdateByExternalId(List<T> entities) {
     return internalInsertOrUpdateByExternalId(entities);
+  }
+
+  /**
+   * Find streams by source ID and category ID with limit. Used for lazy loading and filtering.
+   *
+   * @param sourceId The source ID
+   * @param categoryId The category ID (external_id)
+   * @param limit Maximum number of streams to return
+   * @return List of streams for the category
+   */
+  public List<T> findBySourceAndCategory(Long sourceId, Integer categoryId, int limit) {
+    List<T> results = new ArrayList<>();
+    String sql =
+        "SELECT * FROM "
+            + getTableName()
+            + " WHERE source_id = ? AND category_id = ? ORDER BY num ASC, id DESC LIMIT ?";
+    try (java.sql.Connection conn = dataSource.getConnection();
+        java.sql.PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+      stmt.setInt(2, categoryId);
+      stmt.setInt(3, limit);
+      try (java.sql.ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          results.add(mapRow(rs));
+        }
+      }
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException("Failed to find by source and category in " + getTableName(), e);
+    }
+    return results;
+  }
+
+  /**
+   * Find stream by source ID and external stream ID.
+   *
+   * @param sourceId The source ID
+   * @param externalId The external stream ID
+   * @return The stream or null if not found
+   */
+  public T findBySourceAndStreamId(Long sourceId, Integer externalId) {
+    return findByExternalId(externalId, sourceId);
   }
 
   /**
