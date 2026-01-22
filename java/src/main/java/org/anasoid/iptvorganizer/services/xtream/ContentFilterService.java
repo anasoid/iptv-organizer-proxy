@@ -40,58 +40,40 @@ public class ContentFilterService {
   @Inject SeriesService seriesService;
   @Inject FilterRepository filterRepository;
 
-  // Per-request context (thread-safe with ApplicationScoped and proper usage)
-  private ThreadLocal<FilterContext> contextThreadLocal = new ThreadLocal<>();
-
   /**
-   * Initialize filtering context for a client. Must be called before filtering operations and
-   * cleaned up with {@link #clearContext()} when done.
+   * Build filtering context for a client. Creates a context with the client's filter settings and
+   * adult content preferences.
    *
-   * @param client The client to initialize filtering for
+   * @param client The client to build filtering context for
+   * @return FilterContext with client's filtering configuration
    */
-  public void initializeContext(Client client) {
+  public FilterContext buildFilterContext(Client client) {
     FilterContext context = new FilterContext();
 
     // Set adult content hiding
-    context.hideAdultContent = client.getHideAdultContent() != null && client.getHideAdultContent();
+    context.setHideAdultContent(
+        client.getHideAdultContent() != null && client.getHideAdultContent());
 
     // Load and cache filter if assigned
     if (client.getFilterId() != null) {
       Filter filter = filterRepository.findById(client.getFilterId());
       if (filter != null && Boolean.TRUE.equals(filter.getUseSourceFilter())) {
-        context.filter = filter;
-        context.filterConfig = filterService.getCachedFilterConfig(filter);
+        context.setFilter(filter);
+        context.setFilterConfig(filterService.getCachedFilterConfig(filter));
       }
     }
 
-    contextThreadLocal.set(context);
-  }
-
-  /**
-   * Clear the current filtering context. Must be called after filtering operations to prevent
-   * memory leaks.
-   */
-  public void clearContext() {
-    contextThreadLocal.remove();
-  }
-
-  /**
-   * Get the current filtering context. Returns null if not initialized.
-   *
-   * @return Current FilterContext or null
-   */
-  private FilterContext getContext() {
-    return contextThreadLocal.get();
+    return context;
   }
 
   /**
    * Check if filtering is enabled (filter assigned and active).
    *
+   * @param context The filtering context
    * @return true if filtering is enabled
    */
-  private boolean isFilteringEnabled() {
-    FilterContext ctx = getContext();
-    return ctx != null && ctx.filter != null && ctx.filterConfig != null;
+  private boolean isFilteringEnabled(FilterContext context) {
+    return context != null && context.getFilter() != null && context.getFilterConfig() != null;
   }
 
   /**
@@ -101,6 +83,7 @@ public class ContentFilterService {
    * 3. Category allow_deny=null - shown if contains at least 1 accessible stream 4. Applied filter
    * rules (PHP-compatible)
    *
+   * @param context The filtering context
    * @param sourceId ID of the source
    * @param streamType Stream type (live, vod, series)
    * @param limit Number of categories to fetch
@@ -108,11 +91,9 @@ public class ContentFilterService {
    * @return Filtered list of categories
    */
   public List<Category> getAllowedCategories(
-      Long sourceId, String streamType, int limit, int offset) {
-    FilterContext ctx = getContext();
-    if (ctx == null) {
-      throw new IllegalStateException(
-          "ContentFilterService not initialized. Call initializeContext() first.");
+      FilterContext context, Long sourceId, String streamType, int limit, int offset) {
+    if (context == null) {
+      throw new IllegalArgumentException("FilterContext cannot be null");
     }
 
     // Load categories from database
@@ -120,7 +101,7 @@ public class ContentFilterService {
         categoryService.findBySourceAndTypePaged(sourceId, streamType, limit, offset);
 
     // If no filtering needed, return all
-    if (!isFilteringEnabled() && !ctx.hideAdultContent) {
+    if (!isFilteringEnabled(context) && !context.isHideAdultContent()) {
       return allCategories;
     }
 
@@ -143,7 +124,7 @@ public class ContentFilterService {
       }
 
       // No explicit setting - check if category has accessible streams
-      if (hasAccessibleStreams(sourceId, category, streamType)) {
+      if (hasAccessibleStreams(context, sourceId, category, streamType)) {
         result.add(category);
       }
     }
@@ -154,14 +135,14 @@ public class ContentFilterService {
   /**
    * Check if a category has at least one accessible stream after filtering.
    *
+   * @param context The filtering context
    * @param sourceId ID of the source
    * @param category Category to check
    * @param streamType Stream type
    * @return true if category has at least one accessible stream
    */
-  private boolean hasAccessibleStreams(Long sourceId, Category category, String streamType) {
-    FilterContext ctx = getContext();
-
+  private boolean hasAccessibleStreams(
+      FilterContext context, Long sourceId, Category category, String streamType) {
     // Query first N streams in category (optimization)
     List<? extends BaseStream> streams =
         getStreamsByCategory(
@@ -169,7 +150,7 @@ public class ContentFilterService {
 
     // Check if any stream passes filtering
     for (BaseStream stream : streams) {
-      if (shouldIncludeStream(stream, category)) {
+      if (shouldIncludeStream(context, stream, category)) {
         return true; // Found at least one accessible stream
       }
     }
@@ -181,21 +162,21 @@ public class ContentFilterService {
    * Apply filtering to a stream list. Checks each stream against allow_deny rules, filter rules,
    * and adult content setting.
    *
+   * @param context The filtering context
    * @param streams Streams to filter
    * @param categoryCache Map of category ID → Category
    * @return Filtered streams
    */
   public List<BaseStream> applyFiltersToStreams(
-      List<BaseStream> streams, Map<Integer, Category> categoryCache) {
-    FilterContext ctx = getContext();
-    if (ctx == null) {
+      FilterContext context, List<BaseStream> streams, Map<Integer, Category> categoryCache) {
+    if (context == null) {
       return streams; // No context = no filtering
     }
 
     List<BaseStream> filtered = new ArrayList<>();
 
     for (BaseStream stream : streams) {
-      if (shouldIncludeStream(stream, categoryCache.get(stream.getCategoryId()))) {
+      if (shouldIncludeStream(context, stream, categoryCache.get(stream.getCategoryId()))) {
         filtered.add(stream);
       }
     }
@@ -204,24 +185,24 @@ public class ContentFilterService {
   }
 
   /**
-   * Check if a single stream should be included based on current filtering context.
+   * Check if a single stream should be included based on filtering context.
    *
    * <p>Uses priority-based filtering: 1. Stream allow_deny='allow' → ALWAYS INCLUDE 2. Stream
    * allow_deny='deny' → ALWAYS EXCLUDE 3. Category allow_deny='allow' → INCLUDE 4. Category
    * allow_deny='deny' → EXCLUDE 5. Adult content filter 6. Filter rules (first-match-wins)
    *
+   * @param context The filtering context
    * @param stream Stream to check
    * @param category Stream's category
    * @return true if stream should be included
    */
-  public boolean shouldIncludeStream(BaseStream stream, Category category) {
-    FilterContext ctx = getContext();
-    if (ctx == null) {
+  public boolean shouldIncludeStream(FilterContext context, BaseStream stream, Category category) {
+    if (context == null) {
       return true; // No context = include all
     }
 
     return filterService.shouldIncludeStream(
-        stream, category, ctx.filterConfig, ctx.hideAdultContent);
+        stream, category, context.getFilterConfig(), context.isHideAdultContent());
   }
 
   /**
@@ -266,19 +247,12 @@ public class ContentFilterService {
   }
 
   /**
-   * Get cached filter configuration for current context.
+   * Get cached filter configuration for the given context.
    *
+   * @param context The filtering context
    * @return Filter configuration or null if no filter is active
    */
-  public FilterConfig getCachedFilterConfig() {
-    FilterContext ctx = getContext();
-    return ctx != null ? ctx.filterConfig : null;
-  }
-
-  /** Internal context class to hold filtering state for a client. */
-  private static class FilterContext {
-    Filter filter;
-    FilterConfig filterConfig;
-    boolean hideAdultContent = false;
+  public FilterConfig getCachedFilterConfig(FilterContext context) {
+    return context != null ? context.getFilterConfig() : null;
   }
 }

@@ -9,6 +9,7 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import java.util.Base64;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
@@ -24,6 +25,7 @@ import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
 import org.anasoid.iptvorganizer.services.stream.SeriesService;
 import org.anasoid.iptvorganizer.services.stream.VodStreamService;
 import org.anasoid.iptvorganizer.services.xtream.ContentFilterService;
+import org.anasoid.iptvorganizer.services.xtream.FilterContext;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
 import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
 
@@ -268,17 +270,11 @@ public class StreamDataController {
           categoryService.findBySourceAndCategoryId(
               source.getId(), stream.getCategoryId(), streamTypeCategory);
 
-      // Initialize filtering and check access
-      contentFilterService.initializeContext(client);
-      try {
-        // Use FilterService to check if stream passes all filters
-        return contentFilterService.shouldIncludeStream(stream, category);
-      } finally {
-        contentFilterService.clearContext();
-      }
+      // Build filtering context and check access
+      FilterContext context = contentFilterService.buildFilterContext(client);
+      return contentFilterService.shouldIncludeStream(context, stream, category);
     } catch (Exception e) {
-      LOGGER.severe("Error checking stream access: " + e.getMessage());
-      e.printStackTrace();
+      LOGGER.log(Level.SEVERE, "Error checking stream access: ", e);
       return false; // Deny access on error
     }
   }

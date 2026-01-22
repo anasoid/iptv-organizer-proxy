@@ -167,17 +167,17 @@ public class XtreamUserService {
    * @return Stream result with lazy Iterator of categories
    */
   public JsonStreamResult<Map<?, ?>> getLiveCategories(Client client, Source source) {
-    contentFilterService.initializeContext(client);
-    try {
-      List<Category> categories =
-          contentFilterService.getAllowedCategories(
-              source.getId(), StreamType.LIVE.getCategoryType(), DEFAULT_PAGINATION_LIMIT, 0);
-      // Materialize all data to Maps BEFORE clearing context
-      List<Map<?, ?>> categoryMaps = materializeCategories(categories);
-      return new JsonStreamResult<>(categoryMaps.iterator(), new AtomicLong(0), null);
-    } finally {
-      contentFilterService.clearContext();
-    }
+    FilterContext context = contentFilterService.buildFilterContext(client);
+    List<Category> categories =
+        contentFilterService.getAllowedCategories(
+            context,
+            source.getId(),
+            StreamType.LIVE.getCategoryType(),
+            DEFAULT_PAGINATION_LIMIT,
+            0);
+    // Materialize all data to Maps
+    List<Map<?, ?>> categoryMaps = materializeCategories(categories);
+    return new JsonStreamResult<>(categoryMaps.iterator(), new AtomicLong(0), null);
   }
 
   /**
@@ -188,17 +188,13 @@ public class XtreamUserService {
    * @return Stream result with lazy Iterator of categories
    */
   public JsonStreamResult<Map<?, ?>> getVodCategories(Client client, Source source) {
-    contentFilterService.initializeContext(client);
-    try {
-      List<Category> categories =
-          contentFilterService.getAllowedCategories(
-              source.getId(), StreamType.VOD.getCategoryType(), DEFAULT_PAGINATION_LIMIT, 0);
-      // Materialize all data to Maps BEFORE clearing context
-      List<Map<?, ?>> categoryMaps = materializeCategories(categories);
-      return new JsonStreamResult<>(categoryMaps.iterator(), new AtomicLong(0), null);
-    } finally {
-      contentFilterService.clearContext();
-    }
+    FilterContext context = contentFilterService.buildFilterContext(client);
+    List<Category> categories =
+        contentFilterService.getAllowedCategories(
+            context, source.getId(), StreamType.VOD.getCategoryType(), DEFAULT_PAGINATION_LIMIT, 0);
+    // Materialize all data to Maps
+    List<Map<?, ?>> categoryMaps = materializeCategories(categories);
+    return new JsonStreamResult<>(categoryMaps.iterator(), new AtomicLong(0), null);
   }
 
   /**
@@ -209,19 +205,19 @@ public class XtreamUserService {
    * @return Stream result with lazy Iterator of categories
    */
   public JsonStreamResult<Map<?, ?>> getSeriesCategories(Client client, Source source) {
-    contentFilterService.initializeContext(client);
-    try {
-      List<Category> categories =
-          contentFilterService.getAllowedCategories(
-              source.getId(), StreamType.SERIES.getCategoryType(), DEFAULT_PAGINATION_LIMIT, 0);
-      LOGGER.info("Found " + categories.size() + " series categories before materialization");
-      // Materialize all data to Maps BEFORE clearing context
-      List<Map<?, ?>> categoryMaps = materializeCategories(categories);
-      LOGGER.info("Materialized " + categoryMaps.size() + " series category maps");
-      return new JsonStreamResult<>(categoryMaps.iterator(), new AtomicLong(0), null);
-    } finally {
-      contentFilterService.clearContext();
-    }
+    FilterContext context = contentFilterService.buildFilterContext(client);
+    List<Category> categories =
+        contentFilterService.getAllowedCategories(
+            context,
+            source.getId(),
+            StreamType.SERIES.getCategoryType(),
+            DEFAULT_PAGINATION_LIMIT,
+            0);
+    LOGGER.info("Found " + categories.size() + " series categories before materialization");
+    // Materialize all data to Maps
+    List<Map<?, ?>> categoryMaps = materializeCategories(categories);
+    LOGGER.info("Materialized " + categoryMaps.size() + " series category maps");
+    return new JsonStreamResult<>(categoryMaps.iterator(), new AtomicLong(0), null);
   }
 
   /**
@@ -233,17 +229,8 @@ public class XtreamUserService {
    * @return Stream result with lazy Iterator of streams
    */
   public JsonStreamResult<Map<?, ?>> getLiveStreams(Client client, Source source, Long categoryId) {
-    contentFilterService.initializeContext(client);
-    try {
-      JsonStreamResult<Map<?, ?>> result =
-          getFilteredStreamsByType(client, source, StreamType.LIVE, categoryId);
-      // Wrap iterator to clear context after iteration completes
-      return wrapWithContextCleanup(result, contentFilterService);
-    } finally {
-      // Note: clearContext will be called again by the wrapped iterator when iteration completes
-      // Explicit clear here handles early return/exception cases
-      contentFilterService.clearContext();
-    }
+    FilterContext context = contentFilterService.buildFilterContext(client);
+    return getFilteredStreamsByType(context, client, source, StreamType.LIVE, categoryId);
   }
 
   /**
@@ -255,17 +242,8 @@ public class XtreamUserService {
    * @return Stream result with lazy Iterator of streams
    */
   public JsonStreamResult<Map<?, ?>> getVodStreams(Client client, Source source, Long categoryId) {
-    contentFilterService.initializeContext(client);
-    try {
-      JsonStreamResult<Map<?, ?>> result =
-          getFilteredStreamsByType(client, source, StreamType.VOD, categoryId);
-      // Wrap iterator to clear context after iteration completes
-      return wrapWithContextCleanup(result, contentFilterService);
-    } finally {
-      // Note: clearContext will be called again by the wrapped iterator when iteration completes
-      // Explicit clear here handles early return/exception cases
-      contentFilterService.clearContext();
-    }
+    FilterContext context = contentFilterService.buildFilterContext(client);
+    return getFilteredStreamsByType(context, client, source, StreamType.VOD, categoryId);
   }
 
   /**
@@ -277,17 +255,8 @@ public class XtreamUserService {
    * @return Stream result with lazy Iterator of series
    */
   public JsonStreamResult<Map<?, ?>> getSeries(Client client, Source source, Long categoryId) {
-    contentFilterService.initializeContext(client);
-    try {
-      JsonStreamResult<Map<?, ?>> result =
-          getFilteredStreamsByType(client, source, StreamType.SERIES, categoryId);
-      // Wrap iterator to clear context after iteration completes
-      return wrapWithContextCleanup(result, contentFilterService);
-    } finally {
-      // Note: clearContext will be called again by the wrapped iterator when iteration completes
-      // Explicit clear here handles early return/exception cases
-      contentFilterService.clearContext();
-    }
+    FilterContext context = contentFilterService.buildFilterContext(client);
+    return getFilteredStreamsByType(context, client, source, StreamType.SERIES, categoryId);
   }
 
   /**
@@ -431,42 +400,6 @@ public class XtreamUserService {
   }
 
   /**
-   * Wrap a JsonStreamResult iterator to automatically clear ContentFilterService context after
-   * iteration completes.
-   *
-   * <p>Useful for ensuring context cleanup happens when iteration ends (either normally or via
-   * exception).
-   *
-   * @param result The stream result with items
-   * @param filterService The filter service to clear
-   * @return Wrapped stream result with context cleanup
-   */
-  private JsonStreamResult<Map<?, ?>> wrapWithContextCleanup(
-      JsonStreamResult<Map<?, ?>> result, ContentFilterService filterService) {
-
-    Iterator<Map<?, ?>> wrapped =
-        new Iterator<Map<?, ?>>() {
-          private final Iterator<Map<?, ?>> delegate = result.iterator();
-
-          @Override
-          public boolean hasNext() {
-            boolean has = delegate.hasNext();
-            if (!has) {
-              filterService.clearContext(); // Auto-clear when iteration complete
-            }
-            return has;
-          }
-
-          @Override
-          public Map<?, ?> next() {
-            return delegate.next();
-          }
-        };
-
-    return new JsonStreamResult<>(wrapped, new AtomicLong(0), result);
-  }
-
-  /**
    * Materialize categories to Maps (fully resolve lazy-loaded properties while context is active)
    *
    * @param categories List of categories
@@ -562,6 +495,7 @@ public class XtreamUserService {
   /**
    * Get filtered streams by type
    *
+   * @param context The filtering context
    * @param client The authenticated client
    * @param source The source
    * @param type The stream type
@@ -569,7 +503,7 @@ public class XtreamUserService {
    * @return Stream result with filtered streams
    */
   private JsonStreamResult<Map<?, ?>> getFilteredStreamsByType(
-      Client client, Source source, StreamType type, Long categoryId) {
+      FilterContext context, Client client, Source source, StreamType type, Long categoryId) {
     // Get raw streams from upstream
     JsonStreamResult<Map<?, ?>> rawStreams = getStreamsByType(source, type, categoryId);
 
@@ -578,18 +512,21 @@ public class XtreamUserService {
         buildCategoryCache(source.getId(), type.getCategoryType());
 
     // Apply filtering to stream iterator
-    return applyStreamFiltering(rawStreams, categoryCache);
+    return applyStreamFiltering(context, rawStreams, categoryCache);
   }
 
   /**
    * Apply filtering to streamed results
    *
+   * @param context The filtering context
    * @param rawStreams Raw stream results from Xtream API
    * @param categoryCache Cached categories for lookups
    * @return Filtered stream results
    */
   private JsonStreamResult<Map<?, ?>> applyStreamFiltering(
-      JsonStreamResult<Map<?, ?>> rawStreams, Map<Integer, Category> categoryCache) {
+      FilterContext context,
+      JsonStreamResult<Map<?, ?>> rawStreams,
+      Map<Integer, Category> categoryCache) {
     // For now, return as-is - filtering would be applied per-stream
     // in a lazy iterator wrapper if needed
     return rawStreams;
