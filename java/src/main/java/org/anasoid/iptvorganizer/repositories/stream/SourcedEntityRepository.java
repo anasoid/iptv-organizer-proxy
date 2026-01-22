@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import java.util.*;
 import org.anasoid.iptvorganizer.models.entity.stream.SourcedEntity;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
+import org.anasoid.iptvorganizer.utils.db.DatabaseUtils;
 import org.anasoid.iptvorganizer.utils.streaming.JdbcStreamIterator;
 
 /**
@@ -42,6 +43,9 @@ public abstract class SourcedEntityRepository<T extends SourcedEntity> extends B
    * loading all into memory. The iterator manages its own Connection/Statement/ResultSet lifecycle
    * and closes them automatically when iteration completes or when close() is called.
    *
+   * <p>Uses database-agnostic streaming configuration that optimizes for each database vendor
+   * (MySQL, PostgreSQL, SQLite, H2).
+   *
    * @param sourceId The source ID to filter by
    * @return Iterator that streams rows from the database
    */
@@ -50,7 +54,15 @@ public abstract class SourcedEntityRepository<T extends SourcedEntity> extends B
         "SELECT * FROM " + getTableName() + " WHERE source_id = ? ORDER BY num ASC, id DESC";
     try {
       Connection conn = dataSource.getConnection();
-      PreparedStatement stmt = conn.prepareStatement(sql);
+      // Use forward-only, read-only result set for streaming (standard JDBC)
+      PreparedStatement stmt =
+          conn.prepareStatement(sql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+
+      // Configure streaming based on database vendor
+      // This applies vendor-specific optimizations (e.g., Integer.MIN_VALUE for MySQL,
+      // positive fetch size + autoCommit=false for PostgreSQL)
+      DatabaseUtils.configureStreamingStatement(stmt, conn);
+
       stmt.setLong(1, sourceId);
       ResultSet rs = stmt.executeQuery();
 
