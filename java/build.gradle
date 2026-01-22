@@ -57,6 +57,9 @@ dependencies {
 
     // JaCoCo for code coverage with Quarkus
     testImplementation 'io.quarkus:quarkus-jacoco'
+
+    // Container image extension for Docker builds
+    implementation 'io.quarkus:quarkus-container-image-docker'
 }
 
 spotless {
