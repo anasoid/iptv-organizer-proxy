@@ -42,11 +42,11 @@ public class SyncManager {
           syncSource(source);
           processed++;
         } catch (Exception e) {
-          log.error("Failed to sync source " + source.getId(), e);
+          log.error("Failed to sync source {}", source.getId(), e);
         }
       }
 
-      log.info("Scheduled sync completed: " + processed + " sources processed");
+      log.info("Scheduled sync completed: {} sources processed", processed);
     } catch (Exception e) {
       log.error("Scheduled sync failed: ", e);
     }
@@ -57,7 +57,7 @@ public class SyncManager {
     // Try to acquire lock first
     boolean lockAcquired = syncLockManager.tryAcquireLock(source.getId(), "full");
     if (!lockAcquired) {
-      log.info("Source " + source.getId() + " is already being synced, skipping");
+      log.info("Source {} is already being synced, skipping", source.getId());
       return new ArrayList<>();
     }
 
@@ -67,7 +67,7 @@ public class SyncManager {
     try {
       return performFullSync(source);
     } catch (Exception e) {
-      log.error("Error during sync for source " + source.getId() + ": " + e.getMessage());
+      log.error("Error during sync for source {}: {}", source.getId(), e.getMessage());
       throw e;
     } finally {
       syncLockManager.releaseLock(source.getId());
@@ -92,11 +92,11 @@ public class SyncManager {
 
   /** Trigger manual full sync for a source from admin panel */
   public void triggerManualSync(Source source) {
-    log.info("Manual sync triggered for source: " + source.getName());
+    log.info("Manual sync triggered for source: {}", source.getName());
 
     boolean lockAcquired = syncLockManager.tryAcquireLock(source.getId(), "manual_full");
     if (!lockAcquired) {
-      log.warn("Source " + source.getId() + " is already syncing, cannot start manual sync");
+      log.warn("Source {} is already syncing, cannot start manual sync", source.getId());
       throw new RuntimeException("Source is already syncing");
     }
 
@@ -116,7 +116,7 @@ public class SyncManager {
    * live_streams, vod_categories, vod_streams, series_categories, series
    */
   public SyncLog triggerManualSyncTask(Source source, String taskType) {
-    log.info("Manual sync triggered for source: " + source.getName() + ", task type: " + taskType);
+    log.info("Manual sync triggered for source: {}, task type: {}", source.getName(), taskType);
 
     // Validate task type
     Set<String> validTaskTypes =
@@ -131,7 +131,7 @@ public class SyncManager {
 
     boolean lockAcquired = syncLockManager.tryAcquireLock(source.getId(), "manual_" + taskType);
     if (!lockAcquired) {
-      log.warn("Source " + source.getId() + " is already syncing");
+      log.warn("Source {} is already syncing", source.getId());
       throw new RuntimeException("Source is already syncing");
     }
 

@@ -6,8 +6,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
-import java.util.logging.Level;
-import lombok.extern.java.Log;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.config.SyncConfig;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
@@ -31,7 +30,7 @@ import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
  * Background sync service using Quarkus Scheduler Syncs live streams, VOD, series, and categories
  * from Xtream API
  */
-@Log
+@Slf4j
 public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
 
   private static final int LOG_THRESHOLD = 1000;
@@ -84,7 +83,7 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
       Function<SynchronizedItemMapParameter, R> mapper,
       String itemType) {
     StreamType type = getStreamType();
-    log.info("Syncing " + type.getStreamTypeName() + " for source: " + source.getName());
+    log.info("Syncing {} for source: {}", type.getStreamTypeName(), source.getName());
 
     LocalDateTime syncStartTime = LocalDateTime.now();
     SyncLog syncLog = initializeSyncLog(source.getId(), type.getCategoryType(), itemType);
@@ -132,7 +131,7 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
             fetchedIds.add(externalId);
           }
 
-          log.fine(() -> "Processing " + type.getStreamTypeName() + " ID: " + item.getExternalId());
+          log.debug("Processing {} ID: {}", type.getStreamTypeName(), item.getExternalId());
 
           batch.add(item);
 
@@ -181,9 +180,11 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
       }
 
       log.info(
-          String.format(
-              "%s - Fetched %d items from source %s (%dkb read)",
-              type.getStreamTypeName(), fetchedIds.size(), source.getName(), bytesRead / 1000));
+          "{} - Fetched {} items from source {} ({}kb read)",
+          type.getStreamTypeName(),
+          fetchedIds.size(),
+          source.getName(),
+          bytesRead / 1000);
 
       // Find items to delete
       List<Integer> existingExternalIds =
@@ -197,10 +198,7 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
 
       if (!toDeleteIds.isEmpty()) {
         log.info(
-            "Deleting "
-                + toDeleteIds.size()
-                + " items, first ID: "
-                + toDeleteIds.iterator().next());
+            "Deleting {} items, first ID: {}", toDeleteIds.size(), toDeleteIds.iterator().next());
         for (Integer toDeleteId : toDeleteIds) {
           synchronizedItemRepository.deleteByExternalId(toDeleteId, source.getId());
         }
@@ -208,14 +206,13 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
 
       long duration = (System.currentTimeMillis() - startTime) / 1000;
       log.info(
-          String.format(
-              "%s - Added: %d, Updated: %d, Deleted: %d, Duration(s): %d, Bytes read: %dkb",
-              type.getStreamTypeName(),
-              added,
-              updated,
-              toDeleteIds.size(),
-              duration,
-              bytesRead / 1000));
+          "{} - Added: {}, Updated: {}, Deleted: {}, Duration(s): {}, Bytes read: {}kb",
+          type.getStreamTypeName(),
+          added,
+          updated,
+          toDeleteIds.size(),
+          duration,
+          bytesRead / 1000);
 
       syncLog.setItemsAdded(syncLog.getItemsAdded() + added);
       syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated);
@@ -223,7 +220,7 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
 
       finalizeSyncLog(syncLog, syncStartTime, null);
     } catch (Exception e) {
-      log.log(Level.SEVERE, "Error syncing " + type.getStreamTypeName() + ": ", e);
+      log.error("Error syncing {}: ", type.getStreamTypeName(), e);
       finalizeSyncLog(syncLog, syncStartTime, e);
       throw e;
     }

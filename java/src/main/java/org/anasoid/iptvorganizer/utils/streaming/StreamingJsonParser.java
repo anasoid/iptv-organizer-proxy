@@ -13,11 +13,11 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
-import lombok.extern.java.Log;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.StreamingException;
 
 @ApplicationScoped
-@Log
+@Slf4j
 public class StreamingJsonParser {
 
   private static final int GC_THRESHOLD = 1000;
@@ -75,17 +75,15 @@ public class StreamingJsonParser {
                   finished = true;
                   parser.close();
                   log.info(
-                      "Stream completed: "
-                          + count
-                          + " items, "
-                          + countingStream.getBytesRead()
-                          + " bytes read");
+                      "Stream completed: {} items, {} bytes read",
+                      count,
+                      countingStream.getBytesRead());
                   return false;
                 }
 
                 nextItem = objectMapper.readValue(parser, targetClass);
                 count++;
-                log.fine(() -> "Parsed item: " + nextItem.getClass().getName());
+                log.debug("Parsed item: {}", nextItem.getClass().getName());
 
                 // Log progress every 1000 items
                 if (count % 1000 == 0) {
@@ -94,7 +92,7 @@ public class StreamingJsonParser {
                   previousByteOffset = location;
                   long duration = System.currentTimeMillis() - startStep;
                   startStep = System.currentTimeMillis();
-                  log.fine(
+                  log.debug(
                       "Parsed item count: "
                           + count
                           + " location bytes: "
@@ -161,7 +159,7 @@ public class StreamingJsonParser {
           }
         }
         parser.close();
-        log.info("Successfully parsed " + itemCount + " JSON nodes from array");
+        log.info("Successfully parsed {} JSON nodes from array", itemCount);
         return results;
       }
       // Handle single JSON object

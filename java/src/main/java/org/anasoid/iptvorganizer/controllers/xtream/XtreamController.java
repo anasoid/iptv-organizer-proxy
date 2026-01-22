@@ -16,8 +16,7 @@ import jakarta.ws.rs.core.UriInfo;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.logging.Level;
-import lombok.extern.java.Log;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
@@ -41,9 +40,9 @@ import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
  * /player_api.php?action=get_vod_streams - List VOD streams - /player_api.php?action=get_series -
  * List series
  */
+@Slf4j
 @Path("/player_api.php")
 @ApplicationScoped
-@Log
 public class XtreamController {
 
   @Inject XtreamUserService xtreamUserService;
@@ -87,19 +86,19 @@ public class XtreamController {
       return handleAction(action, client, source, categoryId);
 
     } catch (UnauthorizedException ex) {
-      log.warning("Unauthorized Xtream API request: " + ex.getMessage());
+      log.warn("Unauthorized Xtream API request", ex);
       return Response.status(Response.Status.UNAUTHORIZED)
           .entity("{\"error\":\"" + ex.getMessage() + "\"}")
           .header("Content-Type", MediaType.APPLICATION_JSON)
           .build();
     } catch (ForbiddenException ex) {
-      log.warning("Forbidden Xtream API request: " + ex.getMessage());
+      log.warn("Forbidden Xtream API request", ex);
       return Response.status(Response.Status.FORBIDDEN)
           .entity("{\"error\":\"" + ex.getMessage() + "\"}")
           .header("Content-Type", MediaType.APPLICATION_JSON)
           .build();
     } catch (Exception ex) {
-      log.log(Level.SEVERE, "Error in Xtream API request: ", ex);
+      log.error("Error in Xtream API request: ", ex);
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity("{\"error\":\"Internal server error\"}")
           .header("Content-Type", MediaType.APPLICATION_JSON)
@@ -126,7 +125,7 @@ public class XtreamController {
       return Response.ok(authResponse).header("Content-Type", MediaType.APPLICATION_JSON).build();
 
     } catch (RuntimeException ex) {
-      log.warning("Authentication failed: " + ex.getMessage());
+      log.warn("Authentication failed", ex);
       return Response.status(Response.Status.UNAUTHORIZED)
           .entity("{\"error\":\"" + ex.getMessage() + "\"}")
           .header("Content-Type", MediaType.APPLICATION_JSON)
@@ -165,14 +164,14 @@ public class XtreamController {
           return streamJsonArray(xtreamUserService.getSeries(client, source, categoryId));
 
         default:
-          log.warning("Unknown Xtream API action: " + action);
+          log.warn("Unknown Xtream API action: {}", action);
           return Response.status(Response.Status.BAD_REQUEST)
               .entity("{\"error\":\"Unknown action\"}")
               .header("Content-Type", MediaType.APPLICATION_JSON)
               .build();
       }
     } catch (Exception ex) {
-      log.log(Level.SEVERE, "Error handling Xtream action " + action, ex);
+      log.error("Error handling Xtream action: {}", action, ex);
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity("{\"error\":\"Internal server error\"}")
           .header("Content-Type", MediaType.APPLICATION_JSON)
@@ -208,24 +207,21 @@ public class XtreamController {
                       isFirst = false;
                     }
 
-                    log.fine("Completed streaming JSON array. Total items: " + itemCount);
+                    log.debug("Completed streaming JSON array. Total items: {}", itemCount);
                     os.write(']');
                     os.flush();
                   } catch (IOException ex) {
                     // Log but don't throw - response is already being sent
                     if (ex.getMessage() != null && !ex.getMessage().contains("Stream is closed")) {
-                      log.log(
-                          Level.SEVERE,
-                          "Error streaming JSON (items written: " + itemCount + "): ",
-                          ex);
+                      log.error("Error streaming JSON (items written: {})", itemCount, ex);
                     } else {
-                      log.fine("Stream closed during JSON output: " + ex.getMessage());
+                      log.debug("Stream closed during JSON output", ex);
                     }
                   } finally {
                     try {
                       jsonStreamResult.close();
                     } catch (IOException ex) {
-                      log.warning("Error closing stream: " + ex.getMessage());
+                      log.warn("Error closing stream", ex);
                     }
                   }
                 })

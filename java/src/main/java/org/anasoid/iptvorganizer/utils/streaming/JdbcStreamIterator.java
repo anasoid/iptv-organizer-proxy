@@ -7,7 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import lombok.extern.java.Log;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Lazy Iterator for streaming database ResultSet rows as entities.
@@ -37,7 +37,7 @@ import lombok.extern.java.Log;
  *
  * @param <T> The type of entities being streamed
  */
-@Log
+@Slf4j
 public class JdbcStreamIterator<T> implements Iterator<T>, Closeable {
 
   private static final int GC_THRESHOLD = 1000;
@@ -101,8 +101,7 @@ public class JdbcStreamIterator<T> implements Iterator<T>, Closeable {
       if (resultSet.next()) {
         nextItem = rowMapper.mapRow(resultSet);
         count++;
-        log.fine(
-            () -> "Streamed item: " + nextItem.getClass().getName() + " (count: " + count + ")");
+        log.debug("Streamed item: {} (count: {})", nextItem.getClass().getName(), count);
 
         // Log progress and trigger GC every 1000 items (like StreamingJsonParser)
         if (count % GC_THRESHOLD == 0) {
@@ -110,14 +109,11 @@ public class JdbcStreamIterator<T> implements Iterator<T>, Closeable {
           long itemsThisStep = count - previousCount;
           previousCount = count;
           long itemsPerSecond = itemsThisStep > 0 ? (itemsThisStep * 1000) / duration : 0;
-          log.fine(
-              "Stream progress: "
-                  + count
-                  + " items read in "
-                  + duration
-                  + "ms ("
-                  + itemsPerSecond
-                  + " items/sec)");
+          log.debug(
+              "Stream progress: {} items read in {}ms ({}items/sec)",
+              count,
+              duration,
+              itemsPerSecond + " items/sec)");
 
           System.gc();
         }
@@ -128,11 +124,9 @@ public class JdbcStreamIterator<T> implements Iterator<T>, Closeable {
         finished = true;
         close();
         log.info(
-            "Stream completed: "
-                + count
-                + " items read in "
-                + (System.currentTimeMillis() - startTime)
-                + "ms");
+            "Stream completed: {} items read in {}ms",
+            count,
+            (System.currentTimeMillis() - startTime));
         return false;
       }
     } catch (SQLException e) {
@@ -160,25 +154,25 @@ public class JdbcStreamIterator<T> implements Iterator<T>, Closeable {
         try {
           resultSet.close();
         } catch (SQLException e) {
-          log.warning("Failed to close ResultSet: " + e.getMessage());
+          log.warn("Failed to close ResultSet", e);
         }
       }
       if (statement != null) {
         try {
           statement.close();
         } catch (SQLException e) {
-          log.warning("Failed to close PreparedStatement: " + e.getMessage());
+          log.warn("Failed to close PreparedStatement", e);
         }
       }
       if (connection != null) {
         try {
           connection.close();
         } catch (SQLException e) {
-          log.warning("Failed to close Connection: " + e.getMessage());
+          log.warn("Failed to close Connection", e);
         }
       }
     } catch (Exception e) {
-      log.warning("Error during resource cleanup: " + e.getMessage());
+      log.warn("Error during resource cleanup", e);
     }
   }
 
@@ -187,7 +181,7 @@ public class JdbcStreamIterator<T> implements Iterator<T>, Closeable {
     try {
       close();
     } catch (Exception e) {
-      log.warning("Error during quiet close: " + e.getMessage());
+      log.warn("Error during quiet close", e);
     }
   }
 

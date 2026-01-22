@@ -48,9 +48,7 @@ public class SyncLogService extends BaseService<SyncLog, SyncLogRepository> {
 
       if (!runningLogs.isEmpty()) {
         log.warn(
-            "Found "
-                + runningLogs.size()
-                + " syncs interrupted by shutdown, marking as interrupted");
+            "Found {} syncs interrupted by shutdown, marking as interrupted", runningLogs.size());
 
         for (SyncLog synclog : runningLogs) {
           try {
@@ -59,20 +57,17 @@ public class SyncLogService extends BaseService<SyncLog, SyncLogRepository> {
             synclog.setErrorMessage("Application restarted during sync");
 
             repository.update(synclog);
-            log.info("Marked sync log " + synclog.getId() + " as interrupted");
+            log.info("Marked sync log {} as interrupted", synclog.getId());
           } catch (Exception e) {
             log.error(
-                "Failed to mark sync log "
-                    + synclog.getId()
-                    + " as interrupted: "
-                    + e.getMessage());
+                "Failed to mark sync log {} as interrupted: {}", synclog.getId(), e.getMessage());
           }
         }
       } else {
         log.info("No interrupted syncs found");
       }
     } catch (Exception e) {
-      log.error("Failed to check for interrupted syncs: " + e.getMessage());
+      log.error("Failed to check for interrupted syncs: {}", e.getMessage());
     }
   }
 }

@@ -34,7 +34,7 @@ public class HttpStreamingService {
     final HttpOptions finalOptions = options;
     int maxRetries = finalOptions.getMaxRetries() != null ? finalOptions.getMaxRetries() : 1;
 
-    log.info("Starting HTTP stream request to: " + url);
+    log.info("Starting HTTP stream request to: {}", url);
 
     // Sequential retry logic
     Exception lastException = null;
@@ -44,12 +44,12 @@ public class HttpStreamingService {
       } catch (Exception e) {
         lastException = e;
         if (attempt < maxRetries) {
-          log.info("HTTP request failed (attempt " + (attempt + 1) + "), retrying...");
+          log.info("HTTP request failed (attempt {}), retrying...", (attempt + 1));
         }
       }
     }
 
-    log.error("HTTP streaming failed after " + maxRetries + " retries for: " + url);
+    log.error("HTTP streaming failed after {} retries for: {}", maxRetries, url);
     throw new StreamingException(
         "HTTP streaming failed after " + maxRetries + " retries", lastException);
   }
@@ -79,10 +79,10 @@ public class HttpStreamingService {
             "HTTP error: " + response.statusCode() + " " + response.statusCode());
       }
 
-      log.info("HTTP request successful for: " + url + ", status: " + response.statusCode());
+      log.info("HTTP request successful for: {}, status: {}", url, response.statusCode());
       return response.body();
     } catch (Exception e) {
-      log.error("HTTP request failed for: " + url + ", error: " + e.getMessage());
+      log.error("HTTP request failed for: {}, error: {}", url, e.getMessage());
       throw e;
     }
   }
@@ -106,7 +106,7 @@ public class HttpStreamingService {
       options = createHttpOptions();
     }
 
-    log.info("Streaming JSON from URL: " + url);
+    log.info("Streaming JSON from URL: {}", url);
 
     try {
       // Fetch HTTP response as InputStream
@@ -118,10 +118,10 @@ public class HttpStreamingService {
           (JsonStreamResult<Map<?, ?>>)
               (JsonStreamResult<?>) jsonParser.parseJsonArray(is, Map.class);
 
-      log.info("Successfully starting JSON stream from: " + url);
+      log.info("Successfully starting JSON stream from: {}", url);
       return result;
     } catch (Exception e) {
-      log.error("Failed to parse JSON stream from: " + url + ", error: " + e.getMessage());
+      log.error("Failed to parse JSON stream from: {}, error: {}", url, e.getMessage());
       throw new StreamingException("Failed to parse JSON stream", e);
     }
   }

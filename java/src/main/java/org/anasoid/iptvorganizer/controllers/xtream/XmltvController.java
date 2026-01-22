@@ -65,25 +65,25 @@ public class XmltvController {
       Client client = authResult.getClient();
       Source source = authResult.getSource();
 
-      log.info("XMLTV request from client: " + username);
+      log.info("XMLTV request from client: {}", username);
 
       // Stream XMLTV data from source
       return streamXmltvData(source, client);
 
     } catch (UnauthorizedException ex) {
-      log.warn("XMLTV request unauthorized: " + ex.getMessage());
+      log.warn("XMLTV request unauthorized: {}", ex.getMessage());
       return Response.status(Response.Status.UNAUTHORIZED)
           .entity("<?xml version=\"1.0\" encoding=\"UTF-8\"?><tv></tv>")
           .header("Content-Type", MediaType.APPLICATION_XML)
           .build();
     } catch (ForbiddenException ex) {
-      log.warn("XMLTV request forbidden: " + ex.getMessage());
+      log.warn("XMLTV request forbidden: {}", ex.getMessage());
       return Response.status(Response.Status.FORBIDDEN)
           .entity("<?xml version=\"1.0\" encoding=\"UTF-8\"?><tv></tv>")
           .header("Content-Type", MediaType.APPLICATION_XML)
           .build();
     } catch (Exception ex) {
-      log.error("Error handling XMLTV request: " + ex.getMessage());
+      log.error("Error handling XMLTV request: {}", ex.getMessage());
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity("<?xml version=\"1.0\" encoding=\"UTF-8\"?><tv></tv>")
           .header("Content-Type", MediaType.APPLICATION_XML)
@@ -108,9 +108,9 @@ public class XmltvController {
                     String xmltvUrl = buildXmltvUrl(source);
 
                     log.info(
-                        String.format(
-                            "Streaming XMLTV from source: %s for client: %s",
-                            source.getName(), client.getUsername()));
+                        "Streaming XMLTV from source: {} for client: {}",
+                        source.getName(),
+                        client.getUsername());
 
                     // Fetch XMLTV data from upstream source
                     HttpOptions options =
@@ -132,32 +132,27 @@ public class XmltvController {
                       os.flush();
                     }
 
-                    log.info(
-                        String.format(
-                            "XMLTV streaming completed for client: %s", client.getUsername()));
+                    log.info("XMLTV streaming completed for client: {}", client.getUsername());
 
                   } catch (IOException ex) {
                     // Handle client disconnection
                     if (ex.getMessage() != null && ex.getMessage().contains("Broken pipe")) {
                       log.info(
-                          "Client "
-                              + client.getUsername()
-                              + " disconnected during XMLTV streaming");
+                          "Client {} disconnected during XMLTV streaming", client.getUsername());
                     } else {
                       log.warn(
-                          "Error streaming XMLTV for client "
-                              + client.getUsername()
-                              + ": "
-                              + ex.getMessage());
+                          "Error streaming XMLTV for client {}: {}",
+                          client.getUsername(),
+                          ex.getMessage());
                     }
                   } catch (Exception ex) {
-                    log.error("Error streaming XMLTV: " + ex.getMessage());
+                    log.error("Error streaming XMLTV: {}", ex.getMessage());
                   } finally {
                     if (inputStream != null) {
                       try {
                         inputStream.close();
                       } catch (IOException ex) {
-                        log.warn("Error closing XMLTV stream: " + ex.getMessage());
+                        log.warn("Error closing XMLTV stream: {}", ex.getMessage());
                       }
                     }
                   }

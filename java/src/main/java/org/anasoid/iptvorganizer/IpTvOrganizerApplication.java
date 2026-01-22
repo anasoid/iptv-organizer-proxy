@@ -6,12 +6,12 @@ import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import lombok.extern.java.Log;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.services.synch.SyncLogService;
 import org.anasoid.iptvorganizer.services.synch.SyncManager;
 
 @ApplicationScoped
-@Log
+@Slf4j
 @Startup
 public class IpTvOrganizerApplication {
 

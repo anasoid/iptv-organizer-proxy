@@ -48,11 +48,11 @@ public class SyncLockManager {
               .build();
 
       activeSyncs.put(sourceId, metadata);
-      log.info("Lock acquired for source: " + sourceId + ", sync type: " + syncType);
+      log.info("Lock acquired for source: {}, sync type: {}", sourceId, syncType);
       return true;
     }
 
-    log.info("Failed to acquire lock for source: " + sourceId + " (already locked)");
+    log.info("Failed to acquire lock for source: {} (already locked)", sourceId);
     return false;
   }
 
@@ -63,7 +63,7 @@ public class SyncLockManager {
     if (lock != null && lock.isHeldByCurrentThread()) {
       activeSyncs.remove(sourceId);
       lock.unlock();
-      log.info("Lock released for source: " + sourceId);
+      log.info("Lock released for source: {}", sourceId);
 
       // Clean up lock if no threads are waiting
       if (!lock.hasQueuedThreads()) {
@@ -71,9 +71,7 @@ public class SyncLockManager {
       }
     } else {
       log.warn(
-          "Attempted to release lock for source "
-              + sourceId
-              + " but lock not held by current thread");
+          "Attempted to release lock for source {} but lock not held by current thread", sourceId);
     }
   }
 
@@ -102,13 +100,13 @@ public class SyncLockManager {
     locks.forEach(
         (sourceId, lock) -> {
           if (lock.isLocked()) {
-            log.warn("Force releasing lock for source: " + sourceId + " on shutdown");
+            log.warn("Force releasing lock for source: {} on shutdown", sourceId);
             try {
               if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
               }
             } catch (Exception e) {
-              log.error("Error releasing lock on shutdown: " + e.getMessage());
+              log.error("Error releasing lock on shutdown: {}", e.getMessage());
             }
           }
         });

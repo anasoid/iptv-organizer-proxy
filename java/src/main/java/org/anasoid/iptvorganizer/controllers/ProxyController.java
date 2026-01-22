@@ -78,22 +78,22 @@ public class ProxyController {
 
       // Decode URL
       String decodedUrl = decodeUrl(encodedUrl);
-      log.info(String.format("Proxy request - user: %s, decodedUrl: %s", username, decodedUrl));
+      log.info("Proxy request - user: {}, decodedUrl: {}", username, decodedUrl);
 
       // Stream content from upstream
       return streamFromUpstream(decodedUrl, source);
 
     } catch (UnauthorizedException ex) {
-      log.warn("Proxy request unauthorized: " + ex.getMessage());
+      log.warn("Proxy request unauthorized: {}", ex.getMessage());
       return Response.status(Response.Status.UNAUTHORIZED).build();
     } catch (ForbiddenException ex) {
-      log.warn("Proxy request forbidden: " + ex.getMessage());
+      log.warn("Proxy request forbidden: {}", ex.getMessage());
       return Response.status(Response.Status.FORBIDDEN).build();
     } catch (IllegalArgumentException ex) {
-      log.warn("Invalid proxy URL encoding: " + ex.getMessage());
+      log.warn("Invalid proxy URL encoding: {}", ex.getMessage());
       return Response.status(Response.Status.BAD_REQUEST).build();
     } catch (Exception ex) {
-      log.error("Error handling proxy request: " + ex.getMessage());
+      log.error("Error handling proxy request: {}", ex.getMessage());
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
   }
@@ -152,24 +152,24 @@ public class ProxyController {
                     } catch (IOException ex) {
                       // Handle errno 23 (client disconnection)
                       if (ex.getMessage() != null && ex.getMessage().contains("Broken pipe")) {
-                        log.info("Client disconnected while streaming from: " + upstreamUrl);
+                        log.info("Client disconnected while streaming from: {}", upstreamUrl);
                       } else {
                         log.warn(
-                            "Error streaming content from " + upstreamUrl + ": " + ex.getMessage());
+                            "Error streaming content from {}: {}", upstreamUrl, ex.getMessage());
                       }
                       throw ex;
                     } finally {
                       try {
                         inputStream.close();
                       } catch (IOException ex) {
-                        log.warn("Error closing stream: " + ex.getMessage());
+                        log.warn("Error closing stream: {}", ex.getMessage());
                       }
                     }
                   })
           .build();
 
     } catch (Exception ex) {
-      log.error("Error getting stream from upstream: " + ex.getMessage());
+      log.error("Error getting stream from upstream: {}", ex.getMessage());
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
   }
