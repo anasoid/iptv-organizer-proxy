@@ -14,12 +14,12 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
+import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.jboss.logging.Logger;
 
+@Slf4j
 @ApplicationScoped
 public class SimpleMigrator {
-  private static final Logger LOG = Logger.getLogger(SimpleMigrator.class);
 
   @Inject DataSource dataSource;
 
@@ -45,11 +45,11 @@ public class SimpleMigrator {
           "V012__create_sync_schedule.sql");
 
   void onStart(@Observes StartupEvent event) {
-    LOG.info("Starting database migrations for: " + dbKind);
+    log.info("Starting database migrations for: " + dbKind);
     try {
       runMigrations();
     } catch (Exception e) {
-      LOG.error("Migration failed", e);
+      log.error("Migration failed", e);
       throw new RuntimeException("Database migration failed", e);
     }
   }
@@ -67,7 +67,7 @@ public class SimpleMigrator {
     }
 
     if (pendingMigrations.isEmpty()) {
-      LOG.info("No pending migrations");
+      log.info("No pending migrations");
       return;
     }
 
@@ -123,7 +123,7 @@ public class SimpleMigrator {
     try (Connection conn = dataSource.getConnection();
         Statement stmt = conn.createStatement()) {
       stmt.execute(createTableSql);
-      LOG.debug("schema_version table ensured");
+      log.debug("schema_version table ensured");
     }
   }
 
@@ -137,7 +137,7 @@ public class SimpleMigrator {
       }
       return versions;
     } catch (Exception e) {
-      LOG.debug("schema_version table does not exist yet, treating as empty");
+      log.debug("schema_version table does not exist yet, treating as empty");
       return new ArrayList<>();
     }
   }
@@ -174,7 +174,7 @@ public class SimpleMigrator {
         }
 
         conn.commit();
-        LOG.info("Applied migration: " + filename);
+        log.info("Applied migration: " + filename);
       } catch (Exception e) {
         conn.rollback();
         throw e;

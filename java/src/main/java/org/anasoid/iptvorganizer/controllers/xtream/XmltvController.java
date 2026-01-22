@@ -11,7 +11,7 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.StreamingOutput;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.logging.Logger;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
@@ -32,11 +32,11 @@ import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
  * <p>Returns electronic program guide (EPG) data in XMLTV format for use with Kodi and other IPTV
  * clients.
  */
+@Slf4j
 @Path("/xmltv.php")
 @ApplicationScoped
 public class XmltvController {
 
-  private static final Logger LOGGER = Logger.getLogger(XmltvController.class.getName());
   private static final int CHUNK_SIZE = 8192;
   private static final String XMLTV_ACTION = "get_xmltv";
 
@@ -65,25 +65,25 @@ public class XmltvController {
       Client client = authResult.getClient();
       Source source = authResult.getSource();
 
-      LOGGER.info("XMLTV request from client: " + username);
+      log.info("XMLTV request from client: " + username);
 
       // Stream XMLTV data from source
       return streamXmltvData(source, client);
 
     } catch (UnauthorizedException ex) {
-      LOGGER.warning("XMLTV request unauthorized: " + ex.getMessage());
+      log.warn("XMLTV request unauthorized: " + ex.getMessage());
       return Response.status(Response.Status.UNAUTHORIZED)
           .entity("<?xml version=\"1.0\" encoding=\"UTF-8\"?><tv></tv>")
           .header("Content-Type", MediaType.APPLICATION_XML)
           .build();
     } catch (ForbiddenException ex) {
-      LOGGER.warning("XMLTV request forbidden: " + ex.getMessage());
+      log.warn("XMLTV request forbidden: " + ex.getMessage());
       return Response.status(Response.Status.FORBIDDEN)
           .entity("<?xml version=\"1.0\" encoding=\"UTF-8\"?><tv></tv>")
           .header("Content-Type", MediaType.APPLICATION_XML)
           .build();
     } catch (Exception ex) {
-      LOGGER.severe("Error handling XMLTV request: " + ex.getMessage());
+      log.error("Error handling XMLTV request: " + ex.getMessage());
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity("<?xml version=\"1.0\" encoding=\"UTF-8\"?><tv></tv>")
           .header("Content-Type", MediaType.APPLICATION_XML)
@@ -107,7 +107,7 @@ public class XmltvController {
                     // Build XMLTV URL with action parameter
                     String xmltvUrl = buildXmltvUrl(source);
 
-                    LOGGER.info(
+                    log.info(
                         String.format(
                             "Streaming XMLTV from source: %s for client: %s",
                             source.getName(), client.getUsername()));
@@ -132,32 +132,32 @@ public class XmltvController {
                       os.flush();
                     }
 
-                    LOGGER.info(
+                    log.info(
                         String.format(
                             "XMLTV streaming completed for client: %s", client.getUsername()));
 
                   } catch (IOException ex) {
                     // Handle client disconnection
                     if (ex.getMessage() != null && ex.getMessage().contains("Broken pipe")) {
-                      LOGGER.info(
+                      log.info(
                           "Client "
                               + client.getUsername()
                               + " disconnected during XMLTV streaming");
                     } else {
-                      LOGGER.warning(
+                      log.warn(
                           "Error streaming XMLTV for client "
                               + client.getUsername()
                               + ": "
                               + ex.getMessage());
                     }
                   } catch (Exception ex) {
-                    LOGGER.severe("Error streaming XMLTV: " + ex.getMessage());
+                    log.error("Error streaming XMLTV: " + ex.getMessage());
                   } finally {
                     if (inputStream != null) {
                       try {
                         inputStream.close();
                       } catch (IOException ex) {
-                        LOGGER.warning("Error closing XMLTV stream: " + ex.getMessage());
+                        log.warn("Error closing XMLTV stream: " + ex.getMessage());
                       }
                     }
                   }

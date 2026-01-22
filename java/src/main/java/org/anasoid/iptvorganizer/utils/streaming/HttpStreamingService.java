@@ -10,14 +10,13 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
-import java.util.logging.Logger;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.StreamingException;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 
+@Slf4j
 @ApplicationScoped
 public class HttpStreamingService {
-
-  private static final Logger LOGGER = Logger.getLogger(HttpStreamingService.class.getName());
 
   @Inject StreamingJsonParser jsonParser;
 
@@ -35,7 +34,7 @@ public class HttpStreamingService {
     final HttpOptions finalOptions = options;
     int maxRetries = finalOptions.getMaxRetries() != null ? finalOptions.getMaxRetries() : 1;
 
-    LOGGER.info("Starting HTTP stream request to: " + url);
+    log.info("Starting HTTP stream request to: " + url);
 
     // Sequential retry logic
     Exception lastException = null;
@@ -45,12 +44,12 @@ public class HttpStreamingService {
       } catch (Exception e) {
         lastException = e;
         if (attempt < maxRetries) {
-          LOGGER.info("HTTP request failed (attempt " + (attempt + 1) + "), retrying...");
+          log.info("HTTP request failed (attempt " + (attempt + 1) + "), retrying...");
         }
       }
     }
 
-    LOGGER.severe("HTTP streaming failed after " + maxRetries + " retries for: " + url);
+    log.error("HTTP streaming failed after " + maxRetries + " retries for: " + url);
     throw new StreamingException(
         "HTTP streaming failed after " + maxRetries + " retries", lastException);
   }
@@ -80,10 +79,10 @@ public class HttpStreamingService {
             "HTTP error: " + response.statusCode() + " " + response.statusCode());
       }
 
-      LOGGER.info("HTTP request successful for: " + url + ", status: " + response.statusCode());
+      log.info("HTTP request successful for: " + url + ", status: " + response.statusCode());
       return response.body();
     } catch (Exception e) {
-      LOGGER.severe("HTTP request failed for: " + url + ", error: " + e.getMessage());
+      log.error("HTTP request failed for: " + url + ", error: " + e.getMessage());
       throw e;
     }
   }
@@ -107,7 +106,7 @@ public class HttpStreamingService {
       options = createHttpOptions();
     }
 
-    LOGGER.info("Streaming JSON from URL: " + url);
+    log.info("Streaming JSON from URL: " + url);
 
     try {
       // Fetch HTTP response as InputStream
@@ -119,10 +118,10 @@ public class HttpStreamingService {
           (JsonStreamResult<Map<?, ?>>)
               (JsonStreamResult<?>) jsonParser.parseJsonArray(is, Map.class);
 
-      LOGGER.info("Successfully starting JSON stream from: " + url);
+      log.info("Successfully starting JSON stream from: " + url);
       return result;
     } catch (Exception e) {
-      LOGGER.severe("Failed to parse JSON stream from: " + url + ", error: " + e.getMessage());
+      log.error("Failed to parse JSON stream from: " + url + ", error: " + e.getMessage());
       throw new StreamingException("Failed to parse JSON stream", e);
     }
   }

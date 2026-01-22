@@ -19,9 +19,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.dto.SourceDTO;
 import org.anasoid.iptvorganizer.dto.SyncLogDTO;
 import org.anasoid.iptvorganizer.dto.request.CreateSourceRequest;
@@ -35,13 +34,12 @@ import org.anasoid.iptvorganizer.services.synch.SyncManager;
 import org.anasoid.iptvorganizer.utils.ResponseUtils;
 
 /** Sources controller CRUD operations for sources with sync management */
+@Slf4j
 @Path("/api/sources")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @RolesAllowed("admin")
 public class SourcesController extends BaseController {
-
-  private static final Logger LOGGER = Logger.getLogger(SourcesController.class.getName());
 
   @Inject SourceService sourceService;
 
@@ -70,7 +68,7 @@ public class SourcesController extends BaseController {
       var pagination = PaginationMeta.of(page, limit, total);
       return ResponseUtils.okWithPagination(sources, pagination);
     } catch (Exception ex) {
-      LOGGER.log(Level.SEVERE, "Failed to fetch sources", ex);
+      log.error("Failed to fetch sources", ex);
       return ResponseUtils.serverError("Failed to fetch sources: " + ex.getMessage());
     }
   }
@@ -87,7 +85,7 @@ public class SourcesController extends BaseController {
         return ResponseUtils.notFound("Source not found");
       }
     } catch (Exception ex) {
-      LOGGER.log(Level.SEVERE, "Error fetching source: " + id, ex);
+      log.error("Error fetching source: " + id, ex);
       return ResponseUtils.notFound("Source not found");
     }
   }
@@ -128,7 +126,7 @@ public class SourcesController extends BaseController {
       Source savedSource = sourceService.save(source);
       return ResponseUtils.created(SourceDTO.fromEntity(savedSource));
     } catch (Exception ex) {
-      LOGGER.log(Level.SEVERE, "Failed to create source", ex);
+      log.error("Failed to create source", ex);
       return ResponseUtils.serverError("Failed to create source: " + ex.getMessage());
     }
   }
@@ -175,7 +173,7 @@ public class SourcesController extends BaseController {
       sourceService.update(source);
       return ResponseUtils.ok(SourceDTO.fromEntity(source));
     } catch (Exception ex) {
-      LOGGER.log(Level.SEVERE, "Failed to update source: " + id, ex);
+      log.error("Failed to update source: " + id, ex);
       return ResponseUtils.serverError("Failed to update source: " + ex.getMessage());
     }
   }
@@ -188,7 +186,7 @@ public class SourcesController extends BaseController {
       sourceService.delete(id);
       return ResponseUtils.okMessage("Source deleted successfully");
     } catch (Exception ex) {
-      LOGGER.log(Level.SEVERE, "Failed to delete source: " + id, ex);
+      log.error("Failed to delete source: " + id, ex);
       return ResponseUtils.serverError("Failed to delete source: " + ex.getMessage());
     }
   }
@@ -205,7 +203,7 @@ public class SourcesController extends BaseController {
       // TODO: Implement connection test logic
       return ResponseUtils.okMessage("Connection test passed");
     } catch (Exception ex) {
-      LOGGER.log(Level.SEVERE, "Connection test failed for source: " + id, ex);
+      log.error("Connection test failed for source: " + id, ex);
       return ResponseUtils.serverError("Connection test failed: " + ex.getMessage());
     }
   }
@@ -224,7 +222,7 @@ public class SourcesController extends BaseController {
         syncManager.triggerManualSync(source);
         return ResponseUtils.okMessage("Full sync triggered for source: " + source.getName());
       } catch (Exception ex) {
-        LOGGER.log(Level.SEVERE, "Failed to trigger sync for source: " + id, ex);
+        log.error("Failed to trigger sync for source: " + id, ex);
         if (ex.getMessage().contains("already syncing")) {
           return Response.status(Response.Status.CONFLICT)
               .entity(ApiResponse.error("Source is already syncing"))
@@ -233,7 +231,7 @@ public class SourcesController extends BaseController {
         return ResponseUtils.serverError("Failed to trigger sync: " + ex.getMessage());
       }
     } catch (Exception ex) {
-      LOGGER.log(Level.SEVERE, "Failed to trigger sync for source: " + id, ex);
+      log.error("Failed to trigger sync for source: " + id, ex);
       return ResponseUtils.serverError("Failed to trigger sync: " + ex.getMessage());
     }
   }
@@ -270,8 +268,7 @@ public class SourcesController extends BaseController {
         return ResponseUtils.okMessage(
             "Sync triggered for " + taskType + " on source: " + source.getName());
       } catch (Exception ex) {
-        LOGGER.log(
-            Level.SEVERE, "Failed to trigger sync task " + taskType + " for source: " + id, ex);
+        log.error("Failed to trigger sync task " + taskType + " for source: " + id, ex);
         if (ex.getMessage() != null && ex.getMessage().contains("already syncing")) {
           return Response.status(Response.Status.CONFLICT)
               .entity(ApiResponse.error("Source is already syncing"))
@@ -280,8 +277,7 @@ public class SourcesController extends BaseController {
         return ResponseUtils.serverError("Failed to trigger sync: " + ex.getMessage());
       }
     } catch (Exception ex) {
-      LOGGER.log(
-          Level.SEVERE, "Failed to trigger sync task " + taskType + " for source: " + id, ex);
+      log.error("Failed to trigger sync task " + taskType + " for source: " + id, ex);
       return ResponseUtils.serverError("Failed to trigger sync: " + ex.getMessage());
     }
   }
@@ -301,7 +297,7 @@ public class SourcesController extends BaseController {
         return ResponseUtils.okMessage(
             "Full sync triggered for all types on source: " + source.getName());
       } catch (Exception ex) {
-        LOGGER.log(Level.SEVERE, "Failed to trigger full sync for source: " + id, ex);
+        log.error("Failed to trigger full sync for source: " + id, ex);
         if (ex.getMessage().contains("already syncing")) {
           return Response.status(Response.Status.CONFLICT)
               .entity(ApiResponse.error("Source is already syncing"))
@@ -310,7 +306,7 @@ public class SourcesController extends BaseController {
         return ResponseUtils.serverError("Failed to trigger full sync: " + ex.getMessage());
       }
     } catch (Exception ex) {
-      LOGGER.log(Level.SEVERE, "Failed to trigger full sync for source: " + id, ex);
+      log.error("Failed to trigger full sync for source: " + id, ex);
       return ResponseUtils.serverError("Failed to trigger full sync: " + ex.getMessage());
     }
   }
@@ -328,7 +324,7 @@ public class SourcesController extends BaseController {
               .collect(Collectors.toList());
       return ResponseUtils.ok(logs);
     } catch (Exception ex) {
-      LOGGER.log(Level.SEVERE, "Failed to fetch sync logs for source: " + id, ex);
+      log.error("Failed to fetch sync logs for source: " + id, ex);
       return ResponseUtils.serverError("Failed to fetch sync logs: " + ex.getMessage());
     }
   }
@@ -369,7 +365,7 @@ public class SourcesController extends BaseController {
               .toList();
       return ResponseUtils.ok(statusList);
     } catch (Exception ex) {
-      LOGGER.log(Level.SEVERE, "Failed to fetch sync status", ex);
+      log.error("Failed to fetch sync status", ex);
       return ResponseUtils.serverError("Failed to fetch sync status: " + ex.getMessage());
     }
   }
@@ -398,7 +394,7 @@ public class SourcesController extends BaseController {
 
       return ResponseUtils.ok(response);
     } catch (Exception ex) {
-      LOGGER.log(Level.SEVERE, "Failed to fetch active syncs", ex);
+      log.error("Failed to fetch active syncs", ex);
       return ResponseUtils.serverError("Failed to fetch active syncs: " + ex.getMessage());
     }
   }

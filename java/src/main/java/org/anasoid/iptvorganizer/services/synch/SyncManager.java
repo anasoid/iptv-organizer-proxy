@@ -6,8 +6,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
@@ -19,10 +18,9 @@ import org.anasoid.iptvorganizer.services.synch.synchronizer.VodSynchronizer;
  * Background sync service using Quarkus Scheduler Syncs live streams, VOD, series, and categories
  * from Xtream API
  */
+@Slf4j
 @ApplicationScoped
 public class SyncManager {
-
-  private static final Logger LOGGER = Logger.getLogger(SyncManager.class.getName());
 
   @Inject SourceRepository sourceRepository;
 
@@ -33,7 +31,7 @@ public class SyncManager {
   @Inject SyncLockManager syncLockManager;
 
   public void scheduledSync() {
-    LOGGER.info("Starting scheduled sync check");
+    log.info("Starting scheduled sync check");
 
     try {
       List<Source> sources = sourceRepository.findSourcesNeedingSync();
@@ -44,13 +42,13 @@ public class SyncManager {
           syncSource(source);
           processed++;
         } catch (Exception e) {
-          LOGGER.log(Level.SEVERE, "Failed to sync source " + source.getId(), e);
+          log.error("Failed to sync source " + source.getId(), e);
         }
       }
 
-      LOGGER.info("Scheduled sync completed: " + processed + " sources processed");
+      log.info("Scheduled sync completed: " + processed + " sources processed");
     } catch (Exception e) {
-      LOGGER.log(Level.SEVERE, "Scheduled sync failed: ", e);
+      log.error("Scheduled sync failed: ", e);
     }
   }
 
@@ -59,7 +57,7 @@ public class SyncManager {
     // Try to acquire lock first
     boolean lockAcquired = syncLockManager.tryAcquireLock(source.getId(), "full");
     if (!lockAcquired) {
-      LOGGER.info("Source " + source.getId() + " is already being synced, skipping");
+      log.info("Source " + source.getId() + " is already being synced, skipping");
       return new ArrayList<>();
     }
 
@@ -69,7 +67,7 @@ public class SyncManager {
     try {
       return performFullSync(source);
     } catch (Exception e) {
-      LOGGER.severe("Error during sync for source " + source.getId() + ": " + e.getMessage());
+      log.error("Error during sync for source " + source.getId() + ": " + e.getMessage());
       throw e;
     } finally {
       syncLockManager.releaseLock(source.getId());
@@ -94,11 +92,11 @@ public class SyncManager {
 
   /** Trigger manual full sync for a source from admin panel */
   public void triggerManualSync(Source source) {
-    LOGGER.info("Manual sync triggered for source: " + source.getName());
+    log.info("Manual sync triggered for source: " + source.getName());
 
     boolean lockAcquired = syncLockManager.tryAcquireLock(source.getId(), "manual_full");
     if (!lockAcquired) {
-      LOGGER.warning("Source " + source.getId() + " is already syncing, cannot start manual sync");
+      log.warn("Source " + source.getId() + " is already syncing, cannot start manual sync");
       throw new RuntimeException("Source is already syncing");
     }
 
@@ -118,8 +116,7 @@ public class SyncManager {
    * live_streams, vod_categories, vod_streams, series_categories, series
    */
   public SyncLog triggerManualSyncTask(Source source, String taskType) {
-    LOGGER.info(
-        "Manual sync triggered for source: " + source.getName() + ", task type: " + taskType);
+    log.info("Manual sync triggered for source: " + source.getName() + ", task type: " + taskType);
 
     // Validate task type
     Set<String> validTaskTypes =
@@ -134,7 +131,7 @@ public class SyncManager {
 
     boolean lockAcquired = syncLockManager.tryAcquireLock(source.getId(), "manual_" + taskType);
     if (!lockAcquired) {
-      LOGGER.warning("Source " + source.getId() + " is already syncing");
+      log.warn("Source " + source.getId() + " is already syncing");
       throw new RuntimeException("Source is already syncing");
     }
 

@@ -6,14 +6,13 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Logger;
 import lombok.Builder;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @ApplicationScoped
 public class SyncLockManager {
-
-  private static final Logger LOGGER = Logger.getLogger(SyncLockManager.class.getName());
 
   // Lock storage: sourceId -> ReentrantLock
   private final ConcurrentHashMap<Long, ReentrantLock> locks = new ConcurrentHashMap<>();
@@ -49,11 +48,11 @@ public class SyncLockManager {
               .build();
 
       activeSyncs.put(sourceId, metadata);
-      LOGGER.info("Lock acquired for source: " + sourceId + ", sync type: " + syncType);
+      log.info("Lock acquired for source: " + sourceId + ", sync type: " + syncType);
       return true;
     }
 
-    LOGGER.info("Failed to acquire lock for source: " + sourceId + " (already locked)");
+    log.info("Failed to acquire lock for source: " + sourceId + " (already locked)");
     return false;
   }
 
@@ -64,14 +63,14 @@ public class SyncLockManager {
     if (lock != null && lock.isHeldByCurrentThread()) {
       activeSyncs.remove(sourceId);
       lock.unlock();
-      LOGGER.info("Lock released for source: " + sourceId);
+      log.info("Lock released for source: " + sourceId);
 
       // Clean up lock if no threads are waiting
       if (!lock.hasQueuedThreads()) {
         locks.remove(sourceId);
       }
     } else {
-      LOGGER.warning(
+      log.warn(
           "Attempted to release lock for source "
               + sourceId
               + " but lock not held by current thread");
@@ -97,19 +96,19 @@ public class SyncLockManager {
   /** Cleanup on shutdown (called by @PreDestroy) */
   @PreDestroy
   public void shutdown() {
-    LOGGER.info("SyncLockManager shutting down, releasing all locks...");
+    log.info("SyncLockManager shutting down, releasing all locks...");
 
     // Release all held locks
     locks.forEach(
         (sourceId, lock) -> {
           if (lock.isLocked()) {
-            LOGGER.warning("Force releasing lock for source: " + sourceId + " on shutdown");
+            log.warn("Force releasing lock for source: " + sourceId + " on shutdown");
             try {
               if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
               }
             } catch (Exception e) {
-              LOGGER.severe("Error releasing lock on shutdown: " + e.getMessage());
+              log.error("Error releasing lock on shutdown: " + e.getMessage());
             }
           }
         });

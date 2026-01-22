@@ -4,16 +4,16 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.logging.Logger;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
 import org.anasoid.iptvorganizer.models.entity.SyncLog.SyncLogStatus;
 import org.anasoid.iptvorganizer.repositories.synch.SyncLogRepository;
 import org.anasoid.iptvorganizer.services.BaseService;
 
+@Slf4j
 @ApplicationScoped
 public class SyncLogService extends BaseService<SyncLog, SyncLogRepository> {
 
-  private static final Logger LOGGER = Logger.getLogger(SyncLogService.class.getName());
   @Inject SyncLogRepository repository;
 
   @Override
@@ -41,35 +41,38 @@ public class SyncLogService extends BaseService<SyncLog, SyncLogRepository> {
   }
 
   public void fixInterruptedSyncs() {
-    LOGGER.info("Checking for interrupted syncs from previous shutdown...");
+    log.info("Checking for interrupted syncs from previous shutdown...");
 
     try {
       List<SyncLog> runningLogs = repository.findByStatus(SyncLogStatus.RUNNING);
 
       if (!runningLogs.isEmpty()) {
-        LOGGER.warning(
+        log.warn(
             "Found "
                 + runningLogs.size()
                 + " syncs interrupted by shutdown, marking as interrupted");
 
-        for (SyncLog log : runningLogs) {
+        for (SyncLog synclog : runningLogs) {
           try {
-            log.setStatus(SyncLogStatus.INTERRUPTED);
-            log.setCompletedAt(LocalDateTime.now());
-            log.setErrorMessage("Application restarted during sync");
+            synclog.setStatus(SyncLogStatus.INTERRUPTED);
+            synclog.setCompletedAt(LocalDateTime.now());
+            synclog.setErrorMessage("Application restarted during sync");
 
-            repository.update(log);
-            LOGGER.info("Marked sync log " + log.getId() + " as interrupted");
+            repository.update(synclog);
+            log.info("Marked sync log " + synclog.getId() + " as interrupted");
           } catch (Exception e) {
-            LOGGER.severe(
-                "Failed to mark sync log " + log.getId() + " as interrupted: " + e.getMessage());
+            log.error(
+                "Failed to mark sync log "
+                    + synclog.getId()
+                    + " as interrupted: "
+                    + e.getMessage());
           }
         }
       } else {
-        LOGGER.info("No interrupted syncs found");
+        log.info("No interrupted syncs found");
       }
     } catch (Exception e) {
-      LOGGER.severe("Failed to check for interrupted syncs: " + e.getMessage());
+      log.error("Failed to check for interrupted syncs: " + e.getMessage());
     }
   }
 }

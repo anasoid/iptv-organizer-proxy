@@ -9,8 +9,7 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import java.util.Base64;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
@@ -38,11 +37,10 @@ import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
  * <p>Implements dual proxy architecture: 1. Direct 302 redirect if `disablestreamproxy=true` 2.
  * Base64 URL encoding and redirect to `/proxy` if `disablestreamproxy=false`
  */
+@Slf4j
 @Path("")
 @ApplicationScoped
 public class StreamDataController {
-
-  private static final Logger LOGGER = Logger.getLogger(StreamDataController.class.getName());
 
   @Inject XtreamUserService xtreamUserService;
   @Inject HttpStreamingService httpStreamingService;
@@ -151,23 +149,25 @@ public class StreamDataController {
 
       // NEW: Validate stream access
       if (!hasStreamAccess(client, source, streamId, streamType)) {
-        LOGGER.warning("Client " + username + " attempted to access blocked stream: " + streamId);
+        log.warn("Client {} attempted to access blocked stream: {}", username, streamId);
         return Response.status(Response.Status.FORBIDDEN).build();
       }
 
       // Build stream URL from source
       String streamUrl = buildStreamUrl(source, streamType, streamId, ext);
 
-      LOGGER.info(
-          String.format(
-              "Stream request - user: %s, type: %s, streamId: %s, sourceUrl: %s",
-              username, streamType, streamId, streamUrl));
+      log.info(
+          "Stream request - user: {}, type: {}, streamId: {}, sourceUrl: {}",
+          username,
+          streamType,
+          streamId,
+          streamUrl);
 
       // Check if we should disable proxy (return direct 302)
       Boolean disableStreamProxy = source.getDisableStreamProxy();
       if (disableStreamProxy != null && disableStreamProxy) {
         // Direct 302 redirect to source
-        LOGGER.info("Direct stream proxy disabled, returning 302 redirect to: " + streamUrl);
+        log.info("Direct stream proxy disabled, returning 302 redirect to: {}", streamUrl);
         return Response.seeOther(java.net.URI.create(streamUrl)).build();
       }
 
@@ -175,17 +175,17 @@ public class StreamDataController {
       String encodedUrl = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
       String proxyUrl = buildProxyUrl(uriInfo, username, password, encodedUrl);
 
-      LOGGER.info("Stream proxy enabled, redirecting to proxy: " + proxyUrl);
+      log.info("Stream proxy enabled, redirecting to proxy: {}", proxyUrl);
       return Response.seeOther(java.net.URI.create(proxyUrl)).build();
 
     } catch (UnauthorizedException ex) {
-      LOGGER.warning("Stream request unauthorized: " + ex.getMessage());
+      log.warn("Stream request unauthorized", ex);
       return Response.status(Response.Status.UNAUTHORIZED).build();
     } catch (ForbiddenException ex) {
-      LOGGER.warning("Stream request forbidden: " + ex.getMessage());
+      log.warn("Stream request forbidden", ex);
       return Response.status(Response.Status.FORBIDDEN).build();
     } catch (Exception ex) {
-      LOGGER.severe("Error handling stream request: " + ex.getMessage());
+      log.error("Error handling stream request", ex);
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
   }
@@ -247,20 +247,18 @@ public class StreamDataController {
       try {
         streamIdInt = Integer.parseInt(streamId);
       } catch (NumberFormatException e) {
-        LOGGER.warning("Invalid stream ID format: " + streamId);
+        log.warn("Invalid stream ID format: {}", streamId);
         return false;
       }
 
       // Load stream from database
       BaseStream stream = loadStream(source.getId(), streamIdInt, streamType);
       if (stream == null) {
-        LOGGER.warning(
-            "Stream not found - source: "
-                + source.getId()
-                + ", type: "
-                + streamType
-                + ", id: "
-                + streamId);
+        log.warn(
+            "Stream not found - source: {}, type: {}, id: {}",
+            source.getId(),
+            streamType,
+            streamId);
         return false; // Stream not found
       }
 
@@ -274,7 +272,7 @@ public class StreamDataController {
       FilterContext context = contentFilterService.buildFilterContext(client);
       return contentFilterService.shouldIncludeStream(context, stream, category);
     } catch (Exception e) {
-      LOGGER.log(Level.SEVERE, "Error checking stream access: ", e);
+      log.error("Error checking stream access", e);
       return false; // Deny access on error
     }
   }

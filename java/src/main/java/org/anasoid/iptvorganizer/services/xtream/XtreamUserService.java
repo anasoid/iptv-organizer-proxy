@@ -9,8 +9,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.dto.xtream.XtreamAuthResponse;
 import org.anasoid.iptvorganizer.dto.xtream.XtreamServerInfo;
 import org.anasoid.iptvorganizer.dto.xtream.XtreamUserInfo;
@@ -32,10 +32,9 @@ import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
 import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 
 /** Service for Xtream Codes API user operations */
+@Slf4j
 @ApplicationScoped
 public class XtreamUserService {
-
-  private static final Logger LOGGER = Logger.getLogger(XtreamUserService.class.getName());
 
   private static final int DEFAULT_PAGINATION_LIMIT = 10000;
   private static final String DEFAULT_XTREAM_PASSWORD = "";
@@ -133,26 +132,26 @@ public class XtreamUserService {
     // Find client by username
     Client client = clientRepository.findByUsername(username);
     if (client == null) {
-      LOGGER.warning("Client not found: " + username);
+      log.warn("Client not found: {}", username);
       throw new UnauthorizedException("Invalid credentials");
     }
 
     // Validate password
     if (!password.equals(client.getPassword())) {
-      LOGGER.warning("Invalid password for client: " + username);
+      log.warn("Invalid password for client: {}", username);
       throw new UnauthorizedException("Invalid credentials");
     }
 
     // Check if client is active
     if (client.getIsActive() != null && !client.getIsActive()) {
-      LOGGER.warning("Client is inactive: " + username);
+      log.warn("Client is inactive: {}", username);
       throw new ForbiddenException("Client is inactive");
     }
 
     // Get source for this client
     Source source = sourceRepository.findById(client.getSourceId());
     if (source == null) {
-      LOGGER.warning("Source not found for client: " + username);
+      log.warn("Source not found for client: {}", username);
       throw new ForbiddenException("Source not configured for this client");
     }
 
@@ -213,10 +212,10 @@ public class XtreamUserService {
             StreamType.SERIES.getCategoryType(),
             DEFAULT_PAGINATION_LIMIT,
             0);
-    LOGGER.info("Found " + categories.size() + " series categories before materialization");
+    log.info("Found {} series categories before materialization", categories.size());
     // Materialize all data to Maps
     List<Map<?, ?>> categoryMaps = materializeCategories(categories);
-    LOGGER.info("Materialized " + categoryMaps.size() + " series category maps");
+    log.info("Materialized {} series category maps", categoryMaps.size());
     return new JsonStreamResult<>(categoryMaps.iterator(), new AtomicLong(0), null);
   }
 
@@ -277,10 +276,7 @@ public class XtreamUserService {
 
       return buildFallbackAuthenticationResponse(client, proxyUrl);
     } catch (Exception ex) {
-      LOGGER.warning(
-          String.format(
-              "Failed to fetch authentication from source %d: %s",
-              source.getId(), ex.getMessage()));
+      log.warn("Failed to fetch authentication from source {}", source.getId(), ex);
       return buildFallbackAuthenticationResponse(client, proxyUrl);
     }
   }
@@ -341,7 +337,7 @@ public class XtreamUserService {
         port = "80";
       }
     } catch (Exception ex) {
-      LOGGER.warning("Failed to parse proxy URL: " + ex.getMessage());
+      log.warn("Failed to parse proxy URL", ex);
     }
 
     return XtreamServerInfo.builder()
@@ -388,11 +384,7 @@ public class XtreamUserService {
               }
             });
       } catch (Exception e) {
-        LOGGER.warning(
-            "Failed to parse stream data for stream "
-                + stream.getExternalId()
-                + ": "
-                + e.getMessage());
+        log.warn("Failed to parse stream data for stream {}", stream.getExternalId(), e);
       }
     }
 
@@ -465,11 +457,7 @@ public class XtreamUserService {
                         }
                       });
                 } catch (Exception e) {
-                  LOGGER.warning(
-                      "Failed to parse stream data for stream "
-                          + stream.getExternalId()
-                          + ": "
-                          + e.getMessage());
+                  log.warn("Failed to parse stream data for stream {}", stream.getExternalId(), e);
                 }
               }
 
@@ -592,7 +580,7 @@ public class XtreamUserService {
       try {
         ((AutoCloseable) iterator).close();
       } catch (Exception e) {
-        LOGGER.warning("Failed to close iterator: " + e.getMessage());
+        log.warn("Failed to close iterator", e);
       }
     }
   }

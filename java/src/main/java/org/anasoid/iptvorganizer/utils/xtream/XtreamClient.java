@@ -3,7 +3,7 @@ package org.anasoid.iptvorganizer.utils.xtream;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.Map;
-import java.util.logging.Logger;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
@@ -17,10 +17,9 @@ import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
  * streaming support for categories and streams. All HTTP calls are delegated to
  * HttpStreamingService.
  */
+@Slf4j
 @ApplicationScoped
 public class XtreamClient {
-
-  private static final Logger LOGGER = Logger.getLogger(XtreamClient.class.getName());
 
   private static final long DEFAULT_TIMEOUT_MS = 30000;
   private static final int DEFAULT_MAX_RETRIES = 1;
@@ -98,14 +97,14 @@ public class XtreamClient {
     String action = type.getCategoryAction();
     String url = buildApiUrl(source, action);
 
-    LOGGER.info(
+    log.info(
         String.format(
             "Fetching %s categories for source: %s", type.getStreamTypeName(), source.getName()));
 
     try {
       return httpStreamingService.streamJsonArray(url, createDefaultHttpOptions());
     } catch (Exception ex) {
-      LOGGER.severe(
+      log.error(
           String.format(
               "Failed to fetch %s categories from source %s: %s",
               type.getStreamTypeName(), source.getName(), ex.getMessage()));
@@ -124,13 +123,13 @@ public class XtreamClient {
     String action = type.getStreamAction();
     String url = buildApiUrl(source, action);
 
-    LOGGER.info(
+    log.info(
         String.format("Fetching %s for source: %s", type.getStreamTypeName(), source.getName()));
 
     try {
       return httpStreamingService.streamJsonArray(url, createDefaultHttpOptions());
     } catch (Exception ex) {
-      LOGGER.severe(
+      log.error(
           String.format(
               "Failed to fetch %s from source %s: %s",
               type.getStreamTypeName(), source.getName(), ex.getMessage()));

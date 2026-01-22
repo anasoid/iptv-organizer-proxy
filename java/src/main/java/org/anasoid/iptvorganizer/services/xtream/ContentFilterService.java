@@ -5,8 +5,8 @@ import jakarta.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Filter;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
@@ -26,10 +26,9 @@ import org.anasoid.iptvorganizer.services.stream.VodStreamService;
  * <p>Responsibilities: - Initialize filtering context per client - Apply filters to categories and
  * streams - Check individual stream access - Manage category visibility based on accessible streams
  */
+@Slf4j
 @ApplicationScoped
 public class ContentFilterService {
-
-  private static final Logger LOGGER = Logger.getLogger(ContentFilterService.class.getName());
 
   private static final int CATEGORY_STREAM_CHECK_LIMIT = 100;
 

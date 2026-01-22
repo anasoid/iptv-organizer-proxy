@@ -13,7 +13,7 @@ import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.logging.Logger;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
@@ -35,11 +35,11 @@ import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
  * upstream URL in base64 and redirects to this endpoint, which then streams the content from the
  * upstream source.
  */
+@Slf4j
 @Path("/proxy")
 @ApplicationScoped
 public class ProxyController {
 
-  private static final Logger LOGGER = Logger.getLogger(ProxyController.class.getName());
   private static final int BUFFER_SIZE = 8192;
 
   @Inject XtreamUserService xtreamUserService;
@@ -67,7 +67,7 @@ public class ProxyController {
     try {
       // Validate encoded URL parameter
       if (encodedUrl == null || encodedUrl.isEmpty()) {
-        LOGGER.warning("Proxy request with missing URL");
+        log.warn("Proxy request with missing URL");
         return Response.status(Response.Status.BAD_REQUEST).build();
       }
 
@@ -78,22 +78,22 @@ public class ProxyController {
 
       // Decode URL
       String decodedUrl = decodeUrl(encodedUrl);
-      LOGGER.info(String.format("Proxy request - user: %s, decodedUrl: %s", username, decodedUrl));
+      log.info(String.format("Proxy request - user: %s, decodedUrl: %s", username, decodedUrl));
 
       // Stream content from upstream
       return streamFromUpstream(decodedUrl, source);
 
     } catch (UnauthorizedException ex) {
-      LOGGER.warning("Proxy request unauthorized: " + ex.getMessage());
+      log.warn("Proxy request unauthorized: " + ex.getMessage());
       return Response.status(Response.Status.UNAUTHORIZED).build();
     } catch (ForbiddenException ex) {
-      LOGGER.warning("Proxy request forbidden: " + ex.getMessage());
+      log.warn("Proxy request forbidden: " + ex.getMessage());
       return Response.status(Response.Status.FORBIDDEN).build();
     } catch (IllegalArgumentException ex) {
-      LOGGER.warning("Invalid proxy URL encoding: " + ex.getMessage());
+      log.warn("Invalid proxy URL encoding: " + ex.getMessage());
       return Response.status(Response.Status.BAD_REQUEST).build();
     } catch (Exception ex) {
-      LOGGER.severe("Error handling proxy request: " + ex.getMessage());
+      log.error("Error handling proxy request: " + ex.getMessage());
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
   }
@@ -152,9 +152,9 @@ public class ProxyController {
                     } catch (IOException ex) {
                       // Handle errno 23 (client disconnection)
                       if (ex.getMessage() != null && ex.getMessage().contains("Broken pipe")) {
-                        LOGGER.info("Client disconnected while streaming from: " + upstreamUrl);
+                        log.info("Client disconnected while streaming from: " + upstreamUrl);
                       } else {
-                        LOGGER.warning(
+                        log.warn(
                             "Error streaming content from " + upstreamUrl + ": " + ex.getMessage());
                       }
                       throw ex;
@@ -162,14 +162,14 @@ public class ProxyController {
                       try {
                         inputStream.close();
                       } catch (IOException ex) {
-                        LOGGER.warning("Error closing stream: " + ex.getMessage());
+                        log.warn("Error closing stream: " + ex.getMessage());
                       }
                     }
                   })
           .build();
 
     } catch (Exception ex) {
-      LOGGER.severe("Error getting stream from upstream: " + ex.getMessage());
+      log.error("Error getting stream from upstream: " + ex.getMessage());
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
   }
