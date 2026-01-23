@@ -16,9 +16,9 @@ import lombok.extern.slf4j.Slf4j;
  * of loading all into memory. Follows the pattern established by StreamingJsonParser for consistent
  * caching and resource management.
  *
- * <p>This iterator works across multiple database vendors (MySQL, PostgreSQL, SQLite, H2) when
- * used with {@link org.anasoid.iptvorganizer.utils.db.DatabaseUtils#configureStreamingStatement}
- * for database-agnostic streaming configuration.
+ * <p>This iterator works across multiple database vendors (MySQL, PostgreSQL, SQLite, H2) when used
+ * with {@link org.anasoid.iptvorganizer.utils.db.DatabaseUtils#configureStreamingStatement} for
+ * database-agnostic streaming configuration.
  *
  * <p>Usage:
  *
@@ -73,8 +73,9 @@ public class JdbcStreamIterator<T> implements Iterator<T>, Closeable {
    *
    * <ul>
    *   <li>ResultSet must be created with TYPE_FORWARD_ONLY and CONCUR_READ_ONLY
-   *   <li>Statement must call {@link org.anasoid.iptvorganizer.utils.db.DatabaseUtils#configureStreamingStatement}
-   *   BEFORE executeQuery() to apply database-vendor-specific streaming optimizations
+   *   <li>Statement must call {@link
+   *       org.anasoid.iptvorganizer.utils.db.DatabaseUtils#configureStreamingStatement} BEFORE
+   *       executeQuery() to apply database-vendor-specific streaming optimizations
    *   <li>This enables efficient row-by-row streaming across MySQL, PostgreSQL, SQLite, and H2
    * </ul>
    *
