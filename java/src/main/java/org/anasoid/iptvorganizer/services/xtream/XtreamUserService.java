@@ -20,6 +20,7 @@ import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
+import org.anasoid.iptvorganizer.models.entity.stream.LiveStream;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 import org.anasoid.iptvorganizer.repositories.FilterRepository;
@@ -514,9 +515,17 @@ public class XtreamUserService {
       FilterContext context,
       JsonStreamResult<Map<?, ?>> rawStreams,
       Map<Integer, Category> categoryCache) {
-    // For now, return as-is - filtering would be applied per-stream
-    // in a lazy iterator wrapper if needed
-    return rawStreams;
+    // If no filtering needed, return as-is
+    if (context == null) {
+      return rawStreams;
+    }
+
+    // Create lazy filtering iterator that filters streams during iteration
+    Iterator<Map<?, ?>> filteringIterator =
+        new FilteringIterator(rawStreams.iterator(), context, categoryCache);
+
+    // Wrap in new JsonStreamResult with same close handler
+    return new JsonStreamResult<>(filteringIterator, new AtomicLong(0), rawStreams::close);
   }
 
   /**
@@ -606,6 +615,131 @@ public class XtreamUserService {
     public Map<?, ?> next() {
       BaseStream stream = delegate.next();
       return convertStreamToMap(stream); // Single item conversion
+    }
+  }
+
+  /**
+   * Lazy filtering iterator that filters streams using FilterContext.
+   *
+   * <p>Uses lookahead pattern to process streams one-at-a-time without materializing entire list.
+   * Returns original Maps for streams that pass filtering checks.
+   */
+  private class FilteringIterator implements Iterator<Map<?, ?>> {
+    private final Iterator<Map<?, ?>> delegate;
+    private final FilterContext context;
+    private final Map<Integer, Category> categoryCache;
+    private Map<?, ?> nextItem = null;
+    private boolean hasNextCached = false;
+
+    FilteringIterator(
+        Iterator<Map<?, ?>> delegate, FilterContext context, Map<Integer, Category> categoryCache) {
+      this.delegate = delegate;
+      this.context = context;
+      this.categoryCache = categoryCache;
+    }
+
+    @Override
+    public boolean hasNext() {
+      if (!hasNextCached) {
+        hasNextCached = true;
+        nextItem = advanceToNext();
+      }
+      return nextItem != null;
+    }
+
+    @Override
+    public Map<?, ?> next() {
+      if (!hasNext()) {
+        throw new java.util.NoSuchElementException();
+      }
+      hasNextCached = false;
+      Map<?, ?> result = nextItem;
+      nextItem = null;
+      return result;
+    }
+
+    /** Advance iterator until finding a stream that passes filtering. */
+    private Map<?, ?> advanceToNext() {
+      while (delegate.hasNext()) {
+        Map<?, ?> item = delegate.next();
+        BaseStream stream = extractStreamFromMap(item);
+
+        // Look up category from cache (may be null)
+        Category category = categoryCache.get(stream.getCategoryId());
+
+        // Check if stream passes filtering
+        if (contentFilterService.shouldIncludeStream(context, stream, category)) {
+          return item; // Return original Map
+        }
+      }
+      return null; // No more streams
+    }
+
+    /**
+     * Extract stream information from Map and build temporary BaseStream for filtering.
+     *
+     * @param map The Map containing stream data
+     * @return Temporary BaseStream with extracted fields
+     */
+    private BaseStream extractStreamFromMap(Map<?, ?> map) {
+      // Build temporary BaseStream using builder pattern
+      var builder = LiveStream.builder();
+
+      // Extract and convert Map fields
+      if (map.containsKey("stream_id")) {
+        builder.externalId(toInteger(map.get("stream_id")));
+      }
+      if (map.containsKey("name")) {
+        builder.name(toString(map.get("name")));
+      }
+      if (map.containsKey("category_id")) {
+        builder.categoryId(toInteger(map.get("category_id")));
+      }
+      if (map.containsKey("is_adult")) {
+        builder.isAdult(toBoolean(map.get("is_adult")));
+      }
+      if (map.containsKey("allow_deny")) {
+        builder.allowDeny(toString(map.get("allow_deny")));
+      }
+      if (map.containsKey("labels")) {
+        builder.labels(toString(map.get("labels")));
+      }
+
+      return builder.build();
+    }
+
+    /** Convert Object to Integer, handling various types. */
+    private Integer toInteger(Object obj) {
+      if (obj == null) return null;
+      if (obj instanceof Integer) return (Integer) obj;
+      if (obj instanceof Number) return ((Number) obj).intValue();
+      if (obj instanceof String) {
+        try {
+          return Integer.parseInt((String) obj);
+        } catch (NumberFormatException e) {
+          return null;
+        }
+      }
+      return null;
+    }
+
+    /** Convert Object to String. */
+    private String toString(Object obj) {
+      return obj == null ? null : obj.toString();
+    }
+
+    /** Convert Object to Boolean, handling various types ("1"/"0", true/false, numeric). */
+    private Boolean toBoolean(Object obj) {
+      if (obj == null) return null;
+      if (obj instanceof Boolean) return (Boolean) obj;
+      if (obj instanceof String) {
+        String str = (String) obj;
+        return "1".equals(str) || "true".equalsIgnoreCase(str);
+      }
+      if (obj instanceof Number) {
+        return ((Number) obj).intValue() != 0;
+      }
+      return false;
     }
   }
 }

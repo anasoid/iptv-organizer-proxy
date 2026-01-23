@@ -79,8 +79,8 @@ public class ContentFilterService {
    * Get allowed categories for a stream type. Categories are filtered based on:
    *
    * <p>1. Category allow_deny='allow' - always shown 2. Category allow_deny='deny' - always hidden
-   * 3. Category allow_deny=null - shown if contains at least 1 accessible stream 4. Applied filter
-   * rules (PHP-compatible)
+   * 3. Category allow_deny=null - filtered by YAML rules, then shown if has ≥1 accessible stream 4.
+   * Applied filter rules (PHP-compatible)
    *
    * @param context The filtering context
    * @param sourceId ID of the source
@@ -107,27 +107,38 @@ public class ContentFilterService {
     // Build category cache for later stream filtering
     Map<Integer, Category> categoryCache = buildCategoryCache(sourceId, streamType);
 
-    // Filter categories
-    List<Category> result = new ArrayList<>();
+    // Separate categories into three groups based on allow_deny setting
+    List<Category> allowList = new ArrayList<>();
+    List<Category> neutralList = new ArrayList<>();
 
     for (Category category : allCategories) {
-      // Explicit allow - always show
       if ("allow".equalsIgnoreCase(category.getAllowDeny())) {
-        result.add(category);
-        continue;
-      }
-
-      // Explicit deny - always hide
-      if ("deny".equalsIgnoreCase(category.getAllowDeny())) {
-        continue;
-      }
-
-      // No explicit setting - check if category has accessible streams
-      if (hasAccessibleStreams(context, sourceId, category, streamType)) {
-        result.add(category);
+        allowList.add(category); // Always include
+      } else if ("deny".equalsIgnoreCase(category.getAllowDeny())) {
+        // Skip - always exclude
+      } else {
+        neutralList.add(category); // Need further filtering
       }
     }
 
+    // Apply YAML filter rules to categories without explicit allow_deny
+    List<Category> yamlFiltered = neutralList;
+    if (isFilteringEnabled(context)) {
+      yamlFiltered =
+          filterService.filterCategories(neutralList, streamType, context.getFilterConfig());
+    }
+
+    // Check stream accessibility for YAML-filtered categories
+    List<Category> accessibleCategories = new ArrayList<>();
+    for (Category category : yamlFiltered) {
+      if (hasAccessibleStreams(context, sourceId, category, streamType)) {
+        accessibleCategories.add(category);
+      }
+    }
+
+    // Combine allow-list + accessible categories
+    List<Category> result = new ArrayList<>(allowList);
+    result.addAll(accessibleCategories);
     return result;
   }
 
