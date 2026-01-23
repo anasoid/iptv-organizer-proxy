@@ -228,8 +228,7 @@ public class XtreamUserService {
    * @return Stream result with lazy Iterator of streams
    */
   public JsonStreamResult<Map<?, ?>> getLiveStreams(Client client, Source source, Long categoryId) {
-    FilterContext context = contentFilterService.buildFilterContext(client);
-    return getFilteredStreamsByType(context, client, source, StreamType.LIVE, categoryId);
+    return getFilteredStreamsByType(client, source, StreamType.LIVE, categoryId);
   }
 
   /**
@@ -241,8 +240,8 @@ public class XtreamUserService {
    * @return Stream result with lazy Iterator of streams
    */
   public JsonStreamResult<Map<?, ?>> getVodStreams(Client client, Source source, Long categoryId) {
-    FilterContext context = contentFilterService.buildFilterContext(client);
-    return getFilteredStreamsByType(context, client, source, StreamType.VOD, categoryId);
+
+    return getFilteredStreamsByType(client, source, StreamType.VOD, categoryId);
   }
 
   /**
@@ -254,8 +253,8 @@ public class XtreamUserService {
    * @return Stream result with lazy Iterator of series
    */
   public JsonStreamResult<Map<?, ?>> getSeries(Client client, Source source, Long categoryId) {
-    FilterContext context = contentFilterService.buildFilterContext(client);
-    return getFilteredStreamsByType(context, client, source, StreamType.SERIES, categoryId);
+
+    return getFilteredStreamsByType(client, source, StreamType.SERIES, categoryId);
   }
 
   /**
@@ -483,7 +482,6 @@ public class XtreamUserService {
   /**
    * Get filtered streams by type
    *
-   * @param context The filtering context
    * @param client The authenticated client
    * @param source The source
    * @param type The stream type
@@ -491,7 +489,8 @@ public class XtreamUserService {
    * @return Stream result with filtered streams
    */
   private JsonStreamResult<Map<?, ?>> getFilteredStreamsByType(
-      FilterContext context, Client client, Source source, StreamType type, Long categoryId) {
+      Client client, Source source, StreamType type, Long categoryId) {
+    FilterContext context = contentFilterService.buildFilterContext(client);
     // Get raw streams from upstream
     JsonStreamResult<Map<?, ?>> rawStreams = getStreamsByType(source, type, categoryId);
 

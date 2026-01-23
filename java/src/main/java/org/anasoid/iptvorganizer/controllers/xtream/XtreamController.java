@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
@@ -62,7 +61,6 @@ public class XtreamController {
    * @return JSON response with user_info and server_info
    */
   @GET
-  @POST
   @Produces(MediaType.APPLICATION_JSON)
   public Response handleRequest(
       @QueryParam("username") String username,
