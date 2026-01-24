@@ -160,6 +160,24 @@ public class XtreamUserService {
   }
 
   /**
+   * Get categories for a client by type (with filtering applied)
+   *
+   * @param client The authenticated client
+   * @param source The source
+   * @param type The stream type
+   * @return Stream result with lazy Iterator of categories
+   */
+  public JsonStreamResult<Map<?, ?>> getCategories(Client client, Source source, StreamType type) {
+    FilterContext context = contentFilterService.buildFilterContext(client);
+    List<Category> categories =
+        contentFilterService.getAllowedCategories(
+            context, source.getId(), type.getCategoryType(), DEFAULT_PAGINATION_LIMIT, 0);
+    // Materialize all data to Maps
+    List<Map<?, ?>> categoryMaps = materializeCategories(categories);
+    return new JsonStreamResult<>(categoryMaps.iterator(), new AtomicLong(0), null);
+  }
+
+  /**
    * Get live categories for a client (with filtering applied)
    *
    * @param client The authenticated client
@@ -167,17 +185,7 @@ public class XtreamUserService {
    * @return Stream result with lazy Iterator of categories
    */
   public JsonStreamResult<Map<?, ?>> getLiveCategories(Client client, Source source) {
-    FilterContext context = contentFilterService.buildFilterContext(client);
-    List<Category> categories =
-        contentFilterService.getAllowedCategories(
-            context,
-            source.getId(),
-            StreamType.LIVE.getCategoryType(),
-            DEFAULT_PAGINATION_LIMIT,
-            0);
-    // Materialize all data to Maps
-    List<Map<?, ?>> categoryMaps = materializeCategories(categories);
-    return new JsonStreamResult<>(categoryMaps.iterator(), new AtomicLong(0), null);
+    return getCategories(client, source, StreamType.LIVE);
   }
 
   /**
@@ -188,13 +196,7 @@ public class XtreamUserService {
    * @return Stream result with lazy Iterator of categories
    */
   public JsonStreamResult<Map<?, ?>> getVodCategories(Client client, Source source) {
-    FilterContext context = contentFilterService.buildFilterContext(client);
-    List<Category> categories =
-        contentFilterService.getAllowedCategories(
-            context, source.getId(), StreamType.VOD.getCategoryType(), DEFAULT_PAGINATION_LIMIT, 0);
-    // Materialize all data to Maps
-    List<Map<?, ?>> categoryMaps = materializeCategories(categories);
-    return new JsonStreamResult<>(categoryMaps.iterator(), new AtomicLong(0), null);
+    return getCategories(client, source, StreamType.VOD);
   }
 
   /**
@@ -205,19 +207,7 @@ public class XtreamUserService {
    * @return Stream result with lazy Iterator of categories
    */
   public JsonStreamResult<Map<?, ?>> getSeriesCategories(Client client, Source source) {
-    FilterContext context = contentFilterService.buildFilterContext(client);
-    List<Category> categories =
-        contentFilterService.getAllowedCategories(
-            context,
-            source.getId(),
-            StreamType.SERIES.getCategoryType(),
-            DEFAULT_PAGINATION_LIMIT,
-            0);
-    log.info("Found {} series categories before materialization", categories.size());
-    // Materialize all data to Maps
-    List<Map<?, ?>> categoryMaps = materializeCategories(categories);
-    log.info("Materialized {} series category maps", categoryMaps.size());
-    return new JsonStreamResult<>(categoryMaps.iterator(), new AtomicLong(0), null);
+    return getCategories(client, source, StreamType.SERIES);
   }
 
   /**
@@ -412,72 +402,13 @@ public class XtreamUserService {
   }
 
   /**
-   * Convert categories to Xtream JSON stream format
-   *
-   * @param categories List of categories
-   * @return JsonStreamResult with categories in Xtream format
-   */
-  private JsonStreamResult<Map<?, ?>> convertCategoriesToJsonStream(List<Category> categories) {
-    // Convert Category entities to Map format for Xtream API compatibility
-    List<Map<?, ?>> categoryMaps = materializeCategories(categories);
-    return new JsonStreamResult<>(categoryMaps.iterator(), new AtomicLong(0), null);
-  }
-
-  /**
    * Materialize streams to Maps (fully resolve lazy-loaded properties while context is active)
    *
    * @param streams List of stream entities
    * @return List of Maps with all data materialized
    */
   private List<Map<?, ?>> materializeStreams(List<? extends BaseStream> streams) {
-    return streams.stream()
-        .map(
-            stream -> {
-              Map<String, Object> map = new HashMap<>();
-              // Materialize all properties immediately to avoid lazy loading during streaming
-              map.put("num", stream.getNum());
-              map.put("name", stream.getName());
-              map.put("stream_id", stream.getExternalId());
-              map.put("stream_icon", "");
-              map.put("category_id", stream.getCategoryId());
-              map.put(
-                  "added", stream.getAddedDate() != null ? stream.getAddedDate().toString() : "");
-              map.put("is_adult", stream.getIsAdult() ? "1" : "0");
-              map.put("category_ids", stream.getCategoryIds());
-
-              // Include raw JSON data if available
-              if (stream.getData() != null && !stream.getData().isEmpty()) {
-                try {
-                  Map<String, Object> rawData = objectMapper.readValue(stream.getData(), Map.class);
-                  // Merge raw data with our standardized fields
-                  rawData.forEach(
-                      (key, value) -> {
-                        if (!map.containsKey(key)) {
-                          map.put(key, value);
-                        }
-                      });
-                } catch (Exception e) {
-                  log.warn("Failed to parse stream data for stream {}", stream.getExternalId(), e);
-                }
-              }
-
-              return (Map<?, ?>) (Object) map;
-            })
-        .collect(Collectors.toList());
-  }
-
-  /**
-   * Convert streams to Xtream JSON stream format
-   *
-   * @param streams List of stream entities from database
-   * @return JsonStreamResult with streams in Xtream format
-   */
-  private JsonStreamResult<Map<?, ?>> convertStreamsToJsonStream(
-      List<? extends BaseStream> streams) {
-    // Convert stream entities to Map format for Xtream API compatibility
-    // Using streams stored in database instead of raw API data
-    List<Map<?, ?>> streamMaps = materializeStreams(streams);
-    return new JsonStreamResult<>(streamMaps.iterator(), new AtomicLong(0), null);
+    return streams.stream().map(this::convertStreamToMap).collect(Collectors.toList());
   }
 
   /**
