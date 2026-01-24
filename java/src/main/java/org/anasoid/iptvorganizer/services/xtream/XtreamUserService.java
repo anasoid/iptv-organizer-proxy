@@ -170,8 +170,7 @@ public class XtreamUserService {
   public JsonStreamResult<Map<?, ?>> getCategories(Client client, Source source, StreamType type) {
     FilterContext context = contentFilterService.buildFilterContext(client);
     List<Category> categories =
-        contentFilterService.getAllowedCategories(
-            context, source.getId(), type.getCategoryType(), DEFAULT_PAGINATION_LIMIT, 0);
+        contentFilterService.getAllowedCategories(context, source.getId(), type.getCategoryType());
     // Materialize all data to Maps
     List<Map<?, ?>> categoryMaps = materializeCategories(categories);
     return new JsonStreamResult<>(categoryMaps.iterator(), new AtomicLong(0), null);

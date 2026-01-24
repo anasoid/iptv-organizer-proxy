@@ -85,19 +85,16 @@ public class ContentFilterService {
    * @param context The filtering context
    * @param sourceId ID of the source
    * @param streamType Stream type (live, vod, series)
-   * @param limit Number of categories to fetch
-   * @param offset Pagination offset
    * @return Filtered list of categories
    */
   public List<Category> getAllowedCategories(
-      FilterContext context, Long sourceId, String streamType, int limit, int offset) {
+      FilterContext context, Long sourceId, String streamType) {
     if (context == null) {
       throw new IllegalArgumentException("FilterContext cannot be null");
     }
 
     // Load categories from database
-    List<Category> allCategories =
-        categoryService.findBySourceAndTypePaged(sourceId, streamType, limit, offset);
+    List<Category> allCategories = categoryService.findBySourceAndType(sourceId, streamType);
 
     // If no filtering needed, return all
     if (!isFilteringEnabled(context) && !context.isHideAdultContent()) {
