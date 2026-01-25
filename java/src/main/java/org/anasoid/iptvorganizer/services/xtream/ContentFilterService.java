@@ -101,42 +101,72 @@ public class ContentFilterService {
       return allCategories;
     }
 
-    // Build category cache for later stream filtering
-    Map<Integer, Category> categoryCache = buildCategoryCache(sourceId, streamType);
-
-    // Separate categories into three groups based on allow_deny setting
-    List<Category> allowList = new ArrayList<>();
-    List<Category> neutralList = new ArrayList<>();
+    // Separate explicitly allowed/denied categories from neutral ones
+    List<Category> allowedByDefault = new ArrayList<>();
+    List<Category> neutralCategories = new ArrayList<>();
 
     for (Category category : allCategories) {
       if ("allow".equalsIgnoreCase(category.getAllowDeny())) {
-        allowList.add(category); // Always include
-      } else if ("deny".equalsIgnoreCase(category.getAllowDeny())) {
-        // Skip - always exclude
-      } else {
-        neutralList.add(category); // Need further filtering
+        allowedByDefault.add(category);
+      } else if (!"deny".equalsIgnoreCase(category.getAllowDeny())) {
+        neutralCategories.add(category);
       }
     }
 
-    // Apply YAML filter rules to categories without explicit allow_deny
-    List<Category> yamlFiltered = neutralList;
+    // Apply YAML filter rules to neutral categories
+    List<Category> yamlFilteredCategories = neutralCategories;
     if (isFilteringEnabled(context)) {
-      yamlFiltered =
-          filterService.filterCategories(neutralList, streamType, context.getFilterConfig());
+      yamlFilteredCategories =
+          filterService.filterCategories(neutralCategories, streamType, context.getFilterConfig());
     }
 
-    // Check stream accessibility for YAML-filtered categories
-    List<Category> accessibleCategories = new ArrayList<>();
-    for (Category category : yamlFiltered) {
-      if (hasAccessibleStreams(context, sourceId, category, streamType)) {
-        accessibleCategories.add(category);
+    // Build category cache for stream accessibility checks
+    Map<Integer, Category> categoryCache = buildCategoryCache(sourceId, streamType);
+
+    // Evaluate each neutral category individually
+    List<Category> result = new ArrayList<>(allowedByDefault);
+    for (Category category : yamlFilteredCategories) {
+      if (shouldIncludeCategory(context, category, sourceId, streamType, categoryCache)) {
+        result.add(category);
       }
     }
-
-    // Combine allow-list + accessible categories
-    List<Category> result = new ArrayList<>(allowList);
-    result.addAll(accessibleCategories);
     return result;
+  }
+
+  /**
+   * Check if a single category should be included based on filtering rules.
+   *
+   * <p>Filtering logic (evaluated in order): 1. Category allow_deny='allow' → ALWAYS INCLUDE 2.
+   * Category allow_deny='deny' → ALWAYS EXCLUDE 3. For neutral categories (no explicit allow_deny):
+   * - Check if category has at least one accessible stream
+   *
+   * <p>Note: YAML filter rules are applied during batch loading in getAllowedCategories().
+   *
+   * @param context The filtering context
+   * @param category The category to evaluate
+   * @param sourceId ID of the source
+   * @param streamType Stream type (live, vod, series)
+   * @param categoryCache Map of category ID → Category for lookups
+   * @return true if category should be included
+   */
+  public boolean shouldIncludeCategory(
+      FilterContext context,
+      Category category,
+      Long sourceId,
+      String streamType,
+      Map<Integer, Category> categoryCache) {
+    // Priority 1: Explicit allow always includes
+    if ("allow".equalsIgnoreCase(category.getAllowDeny())) {
+      return true;
+    }
+
+    // Priority 2: Explicit deny always excludes
+    if ("deny".equalsIgnoreCase(category.getAllowDeny())) {
+      return false;
+    }
+
+    // Priority 3: Neutral category - check if it has accessible streams
+    return hasAccessibleStreams(context, sourceId, category, streamType);
   }
 
   /**
@@ -205,7 +235,7 @@ public class ContentFilterService {
    */
   public boolean shouldIncludeStream(FilterContext context, BaseStream stream, Category category) {
     if (context == null) {
-      return true; // No context = include all
+      return false; // No context = include all
     }
 
     return filterService.shouldIncludeStream(
