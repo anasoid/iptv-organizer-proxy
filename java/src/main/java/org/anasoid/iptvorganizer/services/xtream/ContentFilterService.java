@@ -106,9 +106,9 @@ public class ContentFilterService {
     List<Category> neutralCategories = new ArrayList<>();
 
     for (Category category : allCategories) {
-      if ("allow".equalsIgnoreCase(category.getAllowDeny())) {
+      if (FilterService.ALLOW.equalsIgnoreCase(category.getAllowDeny())) {
         allowedByDefault.add(category);
-      } else if (!"deny".equalsIgnoreCase(category.getAllowDeny())) {
+      } else if (!FilterService.DENY.equalsIgnoreCase(category.getAllowDeny())) {
         neutralCategories.add(category);
       }
     }
@@ -156,12 +156,12 @@ public class ContentFilterService {
       String streamType,
       Map<Integer, Category> categoryCache) {
     // Priority 1: Explicit allow always includes
-    if ("allow".equalsIgnoreCase(category.getAllowDeny())) {
+    if (FilterService.ALLOW.equalsIgnoreCase(category.getAllowDeny())) {
       return true;
     }
 
     // Priority 2: Explicit deny always excludes
-    if ("deny".equalsIgnoreCase(category.getAllowDeny())) {
+    if (FilterService.DENY.equalsIgnoreCase(category.getAllowDeny())) {
       return false;
     }
 

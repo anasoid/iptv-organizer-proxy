@@ -92,12 +92,12 @@ tasks.register('quarkusDevDebug') {
 
 tasks.named('quarkusDev') {
     jvmArgs = [
-            '-Xmx72M'
+            '-Xmx84M'
     ]
 }
 tasks.named('quarkusRun') {
     jvmArgs = [
-            '-Xmx72M'
+            '-Xmx64M'
     ]
 }
 

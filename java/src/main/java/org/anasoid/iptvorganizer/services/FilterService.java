@@ -28,6 +28,10 @@ import org.anasoid.iptvorganizer.repositories.FilterRepository;
 @ApplicationScoped
 public class FilterService extends BaseService<Filter, FilterRepository> {
 
+  // Allow/Deny constants
+  public static final String ALLOW = "allow";
+  public static final String DENY = "deny";
+
   @Inject FilterRepository repository;
 
   @Inject ObjectMapper objectMapper;
@@ -407,24 +411,24 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
       String categoryAllowDeny = category != null ? category.getAllowDeny() : null;
 
       // Priority 1: Stream allow_deny='allow' - ALWAYS INCLUDE
-      if ("allow".equalsIgnoreCase(streamAllowDeny)) {
+      if (ALLOW.equalsIgnoreCase(streamAllowDeny)) {
         allowed.add(stream);
         continue;
       }
 
       // Priority 2: Stream allow_deny='deny' - ALWAYS EXCLUDE
-      if ("deny".equalsIgnoreCase(streamAllowDeny)) {
+      if (DENY.equalsIgnoreCase(streamAllowDeny)) {
         continue; // Skip this stream
       }
 
       // Priority 3: Category allow_deny='allow' - INCLUDE STREAM
-      if ("allow".equalsIgnoreCase(categoryAllowDeny)) {
+      if (ALLOW.equalsIgnoreCase(categoryAllowDeny)) {
         allowed.add(stream);
         continue;
       }
 
       // Priority 4: Category allow_deny='deny' - EXCLUDE STREAM
-      if ("deny".equalsIgnoreCase(categoryAllowDeny)) {
+      if (DENY.equalsIgnoreCase(categoryAllowDeny)) {
         continue; // Skip this stream
       }
 
@@ -494,22 +498,22 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
   public boolean shouldIncludeStream(
       BaseStream stream, Category category, FilterConfig config, boolean hideAdultContent) {
     // Priority 1: Stream allow_deny='allow' - ALWAYS INCLUDE
-    if ("allow".equalsIgnoreCase(stream.getAllowDeny())) {
+    if (ALLOW.equalsIgnoreCase(stream.getAllowDeny())) {
       return true;
     }
 
     // Priority 2: Stream allow_deny='deny' - ALWAYS EXCLUDE
-    if ("deny".equalsIgnoreCase(stream.getAllowDeny())) {
+    if (DENY.equalsIgnoreCase(stream.getAllowDeny())) {
       return false;
     }
 
     // Priority 3: Category allow_deny='allow' - INCLUDE
-    if (category != null && "allow".equalsIgnoreCase(category.getAllowDeny())) {
+    if (category != null && ALLOW.equalsIgnoreCase(category.getAllowDeny())) {
       return true;
     }
 
     // Priority 4: Category allow_deny='deny' - EXCLUDE
-    if (category != null && "deny".equalsIgnoreCase(category.getAllowDeny())) {
+    if (category != null && DENY.equalsIgnoreCase(category.getAllowDeny())) {
       return false;
     }
 
