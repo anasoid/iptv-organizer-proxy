@@ -558,6 +558,7 @@ public class XtreamUserService {
     private final Iterator<Map<?, ?>> delegate;
     private final FilterContext context;
     private final Map<Integer, Category> categoryCache;
+    Map<String, Boolean> categoryMatchCache = new HashMap<>();
     private Map<?, ?> nextItem = null;
     private boolean hasNextCached = false;
 
@@ -598,7 +599,7 @@ public class XtreamUserService {
         Category category = categoryCache.get(stream.getCategoryId());
 
         // Check if stream passes filtering
-        if (contentFilterService.shouldIncludeStream(context, stream, category)) {
+        if (contentFilterService.shouldIncludeStream(context, stream, category,categoryMatchCache)) {
           return item; // Return original Map
         }
       }

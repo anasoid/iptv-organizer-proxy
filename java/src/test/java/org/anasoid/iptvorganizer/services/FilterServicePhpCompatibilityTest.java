@@ -135,7 +135,7 @@ public class FilterServicePhpCompatibilityTest {
             .channels(ChannelMatch.builder().byName(Collections.singletonList("ESPN*")).build())
             .build();
 
-    assertTrue(filterService.matchStream(stream, category, match));
+    assertTrue(filterService.matchStream(stream, category, match, new HashMap<>()));
   }
 
   @DisplayName("Matching - category only criteria")
@@ -150,7 +150,7 @@ public class FilterServicePhpCompatibilityTest {
             .categories(CategoryMatch.builder().byName(Collections.singletonList("Sports")).build())
             .build();
 
-    assertTrue(filterService.matchStream(stream, category, match));
+    assertTrue(filterService.matchStream(stream, category, match, new HashMap<>()));
   }
 
   @DisplayName("Matching - both channel and category criteria (AND logic)")
@@ -167,7 +167,7 @@ public class FilterServicePhpCompatibilityTest {
             .build();
 
     // Both match
-    assertTrue(filterService.matchStream(stream, category, match));
+    assertTrue(filterService.matchStream(stream, category, match, new HashMap<>()));
 
     // Channel doesn't match
     MatchCriteria mismatchChannel =
@@ -175,7 +175,7 @@ public class FilterServicePhpCompatibilityTest {
             .channels(ChannelMatch.builder().byName(Collections.singletonList("HBO*")).build())
             .categories(CategoryMatch.builder().byName(Collections.singletonList("Sports")).build())
             .build();
-    assertFalse(filterService.matchStream(stream, category, mismatchChannel));
+    assertFalse(filterService.matchStream(stream, category, mismatchChannel, new HashMap<>()));
   }
 
   // ==================== Priority-Based Filtering Tests ====================

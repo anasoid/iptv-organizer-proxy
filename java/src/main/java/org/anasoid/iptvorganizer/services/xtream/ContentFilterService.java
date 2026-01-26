@@ -3,6 +3,7 @@ package org.anasoid.iptvorganizer.services.xtream;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -172,6 +173,9 @@ public class ContentFilterService {
   /**
    * Check if a category has at least one accessible stream after filtering.
    *
+   * <p>Uses request-scoped category match caching for efficiency when checking multiple streams in
+   * the same category.
+   *
    * @param context The filtering context
    * @param sourceId ID of the source
    * @param category Category to check
@@ -185,9 +189,12 @@ public class ContentFilterService {
         getStreamsByCategory(
             sourceId, category.getExternalId(), streamType, CATEGORY_STREAM_CHECK_LIMIT);
 
+    // Request-scoped cache for category match results
+    Map<String, Boolean> categoryMatchCache = new HashMap<>();
+
     // Check if any stream passes filtering
     for (BaseStream stream : streams) {
-      if (shouldIncludeStream(context, stream, category)) {
+      if (shouldIncludeStream(context, stream, category, categoryMatchCache)) {
         return true; // Found at least one accessible stream
       }
     }
@@ -198,6 +205,9 @@ public class ContentFilterService {
   /**
    * Apply filtering to a stream list. Checks each stream against allow_deny rules, filter rules,
    * and adult content setting.
+   *
+   * <p>Uses request-scoped category match caching to avoid redundant category matching across
+   * streams in the same category.
    *
    * @param context The filtering context
    * @param streams Streams to filter
@@ -211,9 +221,12 @@ public class ContentFilterService {
     }
 
     List<BaseStream> filtered = new ArrayList<>();
+    // Request-scoped cache for category match results - reused across all streams in this batch
+    Map<String, Boolean> categoryMatchCache = new HashMap<>();
 
     for (BaseStream stream : streams) {
-      if (shouldIncludeStream(context, stream, categoryCache.get(stream.getCategoryId()))) {
+      if (shouldIncludeStream(
+          context, stream, categoryCache.get(stream.getCategoryId()), categoryMatchCache)) {
         filtered.add(stream);
       }
     }
@@ -222,7 +235,8 @@ public class ContentFilterService {
   }
 
   /**
-   * Check if a single stream should be included based on filtering context.
+   * Check if a single stream should be included based on filtering context. For batch filtering,
+   * use the overloaded method that accepts categoryMatchCache to enable caching.
    *
    * <p>Uses priority-based filtering: 1. Stream allow_deny='allow' → ALWAYS INCLUDE 2. Stream
    * allow_deny='deny' → ALWAYS EXCLUDE 3. Category allow_deny='allow' → INCLUDE 4. Category
@@ -240,6 +254,37 @@ public class ContentFilterService {
 
     return filterService.shouldIncludeStream(
         stream, category, context.getFilterConfig(), context.isHideAdultContent());
+  }
+
+  /**
+   * Check if a single stream should be included based on filtering context with request-scoped
+   * category caching.
+   *
+   * <p>Uses priority-based filtering: 1. Stream allow_deny='allow' → ALWAYS INCLUDE 2. Stream
+   * allow_deny='deny' → ALWAYS EXCLUDE 3. Category allow_deny='allow' → INCLUDE 4. Category
+   * allow_deny='deny' → EXCLUDE 5. Adult content filter 6. Filter rules (first-match-wins)
+   *
+   * @param context The filtering context
+   * @param stream Stream to check
+   * @param category Stream's category
+   * @param categoryMatchCache Request-scoped cache for category match results
+   * @return true if stream should be included
+   */
+  public boolean shouldIncludeStream(
+      FilterContext context,
+      BaseStream stream,
+      Category category,
+      Map<String, Boolean> categoryMatchCache) {
+    if (context == null) {
+      return false; // No context = include all
+    }
+
+    return filterService.shouldIncludeStream(
+        stream,
+        category,
+        context.getFilterConfig(),
+        context.isHideAdultContent(),
+        categoryMatchCache);
   }
 
   /**

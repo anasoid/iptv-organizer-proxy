@@ -8,6 +8,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -343,12 +344,22 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
    * (AND) - If rule has only channel criteria → only channel must match - If rule has only category
    * criteria → only category must match - If rule has neither → false (doesn't match)
    *
+   * <p>OPTIMIZATION: Category match results are cached within the request (via categoryMatchCache
+   * param) and reused across all streams in the same category. This significantly improves
+   * performance when most filtering is category-based, as is typical in IPTV scenarios.
+   *
    * @param stream Stream to check
    * @param category Category of the stream
    * @param match Match criteria
+   * @param categoryMatchCache Request-scoped cache for category match results (reused during same
+   *     request)
    * @return true if stream matches rule
    */
-  protected boolean matchStream(BaseStream stream, Category category, MatchCriteria match) {
+  protected boolean matchStream(
+      BaseStream stream,
+      Category category,
+      MatchCriteria match,
+      Map<String, Boolean> categoryMatchCache) {
     boolean hasChannelCriteria =
         (match.getChannels() != null)
             && (!isEmpty(match.getChannels().getByName())
@@ -359,31 +370,66 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
             && (!isEmpty(match.getCategories().getByName())
                 || !isEmpty(match.getCategories().getByLabels()));
 
-    // Evaluate channel criteria
-    boolean channelMatches = false;
-    if (hasChannelCriteria) {
-      channelMatches =
-          matchesChannelCriteria(stream.getName(), stream.getLabels(), match.getChannels());
-    }
-
-    // Evaluate category criteria
-    boolean categoryMatches = false;
-    if (hasCategoryCriteria && category != null) {
-      categoryMatches =
-          matchesCategoryCriteria(category.getName(), category.getLabels(), match.getCategories());
-    }
-
     // If both channel and category criteria exist, both must match (AND)
-    // If only one type exists, that one must match
     if (hasChannelCriteria && hasCategoryCriteria) {
-      return channelMatches && categoryMatches;
-    } else if (hasChannelCriteria) {
-      return channelMatches;
-    } else if (hasCategoryCriteria) {
+      // Evaluate channel criteria
+      boolean channelMatches =
+          matchesChannelCriteria(stream.getName(), stream.getLabels(), match.getChannels());
+      if (!channelMatches) {
+        return false; // Short-circuit: channel doesn't match
+      }
+
+      // Evaluate category criteria with request-scoped caching
+      boolean categoryMatches =
+          matchesCategoryWithCache(
+              stream.getCategoryId(), category, match.getCategories(), categoryMatchCache);
       return categoryMatches;
     }
 
+    // If only channel criteria exists
+    if (hasChannelCriteria) {
+      return matchesChannelCriteria(stream.getName(), stream.getLabels(), match.getChannels());
+    }
+
+    // If only category criteria exists - use request cache
+    if (hasCategoryCriteria) {
+      return matchesCategoryWithCache(
+          stream.getCategoryId(), category, match.getCategories(), categoryMatchCache);
+    }
+
     return false;
+  }
+
+  /**
+   * Evaluate category matching with request-scoped caching. Category results are cached because
+   * they're often shared across many streams (all streams in a category have the same category
+   * match result). Cache is request-scoped and should be cleared after the request completes.
+   *
+   * @param categoryId External category ID for cache key
+   * @param category Category object to match
+   * @param criteria Category matching criteria
+   * @param categoryMatchCache Request-scoped cache map (typically a HashMap, not thread-safe)
+   * @return true if category matches criteria
+   */
+  private boolean matchesCategoryWithCache(
+      Integer categoryId,
+      Category category,
+      CategoryMatch criteria,
+      Map<String, Boolean> categoryMatchCache) {
+    if (category == null) {
+      return false;
+    }
+
+    // If categoryId is null, evaluate without caching (e.g., in tests)
+    if (categoryId == null) {
+      return matchesCategoryCriteria(category.getName(), category.getLabels(), criteria);
+    }
+
+    String cacheKey = categoryId + "#" + System.identityHashCode(criteria);
+
+    return categoryMatchCache.computeIfAbsent(
+        cacheKey,
+        key -> matchesCategoryCriteria(category.getName(), category.getLabels(), criteria));
   }
 
   /**
@@ -487,7 +533,9 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
   /**
    * Check if a single stream should be included based on filters.
    *
-   * <p>Used for efficient filtering of individual streams or small batches.
+   * <p>Used for efficient filtering of individual streams or small batches. For batch filtering
+   * with category caching, use shouldIncludeStream(stream, category, config, hideAdultContent,
+   * categoryMatchCache) instead.
    *
    * @param stream Stream to check
    * @param category Stream's category
@@ -497,6 +545,29 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
    */
   public boolean shouldIncludeStream(
       BaseStream stream, Category category, FilterConfig config, boolean hideAdultContent) {
+    return shouldIncludeStream(stream, category, config, hideAdultContent, new HashMap<>());
+  }
+
+  /**
+   * Check if a single stream should be included based on filters with request-scoped category
+   * caching.
+   *
+   * <p>Category match results are cached during the request to avoid redundant matching when
+   * filtering multiple streams from the same category.
+   *
+   * @param stream Stream to check
+   * @param category Stream's category
+   * @param config Filter configuration (null = no filtering)
+   * @param hideAdultContent Whether to hide adult content
+   * @param categoryMatchCache Request-scoped cache for category match results
+   * @return true if stream should be included
+   */
+  public boolean shouldIncludeStream(
+      BaseStream stream,
+      Category category,
+      FilterConfig config,
+      boolean hideAdultContent,
+      Map<String, Boolean> categoryMatchCache) {
     // Priority 1: Stream allow_deny='allow' - ALWAYS INCLUDE
     if (ALLOW.equalsIgnoreCase(stream.getAllowDeny())) {
       return true;
@@ -532,7 +603,7 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
       // Process rules in order - first matching rule wins
       for (FilterRule rule : rules) {
         MatchCriteria match = rule.getMatch();
-        if (match != null && matchStream(stream, category, match)) {
+        if (match != null && matchStream(stream, category, match, categoryMatchCache)) {
           // First matching rule wins
           return rule.getType() == FilterAction.INCLUDE;
         }
