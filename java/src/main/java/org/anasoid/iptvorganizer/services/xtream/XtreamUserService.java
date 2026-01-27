@@ -229,10 +229,6 @@ public class XtreamUserService {
   private XtreamAuthResponse buildAuthenticationResponse(
       Client client, Source source, String proxyUrl) {
     try {
-      // Try to fetch auth data from original source
-      JsonStreamResult<Map<?, ?>> result = xtreamClient.getLiveCategories(source);
-      // For auth endpoint, we just need the structure, so close the stream
-      result.close();
 
       return buildFallbackAuthenticationResponse(client, proxyUrl);
     } catch (Exception ex) {
