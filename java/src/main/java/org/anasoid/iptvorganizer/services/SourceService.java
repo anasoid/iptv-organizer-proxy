@@ -28,4 +28,24 @@ public class SourceService extends BaseService<Source, SourceRepository> {
     }
     return repository.insert(source);
   }
+
+  /**
+   * Check if source has useRedirect configuration
+   *
+   * @param source The source
+   * @return true if useRedirect is explicitly set (not null)
+   */
+  public boolean hasUseRedirectConfig(Source source) {
+    return source != null && source.getUseRedirect() != null;
+  }
+
+  /**
+   * Check if source has useRedirectXmltv configuration
+   *
+   * @param source The source
+   * @return true if useRedirectXmltv is explicitly set (not null)
+   */
+  public boolean hasUseRedirectXmltvConfig(Source source) {
+    return source != null && source.getUseRedirectXmltv() != null;
+  }
 }

@@ -32,6 +32,21 @@ public class ClientDTO {
   @JsonSerialize(using = BooleanAsIntSerializer.class)
   private Boolean hideAdultContent;
 
+  @JsonSerialize(using = BooleanAsIntSerializer.class)
+  private Boolean useRedirect;
+
+  @JsonSerialize(using = BooleanAsIntSerializer.class)
+  private Boolean useRedirectXmltv;
+
+  @JsonSerialize(using = BooleanAsIntSerializer.class)
+  private Boolean enableProxy;
+
+  @JsonSerialize(using = BooleanAsIntSerializer.class)
+  private Boolean disableStreamProxy;
+
+  @JsonSerialize(using = BooleanAsIntSerializer.class)
+  private Boolean streamFollowLocation;
+
   private LocalDateTime lastLogin;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
@@ -50,6 +65,11 @@ public class ClientDTO {
         .expiryDate(entity.getExpiryDate())
         .isActive(entity.getIsActive())
         .hideAdultContent(entity.getHideAdultContent())
+        .useRedirect(entity.getUseRedirect())
+        .useRedirectXmltv(entity.getUseRedirectXmltv())
+        .enableProxy(entity.getEnableProxy())
+        .disableStreamProxy(entity.getDisableStreamProxy())
+        .streamFollowLocation(entity.getStreamFollowLocation())
         .lastLogin(entity.getLastLogin())
         .createdAt(entity.getCreatedAt())
         .updatedAt(entity.getUpdatedAt())

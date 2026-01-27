@@ -37,6 +37,12 @@ public class SourceDTO {
   @JsonSerialize(using = BooleanAsIntSerializer.class)
   private Boolean streamFollowLocation;
 
+  @JsonSerialize(using = BooleanAsIntSerializer.class)
+  private Boolean useRedirect;
+
+  @JsonSerialize(using = BooleanAsIntSerializer.class)
+  private Boolean useRedirectXmltv;
+
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 
@@ -56,6 +62,8 @@ public class SourceDTO {
         .enableProxy(entity.getEnableProxy())
         .disableStreamProxy(entity.getDisableStreamProxy())
         .streamFollowLocation(entity.getStreamFollowLocation())
+        .useRedirect(entity.getUseRedirect())
+        .useRedirectXmltv(entity.getUseRedirectXmltv())
         .createdAt(entity.getCreatedAt())
         .updatedAt(entity.getUpdatedAt())
         .build();

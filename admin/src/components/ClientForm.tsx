@@ -11,8 +11,9 @@ import {
   FormControlLabel,
   Checkbox,
   MenuItem,
+  Typography,
 } from '@mui/material';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ContentCopy as CopyIcon } from '@mui/icons-material';
 import type { Client } from '../services/clientsApi';
@@ -39,6 +40,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
     reset,
     watch,
     setValue,
+    control,
   } = useForm<Client>({
     defaultValues: client || {
       username: '',
@@ -48,6 +50,11 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
       email: '',
       is_active: 1,
       hide_adult_content: 0,
+      use_redirect: null,
+      use_redirect_xmltv: null,
+      enableproxy: null,
+      disablestreamproxy: null,
+      stream_follow_location: null,
     },
   });
 
@@ -225,6 +232,109 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           }
           label="Hide Adult Content"
         />
+
+        <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2 }}>
+          <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+            Stream & XMLTV Redirect Settings (Optional - leave unchecked to inherit from source/env)
+          </Typography>
+
+          <Controller
+            name="use_redirect"
+            control={control}
+            render={({ field }) => (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={Boolean(field.value)}
+                    onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                    indeterminate={field.value === null}
+                  />
+                }
+                label="Enable Stream Direct Redirect (302)"
+              />
+            )}
+          />
+          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4, mb: 2 }}>
+            When enabled, stream requests return a direct 302 redirect instead of proxying through /proxy endpoint
+          </Typography>
+
+          <Controller
+            name="use_redirect_xmltv"
+            control={control}
+            render={({ field }) => (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={Boolean(field.value)}
+                    onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                    indeterminate={field.value === null}
+                  />
+                }
+                label="Enable XMLTV Direct Redirect (302)"
+              />
+            )}
+          />
+          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4, mb: 2 }}>
+            When enabled, XMLTV EPG requests return a direct 302 redirect instead of streaming content
+          </Typography>
+
+          <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2 }}>
+            <Typography variant="caption" sx={{ fontWeight: 600 }}>
+              Proxy Settings (Optional - leave unchecked to inherit from source)
+            </Typography>
+
+            <Controller
+              name="enableproxy"
+              control={control}
+              render={({ field }) => (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={Boolean(field.value)}
+                      onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                      indeterminate={field.value === null}
+                    />
+                  }
+                  label="Enable HTTP Proxy"
+                />
+              )}
+            />
+
+            <Controller
+              name="disablestreamproxy"
+              control={control}
+              render={({ field }) => (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={Boolean(field.value)}
+                      onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                      indeterminate={field.value === null}
+                    />
+                  }
+                  label="Disable Stream Proxy"
+                />
+              )}
+            />
+
+            <Controller
+              name="stream_follow_location"
+              control={control}
+              render={({ field }) => (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={Boolean(field.value)}
+                      onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                      indeterminate={field.value === null}
+                    />
+                  }
+                  label="Follow HTTP Redirects"
+                />
+              )}
+            />
+          </Box>
+        </Box>
 
         {credentials && sourceId && (
           <Box sx={{ p: 2, bgcolor: 'info.light', borderRadius: 1 }}>

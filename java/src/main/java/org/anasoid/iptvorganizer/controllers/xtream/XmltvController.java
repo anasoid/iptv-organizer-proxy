@@ -11,6 +11,7 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.StreamingOutput;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
@@ -19,6 +20,7 @@ import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
+import org.anasoid.iptvorganizer.services.ClientService;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
 import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 
@@ -41,6 +43,7 @@ public class XmltvController {
   private static final String XMLTV_ACTION = "get_xmltv";
 
   @Inject XtreamUserService xtreamUserService;
+  @Inject ClientService clientService;
   @Inject ClientRepository clientRepository;
   @Inject SourceRepository sourceRepository;
   @Inject XtreamClient xtreamClient;
@@ -66,6 +69,21 @@ public class XmltvController {
       Source source = authResult.getSource();
 
       log.info("XMLTV request from client: {}", username);
+
+      // Check useRedirectXmltv setting with priority: client -> source -> environment
+      boolean useRedirectXmltv = clientService.resolveUseRedirectXmltv(client, source);
+      log.info(
+          "useRedirectXmltv for XMLTV: {} (client: {}, source: {})",
+          useRedirectXmltv,
+          client.getUseRedirectXmltv(),
+          source.getUseRedirectXmltv());
+
+      // If useRedirectXmltv is enabled, return direct 302 redirect to XMLTV URL
+      if (useRedirectXmltv) {
+        String xmltvUrl = buildXmltvUrl(source);
+        log.info("useRedirectXmltv enabled, returning direct 302 redirect to: {}", xmltvUrl);
+        return Response.seeOther(URI.create(xmltvUrl)).build();
+      }
 
       // Stream XMLTV data from source
       return streamXmltvData(source, client);

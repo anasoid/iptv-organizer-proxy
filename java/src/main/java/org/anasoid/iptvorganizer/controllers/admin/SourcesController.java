@@ -119,6 +119,8 @@ public class SourcesController extends BaseController {
                   request.getStreamFollowLocation() != null
                       ? request.getStreamFollowLocation()
                       : false)
+              .useRedirect(request.getUseRedirect())
+              .useRedirectXmltv(request.getUseRedirectXmltv())
               .createdAt(LocalDateTime.now())
               .updatedAt(LocalDateTime.now())
               .build();
@@ -167,6 +169,13 @@ public class SourcesController extends BaseController {
       }
       if (request.getStreamFollowLocation() != null) {
         source.setStreamFollowLocation(request.getStreamFollowLocation());
+      }
+      // Allow setting to null for optional redirect settings
+      if (request.getUseRedirect() != null) {
+        source.setUseRedirect(request.getUseRedirect());
+      }
+      if (request.getUseRedirectXmltv() != null) {
+        source.setUseRedirectXmltv(request.getUseRedirectXmltv());
       }
 
       source.setUpdatedAt(LocalDateTime.now());

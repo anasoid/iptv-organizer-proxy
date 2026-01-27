@@ -20,6 +20,11 @@ public class Client extends BaseEntity {
   private LocalDate expiryDate;
   private Boolean isActive;
   private Boolean hideAdultContent;
+  private Boolean useRedirect;
+  private Boolean useRedirectXmltv;
+  private Boolean enableProxy;
+  private Boolean disableStreamProxy;
+  private Boolean streamFollowLocation;
   private String notes;
   private LocalDateTime lastLogin;
 }

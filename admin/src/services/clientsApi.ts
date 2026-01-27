@@ -9,6 +9,11 @@ export interface Client {
   email?: string | null;
   is_active: number;
   hide_adult_content?: number;
+  use_redirect?: number | null;
+  use_redirect_xmltv?: number | null;
+  enableproxy?: number | null;
+  disablestreamproxy?: number | null;
+  stream_follow_location?: number | null;
   created_at?: string;
   updated_at?: string;
 }

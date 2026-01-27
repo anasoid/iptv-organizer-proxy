@@ -34,4 +34,10 @@ public class CreateSourceRequest {
 
   @JsonProperty("stream_follow_location")
   private Boolean streamFollowLocation;
+
+  @JsonProperty("use_redirect")
+  private Boolean useRedirect;
+
+  @JsonProperty("use_redirect_xmltv")
+  private Boolean useRedirectXmltv;
 }

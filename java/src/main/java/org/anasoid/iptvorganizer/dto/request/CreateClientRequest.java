@@ -36,5 +36,20 @@ public class CreateClientRequest {
   @JsonProperty("hide_adult_content")
   private Boolean hideAdultContent;
 
+  @JsonProperty("use_redirect")
+  private Boolean useRedirect;
+
+  @JsonProperty("use_redirect_xmltv")
+  private Boolean useRedirectXmltv;
+
+  @JsonProperty("enableproxy")
+  private Boolean enableProxy;
+
+  @JsonProperty("disablestreamproxy")
+  private Boolean disableStreamProxy;
+
+  @JsonProperty("stream_follow_location")
+  private Boolean streamFollowLocation;
+
   private String notes;
 }

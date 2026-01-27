@@ -44,9 +44,11 @@ export default function SourceForm({
       sync_interval: 1,
       is_active: 1,
       sync_status: "idle",
-      enableproxy: 0,
-      disablestreamproxy: 0,
-      stream_follow_location: 1,
+      enableproxy: null,
+      disablestreamproxy: null,
+      stream_follow_location: null,
+      use_redirect: null,
+      use_redirect_xmltv: null,
     },
   });
 
@@ -172,7 +174,7 @@ export default function SourceForm({
 
         <Box sx={{ borderTop: 1, borderColor: "divider", pt: 2, mt: 2 }}>
           <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-            Proxy Configuration
+            Proxy Configuration (Optional - leave unchecked to inherit from environment)
           </Typography>
 
           <Controller
@@ -183,7 +185,8 @@ export default function SourceForm({
                 control={
                   <Checkbox
                     checked={Boolean(field.value)}
-                    onChange={(e) => field.onChange(e.target.checked ? 1 : 0)}
+                    onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                    indeterminate={field.value === null}
                   />
                 }
                 label="Enable HTTP Proxy for Upstream Requests"
@@ -206,10 +209,11 @@ export default function SourceForm({
                 control={
                   <Checkbox
                     checked={Boolean(field.value)}
-                    onChange={(e) => field.onChange(e.target.checked ? 1 : 0)}
+                    onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                    indeterminate={field.value === null}
                   />
                 }
-                label="Disable binary Stream Proxy Endpoint (Direct Redirects)"
+                label="Disable Stream Proxy Endpoint (Direct Redirects)"
               />
             )}
           />
@@ -229,7 +233,8 @@ export default function SourceForm({
                 control={
                   <Checkbox
                     checked={Boolean(field.value)}
-                    onChange={(e) => field.onChange(e.target.checked ? 1 : 0)}
+                    onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                    indeterminate={field.value === null}
                   />
                 }
                 label="Follow HTTP Redirects When Streaming"
@@ -242,6 +247,58 @@ export default function SourceForm({
           >
             When enabled, the proxy will automatically follow HTTP redirects
             (301/302) from the upstream source when streaming content
+          </Typography>
+        </Box>
+
+        <Box sx={{ borderTop: 1, borderColor: "divider", pt: 2, mt: 2 }}>
+          <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+            Stream & XMLTV Redirect Mode (Optional)
+          </Typography>
+
+          <Controller
+            name="use_redirect"
+            control={control}
+            render={({ field }) => (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={Boolean(field.value)}
+                    onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                    indeterminate={field.value === null}
+                  />
+                }
+                label="Enable Stream Direct Redirect (302)"
+              />
+            )}
+          />
+          <Typography
+            variant="caption"
+            sx={{ display: "block", color: "text.secondary", ml: 4, mb: 2 }}
+          >
+            When enabled, stream requests return a direct 302 redirect instead of proxying through /proxy endpoint
+          </Typography>
+
+          <Controller
+            name="use_redirect_xmltv"
+            control={control}
+            render={({ field }) => (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={Boolean(field.value)}
+                    onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                    indeterminate={field.value === null}
+                  />
+                }
+                label="Enable XMLTV Direct Redirect (302)"
+              />
+            )}
+          />
+          <Typography
+            variant="caption"
+            sx={{ display: "block", color: "text.secondary", ml: 4 }}
+          >
+            When enabled, XMLTV EPG requests return a direct 302 redirect instead of streaming content
           </Typography>
         </Box>
       </DialogContent>

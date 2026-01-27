@@ -4,10 +4,15 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.List;
 import org.anasoid.iptvorganizer.models.entity.Client;
+import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 
 @ApplicationScoped
 public class ClientService extends BaseService<Client, ClientRepository> {
+
+  // Environment variable names
+  private static final String ENV_STREAM_USE_REDIRECT = "STREAM_USE_REDIRECT";
+  private static final String ENV_STREAM_USE_REDIRECT_XMLTV = "STREAM_USE_REDIRECT_XMLTV";
 
   @Inject ClientRepository repository;
 
@@ -41,5 +46,83 @@ public class ClientService extends BaseService<Client, ClientRepository> {
   /** Count clients matching search criteria */
   public Long countSearchClients(String search) {
     return repository.countSearchClients(search);
+  }
+
+  /**
+   * Check if client has useRedirect configuration
+   *
+   * @param client The client
+   * @return true if useRedirect is explicitly set (not null)
+   */
+  public boolean hasUseRedirectConfig(Client client) {
+    return client != null && client.getUseRedirect() != null;
+  }
+
+  /**
+   * Check if client has useRedirectXmltv configuration
+   *
+   * @param client The client
+   * @return true if useRedirectXmltv is explicitly set (not null)
+   */
+  public boolean hasUseRedirectXmltvConfig(Client client) {
+    return client != null && client.getUseRedirectXmltv() != null;
+  }
+
+  /**
+   * Resolve useRedirect setting with priority: client -> source -> environment variable Uses
+   * STREAM_USE_REDIRECT environment variable
+   *
+   * @param client The client
+   * @param source The source
+   * @return true if redirect should be used
+   */
+  public boolean resolveUseRedirect(Client client, Source source) {
+    // Priority 1: Client-level setting
+    if (hasUseRedirectConfig(client)) {
+      return client.getUseRedirect();
+    }
+
+    // Priority 2: Source-level setting
+    if (source != null && source.getUseRedirect() != null) {
+      return source.getUseRedirect();
+    }
+
+    // Priority 3: Environment variable
+    String envValue = System.getenv(ENV_STREAM_USE_REDIRECT);
+    if (envValue != null) {
+      return Boolean.parseBoolean(envValue);
+    }
+
+    // Default: false (use proxy)
+    return false;
+  }
+
+  /**
+   * Resolve useRedirectXmltv setting with priority: client -> source -> environment variable Uses
+   * STREAM_USE_REDIRECT_XMLTV environment variable
+   *
+   * @param client The client
+   * @param source The source
+   * @return true if redirect should be used for XMLTV
+   */
+  public boolean resolveUseRedirectXmltv(Client client, Source source) {
+    // Priority 1: Client-level setting
+    if (hasUseRedirectXmltvConfig(client)) {
+      return client.getUseRedirectXmltv();
+    }
+
+    // Priority 2: Source-level setting
+    if (source != null && source.getUseRedirectXmltv() != null) {
+      return source.getUseRedirectXmltv();
+    }
+
+    // Priority 3: Environment variable
+    String envValue = System.getenv(ENV_STREAM_USE_REDIRECT_XMLTV);
+    if (envValue != null) {
+      return Boolean.parseBoolean(envValue);
+    }
+
+    // Default: false (stream content)
+    return false;
   }
 }

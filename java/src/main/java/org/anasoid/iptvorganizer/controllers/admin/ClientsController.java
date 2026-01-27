@@ -93,6 +93,11 @@ public class ClientsController extends BaseController {
               .isActive(request.getIsActive() != null ? request.getIsActive() : true)
               .hideAdultContent(
                   request.getHideAdultContent() != null ? request.getHideAdultContent() : false)
+              .useRedirect(request.getUseRedirect())
+              .useRedirectXmltv(request.getUseRedirectXmltv())
+              .enableProxy(request.getEnableProxy())
+              .disableStreamProxy(request.getDisableStreamProxy())
+              .streamFollowLocation(request.getStreamFollowLocation())
               .notes(request.getNotes())
               .createdAt(LocalDateTime.now())
               .updatedAt(LocalDateTime.now())
@@ -123,6 +128,15 @@ public class ClientsController extends BaseController {
       if (request.getIsActive() != null) client.setIsActive(request.getIsActive());
       if (request.getHideAdultContent() != null)
         client.setHideAdultContent(request.getHideAdultContent());
+      // Allow setting to null for optional redirect/proxy settings
+      if (request.getUseRedirect() != null) client.setUseRedirect(request.getUseRedirect());
+      if (request.getUseRedirectXmltv() != null)
+        client.setUseRedirectXmltv(request.getUseRedirectXmltv());
+      if (request.getEnableProxy() != null) client.setEnableProxy(request.getEnableProxy());
+      if (request.getDisableStreamProxy() != null)
+        client.setDisableStreamProxy(request.getDisableStreamProxy());
+      if (request.getStreamFollowLocation() != null)
+        client.setStreamFollowLocation(request.getStreamFollowLocation());
       if (request.getNotes() != null) client.setNotes(request.getNotes());
       client.setUpdatedAt(LocalDateTime.now());
 

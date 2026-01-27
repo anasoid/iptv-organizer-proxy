@@ -11,9 +11,11 @@ export interface Source {
   last_sync?: string | null;
   next_sync?: string | null;
   is_active: number;
-  enableproxy?: number;
-  disablestreamproxy?: number;
-  stream_follow_location?: number;
+  enableproxy?: number | null;
+  disablestreamproxy?: number | null;
+  stream_follow_location?: number | null;
+  use_redirect?: number | null;
+  use_redirect_xmltv?: number | null;
   created_at?: string;
   updated_at?: string;
 }

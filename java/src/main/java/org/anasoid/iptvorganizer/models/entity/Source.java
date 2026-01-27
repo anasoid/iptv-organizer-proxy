@@ -24,4 +24,6 @@ public class Source extends BaseEntity {
   private Boolean enableProxy;
   private Boolean disableStreamProxy;
   private Boolean streamFollowLocation;
+  private Boolean useRedirect;
+  private Boolean useRedirectXmltv;
 }

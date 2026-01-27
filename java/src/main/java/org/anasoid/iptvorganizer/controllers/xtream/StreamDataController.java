@@ -20,6 +20,7 @@ import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.http.UpstreamStatusResult;
+import org.anasoid.iptvorganizer.services.ClientService;
 import org.anasoid.iptvorganizer.services.http.HeaderFilterService;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
 import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
@@ -45,6 +46,7 @@ import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
 public class StreamDataController {
 
   @Inject XtreamUserService xtreamUserService;
+  @Inject ClientService clientService;
   @Inject HttpStreamingService httpStreamingService;
   @Inject HeaderFilterService headerFilterService;
   @Inject ContentFilterService contentFilterService;
@@ -170,6 +172,20 @@ public class StreamDataController {
           streamType,
           streamId,
           streamUrl);
+
+      // Check useRedirect setting with priority: client -> source -> environment
+      boolean useRedirect = clientService.resolveUseRedirect(client, source);
+      log.info(
+          "useRedirect for stream: {} (client: {}, source: {})",
+          useRedirect,
+          client.getUseRedirect(),
+          source.getUseRedirect());
+
+      // If useRedirect is enabled, return direct 302 redirect to original URL
+      if (useRedirect) {
+        log.info("useRedirect enabled, returning direct 302 redirect to: {}", streamUrl);
+        return Response.seeOther(URI.create(streamUrl)).build();
+      }
 
       // Extract and filter client headers to forward
       Map<String, String> requestHeaders = headerFilterService.filterRequestHeaders(httpHeaders);
