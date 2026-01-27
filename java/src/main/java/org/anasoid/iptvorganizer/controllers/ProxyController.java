@@ -6,6 +6,7 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.StreamingOutput;
 import java.io.IOException;
@@ -13,14 +14,17 @@ import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
+import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
+import org.anasoid.iptvorganizer.services.http.HeaderFilterService;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
 import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
 
@@ -44,6 +48,7 @@ public class ProxyController {
 
   @Inject XtreamUserService xtreamUserService;
   @Inject HttpStreamingService httpStreamingService;
+  @Inject HeaderFilterService headerFilterService;
   @Inject ClientRepository clientRepository;
   @Inject SourceRepository sourceRepository;
 
@@ -55,6 +60,7 @@ public class ProxyController {
    * @param username Client username
    * @param password Client password
    * @param encodedUrl Base64 encoded upstream URL
+   * @param httpHeaders Client request headers
    * @return Stream response with content from upstream
    */
   @GET
@@ -62,7 +68,8 @@ public class ProxyController {
   public Response handleProxyRequest(
       @PathParam("username") String username,
       @PathParam("password") String password,
-      @QueryParam("url") String encodedUrl) {
+      @QueryParam("url") String encodedUrl,
+      @jakarta.ws.rs.core.Context HttpHeaders httpHeaders) {
 
     try {
       // Validate encoded URL parameter
@@ -81,7 +88,7 @@ public class ProxyController {
       log.info("Proxy request - user: {}, decodedUrl: {}", username, decodedUrl);
 
       // Stream content from upstream
-      return streamFromUpstream(decodedUrl, source);
+      return streamFromUpstream(decodedUrl, source, httpHeaders);
 
     } catch (UnauthorizedException ex) {
       log.warn("Proxy request unauthorized: {}", ex.getMessage());
@@ -119,14 +126,18 @@ public class ProxyController {
   }
 
   /**
-   * Stream content from upstream URL
+   * Stream content from upstream URL with header forwarding
    *
    * @param upstreamUrl The upstream URL
    * @param source The source (for configuration)
+   * @param httpHeaders Client request headers to forward
    * @return Response with streaming output
    */
-  private Response streamFromUpstream(String upstreamUrl, Source source) {
+  private Response streamFromUpstream(String upstreamUrl, Source source, HttpHeaders httpHeaders) {
     try {
+      // Extract and filter client headers to forward
+      Map<String, String> requestHeaders = headerFilterService.filterRequestHeaders(httpHeaders);
+
       // Build HTTP options with redirect following if configured
       HttpOptions options =
           HttpOptions.builder()
@@ -136,12 +147,23 @@ public class ProxyController {
                   source.getStreamFollowLocation() != null && source.getStreamFollowLocation())
               .build();
 
-      // Stream content from upstream
-      InputStream inputStream = httpStreamingService.streamHttp(upstreamUrl, options);
+      // Stream content from upstream with header forwarding
+      HttpStreamingResponse streamResponse =
+          httpStreamingService.streamHttpWithHeaders(upstreamUrl, options, requestHeaders);
 
-      return Response.ok(
+      // Check for HTTP errors
+      if (streamResponse.getStatusCode() >= 400) {
+        log.warn(
+            "Upstream error response: {} for URL: {}", streamResponse.getStatusCode(), upstreamUrl);
+        return Response.status(streamResponse.getStatusCode()).build();
+      }
+
+      // Build response with streaming output
+      Response.ResponseBuilder responseBuilder =
+          Response.ok(
               (StreamingOutput)
                   os -> {
+                    InputStream inputStream = streamResponse.getBody();
                     try {
                       byte[] buffer = new byte[BUFFER_SIZE];
                       int bytesRead;
@@ -150,9 +172,11 @@ public class ProxyController {
                         os.flush();
                       }
                     } catch (IOException ex) {
-                      // Handle errno 23 (client disconnection)
-                      if (ex.getMessage() != null && ex.getMessage().contains("Broken pipe")) {
-                        log.info("Client disconnected while streaming from: {}", upstreamUrl);
+                      // Handle client disconnection
+                      if (ex.getMessage() != null
+                          && (ex.getMessage().contains("Broken pipe")
+                              || ex.getMessage().contains("Connection reset"))) {
+                        log.info("Client disconnected (normal for IPTV) - {}", upstreamUrl);
                       } else {
                         log.warn(
                             "Error streaming content from {}: {}", upstreamUrl, ex.getMessage());
@@ -165,8 +189,12 @@ public class ProxyController {
                         log.warn("Error closing stream: {}", ex.getMessage());
                       }
                     }
-                  })
-          .build();
+                  });
+
+      // Apply upstream response headers
+      headerFilterService.applyResponseHeaders(responseBuilder, streamResponse.getHeaders());
+
+      return responseBuilder.build();
 
     } catch (Exception ex) {
       log.error("Error getting stream from upstream: {}", ex.getMessage());

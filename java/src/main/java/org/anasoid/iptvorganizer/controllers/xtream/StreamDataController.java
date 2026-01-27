@@ -6,9 +6,12 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
+import java.net.URI;
 import java.util.Base64;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
@@ -16,9 +19,8 @@ import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
-import org.anasoid.iptvorganizer.repositories.ClientRepository;
-import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
-import org.anasoid.iptvorganizer.services.FilterService;
+import org.anasoid.iptvorganizer.models.http.UpstreamStatusResult;
+import org.anasoid.iptvorganizer.services.http.HeaderFilterService;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
 import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
 import org.anasoid.iptvorganizer.services.stream.SeriesService;
@@ -44,10 +46,8 @@ public class StreamDataController {
 
   @Inject XtreamUserService xtreamUserService;
   @Inject HttpStreamingService httpStreamingService;
-  @Inject ClientRepository clientRepository;
-  @Inject SourceRepository sourceRepository;
+  @Inject HeaderFilterService headerFilterService;
   @Inject ContentFilterService contentFilterService;
-  @Inject FilterService filterService;
   @Inject CategoryService categoryService;
   @Inject LiveStreamService liveStreamService;
   @Inject VodStreamService vodStreamService;
@@ -63,6 +63,7 @@ public class StreamDataController {
    * @param streamId Stream ID
    * @param ext File extension (m3u8, ts, etc)
    * @param uriInfo Request URI info
+   * @param httpHeaders Client request headers
    * @return Stream response or redirect
    */
   @GET
@@ -72,8 +73,9 @@ public class StreamDataController {
       @PathParam("password") String password,
       @PathParam("streamId") String streamId,
       @PathParam("ext") String ext,
-      @Context UriInfo uriInfo) {
-    return handleStreamRequest(username, password, streamId, ext, "live", uriInfo);
+      @Context UriInfo uriInfo,
+      @Context HttpHeaders httpHeaders) {
+    return handleStreamRequest(username, password, streamId, ext, "live", uriInfo, httpHeaders);
   }
 
   /**
@@ -86,6 +88,7 @@ public class StreamDataController {
    * @param streamId Stream ID
    * @param ext File extension
    * @param uriInfo Request URI info
+   * @param httpHeaders Client request headers
    * @return Stream response or redirect
    */
   @GET
@@ -95,8 +98,9 @@ public class StreamDataController {
       @PathParam("password") String password,
       @PathParam("streamId") String streamId,
       @PathParam("ext") String ext,
-      @Context UriInfo uriInfo) {
-    return handleStreamRequest(username, password, streamId, ext, "movie", uriInfo);
+      @Context UriInfo uriInfo,
+      @Context HttpHeaders httpHeaders) {
+    return handleStreamRequest(username, password, streamId, ext, "movie", uriInfo, httpHeaders);
   }
 
   /**
@@ -109,6 +113,7 @@ public class StreamDataController {
    * @param streamId Stream ID
    * @param ext File extension
    * @param uriInfo Request URI info
+   * @param httpHeaders Client request headers
    * @return Stream response or redirect
    */
   @GET
@@ -118,8 +123,9 @@ public class StreamDataController {
       @PathParam("password") String password,
       @PathParam("streamId") String streamId,
       @PathParam("ext") String ext,
-      @Context UriInfo uriInfo) {
-    return handleStreamRequest(username, password, streamId, ext, "series", uriInfo);
+      @Context UriInfo uriInfo,
+      @Context HttpHeaders httpHeaders) {
+    return handleStreamRequest(username, password, streamId, ext, "series", uriInfo, httpHeaders);
   }
 
   /**
@@ -131,6 +137,7 @@ public class StreamDataController {
    * @param ext File extension
    * @param streamType Stream type (live, movie, series)
    * @param uriInfo Request URI info
+   * @param httpHeaders Client request headers
    * @return Response with stream or redirect
    */
   private Response handleStreamRequest(
@@ -139,7 +146,8 @@ public class StreamDataController {
       String streamId,
       String ext,
       String streamType,
-      UriInfo uriInfo) {
+      UriInfo uriInfo,
+      HttpHeaders httpHeaders) {
 
     try {
       // Validate and authenticate client
@@ -163,12 +171,45 @@ public class StreamDataController {
           streamId,
           streamUrl);
 
-      // Check if we should disable proxy (return direct 302)
+      // Extract and filter client headers to forward
+      Map<String, String> requestHeaders = headerFilterService.filterRequestHeaders(httpHeaders);
+
+      // Check upstream status to detect redirects early
+      UpstreamStatusResult upstreamStatus =
+          httpStreamingService.checkUpstreamStatus(streamUrl, requestHeaders);
+
+      // Handle upstream redirects
+      if (upstreamStatus.isRedirect() && upstreamStatus.getLocation() != null) {
+        String redirectUrl = upstreamStatus.getLocation();
+        log.info("Upstream redirect detected: {} -> {}", streamUrl, redirectUrl);
+
+        Boolean disableStreamProxy = source.getDisableStreamProxy();
+        if (disableStreamProxy != null && disableStreamProxy) {
+          // Direct redirect to discovered URL
+          log.info("Direct stream proxy disabled, returning 302 redirect to: {}", redirectUrl);
+          return Response.seeOther(URI.create(redirectUrl)).build();
+        } else {
+          // Encode and redirect through proxy
+          String encodedUrl = Base64.getUrlEncoder().encodeToString(redirectUrl.getBytes());
+          String proxyUrl = buildProxyUrl(uriInfo, username, password, encodedUrl);
+          log.info(
+              "Stream proxy enabled with upstream redirect, redirecting to proxy: {}", proxyUrl);
+          return Response.seeOther(URI.create(proxyUrl)).build();
+        }
+      }
+
+      // Handle upstream errors
+      if (upstreamStatus.isError() || upstreamStatus.getStatusCode() >= 400) {
+        log.warn("Upstream error: {}", upstreamStatus.getStatusCode());
+        return Response.status(upstreamStatus.getStatusCode()).build();
+      }
+
+      // No upstream redirect detected - use normal redirect logic
       Boolean disableStreamProxy = source.getDisableStreamProxy();
       if (disableStreamProxy != null && disableStreamProxy) {
         // Direct 302 redirect to source
         log.info("Direct stream proxy disabled, returning 302 redirect to: {}", streamUrl);
-        return Response.seeOther(java.net.URI.create(streamUrl)).build();
+        return Response.seeOther(URI.create(streamUrl)).build();
       }
 
       // Otherwise, encode URL and redirect to our proxy endpoint
@@ -176,7 +217,7 @@ public class StreamDataController {
       String proxyUrl = buildProxyUrl(uriInfo, username, password, encodedUrl);
 
       log.info("Stream proxy enabled, redirecting to proxy: {}", proxyUrl);
-      return Response.seeOther(java.net.URI.create(proxyUrl)).build();
+      return Response.seeOther(URI.create(proxyUrl)).build();
 
     } catch (UnauthorizedException ex) {
       log.warn("Stream request unauthorized", ex);

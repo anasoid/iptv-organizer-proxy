@@ -16,6 +16,8 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.StreamingException;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
+import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
+import org.anasoid.iptvorganizer.models.http.UpstreamStatusResult;
 
 @Slf4j
 @ApplicationScoped
@@ -87,6 +89,158 @@ public class HttpStreamingService {
     } catch (IOException | InterruptedException | URISyntaxException e) {
       log.error("HTTP request failed for: {}, error: {}", url, e.getMessage());
       throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Stream HTTP response with request header forwarding and response header capture.
+   *
+   * <p>This method enhances the basic streamHttp() by: - Forwarding client headers (User-Agent,
+   * Range, etc) to upstream - Capturing and returning response headers for propagation to client
+   *
+   * @param url The URL to stream from
+   * @param options HTTP options (timeout, retries, headers)
+   * @param requestHeaders Headers to forward to upstream (client headers)
+   * @return HttpStreamingResponse with status, headers, and body
+   */
+  public HttpStreamingResponse streamHttpWithHeaders(
+      String url, HttpOptions options, Map<String, String> requestHeaders) {
+    if (options == null) {
+      options = createHttpOptions();
+    }
+
+    final HttpOptions finalOptions = options;
+    int maxRetries = finalOptions.getMaxRetries() != null ? finalOptions.getMaxRetries() : 1;
+
+    log.info("Starting HTTP stream request with headers to: {}", url);
+
+    // Sequential retry logic
+    Exception lastException = null;
+    for (int attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return performHttpRequestWithHeaders(url, finalOptions, requestHeaders);
+      } catch (Exception e) {
+        lastException = e;
+        if (attempt < maxRetries) {
+          log.info("HTTP request with headers failed (attempt {}), retrying...", (attempt + 1));
+        }
+      }
+    }
+
+    log.error("HTTP streaming with headers failed after {} retries for: {}", maxRetries, url);
+    throw new StreamingException(
+        "HTTP streaming with headers failed after " + maxRetries + " retries", lastException);
+  }
+
+  /**
+   * Perform actual HTTP request with request headers and return response with headers.
+   *
+   * @param url The URL to request
+   * @param options HTTP options
+   * @param requestHeaders Headers to forward
+   * @return HttpStreamingResponse with status, headers, and body
+   */
+  private HttpStreamingResponse performHttpRequestWithHeaders(
+      String url, HttpOptions options, Map<String, String> requestHeaders) {
+    try {
+      HttpRequest.Builder requestBuilder = HttpRequest.newBuilder().uri(new URI(url)).GET();
+
+      // Add options headers
+      if (options.getHeaders() != null) {
+        options.getHeaders().forEach(requestBuilder::header);
+      }
+
+      // Add forwarded request headers
+      if (requestHeaders != null) {
+        requestHeaders.forEach(
+            (k, v) -> {
+              requestBuilder.header(k, v);
+              log.debug("Forwarded request header: {} = {}", k, v);
+            });
+      }
+
+      // Set timeout
+      if (options.getTimeout() != null) {
+        requestBuilder.timeout(Duration.ofMillis(options.getTimeout()));
+      }
+
+      HttpRequest request = requestBuilder.build();
+
+      HttpResponse<InputStream> response =
+          httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+
+      if (response.statusCode() >= 400) {
+        log.warn("HTTP error response: {} for URL: {}", response.statusCode(), url);
+      }
+
+      log.info(
+          "HTTP request with headers successful for: {}, status: {}", url, response.statusCode());
+
+      return HttpStreamingResponse.builder()
+          .statusCode(response.statusCode())
+          .headers(response.headers().map())
+          .body(response.body())
+          .build();
+    } catch (IOException | InterruptedException | URISyntaxException e) {
+      log.error("HTTP request with headers failed for: {}, error: {}", url, e.getMessage());
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Check upstream status with HEAD request to detect redirects early.
+   *
+   * <p>This performs a HEAD request to check status and Location header without transferring the
+   * response body. Useful for detecting 302 redirects before streaming begins, matching the PHP
+   * implementation's checkUpstreamStatus() behavior.
+   *
+   * @param url The URL to check
+   * @param requestHeaders Headers to forward (optional)
+   * @return UpstreamStatusResult with status, location, and error info
+   */
+  public UpstreamStatusResult checkUpstreamStatus(String url, Map<String, String> requestHeaders) {
+    try {
+      HttpRequest.Builder requestBuilder =
+          HttpRequest.newBuilder()
+              .uri(new URI(url))
+              .method("HEAD", HttpRequest.BodyPublishers.noBody())
+              .timeout(Duration.ofSeconds(10));
+
+      // Add forwarded request headers
+      if (requestHeaders != null) {
+        requestHeaders.forEach(
+            (k, v) -> {
+              requestBuilder.header(k, v);
+              log.debug("Forwarded status check header: {} = {}", k, v);
+            });
+      }
+
+      HttpRequest request = requestBuilder.build();
+
+      HttpResponse<Void> response =
+          httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+
+      // Extract Location header if present
+      String location = response.headers().firstValue("Location").orElse(null);
+
+      log.info(
+          "Upstream status check for: {}, status: {}, redirect: {}",
+          url,
+          response.statusCode(),
+          location != null ? "yes (" + location + ")" : "no");
+
+      return UpstreamStatusResult.builder()
+          .statusCode(response.statusCode())
+          .location(location)
+          .error(false)
+          .build();
+    } catch (IOException | InterruptedException | URISyntaxException e) {
+      log.error("Upstream status check failed for: {}, error: {}", url, e.getMessage());
+      return UpstreamStatusResult.builder()
+          .statusCode(0)
+          .error(true)
+          .errorMessage(e.getMessage())
+          .build();
     }
   }
 
