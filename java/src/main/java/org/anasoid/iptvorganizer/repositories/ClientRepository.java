@@ -115,6 +115,10 @@ public class ClientRepository extends BaseRepository<Client> {
 
   /** Find client by username */
   public Client findByUsernameAndPassword(String username, String password) {
+    // Validate inputs
+    if (username == null || username.trim().isEmpty()) {
+      throw new RuntimeException("Username is required");
+    }
     Client client = this.findByUsername(username);
     if (client == null) {
       throw new RuntimeException("Client not found");

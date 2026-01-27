@@ -61,10 +61,6 @@ public class XtreamUserService {
    * @throws RuntimeException if client not found or authentication fails
    */
   public XtreamAuthResponse authenticate(String username, String password, String proxyUrl) {
-    // Validate inputs
-    if (username == null || username.trim().isEmpty()) {
-      throw new RuntimeException("Username is required");
-    }
 
     // Find client by username
     Client client = clientRepository.findByUsernameAndPassword(username, password);
