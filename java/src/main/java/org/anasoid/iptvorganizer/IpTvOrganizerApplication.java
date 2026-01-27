@@ -7,6 +7,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.migrations.SimpleMigrator;
 import org.anasoid.iptvorganizer.services.synch.SyncLogService;
 import org.anasoid.iptvorganizer.services.synch.SyncManager;
 
@@ -15,6 +16,7 @@ import org.anasoid.iptvorganizer.services.synch.SyncManager;
 @Startup
 public class IpTvOrganizerApplication {
 
+  @Inject SimpleMigrator simpleMigrator;
   @Inject SyncManager syncManager;
   @Inject SyncLogService syncLogService;
 
@@ -29,6 +31,7 @@ public class IpTvOrganizerApplication {
 
   void onStart(@Observes StartupEvent event) {
     log.info("On startup IpTvOrganizerApplication");
+    simpleMigrator.startMigrations();
     syncLogService.fixInterruptedSyncs();
     log.info("On startup IpTvOrganizerApplication done");
   }
