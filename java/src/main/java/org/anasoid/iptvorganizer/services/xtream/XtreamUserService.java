@@ -22,45 +22,41 @@ import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.LiveStream;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
+import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
-import org.anasoid.iptvorganizer.repositories.FilterRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
 import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
 import org.anasoid.iptvorganizer.services.stream.SeriesService;
 import org.anasoid.iptvorganizer.services.stream.VodStreamService;
+import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
 import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
-import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 
 /** Service for Xtream Codes API user operations */
 @Slf4j
 @ApplicationScoped
 public class XtreamUserService {
 
-  private static final int DEFAULT_PAGINATION_LIMIT = 10000;
-  private static final String DEFAULT_XTREAM_PASSWORD = "";
-
   @Inject ClientRepository clientRepository;
   @Inject SourceRepository sourceRepository;
-  @Inject FilterRepository filterRepository;
-  @Inject XtreamClient xtreamClient;
   @Inject CategoryService categoryService;
   @Inject LiveStreamService liveStreamService;
   @Inject VodStreamService vodStreamService;
   @Inject SeriesService seriesService;
   @Inject ContentFilterService contentFilterService;
   @Inject ObjectMapper objectMapper;
+  @Inject HttpStreamingService httpStreamingService;
 
   /**
-   * Authenticate client and return server/user info
+   * Authenticate client and return server/user info as JSON Map
    *
    * @param username Client username
    * @param password Client password
    * @param proxyUrl Base URL of this proxy server
-   * @return Authentication response with server and user info
+   * @return Authentication response as Map with server and user info
    * @throws RuntimeException if client not found or authentication fails
    */
-  public XtreamAuthResponse authenticate(String username, String password, String proxyUrl) {
+  public Map<String, Object> authenticate(String username, String password, String proxyUrl) {
 
     // Find client by username
     Client client = clientRepository.findByUsernameAndPassword(username, password);
@@ -71,8 +67,14 @@ public class XtreamUserService {
       throw new RuntimeException("Source not found for client");
     }
 
-    // Build response
-    return buildAuthenticationResponse(client, source, proxyUrl);
+    // Try to fetch from upstream, fallback on error
+
+    Map<String, Object> authData = fetchAuthenticationFromUpstream(source, proxyUrl);
+
+    // Replace user credentials with client credentials
+    replaceUserInfo(authData, client);
+
+    return authData;
   }
 
   /**
@@ -215,7 +217,87 @@ public class XtreamUserService {
   }
 
   /**
-   * Build authentication response with server and user info
+   * Fetch authentication data from upstream source
+   *
+   * @param source The source with credentials
+   * @param proxyUrl The proxy URL for replacing server info
+   * @return Authentication data as Map with user_info and server_info
+   * @throws Exception if fetch or validation fails
+   */
+  private Map<String, Object> fetchAuthenticationFromUpstream(Source source, String proxyUrl) {
+    // Build upstream URL with source credentials
+    String upstreamUrl =
+        String.format(
+            "%s/player_api.php?username=%s&password=%s",
+            source.getUrl().replaceAll("/$", ""), source.getUsername(), source.getPassword());
+
+    // Fetch from upstream
+    HttpOptions options = HttpOptions.builder().timeout(30000L).maxRetries(1).build();
+
+    Map<String, Object> authData = httpStreamingService.fetchJsonObject(upstreamUrl, options);
+
+    // Validate structure
+    if (!authData.containsKey("user_info") || !authData.containsKey("server_info")) {
+      throw new RuntimeException("Invalid authentication response from upstream");
+    }
+
+    // Replace server_info with proxy details
+    replaceServerInfo(authData, proxyUrl);
+
+    return authData;
+  }
+
+  /**
+   * Replace server_info fields with proxy details
+   *
+   * @param authData The authentication data Map
+   * @param proxyUrl The proxy server URL
+   */
+  @SuppressWarnings("unchecked")
+  private void replaceServerInfo(Map<String, Object> authData, String proxyUrl) {
+    try {
+      java.net.URL url = new java.net.URL(proxyUrl);
+      String scheme = url.getProtocol();
+      String host = url.getHost();
+      int port = url.getPort() > 0 ? url.getPort() : (scheme.equals("https") ? 443 : 80);
+
+      Map<String, Object> serverInfo = (Map<String, Object>) authData.get("server_info");
+
+      // Replace URL with proxy hostname
+      serverInfo.put("url", host);
+      serverInfo.put("server_protocol", scheme);
+
+      // Set ports based on protocol
+      if ("https".equals(scheme)) {
+        serverInfo.put("https_port", String.valueOf(port));
+        serverInfo.put("port", "80");
+      } else {
+        serverInfo.put("port", String.valueOf(port));
+        serverInfo.put("https_port", "443");
+      }
+
+    } catch (Exception ex) {
+      log.warn("Failed to parse proxy URL for server info replacement", ex);
+    }
+  }
+
+  /**
+   * Replace user_info fields with client credentials
+   *
+   * @param authData The authentication data Map
+   * @param client The client
+   */
+  @SuppressWarnings("unchecked")
+  private void replaceUserInfo(Map<String, Object> authData, Client client) {
+    Map<String, Object> userInfo = (Map<String, Object>) authData.get("user_info");
+
+    // Replace with client credentials (not source credentials)
+    userInfo.put("username", client.getUsername());
+    userInfo.put("password", client.getPassword()); // Empty string
+  }
+
+  /**
+   * Build authentication response with server and user info (legacy - kept for compatibility)
    *
    * @param client The authenticated client
    * @param source The source
@@ -246,7 +328,7 @@ public class XtreamUserService {
     XtreamUserInfo userInfo =
         XtreamUserInfo.builder()
             .username(client.getUsername())
-            .password(DEFAULT_XTREAM_PASSWORD)
+            .password(client.getPassword())
             .message("")
             .auth(1)
             .status(client.getIsActive() != null && client.getIsActive() ? "Active" : "Inactive")

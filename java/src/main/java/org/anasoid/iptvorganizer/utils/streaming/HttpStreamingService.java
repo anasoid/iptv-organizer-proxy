@@ -1,10 +1,13 @@
 package org.anasoid.iptvorganizer.utils.streaming;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -55,22 +58,22 @@ public class HttpStreamingService {
   }
 
   /** Perform actual HTTP request and return response body as InputStream */
-  private InputStream performHttpRequest(String url, HttpOptions options) throws Exception {
-    HttpRequest.Builder requestBuilder = HttpRequest.newBuilder().uri(new URI(url)).GET();
-
-    // Add custom headers
-    if (options.getHeaders() != null) {
-      options.getHeaders().forEach(requestBuilder::header);
-    }
-
-    // Set timeout
-    if (options.getTimeout() != null) {
-      requestBuilder.timeout(Duration.ofMillis(options.getTimeout()));
-    }
-
-    HttpRequest request = requestBuilder.build();
-
+  private InputStream performHttpRequest(String url, HttpOptions options) {
     try {
+      HttpRequest.Builder requestBuilder = HttpRequest.newBuilder().uri(new URI(url)).GET();
+
+      // Add custom headers
+      if (options.getHeaders() != null) {
+        options.getHeaders().forEach(requestBuilder::header);
+      }
+
+      // Set timeout
+      if (options.getTimeout() != null) {
+        requestBuilder.timeout(Duration.ofMillis(options.getTimeout()));
+      }
+
+      HttpRequest request = requestBuilder.build();
+
       HttpResponse<InputStream> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
 
@@ -81,9 +84,9 @@ public class HttpStreamingService {
 
       log.info("HTTP request successful for: {}, status: {}", url, response.statusCode());
       return response.body();
-    } catch (Exception e) {
+    } catch (IOException | InterruptedException | URISyntaxException e) {
       log.error("HTTP request failed for: {}, error: {}", url, e.getMessage());
-      throw e;
+      throw new RuntimeException(e);
     }
   }
 
@@ -123,6 +126,37 @@ public class HttpStreamingService {
     } catch (Exception e) {
       log.error("Failed to parse JSON stream from: {}, error: {}", url, e.getMessage());
       throw new StreamingException("Failed to parse JSON stream", e);
+    }
+  }
+
+  /**
+   * Fetch single JSON object from HTTP endpoint.
+   *
+   * @param url The URL to fetch from
+   * @param options HTTP options (timeout, retries, headers)
+   * @return Map containing the JSON object
+   * @throws Exception if fetch or parsing fails
+   */
+  public Map<String, Object> fetchJsonObject(String url, HttpOptions options) {
+    if (options == null) {
+      options = createHttpOptions();
+    }
+
+    log.info("Fetching JSON object from URL: {}", url);
+
+    InputStream is = performHttpRequest(url, options);
+    try {
+      Map<String, Object> result = objectMapper.readValue(is, new TypeReference<>() {});
+      log.info("Successfully fetched JSON object from: {}", url);
+      return result;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      try {
+        is.close();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 }
