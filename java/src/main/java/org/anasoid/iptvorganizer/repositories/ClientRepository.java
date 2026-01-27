@@ -112,4 +112,23 @@ public class ClientRepository extends BaseRepository<Client> {
       throw new RuntimeException("Failed to find client by username: " + username, e);
     }
   }
+
+  /** Find client by username */
+  public Client findByUsernameAndPassword(String username, String password) {
+    Client client = this.findByUsername(username);
+    if (client == null) {
+      throw new RuntimeException("Client not found");
+    }
+
+    // Validate password
+    if (password == null || !password.equals(client.getPassword())) {
+      throw new RuntimeException("Invalid password");
+    }
+
+    // Check if client is active
+    if (client.getIsActive() != null && !client.getIsActive()) {
+      throw new RuntimeException("Client is inactive");
+    }
+    return client;
+  }
 }

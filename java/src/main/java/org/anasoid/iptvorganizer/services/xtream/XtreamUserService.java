@@ -67,20 +67,7 @@ public class XtreamUserService {
     }
 
     // Find client by username
-    Client client = clientRepository.findByUsername(username);
-    if (client == null) {
-      throw new RuntimeException("Client not found");
-    }
-
-    // Validate password
-    if (password == null || !password.equals(client.getPassword())) {
-      throw new RuntimeException("Invalid password");
-    }
-
-    // Check if client is active
-    if (client.getIsActive() != null && !client.getIsActive()) {
-      throw new RuntimeException("Client is inactive");
-    }
+    Client client = clientRepository.findByUsernameAndPassword(username, password);
 
     // Get source for this client
     Source source = sourceRepository.findById(client.getSourceId());
@@ -131,23 +118,7 @@ public class XtreamUserService {
     }
 
     // Find client by username
-    Client client = clientRepository.findByUsername(username);
-    if (client == null) {
-      log.warn("Client not found: {}", username);
-      throw new UnauthorizedException("Invalid credentials");
-    }
-
-    // Validate password
-    if (!password.equals(client.getPassword())) {
-      log.warn("Invalid password for client: {}", username);
-      throw new UnauthorizedException("Invalid credentials");
-    }
-
-    // Check if client is active
-    if (client.getIsActive() != null && !client.getIsActive()) {
-      log.warn("Client is inactive: {}", username);
-      throw new ForbiddenException("Client is inactive");
-    }
+    Client client = clientRepository.findByUsernameAndPassword(username, password);
 
     // Get source for this client
     Source source = sourceRepository.findById(client.getSourceId());
@@ -599,7 +570,8 @@ public class XtreamUserService {
         Category category = categoryCache.get(stream.getCategoryId());
 
         // Check if stream passes filtering
-        if (contentFilterService.shouldIncludeStream(context, stream, category,categoryMatchCache)) {
+        if (contentFilterService.shouldIncludeStream(
+            context, stream, category, categoryMatchCache)) {
           return item; // Return original Map
         }
       }
