@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS sources (
     enableproxy INTEGER NOT NULL DEFAULT 0 CHECK(enableproxy IN (0, 1)),
     disablestreamproxy INTEGER NOT NULL DEFAULT 0 CHECK(disablestreamproxy IN (0, 1)),
     stream_follow_location INTEGER NOT NULL DEFAULT 1 CHECK(stream_follow_location IN (0, 1)),
+    use_redirect INTEGER,
+    use_redirect_xmltv INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

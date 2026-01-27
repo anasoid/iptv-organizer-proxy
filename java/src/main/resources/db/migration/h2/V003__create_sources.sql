@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS sources (
     enableproxy BOOLEAN NOT NULL DEFAULT FALSE,
     disablestreamproxy BOOLEAN NOT NULL DEFAULT FALSE,
     stream_follow_location BOOLEAN NOT NULL DEFAULT TRUE,
+    use_redirect BOOLEAN,
+    use_redirect_xmltv BOOLEAN,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

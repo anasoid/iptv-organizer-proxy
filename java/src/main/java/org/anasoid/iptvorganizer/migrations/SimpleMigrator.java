@@ -39,8 +39,7 @@ public class SimpleMigrator {
           "V008__create_vod_streams.sql",
           "V009__create_series.sql",
           "V010__create_sync_logs.sql",
-          "V011__create_connection_logs.sql",
-          "V012__add_redirect_columns.sql");
+          "V011__create_connection_logs.sql");
 
   public void startMigrations() {
     log.info("Starting database migrations for: " + dbKind);

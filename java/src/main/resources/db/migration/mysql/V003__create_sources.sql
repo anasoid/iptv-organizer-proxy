@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS sources (
     enableproxy TINYINT(1) NOT NULL DEFAULT 0,
     disablestreamproxy TINYINT(1) NOT NULL DEFAULT 0,
     stream_follow_location TINYINT(1) NOT NULL DEFAULT 1,
+    use_redirect TINYINT(1) NULL,
+    use_redirect_xmltv TINYINT(1) NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_source_is_active (is_active),
