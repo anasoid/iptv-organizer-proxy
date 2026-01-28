@@ -184,36 +184,6 @@ public class StreamDataController {
     }
   }
 
-  private Response getStream(Client client, Source source, String streamUrl, UriInfo uriInfo) {
-    // Check useRedirect setting with priority: client -> source -> environment
-
-    // If useRedirect is enabled, return direct 302 redirect to original URL
-    boolean disableStreamProxy = clientService.resolveDisableStreamProxy(client, source);
-    boolean useRedirect = clientService.resolveUseRedirect(client, source);
-    if (disableStreamProxy) {
-      // Direct 302 redirect to source
-      // Note: Client's player will follow any redirects automatically
-      log.info("Direct stream proxy disabled, returning 302 redirect to: {}", streamUrl);
-      if (useRedirect) {
-        log.info("useRedirect enabled, returning direct 302 redirect to: {}", streamUrl);
-        return Response.seeOther(URI.create(streamUrl)).build();
-      } else {
-        log.info("useRedirect enabled, returning direct 302 redirect to: {}", streamUrl);
-        return Response.seeOther(URI.create(streamUrl)).build();
-      }
-    } else {
-
-      // Otherwise, encode URL and redirect to our proxy endpoint
-      // Our proxy endpoint will handle redirect following automatically via HttpClient
-      String encodedUrl = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
-      String proxyUrl =
-          buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrl);
-
-      log.info("Stream proxy enabled, redirecting to proxy: {}", proxyUrl);
-      return Response.seeOther(URI.create(proxyUrl)).build();
-    }
-  }
-
   private Response getStream(
       Client client, Source source, String streamUrl, UriInfo uriInfo, HttpHeaders httpHeaders) {
     boolean disableStreamProxy = clientService.resolveDisableStreamProxy(client, source);
@@ -311,7 +281,7 @@ public class StreamDataController {
       Client client, Source source, String streamId, String streamType) {
     try {
       // Parse stream ID as integer
-      Integer streamIdInt;
+      int streamIdInt;
       try {
         streamIdInt = Integer.parseInt(streamId);
       } catch (NumberFormatException e) {
@@ -354,17 +324,12 @@ public class StreamDataController {
    * @return Stream or null if not found
    */
   private BaseStream loadStream(Long sourceId, Integer streamId, String streamType) {
-    switch (streamType.toLowerCase()) {
-      case "live":
-        return liveStreamService.findBySourceAndStreamId(sourceId, streamId);
-      case "movie":
-      case "vod":
-        return vodStreamService.findBySourceAndStreamId(sourceId, streamId);
-      case "series":
-        return seriesService.findBySourceAndStreamId(sourceId, streamId);
-      default:
-        return null;
-    }
+    return switch (streamType.toLowerCase()) {
+      case "live" -> liveStreamService.findBySourceAndStreamId(sourceId, streamId);
+      case "movie", "vod" -> vodStreamService.findBySourceAndStreamId(sourceId, streamId);
+      case "series" -> seriesService.findBySourceAndStreamId(sourceId, streamId);
+      default -> null;
+    };
   }
 
   /**
@@ -374,16 +339,11 @@ public class StreamDataController {
    * @return Category type string
    */
   private String getStreamTypeCategory(String streamType) {
-    switch (streamType.toLowerCase()) {
-      case "live":
-        return "live";
-      case "movie":
-      case "vod":
-        return "vod";
-      case "series":
-        return "series";
-      default:
-        return streamType.toLowerCase();
-    }
+    return switch (streamType.toLowerCase()) {
+      case "live" -> "live";
+      case "movie", "vod" -> "vod";
+      case "series" -> "series";
+      default -> streamType.toLowerCase();
+    };
   }
 }

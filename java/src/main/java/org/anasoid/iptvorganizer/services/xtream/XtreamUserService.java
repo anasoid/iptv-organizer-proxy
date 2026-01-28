@@ -3,7 +3,7 @@ package org.anasoid.iptvorganizer.services.xtream;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.time.ZoneId;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -11,9 +11,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.anasoid.iptvorganizer.dto.xtream.XtreamAuthResponse;
-import org.anasoid.iptvorganizer.dto.xtream.XtreamServerInfo;
-import org.anasoid.iptvorganizer.dto.xtream.XtreamUserInfo;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
@@ -222,7 +219,6 @@ public class XtreamUserService {
    * @param source The source with credentials
    * @param proxyUrl The proxy URL for replacing server info
    * @return Authentication data as Map with user_info and server_info
-   * @throws Exception if fetch or validation fails
    */
   private Map<String, Object> fetchAuthenticationFromUpstream(Source source, String proxyUrl) {
     // Build upstream URL with source credentials
@@ -256,7 +252,7 @@ public class XtreamUserService {
   @SuppressWarnings("unchecked")
   private void replaceServerInfo(Map<String, Object> authData, String proxyUrl) {
     try {
-      java.net.URL url = new java.net.URL(proxyUrl);
+      java.net.URL url = URI.create(proxyUrl).toURL();
       String scheme = url.getProtocol();
       String host = url.getHost();
       int port = url.getPort() > 0 ? url.getPort() : (scheme.equals("https") ? 443 : 80);
@@ -297,95 +293,6 @@ public class XtreamUserService {
   }
 
   /**
-   * Build authentication response with server and user info (legacy - kept for compatibility)
-   *
-   * @param client The authenticated client
-   * @param source The source
-   * @param proxyUrl The proxy server URL
-   * @return Built authentication response
-   */
-  private XtreamAuthResponse buildAuthenticationResponse(
-      Client client, Source source, String proxyUrl) {
-    try {
-
-      return buildFallbackAuthenticationResponse(client, proxyUrl);
-    } catch (Exception ex) {
-      log.warn("Failed to fetch authentication from source {}", source.getId(), ex);
-      return buildFallbackAuthenticationResponse(client, proxyUrl);
-    }
-  }
-
-  /**
-   * Build fallback authentication response with basic info
-   *
-   * @param client The client
-   * @param proxyUrl The proxy server URL
-   * @return Built authentication response
-   */
-  private XtreamAuthResponse buildFallbackAuthenticationResponse(Client client, String proxyUrl) {
-    XtreamServerInfo serverInfo = buildServerInfo(proxyUrl);
-
-    XtreamUserInfo userInfo =
-        XtreamUserInfo.builder()
-            .username(client.getUsername())
-            .password(client.getPassword())
-            .message("")
-            .auth(1)
-            .status(client.getIsActive() != null && client.getIsActive() ? "Active" : "Inactive")
-            .isTrial("0")
-            .activeConnections("0")
-            .createdAt(System.currentTimeMillis() / 1000)
-            .allowedOutputFormats(List.of("m3u8", "ts", "rtmp"))
-            .build();
-
-    if (client.getExpiryDate() != null) {
-      userInfo.setExpDate(
-          client.getExpiryDate().atStartOfDay(ZoneId.systemDefault()).toInstant().getEpochSecond());
-    }
-
-    return XtreamAuthResponse.builder().userInfo(userInfo).serverInfo(serverInfo).build();
-  }
-
-  /**
-   * Build server info with proxy URL details
-   *
-   * @param proxyUrl The proxy URL
-   * @return Built server info
-   */
-  private XtreamServerInfo buildServerInfo(String proxyUrl) {
-    String host = "localhost";
-    String port = "8080";
-    String protocol = "http";
-    String httpsPort = "443";
-
-    // Parse proxy URL
-    try {
-      java.net.URL url = new java.net.URL(proxyUrl);
-      host = url.getHost();
-      protocol = url.getProtocol();
-      port =
-          String.valueOf(url.getPort() > 0 ? url.getPort() : (protocol.equals("https") ? 443 : 80));
-
-      if (protocol.equals("https")) {
-        httpsPort = port;
-        port = "80";
-      }
-    } catch (Exception ex) {
-      log.warn("Failed to parse proxy URL", ex);
-    }
-
-    return XtreamServerInfo.builder()
-        .url(host)
-        .port(port)
-        .httpsPort(httpsPort)
-        .serverProtocol(protocol)
-        .rtmpPort("1935")
-        .timestampNow(System.currentTimeMillis() / 1000)
-        .timeNow(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date()))
-        .build();
-  }
-
-  /**
    * Convert a single stream to Xtream Map format (lazy conversion).
    *
    * <p>Maps a BaseStream entity to a Map<String, Object> with Xtream API fields. This is called
@@ -409,6 +316,7 @@ public class XtreamUserService {
     // Include raw JSON data if available
     if (stream.getData() != null && !stream.getData().isEmpty()) {
       try {
+        @SuppressWarnings("unchecked")
         Map<String, Object> rawData = objectMapper.readValue(stream.getData(), Map.class);
         // Merge raw data with our standardized fields
         rawData.forEach(
@@ -422,7 +330,7 @@ public class XtreamUserService {
       }
     }
 
-    return (Map<?, ?>) (Object) map;
+    return map;
   }
 
   /**
@@ -440,19 +348,9 @@ public class XtreamUserService {
               map.put("category_id", cat.getExternalId());
               map.put("category_name", cat.getName());
               map.put("parent_id", cat.getParentId());
-              return (Map<?, ?>) (Object) map;
+              return (Map<?, ?>) map;
             })
         .collect(Collectors.toList());
-  }
-
-  /**
-   * Materialize streams to Maps (fully resolve lazy-loaded properties while context is active)
-   *
-   * @param streams List of stream entities
-   * @return List of Maps with all data materialized
-   */
-  private List<Map<?, ?>> materializeStreams(List<? extends BaseStream> streams) {
-    return streams.stream().map(this::convertStreamToMap).collect(Collectors.toList());
   }
 
   /**
@@ -530,21 +428,13 @@ public class XtreamUserService {
    */
   private JsonStreamResult<Map<?, ?>> getStreamsByType(
       Source source, StreamType type, Long categoryId) {
-    final Iterator<? extends BaseStream> streamIterator;
-
-    switch (type) {
-      case LIVE:
-        streamIterator = liveStreamService.streamBySourceId(source.getId());
-        break;
-      case VOD:
-        streamIterator = vodStreamService.streamBySourceId(source.getId());
-        break;
-      case SERIES:
-        streamIterator = seriesService.streamBySourceId(source.getId());
-        break;
-      default:
-        throw new IllegalArgumentException("Unknown stream type: " + type);
-    }
+    final Iterator<? extends BaseStream> streamIterator =
+        switch (type) {
+          case LIVE -> liveStreamService.streamBySourceId(source.getId());
+          case VOD -> vodStreamService.streamBySourceId(source.getId());
+          case SERIES -> seriesService.streamBySourceId(source.getId());
+          default -> throw new IllegalArgumentException("Unknown stream type: " + type);
+        };
 
     // Wrap with lazy Map conversion (single item at a time)
     Iterator<Map<?, ?>> mapIterator = new MappingIterator(streamIterator);
@@ -687,15 +577,24 @@ public class XtreamUserService {
 
     /** Convert Object to Integer, handling various types. */
     private Integer toInteger(Object obj) {
-      if (obj == null) return null;
-      if (obj instanceof Integer) return (Integer) obj;
-      if (obj instanceof Number) return ((Number) obj).intValue();
-      if (obj instanceof String) {
-        try {
-          return Integer.parseInt((String) obj);
-        } catch (NumberFormatException e) {
+      switch (obj) {
+        case null -> {
           return null;
         }
+        case Integer i -> {
+          return i;
+        }
+        case Number number -> {
+          return number.intValue();
+        }
+        case String s -> {
+          try {
+            return Integer.parseInt(s);
+          } catch (NumberFormatException e) {
+            return null;
+          }
+        }
+        default -> {}
       }
       return null;
     }
@@ -707,16 +606,13 @@ public class XtreamUserService {
 
     /** Convert Object to Boolean, handling various types ("1"/"0", true/false, numeric). */
     private Boolean toBoolean(Object obj) {
-      if (obj == null) return null;
-      if (obj instanceof Boolean) return (Boolean) obj;
-      if (obj instanceof String) {
-        String str = (String) obj;
-        return "1".equals(str) || "true".equalsIgnoreCase(str);
-      }
-      if (obj instanceof Number) {
-        return ((Number) obj).intValue() != 0;
-      }
-      return false;
+      return switch (obj) {
+        case null -> null;
+        case Boolean b -> b;
+        case String str -> "1".equals(str) || "true".equalsIgnoreCase(str);
+        case Number number -> number.intValue() != 0;
+        default -> false;
+      };
     }
   }
 }
