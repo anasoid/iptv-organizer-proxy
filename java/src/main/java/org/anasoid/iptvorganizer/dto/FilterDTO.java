@@ -1,6 +1,7 @@
 package org.anasoid.iptvorganizer.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
@@ -20,13 +21,20 @@ public class FilterDTO {
   private Long id;
   private String name;
   private String description;
+
+  @JsonProperty("filter_config")
   private String filterConfig;
 
+  @JsonProperty("use_source_filter")
   @JsonSerialize(using = BooleanAsIntSerializer.class)
   private Boolean useSourceFilter;
 
   private String favoris;
+
+  @JsonProperty("created_at")
   private LocalDateTime createdAt;
+
+  @JsonProperty("updated_at")
   private LocalDateTime updatedAt;
 
   /** Convert entity to DTO */

@@ -45,9 +45,11 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
     defaultValues: client || {
       username: '',
       password: '',
+      name: '',
       source_id: undefined,
       filter_id: null,
       email: '',
+      expiry_date: undefined,
       is_active: 1,
       hide_adult_content: 0,
       use_redirect: null,
@@ -55,6 +57,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
       enableproxy: null,
       disablestreamproxy: null,
       stream_follow_location: null,
+      notes: '',
     },
   });
 
@@ -213,6 +216,20 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           helperText={errors.email?.message}
         />
 
+        <TextField
+          label="Display Name (Optional)"
+          fullWidth
+          {...register('name')}
+        />
+
+        <TextField
+          label="Expiry Date (Optional)"
+          fullWidth
+          type="date"
+          slotProps={{ input: { max: '2099-12-31' } }}
+          {...register('expiry_date')}
+        />
+
         <FormControlLabel
           control={
             <Checkbox
@@ -231,6 +248,14 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
             />
           }
           label="Hide Adult Content"
+        />
+
+        <TextField
+          label="Notes (Optional)"
+          fullWidth
+          multiline
+          rows={3}
+          {...register('notes')}
         />
 
         <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2 }}>

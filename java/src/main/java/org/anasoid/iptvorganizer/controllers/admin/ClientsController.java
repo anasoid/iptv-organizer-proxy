@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.dto.ClientDTO;
 import org.anasoid.iptvorganizer.dto.request.CreateClientRequest;
+import org.anasoid.iptvorganizer.dto.request.UpdateClientRequest;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.services.ClientService;
@@ -113,13 +114,15 @@ public class ClientsController extends BaseController {
   /** Update client PUT /api/clients/:id */
   @PUT
   @Path("/{id}")
-  public Response updateClient(@PathParam("id") Long id, Client request) {
+  public Response updateClient(@PathParam("id") Long id, UpdateClientRequest request) {
     try {
       Client client = clientService.getById(id);
       if (client == null) {
         return ResponseUtils.notFound("Client not found");
       }
 
+      if (request.getSourceId() != null) client.setSourceId(request.getSourceId());
+      if (request.getFilterId() != null) client.setFilterId(request.getFilterId());
       if (request.getUsername() != null) client.setUsername(request.getUsername());
       if (request.getPassword() != null) client.setPassword(request.getPassword());
       if (request.getName() != null) client.setName(request.getName());

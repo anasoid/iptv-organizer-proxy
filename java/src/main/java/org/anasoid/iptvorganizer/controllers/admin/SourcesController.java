@@ -24,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.dto.SourceDTO;
 import org.anasoid.iptvorganizer.dto.SyncLogDTO;
 import org.anasoid.iptvorganizer.dto.request.CreateSourceRequest;
+import org.anasoid.iptvorganizer.dto.request.UpdateSourceRequest;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.entity.Source;
@@ -136,7 +137,7 @@ public class SourcesController extends BaseController {
   /** Update source PUT /api/sources/:id */
   @PUT
   @Path("/{id}")
-  public Response updateSource(@PathParam("id") Long id, CreateSourceRequest request) {
+  public Response updateSource(@PathParam("id") Long id, UpdateSourceRequest request) {
     try {
       Source source = sourceService.getById(id);
       if (source == null) {

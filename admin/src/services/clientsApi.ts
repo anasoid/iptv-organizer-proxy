@@ -4,9 +4,11 @@ export interface Client {
   id?: number;
   username: string;
   password: string;
+  name?: string | null;
   source_id: number;
   filter_id?: number | null;
   email?: string | null;
+  expiry_date?: string | null;
   is_active: number;
   hide_adult_content?: number;
   use_redirect?: number | null;
@@ -14,6 +16,7 @@ export interface Client {
   enableproxy?: number | null;
   disablestreamproxy?: number | null;
   stream_follow_location?: number | null;
+  notes?: string | null;
   created_at?: string;
   updated_at?: string;
 }
