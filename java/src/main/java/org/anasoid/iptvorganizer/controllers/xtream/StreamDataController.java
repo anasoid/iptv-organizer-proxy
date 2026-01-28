@@ -11,7 +11,6 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import java.net.URI;
 import java.util.Base64;
-import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
@@ -19,9 +18,7 @@ import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
-import org.anasoid.iptvorganizer.models.http.UpstreamStatusResult;
 import org.anasoid.iptvorganizer.services.ClientService;
-import org.anasoid.iptvorganizer.services.http.HeaderFilterService;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
 import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
 import org.anasoid.iptvorganizer.services.stream.SeriesService;
@@ -29,7 +26,6 @@ import org.anasoid.iptvorganizer.services.stream.VodStreamService;
 import org.anasoid.iptvorganizer.services.xtream.ContentFilterService;
 import org.anasoid.iptvorganizer.services.xtream.FilterContext;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
-import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
 
 /**
  * Stream Data Controller
@@ -47,8 +43,6 @@ public class StreamDataController {
 
   @Inject XtreamUserService xtreamUserService;
   @Inject ClientService clientService;
-  @Inject HttpStreamingService httpStreamingService;
-  @Inject HeaderFilterService headerFilterService;
   @Inject ContentFilterService contentFilterService;
   @Inject CategoryService categoryService;
   @Inject LiveStreamService liveStreamService;
@@ -187,48 +181,17 @@ public class StreamDataController {
         return Response.seeOther(URI.create(streamUrl)).build();
       }
 
-      // Extract and filter client headers to forward
-      Map<String, String> requestHeaders = headerFilterService.filterRequestHeaders(httpHeaders);
-
-      // Check upstream status to detect redirects early
-      UpstreamStatusResult upstreamStatus =
-          httpStreamingService.checkUpstreamStatus(streamUrl, requestHeaders);
-
-      // Handle upstream redirects
-      if (upstreamStatus.isRedirect() && upstreamStatus.getLocation() != null) {
-        String redirectUrl = upstreamStatus.getLocation();
-        log.info("Upstream redirect detected: {} -> {}", streamUrl, redirectUrl);
-
-        Boolean disableStreamProxy = source.getDisableStreamProxy();
-        if (disableStreamProxy != null && disableStreamProxy) {
-          // Direct redirect to discovered URL
-          log.info("Direct stream proxy disabled, returning 302 redirect to: {}", redirectUrl);
-          return Response.seeOther(URI.create(redirectUrl)).build();
-        } else {
-          // Encode and redirect through proxy
-          String encodedUrl = Base64.getUrlEncoder().encodeToString(redirectUrl.getBytes());
-          String proxyUrl = buildProxyUrl(uriInfo, username, password, encodedUrl);
-          log.info(
-              "Stream proxy enabled with upstream redirect, redirecting to proxy: {}", proxyUrl);
-          return Response.seeOther(URI.create(proxyUrl)).build();
-        }
-      }
-
-      // Handle upstream errors
-      if (upstreamStatus.isError() || upstreamStatus.getStatusCode() >= 400) {
-        log.warn("Upstream error: {}", upstreamStatus.getStatusCode());
-        return Response.status(upstreamStatus.getStatusCode()).build();
-      }
-
-      // No upstream redirect detected - use normal redirect logic
+      // Check if we should use direct proxy (without our proxy endpoint)
       Boolean disableStreamProxy = source.getDisableStreamProxy();
       if (disableStreamProxy != null && disableStreamProxy) {
         // Direct 302 redirect to source
+        // Note: Client's player will follow any redirects automatically
         log.info("Direct stream proxy disabled, returning 302 redirect to: {}", streamUrl);
         return Response.seeOther(URI.create(streamUrl)).build();
       }
 
       // Otherwise, encode URL and redirect to our proxy endpoint
+      // Our proxy endpoint will handle redirect following automatically via HttpClient
       String encodedUrl = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
       String proxyUrl = buildProxyUrl(uriInfo, username, password, encodedUrl);
 

@@ -17,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.StreamingException;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
-import org.anasoid.iptvorganizer.models.http.UpstreamStatusResult;
 
 @Slf4j
 @ApplicationScoped
@@ -28,7 +27,16 @@ public class HttpStreamingService {
   @Inject ObjectMapper objectMapper;
 
   private final HttpClient httpClient =
-      HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build();
+      HttpClient.newBuilder()
+          .connectTimeout(Duration.ofSeconds(30))
+          .followRedirects(HttpClient.Redirect.NORMAL)
+          .build();
+
+  private final HttpClient httpClientNoRedirects =
+      HttpClient.newBuilder()
+          .connectTimeout(Duration.ofSeconds(30))
+          .followRedirects(HttpClient.Redirect.NEVER)
+          .build();
 
   /** Stream HTTP response as InputStream */
   public InputStream streamHttp(String url, HttpOptions options) {
@@ -62,6 +70,12 @@ public class HttpStreamingService {
   /** Perform actual HTTP request and return response body as InputStream */
   private InputStream performHttpRequest(String url, HttpOptions options) {
     try {
+      // Choose client based on followRedirects option (default: follow redirects)
+      HttpClient clientToUse = httpClient;
+      if (options.getFollowRedirects() != null && !options.getFollowRedirects()) {
+        clientToUse = httpClientNoRedirects;
+      }
+
       HttpRequest.Builder requestBuilder = HttpRequest.newBuilder().uri(new URI(url)).GET();
 
       // Add custom headers
@@ -77,7 +91,7 @@ public class HttpStreamingService {
       HttpRequest request = requestBuilder.build();
 
       HttpResponse<InputStream> response =
-          httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+          clientToUse.send(request, HttpResponse.BodyHandlers.ofInputStream());
 
       if (response.statusCode() >= 400) {
         throw new StreamingException(
@@ -143,6 +157,12 @@ public class HttpStreamingService {
   private HttpStreamingResponse performHttpRequestWithHeaders(
       String url, HttpOptions options, Map<String, String> requestHeaders) {
     try {
+      // Choose client based on followRedirects option (default: follow redirects)
+      HttpClient clientToUse = httpClient;
+      if (options.getFollowRedirects() != null && !options.getFollowRedirects()) {
+        clientToUse = httpClientNoRedirects;
+      }
+
       HttpRequest.Builder requestBuilder = HttpRequest.newBuilder().uri(new URI(url)).GET();
 
       // Add options headers
@@ -167,7 +187,7 @@ public class HttpStreamingService {
       HttpRequest request = requestBuilder.build();
 
       HttpResponse<InputStream> response =
-          httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+          clientToUse.send(request, HttpResponse.BodyHandlers.ofInputStream());
 
       if (response.statusCode() >= 400) {
         log.warn("HTTP error response: {} for URL: {}", response.statusCode(), url);
@@ -187,62 +207,6 @@ public class HttpStreamingService {
     }
   }
 
-  /**
-   * Check upstream status with HEAD request to detect redirects early.
-   *
-   * <p>This performs a HEAD request to check status and Location header without transferring the
-   * response body. Useful for detecting 302 redirects before streaming begins, matching the PHP
-   * implementation's checkUpstreamStatus() behavior.
-   *
-   * @param url The URL to check
-   * @param requestHeaders Headers to forward (optional)
-   * @return UpstreamStatusResult with status, location, and error info
-   */
-  public UpstreamStatusResult checkUpstreamStatus(String url, Map<String, String> requestHeaders) {
-    try {
-      HttpRequest.Builder requestBuilder =
-          HttpRequest.newBuilder()
-              .uri(new URI(url))
-              .method("HEAD", HttpRequest.BodyPublishers.noBody())
-              .timeout(Duration.ofSeconds(10));
-
-      // Add forwarded request headers
-      if (requestHeaders != null) {
-        requestHeaders.forEach(
-            (k, v) -> {
-              requestBuilder.header(k, v);
-              log.debug("Forwarded status check header: {} = {}", k, v);
-            });
-      }
-
-      HttpRequest request = requestBuilder.build();
-
-      HttpResponse<Void> response =
-          httpClient.send(request, HttpResponse.BodyHandlers.discarding());
-
-      // Extract Location header if present
-      String location = response.headers().firstValue("Location").orElse(null);
-
-      log.info(
-          "Upstream status check for: {}, status: {}, redirect: {}",
-          url,
-          response.statusCode(),
-          location != null ? "yes (" + location + ")" : "no");
-
-      return UpstreamStatusResult.builder()
-          .statusCode(response.statusCode())
-          .location(location)
-          .error(false)
-          .build();
-    } catch (IOException | InterruptedException | URISyntaxException e) {
-      log.error("Upstream status check failed for: {}, error: {}", url, e.getMessage());
-      return UpstreamStatusResult.builder()
-          .statusCode(0)
-          .error(true)
-          .errorMessage(e.getMessage())
-          .build();
-    }
-  }
 
   private HttpOptions createHttpOptions() {
     HttpOptions httpOptions = new HttpOptions();
