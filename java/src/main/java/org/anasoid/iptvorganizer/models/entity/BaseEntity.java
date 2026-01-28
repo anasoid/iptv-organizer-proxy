@@ -1,5 +1,6 @@
 package org.anasoid.iptvorganizer.models.entity;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -10,6 +11,7 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public abstract class BaseEntity {
   protected Long id;
   protected LocalDateTime createdAt;

@@ -6,9 +6,6 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
-import java.util.stream.Collectors;
-import org.anasoid.iptvorganizer.dto.FilterDTO;
-import org.anasoid.iptvorganizer.dto.request.CreateFilterRequest;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.entity.Filter;
 import org.anasoid.iptvorganizer.services.FilterService;
@@ -34,10 +31,7 @@ public class FiltersController extends BaseController {
     }
 
     try {
-      var filters =
-          filterService.getAllPaged(page, limit).stream()
-              .map(FilterDTO::fromEntity)
-              .collect(Collectors.toList());
+      var filters = filterService.getAllPaged(page, limit);
       long total = filterService.count();
       var pagination = PaginationMeta.of(page, limit, total);
       return ResponseUtils.okWithPagination(filters, pagination);
@@ -53,7 +47,7 @@ public class FiltersController extends BaseController {
     try {
       Filter filter = filterService.getById(id);
       if (filter != null) {
-        return ResponseUtils.ok(FilterDTO.fromEntity(filter));
+        return ResponseUtils.ok(filter);
       } else {
         return ResponseUtils.notFound("Filter not found");
       }
@@ -64,26 +58,21 @@ public class FiltersController extends BaseController {
 
   /** Create filter POST /api/filters */
   @POST
-  public Response createFilter(CreateFilterRequest request) {
+  public Response createFilter(Filter request) {
     if (request.getName() == null || request.getName().isBlank()) {
       return ResponseUtils.badRequest("Name is required");
     }
 
     try {
-      Filter filter =
-          Filter.builder()
-              .name(request.getName())
-              .description(request.getDescription())
-              .filterConfig(request.getFilterConfig())
-              .useSourceFilter(
-                  request.getUseSourceFilter() != null ? request.getUseSourceFilter() : false)
-              .favoris(request.getFavoris())
-              .createdAt(LocalDateTime.now())
-              .updatedAt(LocalDateTime.now())
-              .build();
+      // Set defaults for new filter
+      if (request.getUseSourceFilter() == null) {
+        request.setUseSourceFilter(false);
+      }
+      request.setCreatedAt(LocalDateTime.now());
+      request.setUpdatedAt(LocalDateTime.now());
 
-      Filter savedFilter = filterService.save(filter);
-      return ResponseUtils.created(FilterDTO.fromEntity(savedFilter));
+      Filter savedFilter = filterService.save(request);
+      return ResponseUtils.created(savedFilter);
     } catch (Exception ex) {
       return ResponseUtils.serverError("Failed to create filter: " + ex.getMessage());
     }
@@ -92,13 +81,14 @@ public class FiltersController extends BaseController {
   /** Update filter PUT /api/filters/:id */
   @PUT
   @Path("/{id}")
-  public Response updateFilter(@PathParam("id") Long id, CreateFilterRequest request) {
+  public Response updateFilter(@PathParam("id") Long id, Filter request) {
     try {
       Filter filter = filterService.getById(id);
       if (filter == null) {
         return ResponseUtils.notFound("Filter not found");
       }
 
+      // Merge non-null fields from request
       if (request.getName() != null) filter.setName(request.getName());
       if (request.getDescription() != null) filter.setDescription(request.getDescription());
       if (request.getFilterConfig() != null) filter.setFilterConfig(request.getFilterConfig());
@@ -108,7 +98,7 @@ public class FiltersController extends BaseController {
       filter.setUpdatedAt(LocalDateTime.now());
 
       filterService.update(filter);
-      return ResponseUtils.ok(FilterDTO.fromEntity(filter));
+      return ResponseUtils.ok(filter);
     } catch (Exception ex) {
       return ResponseUtils.serverError("Failed to update filter: " + ex.getMessage());
     }
@@ -137,12 +127,12 @@ public class FiltersController extends BaseController {
         return ResponseUtils.notFound("Filter not found");
       }
 
-      if (request != null && request.get("use_source_filter") != null) {
-        filter.setUseSourceFilter(request.get("use_source_filter"));
+      if (request != null && request.get("useSourceFilter") != null) {
+        filter.setUseSourceFilter(request.get("useSourceFilter"));
         filter.setUpdatedAt(LocalDateTime.now());
         filterService.update(filter);
       }
-      return ResponseUtils.ok(FilterDTO.fromEntity(filter));
+      return ResponseUtils.ok(filter);
     } catch (Exception ex) {
       return ResponseUtils.serverError("Failed to update filter: " + ex.getMessage());
     }

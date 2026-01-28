@@ -1,5 +1,6 @@
 package org.anasoid.iptvorganizer.models.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -14,7 +15,9 @@ import lombok.experimental.SuperBuilder;
 @EqualsAndHashCode(callSuper = true)
 public class AdminUser extends BaseEntity {
   private String username;
-  private String passwordHash;
+
+  @JsonIgnore private String passwordHash;
+
   private String email;
   private Boolean isActive;
   private LocalDateTime lastLogin;

@@ -1,5 +1,6 @@
 package org.anasoid.iptvorganizer.models.entity.stream;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -16,6 +17,7 @@ import lombok.experimental.SuperBuilder;
 @AllArgsConstructor
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public abstract class BaseStream extends SourcedEntity {
   /** ID of the category this stream belongs to */
   private Integer categoryId;

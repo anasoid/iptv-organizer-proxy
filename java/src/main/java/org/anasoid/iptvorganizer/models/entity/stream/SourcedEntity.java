@@ -1,5 +1,6 @@
 package org.anasoid.iptvorganizer.models.entity.stream;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -16,6 +17,7 @@ import org.anasoid.iptvorganizer.models.entity.BaseEntity;
 @AllArgsConstructor
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public abstract class SourcedEntity extends BaseEntity {
   /** ID of the source this entity belongs to */
   private Long sourceId;

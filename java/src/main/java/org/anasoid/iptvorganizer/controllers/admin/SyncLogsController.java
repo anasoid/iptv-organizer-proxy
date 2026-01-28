@@ -5,8 +5,6 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import java.util.stream.Collectors;
-import org.anasoid.iptvorganizer.dto.SyncLogDTO;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.services.synch.SyncLogService;
 import org.anasoid.iptvorganizer.utils.ResponseUtils;
@@ -38,11 +36,10 @@ public class SyncLogsController extends BaseController {
     }
 
     try {
-      var logs =
-          syncLogService.findBySourceId(sourceId).stream()
-              .map(SyncLogDTO::fromEntity)
-              .limit(limit)
-              .collect(Collectors.toList());
+      var logs = syncLogService.findBySourceId(sourceId);
+      if (logs.size() > limit) {
+        logs = logs.subList(0, limit);
+      }
       long total = syncLogService.count();
       return ResponseUtils.okWithPagination(logs, PaginationMeta.of(page, limit, total));
     } catch (Exception ex) {
@@ -57,7 +54,7 @@ public class SyncLogsController extends BaseController {
     try {
       var log = syncLogService.getById(id);
       if (log != null) {
-        return ResponseUtils.ok(SyncLogDTO.fromEntity(log));
+        return ResponseUtils.ok(log);
       } else {
         return ResponseUtils.notFound("Sync log not found");
       }

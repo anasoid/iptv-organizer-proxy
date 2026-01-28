@@ -12,9 +12,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.controllers.admin.BaseController;
-import org.anasoid.iptvorganizer.dto.CategoryDTO;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
 import org.anasoid.iptvorganizer.utils.ResponseUtils;
@@ -46,11 +44,7 @@ public class CategoriesController extends BaseController {
 
     try {
       var categories =
-          categoryService
-              .findBySourceIdFiltered(sourceId, categoryType, search, page, limit)
-              .stream()
-              .map(CategoryDTO::fromEntity)
-              .collect(Collectors.toList());
+          categoryService.findBySourceIdFiltered(sourceId, categoryType, search, page, limit);
       long total = categoryService.countBySourceIdFiltered(sourceId, categoryType, search);
       return ResponseUtils.okWithPagination(categories, PaginationMeta.of(page, limit, total));
     } catch (Exception ex) {
@@ -65,7 +59,7 @@ public class CategoriesController extends BaseController {
     try {
       var cat = categoryService.getById(id);
       if (cat != null) {
-        return ResponseUtils.ok(CategoryDTO.fromEntity(cat));
+        return ResponseUtils.ok(cat);
       } else {
         return ResponseUtils.notFound("Category not found");
       }
@@ -88,7 +82,7 @@ public class CategoriesController extends BaseController {
         cat.setAllowDeny(request.get("allowDeny"));
         categoryService.update(cat);
       }
-      return ResponseUtils.ok(CategoryDTO.fromEntity(cat));
+      return ResponseUtils.ok(cat);
     } catch (Exception ex) {
       return ResponseUtils.serverError("Failed to update category: " + ex.getMessage());
     }

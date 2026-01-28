@@ -5,7 +5,6 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.anasoid.iptvorganizer.controllers.admin.BaseController;
-import org.anasoid.iptvorganizer.dto.StreamDTO;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.utils.ResponseUtils;
 
@@ -49,7 +48,7 @@ public class StreamsController extends BaseController {
   public Response getStream(@PathParam("id") Long id, @QueryParam("type") String type) {
     try {
       // TODO: Implement stream retrieval by type
-      return ResponseUtils.ok(new StreamDTO());
+      return ResponseUtils.notFound("Stream not found");
     } catch (Exception ex) {
       return ResponseUtils.serverError("Failed to fetch stream: " + ex.getMessage());
     }

@@ -6,10 +6,6 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
-import java.util.stream.Collectors;
-import org.anasoid.iptvorganizer.dto.ClientDTO;
-import org.anasoid.iptvorganizer.dto.request.CreateClientRequest;
-import org.anasoid.iptvorganizer.dto.request.UpdateClientRequest;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.services.ClientService;
@@ -37,18 +33,12 @@ public class ClientsController extends BaseController {
 
     try {
       if (search != null && !search.isBlank()) {
-        var clients =
-            clientService.searchClients(search, page, limit).stream()
-                .map(ClientDTO::fromEntity)
-                .collect(Collectors.toList());
+        var clients = clientService.searchClients(search, page, limit);
         long total = clientService.countSearchClients(search);
         var pagination = PaginationMeta.of(page, limit, total);
         return ResponseUtils.okWithPagination(clients, pagination);
       } else {
-        var clients =
-            clientService.getAllPaged(page, limit).stream()
-                .map(ClientDTO::fromEntity)
-                .collect(Collectors.toList());
+        var clients = clientService.getAllPaged(page, limit);
         long total = clientService.count();
         var pagination = PaginationMeta.of(page, limit, total);
         return ResponseUtils.okWithPagination(clients, pagination);
@@ -65,7 +55,7 @@ public class ClientsController extends BaseController {
     try {
       Client client = clientService.getById(id);
       if (client != null) {
-        return ResponseUtils.ok(ClientDTO.fromEntity(client));
+        return ResponseUtils.ok(client);
       } else {
         return ResponseUtils.notFound("Client not found");
       }
@@ -76,36 +66,24 @@ public class ClientsController extends BaseController {
 
   /** Create client POST /api/clients */
   @POST
-  public Response createClient(CreateClientRequest request) {
+  public Response createClient(Client request) {
     if (request.getUsername() == null || request.getUsername().isBlank()) {
       return ResponseUtils.badRequest("Username is required");
     }
 
     try {
-      Client client =
-          Client.builder()
-              .sourceId(request.getSourceId())
-              .filterId(request.getFilterId())
-              .username(request.getUsername())
-              .password(request.getPassword())
-              .name(request.getName())
-              .email(request.getEmail())
-              .expiryDate(request.getExpiryDate())
-              .isActive(request.getIsActive() != null ? request.getIsActive() : true)
-              .hideAdultContent(
-                  request.getHideAdultContent() != null ? request.getHideAdultContent() : false)
-              .useRedirect(request.getUseRedirect())
-              .useRedirectXmltv(request.getUseRedirectXmltv())
-              .enableProxy(request.getEnableProxy())
-              .disableStreamProxy(request.getDisableStreamProxy())
-              .streamFollowLocation(request.getStreamFollowLocation())
-              .notes(request.getNotes())
-              .createdAt(LocalDateTime.now())
-              .updatedAt(LocalDateTime.now())
-              .build();
+      // Set defaults for new client
+      if (request.getIsActive() == null) {
+        request.setIsActive(true);
+      }
+      if (request.getHideAdultContent() == null) {
+        request.setHideAdultContent(false);
+      }
+      request.setCreatedAt(LocalDateTime.now());
+      request.setUpdatedAt(LocalDateTime.now());
 
-      Client savedClient = clientService.save(client);
-      return ResponseUtils.created(ClientDTO.fromEntity(savedClient));
+      Client savedClient = clientService.save(request);
+      return ResponseUtils.created(savedClient);
     } catch (Exception ex) {
       return ResponseUtils.serverError("Failed to create client: " + ex.getMessage());
     }
@@ -114,13 +92,14 @@ public class ClientsController extends BaseController {
   /** Update client PUT /api/clients/:id */
   @PUT
   @Path("/{id}")
-  public Response updateClient(@PathParam("id") Long id, UpdateClientRequest request) {
+  public Response updateClient(@PathParam("id") Long id, Client request) {
     try {
       Client client = clientService.getById(id);
       if (client == null) {
         return ResponseUtils.notFound("Client not found");
       }
 
+      // Merge non-null fields from request into existing client
       if (request.getSourceId() != null) client.setSourceId(request.getSourceId());
       if (request.getFilterId() != null) client.setFilterId(request.getFilterId());
       if (request.getUsername() != null) client.setUsername(request.getUsername());
@@ -144,7 +123,7 @@ public class ClientsController extends BaseController {
       client.setUpdatedAt(LocalDateTime.now());
 
       clientService.update(client);
-      return ResponseUtils.ok(ClientDTO.fromEntity(client));
+      return ResponseUtils.ok(client);
     } catch (Exception ex) {
       return ResponseUtils.serverError("Failed to update client: " + ex.getMessage());
     }

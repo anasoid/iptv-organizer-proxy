@@ -7,7 +7,6 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.HashMap;
 import java.util.Map;
-import org.anasoid.iptvorganizer.dto.AdminUserDTO;
 import org.anasoid.iptvorganizer.dto.request.LoginRequest;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.models.entity.AdminUser;
@@ -48,10 +47,10 @@ public class AuthController extends BaseController {
       String token = (String) loginResponse.get("token");
       AdminUser user = (AdminUser) loginResponse.get("user");
 
-      // Create response with token and user DTO
+      // Create response with token and user entity (direct, no DTO conversion)
       Map<String, Object> responseData = new HashMap<>();
       responseData.put("token", token);
-      responseData.put("user", AdminUserDTO.fromEntity(user));
+      responseData.put("user", user);
 
       return Response.ok(responseData).build();
     } catch (Exception ex) {
@@ -69,7 +68,7 @@ public class AuthController extends BaseController {
     try {
       Long userId = getCurrentUserId();
       AdminUser user = adminUserService.getById(userId);
-      return Response.ok(ApiResponse.success(AdminUserDTO.fromEntity(user))).build();
+      return Response.ok(ApiResponse.success(user)).build();
     } catch (Exception ex) {
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity(ApiResponse.error("Failed to get user info: " + ex.getMessage()))

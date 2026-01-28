@@ -19,15 +19,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.anasoid.iptvorganizer.dto.SourceDTO;
-import org.anasoid.iptvorganizer.dto.SyncLogDTO;
-import org.anasoid.iptvorganizer.dto.request.CreateSourceRequest;
-import org.anasoid.iptvorganizer.dto.request.UpdateSourceRequest;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.entity.SyncLog;
 import org.anasoid.iptvorganizer.services.SourceService;
 import org.anasoid.iptvorganizer.services.synch.SyncLockManager;
 import org.anasoid.iptvorganizer.services.synch.SyncLogService;
@@ -61,10 +57,7 @@ public class SourcesController extends BaseController {
     }
 
     try {
-      List<SourceDTO> sources =
-          sourceService.getAllPaged(page, limit).stream()
-              .map(SourceDTO::fromEntity)
-              .collect(Collectors.toList());
+      List<Source> sources = sourceService.getAllPaged(page, limit);
       long total = sourceService.count();
       var pagination = PaginationMeta.of(page, limit, total);
       return ResponseUtils.okWithPagination(sources, pagination);
@@ -81,7 +74,7 @@ public class SourcesController extends BaseController {
     try {
       Source source = sourceService.getById(id);
       if (source != null) {
-        return ResponseUtils.ok(SourceDTO.fromEntity(source));
+        return ResponseUtils.ok(source);
       } else {
         return ResponseUtils.notFound("Source not found");
       }
@@ -93,7 +86,7 @@ public class SourcesController extends BaseController {
 
   /** Create source POST /api/sources */
   @POST
-  public Response createSource(CreateSourceRequest request) {
+  public Response createSource(Source request) {
     if (request.getName() == null || request.getName().isBlank()) {
       return ResponseUtils.badRequest("Name is required");
     }
@@ -105,29 +98,27 @@ public class SourcesController extends BaseController {
     }
 
     try {
-      Source source =
-          Source.builder()
-              .name(request.getName())
-              .url(request.getUrl())
-              .username(request.getUsername())
-              .password(request.getPassword())
-              .syncInterval(request.getSyncInterval() != null ? request.getSyncInterval() : 1)
-              .isActive(request.getIsActive() != null ? request.getIsActive() : true)
-              .enableProxy(request.getEnableProxy() != null ? request.getEnableProxy() : false)
-              .disableStreamProxy(
-                  request.getDisableStreamProxy() != null ? request.getDisableStreamProxy() : false)
-              .streamFollowLocation(
-                  request.getStreamFollowLocation() != null
-                      ? request.getStreamFollowLocation()
-                      : false)
-              .useRedirect(request.getUseRedirect())
-              .useRedirectXmltv(request.getUseRedirectXmltv())
-              .createdAt(LocalDateTime.now())
-              .updatedAt(LocalDateTime.now())
-              .build();
+      // Set defaults for new source
+      if (request.getSyncInterval() == null) {
+        request.setSyncInterval(1);
+      }
+      if (request.getIsActive() == null) {
+        request.setIsActive(true);
+      }
+      if (request.getEnableProxy() == null) {
+        request.setEnableProxy(false);
+      }
+      if (request.getDisableStreamProxy() == null) {
+        request.setDisableStreamProxy(false);
+      }
+      if (request.getStreamFollowLocation() == null) {
+        request.setStreamFollowLocation(false);
+      }
+      request.setCreatedAt(LocalDateTime.now());
+      request.setUpdatedAt(LocalDateTime.now());
 
-      Source savedSource = sourceService.save(source);
-      return ResponseUtils.created(SourceDTO.fromEntity(savedSource));
+      Source savedSource = sourceService.save(request);
+      return ResponseUtils.created(savedSource);
     } catch (Exception ex) {
       log.error("Failed to create source", ex);
       return ResponseUtils.serverError("Failed to create source: " + ex.getMessage());
@@ -137,13 +128,14 @@ public class SourcesController extends BaseController {
   /** Update source PUT /api/sources/:id */
   @PUT
   @Path("/{id}")
-  public Response updateSource(@PathParam("id") Long id, UpdateSourceRequest request) {
+  public Response updateSource(@PathParam("id") Long id, Source request) {
     try {
       Source source = sourceService.getById(id);
       if (source == null) {
         return ResponseUtils.notFound("Source not found");
       }
 
+      // Merge non-null fields from request into existing source
       if (request.getName() != null) {
         source.setName(request.getName());
       }
@@ -181,7 +173,7 @@ public class SourcesController extends BaseController {
 
       source.setUpdatedAt(LocalDateTime.now());
       sourceService.update(source);
-      return ResponseUtils.ok(SourceDTO.fromEntity(source));
+      return ResponseUtils.ok(source);
     } catch (Exception ex) {
       log.error("Failed to update source: {}", id, ex);
       return ResponseUtils.serverError("Failed to update source: " + ex.getMessage());
@@ -327,11 +319,10 @@ public class SourcesController extends BaseController {
   public Response getSyncLogs(
       @PathParam("id") Long id, @QueryParam("limit") @DefaultValue("20") int limit) {
     try {
-      List<?> logs =
-          syncLogService.findBySourceId(id).stream()
-              .map(SyncLogDTO::fromEntity)
-              .limit(limit)
-              .collect(Collectors.toList());
+      List<SyncLog> logs = syncLogService.findBySourceId(id);
+      if (logs.size() > limit) {
+        logs = logs.subList(0, limit);
+      }
       return ResponseUtils.ok(logs);
     } catch (Exception ex) {
       log.error("Failed to fetch sync logs for source: {}", id, ex);

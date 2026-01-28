@@ -6,10 +6,6 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
-import java.util.stream.Collectors;
-import org.anasoid.iptvorganizer.dto.AdminUserDTO;
-import org.anasoid.iptvorganizer.dto.request.CreateAdminUserRequest;
-import org.anasoid.iptvorganizer.dto.request.UpdateAdminUserRequest;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.exceptions.ValidationException;
 import org.anasoid.iptvorganizer.models.entity.AdminUser;
@@ -39,10 +35,7 @@ public class AdminUsersController extends BaseController {
     }
 
     try {
-      var users =
-          adminUserService.getAllPaged(page, limit).stream()
-              .map(AdminUserDTO::fromEntity)
-              .collect(Collectors.toList());
+      var users = adminUserService.getAllPaged(page, limit);
       long total = adminUserService.count();
       var pagination = PaginationMeta.of(page, limit, total);
       return ResponseUtils.okWithPagination(users, pagination);
@@ -58,7 +51,7 @@ public class AdminUsersController extends BaseController {
     try {
       AdminUser user = adminUserService.getById(id);
       if (user != null) {
-        return ResponseUtils.ok(AdminUserDTO.fromEntity(user));
+        return ResponseUtils.ok(user);
       } else {
         return ResponseUtils.notFound("Admin user not found");
       }
@@ -69,11 +62,11 @@ public class AdminUsersController extends BaseController {
 
   /** Create admin user POST /api/admin-users */
   @POST
-  public Response createAdminUser(CreateAdminUserRequest request) {
+  public Response createAdminUser(AdminUser request) {
     if (request.getUsername() == null || request.getUsername().isBlank()) {
       return ResponseUtils.badRequest("Username is required");
     }
-    if (request.getPassword() == null || request.getPassword().isBlank()) {
+    if (request.getPasswordHash() == null || request.getPasswordHash().isBlank()) {
       return ResponseUtils.badRequest("Password is required");
     }
     if (request.getEmail() == null || request.getEmail().isBlank()) {
@@ -86,19 +79,19 @@ public class AdminUsersController extends BaseController {
         throw new ValidationException("Username already exists");
       }
 
-      String hashedPassword = passwordService.hashPassword(request.getPassword());
-      AdminUser user =
-          AdminUser.builder()
-              .username(request.getUsername())
-              .passwordHash(hashedPassword)
-              .email(request.getEmail())
-              .isActive(request.getIsActive() != null ? request.getIsActive() : true)
-              .createdAt(LocalDateTime.now())
-              .updatedAt(LocalDateTime.now())
-              .build();
+      // Hash the password (plain password is passed as passwordHash initially)
+      String hashedPassword = passwordService.hashPassword(request.getPasswordHash());
+      request.setPasswordHash(hashedPassword);
 
-      AdminUser savedUser = adminUserService.save(user);
-      return ResponseUtils.created(AdminUserDTO.fromEntity(savedUser));
+      // Set defaults
+      if (request.getIsActive() == null) {
+        request.setIsActive(true);
+      }
+      request.setCreatedAt(LocalDateTime.now());
+      request.setUpdatedAt(LocalDateTime.now());
+
+      AdminUser savedUser = adminUserService.save(request);
+      return ResponseUtils.created(savedUser);
     } catch (ValidationException ex) {
       return ResponseUtils.badRequest(ex.getMessage());
     } catch (Exception ex) {
@@ -109,7 +102,7 @@ public class AdminUsersController extends BaseController {
   /** Update admin user PUT /api/admin-users/:id */
   @PUT
   @Path("/{id}")
-  public Response updateAdminUser(@PathParam("id") Long id, UpdateAdminUserRequest request) {
+  public Response updateAdminUser(@PathParam("id") Long id, AdminUser request) {
     Long currentUserId = getCurrentUserId();
 
     try {
@@ -118,6 +111,7 @@ public class AdminUsersController extends BaseController {
         return ResponseUtils.notFound("Admin user not found");
       }
 
+      // Merge non-null fields from request
       if (request.getEmail() != null && !request.getEmail().isBlank()) {
         user.setEmail(request.getEmail());
       }
@@ -126,14 +120,15 @@ public class AdminUsersController extends BaseController {
         user.setIsActive(request.getIsActive());
       }
 
-      if (request.getPassword() != null && !request.getPassword().isBlank()) {
-        String hashedPassword = passwordService.hashPassword(request.getPassword());
+      // If passwordHash is provided (plain password from request), hash it
+      if (request.getPasswordHash() != null && !request.getPasswordHash().isBlank()) {
+        String hashedPassword = passwordService.hashPassword(request.getPasswordHash());
         user.setPasswordHash(hashedPassword);
       }
 
       user.setUpdatedAt(LocalDateTime.now());
       adminUserService.update(user);
-      return ResponseUtils.ok(AdminUserDTO.fromEntity(user));
+      return ResponseUtils.ok(user);
     } catch (Exception ex) {
       return ResponseUtils.serverError("Failed to update admin user: " + ex.getMessage());
     }
