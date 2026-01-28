@@ -14,19 +14,17 @@ import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
-import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 import org.anasoid.iptvorganizer.services.http.HeaderFilterService;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
-import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
+import org.anasoid.iptvorganizer.utils.streaming.StreamProxyHttpClient;
 
 /**
  * Proxy Controller
@@ -47,7 +45,7 @@ public class ProxyController {
   private static final int BUFFER_SIZE = 8192;
 
   @Inject XtreamUserService xtreamUserService;
-  @Inject HttpStreamingService httpStreamingService;
+  @Inject StreamProxyHttpClient streamProxyHttpClient;
   @Inject HeaderFilterService headerFilterService;
   @Inject ClientRepository clientRepository;
   @Inject SourceRepository sourceRepository;
@@ -88,7 +86,7 @@ public class ProxyController {
       log.info("Proxy request - user: {}, decodedUrl: {}", username, decodedUrl);
 
       // Stream content from upstream
-      return streamFromUpstream(decodedUrl, source, httpHeaders);
+      return streamFromUpstream(decodedUrl, client, source, httpHeaders);
 
     } catch (UnauthorizedException ex) {
       log.warn("Proxy request unauthorized: {}", ex.getMessage());
@@ -129,32 +127,20 @@ public class ProxyController {
    * Stream content from upstream URL with header forwarding
    *
    * @param upstreamUrl The upstream URL
+   * @param client The authenticated client (for configuration fallback)
    * @param source The source (for configuration)
    * @param httpHeaders Client request headers to forward
    * @return Response with streaming output
    */
-  private Response streamFromUpstream(String upstreamUrl, Source source, HttpHeaders httpHeaders) {
+  private Response streamFromUpstream(
+      String upstreamUrl, Client client, Source source, HttpHeaders httpHeaders) {
     try {
-      // Extract and filter client headers to forward
-      Map<String, String> requestHeaders = headerFilterService.filterRequestHeaders(httpHeaders);
-
-      // Build HTTP options with redirect following if configured
-      HttpOptions options =
-          HttpOptions.builder()
-              .timeout(30000L)
-              .maxRetries(1)
-              .followRedirects(
-                  source.getStreamFollowLocation() != null && source.getStreamFollowLocation())
-              .build();
-
-      // Stream content from upstream with header forwarding
+      // Load stream from upstream via HTTP proxy client
       HttpStreamingResponse streamResponse =
-          httpStreamingService.streamHttpWithHeaders(upstreamUrl, options, requestHeaders);
+          streamProxyHttpClient.loadStreamWithProxy(upstreamUrl, client, source, httpHeaders);
 
       // Check for HTTP errors
       if (streamResponse.getStatusCode() >= 400) {
-        log.warn(
-            "Upstream error response: {} for URL: {}", streamResponse.getStatusCode(), upstreamUrl);
         return Response.status(streamResponse.getStatusCode()).build();
       }
 
