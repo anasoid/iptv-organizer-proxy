@@ -167,20 +167,6 @@ public class StreamDataController {
           streamId,
           streamUrl);
 
-      // Check useRedirect setting with priority: client -> source -> environment
-      boolean useRedirect = clientService.resolveUseRedirect(client, source);
-      log.info(
-          "useRedirect for stream: {} (client: {}, source: {})",
-          useRedirect,
-          client.getUseRedirect(),
-          source.getUseRedirect());
-
-      // If useRedirect is enabled, return direct 302 redirect to original URL
-      if (useRedirect) {
-        log.info("useRedirect enabled, returning direct 302 redirect to: {}", streamUrl);
-        return Response.seeOther(URI.create(streamUrl)).build();
-      }
-
       return getStream(client, source, streamUrl, uriInfo);
 
     } catch (UnauthorizedException ex) {
@@ -196,22 +182,32 @@ public class StreamDataController {
   }
 
   private Response getStream(Client client, Source source, String streamUrl, UriInfo uriInfo) {
+    // Check useRedirect setting with priority: client -> source -> environment
+
+    // If useRedirect is enabled, return direct 302 redirect to original URL
 
     if (clientService.resolveDisableStreamProxy(client, source)) {
       // Direct 302 redirect to source
       // Note: Client's player will follow any redirects automatically
       log.info("Direct stream proxy disabled, returning 302 redirect to: {}", streamUrl);
-      return Response.seeOther(URI.create(streamUrl)).build();
+      if (clientService.resolveUseRedirect(client, source)) {
+        log.info("useRedirect enabled, returning direct 302 redirect to: {}", streamUrl);
+        return Response.seeOther(URI.create(streamUrl)).build();
+      } else {
+        log.info("useRedirect enabled, returning direct 302 redirect to: {}", streamUrl);
+        return Response.seeOther(URI.create(streamUrl)).build();
+      }
+    } else {
+
+      // Otherwise, encode URL and redirect to our proxy endpoint
+      // Our proxy endpoint will handle redirect following automatically via HttpClient
+      String encodedUrl = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
+      String proxyUrl =
+          buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrl);
+
+      log.info("Stream proxy enabled, redirecting to proxy: {}", proxyUrl);
+      return Response.seeOther(URI.create(proxyUrl)).build();
     }
-
-    // Otherwise, encode URL and redirect to our proxy endpoint
-    // Our proxy endpoint will handle redirect following automatically via HttpClient
-    String encodedUrl = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
-    String proxyUrl =
-        buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrl);
-
-    log.info("Stream proxy enabled, redirecting to proxy: {}", proxyUrl);
-    return Response.seeOther(URI.create(proxyUrl)).build();
   }
 
   /**
