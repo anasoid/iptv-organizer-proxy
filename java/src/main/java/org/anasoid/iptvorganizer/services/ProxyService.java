@@ -22,8 +22,8 @@ public class ProxyService extends BaseService<Proxy, ProxyRepository> {
     }
 
     // Validate that either proxyUrl or proxyHost is provided
-    if ((proxy.getProxyUrl() == null || proxy.getProxyUrl().isBlank()) &&
-        (proxy.getProxyHost() == null || proxy.getProxyHost().isBlank())) {
+    if ((proxy.getProxyUrl() == null || proxy.getProxyUrl().isBlank())
+        && (proxy.getProxyHost() == null || proxy.getProxyHost().isBlank())) {
       throw new IllegalArgumentException("Either proxy URL or proxy host must be provided");
     }
 

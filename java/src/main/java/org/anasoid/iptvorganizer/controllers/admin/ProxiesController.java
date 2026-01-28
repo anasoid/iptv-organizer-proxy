@@ -90,7 +90,8 @@ public class ProxiesController extends BaseController {
       // Update basic fields
       if (request.getName() != null && !request.getName().isBlank()) {
         // Check if new name already exists (and it's not the same as current name)
-        if (!request.getName().equals(proxy.getName()) && proxyService.nameExists(request.getName())) {
+        if (!request.getName().equals(proxy.getName())
+            && proxyService.nameExists(request.getName())) {
           return ResponseUtils.badRequest("Proxy name already exists");
         }
         proxy.setName(request.getName());

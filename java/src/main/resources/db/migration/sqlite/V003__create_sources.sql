@@ -13,12 +13,14 @@ CREATE TABLE IF NOT EXISTS sources (
     stream_follow_location INTEGER NOT NULL DEFAULT 1 CHECK(stream_follow_location IN (0, 1)),
     use_redirect INTEGER,
     use_redirect_xmltv INTEGER,
+    proxy_id INTEGER REFERENCES proxies(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_source_is_active ON sources(is_active);
 CREATE INDEX IF NOT EXISTS idx_source_next_sync ON sources(next_sync);
+CREATE INDEX IF NOT EXISTS idx_source_proxy_id ON sources(proxy_id);
 
 CREATE TRIGGER IF NOT EXISTS update_sources_updated_at
 AFTER UPDATE ON sources

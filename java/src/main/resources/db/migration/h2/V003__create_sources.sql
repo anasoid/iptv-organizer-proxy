@@ -13,9 +13,11 @@ CREATE TABLE IF NOT EXISTS sources (
     stream_follow_location BOOLEAN NOT NULL DEFAULT TRUE,
     use_redirect BOOLEAN,
     use_redirect_xmltv BOOLEAN,
+    proxy_id INT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_source_is_active ON sources(is_active);
 CREATE INDEX IF NOT EXISTS idx_source_next_sync ON sources(next_sync);
+CREATE INDEX IF NOT EXISTS idx_source_proxy_id ON sources(proxy_id);

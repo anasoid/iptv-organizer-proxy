@@ -13,8 +13,11 @@ CREATE TABLE IF NOT EXISTS sources (
     stream_follow_location TINYINT(1) NOT NULL DEFAULT 1,
     use_redirect TINYINT(1) NULL,
     use_redirect_xmltv TINYINT(1) NULL,
+    proxy_id INT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_source_is_active (is_active),
-    INDEX idx_source_next_sync (next_sync)
+    INDEX idx_source_next_sync (next_sync),
+    INDEX idx_source_proxy_id (proxy_id),
+    CONSTRAINT fk_source_proxy FOREIGN KEY (proxy_id) REFERENCES proxies(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
