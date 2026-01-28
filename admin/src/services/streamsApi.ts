@@ -1,25 +1,5 @@
 import api from './api';
-
-export interface StreamData {
-  [key: string]: unknown;
-  stream_icon?: string;
-}
-
-export interface Stream {
-  id: number;
-  source_id: number;
-  stream_id: string | number;
-  num: number;
-  name: string;
-  category_id: string | number | null;
-  category_ids?: string | number[] | null;
-  is_adult: number;
-  allow_deny?: 'allow' | 'deny' | null;
-  labels?: string | null;
-  data?: StreamData | null;
-  created_at: string;
-  updated_at: string;
-}
+import type { Stream } from '../types';
 
 export interface StreamsListResponse {
   success: boolean;
@@ -40,19 +20,19 @@ export interface StreamResponse {
 type StreamType = 'live' | 'vod' | 'series';
 
 interface StreamsParams {
-  source_id: number;
+  sourceId: number;
   type: StreamType;
   page: number;
   limit: number;
-  category_id?: number;
+  categoryId?: number;
   search?: string;
-  stream_id?: number | string;
+  streamId?: number | string;
 }
 
 class StreamsApi {
   /**
    * Get all streams by source and type (paginated)
-   * Optional filter by category_id, search by name, and stream_id
+   * Optional filter by categoryId, search by name, and streamId
    */
   async getStreams(
     sourceId: number,
@@ -63,15 +43,15 @@ class StreamsApi {
     search?: string,
     streamId?: number | string
   ) {
-    const params: StreamsParams = { source_id: sourceId, type, page, limit };
+    const params: Record<string, string | number | boolean> = { sourceId, type, page, limit };
     if (categoryId) {
-      params.category_id = categoryId;
+      params.categoryId = categoryId;
     }
     if (search) {
       params.search = search;
     }
     if (streamId !== undefined && streamId !== '') {
-      params.stream_id = streamId;
+      params.streamId = streamId;
     }
 
     const response = await api.get('/streams', { params });
@@ -122,7 +102,7 @@ class StreamsApi {
     if (type) {
       params.type = type;
     }
-    const response = await api.patch(`/streams/${id}/allow-deny`, { allow_deny: allowDeny }, { params });
+    const response = await api.patch(`/streams/${id}/allow-deny`, { allowDeny }, { params });
     return response.data as StreamResponse;
   }
 }

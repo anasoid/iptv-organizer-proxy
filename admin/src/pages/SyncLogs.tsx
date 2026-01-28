@@ -43,8 +43,8 @@ export default function SyncLogs() {
 
   // Build filters object
   const filters = {
-    ...(sourceIdFilter ? { source_id: sourceIdFilter } : {}),
-    ...(syncTypeFilter ? { sync_type: syncTypeFilter } : {}),
+    ...(sourceIdFilter ? { sourceId: sourceIdFilter } : {}),
+    ...(syncTypeFilter ? { syncType: syncTypeFilter } : {}),
     ...(statusFilter ? { status: statusFilter } : {}),
   };
 
@@ -111,14 +111,14 @@ export default function SyncLogs() {
   const columns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 70 },
     {
-      field: 'source_name',
+      field: 'sourceName',
       headerName: 'Source',
       width: 150,
       flex: 1,
-      renderCell: (params) => params.value || `Source #${params.row.source_id}`,
+      renderCell: (params) => params.value || `Source #${params.row.sourceId}`,
     },
     {
-      field: 'sync_type',
+      field: 'syncType',
       headerName: 'Type',
       width: 150,
       renderCell: (params) => {
@@ -139,34 +139,34 @@ export default function SyncLogs() {
       ),
     },
     {
-      field: 'started_at',
+      field: 'startedAt',
       headerName: 'Started',
       width: 160,
       renderCell: (params) =>
         params.value ? new Date(params.value).toLocaleString() : '-',
     },
     {
-      field: 'duration_seconds',
+      field: 'durationSeconds',
       headerName: 'Duration',
       width: 90,
       renderCell: (params) => formatDuration(params.value),
     },
     {
-      field: 'items_added',
+      field: 'itemsAdded',
       headerName: 'Added',
       width: 80,
       align: 'right',
       headerAlign: 'right',
     },
     {
-      field: 'items_updated',
+      field: 'itemsUpdated',
       headerName: 'Updated',
       width: 80,
       align: 'right',
       headerAlign: 'right',
     },
     {
-      field: 'items_deleted',
+      field: 'itemsDeleted',
       headerName: 'Deleted',
       width: 80,
       align: 'right',
@@ -228,7 +228,7 @@ export default function SyncLogs() {
                   Total Syncs
                 </Typography>
                 <Typography variant="h5">
-                  {stats.total_syncs || 0}
+                  {stats.totalSyncs || 0}
                 </Typography>
               </CardContent>
             </Card>
@@ -240,7 +240,7 @@ export default function SyncLogs() {
                   Completed
                 </Typography>
                 <Typography variant="h5" color="success.main">
-                  {stats.completed_syncs || 0}
+                  {stats.completedSyncs || 0}
                 </Typography>
               </CardContent>
             </Card>
@@ -252,7 +252,7 @@ export default function SyncLogs() {
                   Failed
                 </Typography>
                 <Typography variant="h5" color="error.main">
-                  {stats.failed_syncs || 0}
+                  {stats.failedSyncs || 0}
                 </Typography>
               </CardContent>
             </Card>
@@ -353,7 +353,7 @@ export default function SyncLogs() {
                     Source
                   </Typography>
                   <Typography variant="body1">
-                    {viewLog.source_name || `Source #${viewLog.source_id}`}
+                    {viewLog.sourceName || `Source #${viewLog.sourceId}`}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
@@ -361,7 +361,7 @@ export default function SyncLogs() {
                     Sync Type
                   </Typography>
                   <Typography variant="body1">
-                    {SYNC_TYPES.find(t => t.id === viewLog.sync_type)?.label || viewLog.sync_type}
+                    {SYNC_TYPES.find(t => t.id === viewLog.syncType)?.label || viewLog.syncType}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
@@ -379,7 +379,7 @@ export default function SyncLogs() {
                     Started At
                   </Typography>
                   <Typography variant="body1">
-                    {new Date(viewLog.started_at).toLocaleString()}
+                    {new Date(viewLog.startedAt).toLocaleString()}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
@@ -387,7 +387,7 @@ export default function SyncLogs() {
                     Completed At
                   </Typography>
                   <Typography variant="body1">
-                    {viewLog.completed_at ? new Date(viewLog.completed_at).toLocaleString() : '-'}
+                    {viewLog.completedAt ? new Date(viewLog.completedAt).toLocaleString() : '-'}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
@@ -395,34 +395,34 @@ export default function SyncLogs() {
                     Duration
                   </Typography>
                   <Typography variant="body1">
-                    {formatDuration(viewLog.duration_seconds)}
+                    {formatDuration(viewLog.durationSeconds)}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="body2" color="textSecondary">
                     Items Added
                   </Typography>
-                  <Typography variant="body1">{viewLog.items_added}</Typography>
+                  <Typography variant="body1">{viewLog.itemsAdded}</Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="body2" color="textSecondary">
                     Items Updated
                   </Typography>
-                  <Typography variant="body1">{viewLog.items_updated}</Typography>
+                  <Typography variant="body1">{viewLog.itemsUpdated}</Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="body2" color="textSecondary">
                     Items Deleted
                   </Typography>
-                  <Typography variant="body1">{viewLog.items_deleted}</Typography>
+                  <Typography variant="body1">{viewLog.itemsDeleted}</Typography>
                 </Grid>
-                {viewLog.error_message && (
+                {viewLog.errorMessage && (
                   <Grid item xs={12}>
                     <Typography variant="body2" color="textSecondary">
                       Error Message
                     </Typography>
                     <Alert severity="error" sx={{ mt: 1 }}>
-                      {viewLog.error_message}
+                      {viewLog.errorMessage}
                     </Alert>
                   </Grid>
                 )}

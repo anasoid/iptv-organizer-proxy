@@ -174,8 +174,8 @@ const FILTER_TEMPLATES = {
 export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormProps) {
   const [name, setName] = useState(filter?.name || '');
   const [description, setDescription] = useState(filter?.description || '');
-  const [rulesYaml, setRulesYaml] = useState(filter?.filter_config || '');
-  const [useSourceFilter, setUseSourceFilter] = useState(filter?.use_source_filter ? true : true);
+  const [rulesYaml, setRulesYaml] = useState(filter?.filterConfig || '');
+  const [useSourceFilter, setUseSourceFilter] = useState(filter?.useSourceFilter ? true : true);
   const [error, setError] = useState<string | null>(null);
   const [showRulesExamples, setShowRulesExamples] = useState(false);
   const [rulesTabIndex, setRulesTabIndex] = useState(0);
@@ -186,8 +186,8 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setName(filter?.name || '');
     setDescription(filter?.description || '');
-    setRulesYaml(filter?.filter_config || '');
-    setUseSourceFilter(filter?.use_source_filter ? true : true);
+    setRulesYaml(filter?.filterConfig || '');
+    setUseSourceFilter(filter?.useSourceFilter ? true : true);
     setError(null);
     setTabIndex(0);
   }, [filter]);
@@ -264,8 +264,8 @@ export default function FilterForm({ filter, onSuccess, onCancel }: FilterFormPr
     const data = {
       name: name.trim(),
       description: description.trim() || null,
-      filter_config: rulesYaml,
-      use_source_filter: useSourceFilter ? 1 : 0,
+      filterConfig: rulesYaml,
+      useSourceFilter: useSourceFilter,
     };
 
     if (filter) {

@@ -1,17 +1,5 @@
 import api from './api';
-
-export interface Category {
-  id: number;
-  source_id: number;
-  category_id: string | number;
-  category_name: string;
-  category_type: 'live' | 'vod' | 'series';
-  num: number;
-  allow_deny?: 'allow' | 'deny' | null;
-  parent_id?: number | null;
-  labels?: string | null;
-  created_at: string;
-}
+import type { Category } from '../types';
 
 export interface CategoriesListResponse {
   success: boolean;
@@ -35,12 +23,12 @@ class CategoriesApi {
    * Optional search by name and filter by category type
    */
   async getCategories(sourceId: number, page: number = 1, limit: number = 20, search?: string, categoryType?: 'live' | 'vod' | 'series') {
-    const params: { source_id: number; page: number; limit: number; search?: string; category_type?: string } = { source_id: sourceId, page, limit };
+    const params: Record<string, string | number> = { sourceId, page, limit };
     if (search) {
       params.search = search;
     }
     if (categoryType) {
-      params.category_type = categoryType;
+      params.categoryType = categoryType;
     }
     const response = await api.get('/categories', { params });
     return response.data as CategoriesListResponse;
@@ -48,11 +36,11 @@ class CategoriesApi {
 
   /**
    * Get single category by ID
-   * @param id - category ID (can be database id or functional category_id depending on lookup)
-   * @param sourceId - if provided, searches by source_id + category_id (functional lookup)
+   * @param id - category ID
+   * @param sourceId - if provided, searches by source_id
    */
   async getCategory(id: number, sourceId?: number) {
-    const params = sourceId ? { source_id: sourceId } : {};
+    const params = sourceId ? { sourceId } : {};
     const response = await api.get(`/categories/${id}`, { params });
     return response.data as CategoryResponse;
   }
@@ -63,7 +51,7 @@ class CategoriesApi {
    * @param allowDeny - 'allow', 'deny', or null to remove override
    */
   async updateAllowDeny(id: number, allowDeny: 'allow' | 'deny' | null) {
-    const response = await api.patch(`/categories/${id}/allow-deny`, { allow_deny: allowDeny });
+    const response = await api.patch(`/categories/${id}/allow-deny`, { allowDeny });
     return response.data as CategoryResponse;
   }
 }

@@ -2,27 +2,29 @@ import api from './api';
 
 export interface SyncLog {
   id: number;
-  source_id: number;
-  source_name?: string;
-  sync_type: string;
-  started_at: string;
-  completed_at?: string | null;
-  duration_seconds?: number | null;
+  sourceId: number;
+  sourceName?: string;
+  syncType: string;
+  startedAt: string;
+  completedAt?: string | null;
+  durationSeconds?: number | null;
   status: 'running' | 'completed' | 'failed';
-  items_added: number;
-  items_updated: number;
-  items_deleted: number;
-  error_message?: string | null;
+  itemsAdded: number;
+  itemsUpdated: number;
+  itemsDeleted: number;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SyncLogStats {
-  total_syncs: number;
-  completed_syncs: number;
-  failed_syncs: number;
-  running_syncs?: number;
-  total_added: number;
-  total_updated: number;
-  total_deleted: number;
+  totalSyncs: number;
+  completedSyncs: number;
+  failedSyncs: number;
+  runningSyncs?: number;
+  totalAdded: number;
+  totalUpdated: number;
+  totalDeleted: number;
 }
 
 export interface SyncLogsResponse {
@@ -60,8 +62,8 @@ class SyncLogsApi {
     page: number = 1,
     limit: number = 10,
     filters?: {
-      source_id?: number;
-      sync_type?: string;
+      sourceId?: number;
+      syncType?: string;
       status?: string;
     }
   ): Promise<SyncLogsResponse> {
@@ -91,8 +93,8 @@ class SyncLogsApi {
    * Get sync log statistics
    */
   async getSyncLogStats(filters?: {
-    source_id?: number;
-    sync_type?: string;
+    sourceId?: number;
+    syncType?: string;
   }): Promise<SyncLogStatsResponse> {
     const response = await api.get('/sync-logs/stats', {
       params: filters,

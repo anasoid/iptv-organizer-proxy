@@ -81,18 +81,10 @@ java {
 group 'org.anasoid.iptvorganizer'
 version "${projectVersion}"
 
-// Quarkus dev mode debugging task
-// Usage: ./gradlew quarkusDevDebug -Ddebug=8000 -Dsuspend=n
-// Or simpler: ./gradlew quarkusDev -Ddebug=8000 -Dsuspend=n
-tasks.register('quarkusDevDebug') {
-    description = 'Run quarkusDev with debugging enabled (use: ./gradlew quarkusDevDebug -Ddebug=8000)'
-    dependsOn quarkusDev
-}
-
 
 tasks.named('quarkusDev') {
     jvmArgs = [
-            '-Xmx84M'
+            '-Xmx128M'
     ]
 }
 tasks.named('quarkusRun') {

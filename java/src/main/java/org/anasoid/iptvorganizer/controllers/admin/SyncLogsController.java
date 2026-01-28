@@ -18,11 +18,11 @@ public class SyncLogsController extends BaseController {
 
   @Inject SyncLogService syncLogService;
 
-  /** Get sync logs with filters GET /api/sync-logs?page=1&limit=20&source_id=&sync_type=&status= */
+  /** Get sync logs with filters GET /api/sync-logs?page=1&limit=20&sourceId=&syncType=&status= */
   @GET
   public Response getSyncLogs(
-      @QueryParam("source_id") Long sourceId,
-      @QueryParam("sync_type") String syncType,
+      @QueryParam("sourceId") Long sourceId,
+      @QueryParam("syncType") String syncType,
       @QueryParam("status") String status,
       @QueryParam("page") @DefaultValue("1") int page,
       @QueryParam("limit") @DefaultValue("20") int limit) {
@@ -31,17 +31,44 @@ public class SyncLogsController extends BaseController {
       return ResponseUtils.badRequest("Page and limit must be greater than 0");
     }
 
-    if (sourceId == null) {
-      return ResponseUtils.badRequest("source_id is required");
-    }
-
     try {
-      var logs = syncLogService.findBySourceId(sourceId);
-      if (logs.size() > limit) {
-        logs = logs.subList(0, limit);
+      java.util.List<org.anasoid.iptvorganizer.models.entity.SyncLog> logs;
+
+      // Fetch logs by source if sourceId provided, otherwise fetch all logs
+      if (sourceId != null) {
+        logs = syncLogService.findBySourceId(sourceId);
+      } else {
+        logs = syncLogService.getAll();
       }
-      long total = syncLogService.count();
-      return ResponseUtils.okWithPagination(logs, PaginationMeta.of(page, limit, total));
+
+      // Apply status filter if provided
+      if (status != null && !status.isBlank()) {
+        final String statusFilter = status;
+        logs =
+            logs.stream()
+                .filter(l -> l.getStatus().toString().equalsIgnoreCase(statusFilter))
+                .collect(java.util.stream.Collectors.toList());
+      }
+
+      // Apply sync type filter if provided
+      if (syncType != null && !syncType.isBlank()) {
+        final String typeFilter = syncType;
+        logs =
+            logs.stream()
+                .filter(l -> l.getSyncType().equalsIgnoreCase(typeFilter))
+                .collect(java.util.stream.Collectors.toList());
+      }
+
+      // Apply pagination
+      long total = logs.size();
+      int startIdx = (page - 1) * limit;
+      int endIdx = Math.min(startIdx + limit, (int) total);
+      java.util.List<org.anasoid.iptvorganizer.models.entity.SyncLog> paginatedLogs =
+          startIdx < logs.size()
+              ? logs.subList(startIdx, endIdx)
+              : java.util.Collections.emptyList();
+
+      return ResponseUtils.okWithPagination(paginatedLogs, PaginationMeta.of(page, limit, total));
     } catch (Exception ex) {
       return ResponseUtils.serverError("Failed to fetch sync logs: " + ex.getMessage());
     }
@@ -75,16 +102,57 @@ public class SyncLogsController extends BaseController {
     }
   }
 
-  /** Get sync logs statistics GET /api/sync-logs/stats?source_id=&sync_type= */
+  /** Get sync logs statistics GET /api/sync-logs/stats?sourceId=&syncType= */
   @GET
   @Path("/stats")
   public Response getSyncStats(
-      @QueryParam("source_id") Long sourceId, @QueryParam("sync_type") String syncType) {
-    // TODO: Implement statistics retrieval
-    var stats = new java.util.HashMap<String, Object>();
-    stats.put("totalSyncs", 0);
-    stats.put("successfulSyncs", 0);
-    stats.put("failedSyncs", 0);
-    return ResponseUtils.ok(stats);
+      @QueryParam("sourceId") Long sourceId, @QueryParam("syncType") String syncType) {
+    try {
+      java.util.List<org.anasoid.iptvorganizer.models.entity.SyncLog> logs;
+
+      // Fetch logs by source if sourceId provided, otherwise fetch all logs
+      if (sourceId != null) {
+        logs = syncLogService.findBySourceId(sourceId);
+      } else {
+        logs = syncLogService.getAll();
+      }
+
+      // Apply sync type filter if provided
+      if (syncType != null && !syncType.isBlank()) {
+        final String typeFilter = syncType;
+        logs =
+            logs.stream()
+                .filter(l -> l.getSyncType().equalsIgnoreCase(typeFilter))
+                .collect(java.util.stream.Collectors.toList());
+      }
+
+      // Calculate statistics
+      long totalSyncs = logs.size();
+      long completedSyncs =
+          logs.stream().filter(l -> "COMPLETED".equalsIgnoreCase(l.getStatus().toString())).count();
+      long failedSyncs =
+          logs.stream().filter(l -> "FAILED".equalsIgnoreCase(l.getStatus().toString())).count();
+      long runningSyncs =
+          logs.stream().filter(l -> "RUNNING".equalsIgnoreCase(l.getStatus().toString())).count();
+      long totalAdded =
+          logs.stream().mapToLong(l -> l.getItemsAdded() != null ? l.getItemsAdded() : 0).sum();
+      long totalUpdated =
+          logs.stream().mapToLong(l -> l.getItemsUpdated() != null ? l.getItemsUpdated() : 0).sum();
+      long totalDeleted =
+          logs.stream().mapToLong(l -> l.getItemsDeleted() != null ? l.getItemsDeleted() : 0).sum();
+
+      var stats = new java.util.HashMap<String, Object>();
+      stats.put("totalSyncs", totalSyncs);
+      stats.put("completedSyncs", completedSyncs);
+      stats.put("failedSyncs", failedSyncs);
+      stats.put("runningSyncs", runningSyncs);
+      stats.put("totalAdded", totalAdded);
+      stats.put("totalUpdated", totalUpdated);
+      stats.put("totalDeleted", totalDeleted);
+
+      return ResponseUtils.ok(stats);
+    } catch (Exception ex) {
+      return ResponseUtils.serverError("Failed to fetch sync statistics: " + ex.getMessage());
+    }
   }
 }

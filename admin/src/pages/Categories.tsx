@@ -69,9 +69,9 @@ export default function Categories() {
   if (allowDenyFilter !== 'all') {
     categories = categories.filter((cat) => {
       if (allowDenyFilter === 'default') {
-        return cat.allow_deny === null;
+        return cat.allowDeny === null;
       }
-      return cat.allow_deny === allowDenyFilter;
+      return cat.allowDeny === allowDenyFilter;
     });
   }
 
@@ -91,9 +91,9 @@ export default function Categories() {
   const columns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 70 },
     { field: 'num', headerName: 'Order', width: 80 },
-    { field: 'category_name', headerName: 'Name', width: 200, flex: 1 },
+    { field: 'name', headerName: 'Name', width: 200, flex: 1 },
     {
-      field: 'category_type',
+      field: 'type',
       headerName: 'Type',
       width: 100,
       renderCell: (params) => (
@@ -104,10 +104,10 @@ export default function Categories() {
         />
       ),
     },
-    { field: 'category_id', headerName: 'Category ID', width: 120 },
+    { field: 'externalId', headerName: 'Category ID', width: 120 },
     { field: 'labels', headerName: 'Labels', width: 200, flex: 1 },
     {
-      field: 'allow_deny',
+      field: 'allowDeny',
       headerName: 'Access Control',
       width: 120,
       sortable: false,
@@ -115,7 +115,7 @@ export default function Categories() {
       renderCell: (params) => {
         const category = params.row as Category;
         const isLoading = updateAllowDenyMutation.isPending;
-        const value = category.allow_deny ?? 'default';
+        const value = category.allowDeny ?? 'default';
 
         const getColor = (val: string) => {
           switch (val) {
@@ -194,25 +194,25 @@ export default function Categories() {
       <CardContent sx={{ flexGrow: 1 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
           <Typography variant="subtitle2" component="div" sx={{ fontWeight: 600, flex: 1, minHeight: '2.4em' }}>
-            {category.category_name}
+            {category.name}
           </Typography>
           <Chip label={`#${category.num}`} size="small" color="primary" variant="outlined" sx={{ ml: 1 }} />
         </Box>
 
         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
-          ID: {category.category_id}
+          ID: {category.externalId}
         </Typography>
 
         <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 2 }}>
           <Chip
-            label={category.category_type.toUpperCase()}
-            color={getCategoryTypeColor(category.category_type)}
+            label={category.type.toUpperCase()}
+            color={getCategoryTypeColor(category.type)}
             size="small"
           />
-          {category.allow_deny && (
+          {category.allowDeny && (
             <Chip
-              label={category.allow_deny.charAt(0).toUpperCase() + category.allow_deny.slice(1)}
-              color={category.allow_deny === 'allow' ? 'success' : 'error'}
+              label={category.allowDeny.charAt(0).toUpperCase() + category.allowDeny.slice(1)}
+              color={category.allowDeny === 'allow' ? 'success' : 'error'}
               size="small"
             />
           )}

@@ -27,19 +27,18 @@ public class CategoriesController extends BaseController {
   @Inject CategoryService categoryService;
 
   /**
-   * Get categories with filters GET
-   * /api/categories?source_id=&page=1&limit=20&search=&category_type=
+   * Get categories with filters GET /api/categories?sourceId=&page=1&limit=20&search=&categoryType=
    */
   @GET
   public Response getCategories(
-      @QueryParam("source_id") Long sourceId,
-      @QueryParam("category_type") String categoryType,
+      @QueryParam("sourceId") Long sourceId,
+      @QueryParam("categoryType") String categoryType,
       @QueryParam("search") String search,
       @QueryParam("page") @DefaultValue("1") int page,
       @QueryParam("limit") @DefaultValue("20") int limit) {
 
     if (sourceId == null) {
-      return ResponseUtils.badRequest("source_id is required");
+      return ResponseUtils.badRequest("sourceId is required");
     }
 
     try {

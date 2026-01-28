@@ -55,17 +55,17 @@ export default function CategoryDetail() {
 
   // Fetch streams only for the same type as the category
   const { data: streamsData, isLoading: isLoadingStreams } = useQuery({
-    queryKey: ['category-streams', category?.source_id, category?.category_id, category?.category_type],
+    queryKey: ['category-streams', category?.sourceId, category?.externalId, category?.type],
     queryFn: () => {
       if (!category) return Promise.resolve(null);
-      const categoryId = typeof category.category_id === 'string' ? parseInt(category.category_id, 10) : category.category_id;
-      switch (category.category_type) {
+      const categoryId = typeof category.externalId === 'string' ? parseInt(category.externalId, 10) : category.externalId;
+      switch (category.type) {
         case 'live':
-          return streamsApi.getLiveStreams(category.source_id, categoryId);
+          return streamsApi.getLiveStreams(category.sourceId, categoryId);
         case 'vod':
-          return streamsApi.getVodStreams(category.source_id, categoryId);
+          return streamsApi.getVodStreams(category.sourceId, categoryId);
         case 'series':
-          return streamsApi.getSeriesStreams(category.source_id, categoryId);
+          return streamsApi.getSeriesStreams(category.sourceId, categoryId);
         default:
           return Promise.resolve(null);
       }
@@ -92,10 +92,10 @@ export default function CategoryDetail() {
 
   const streamColumns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 70 },
-    { field: 'stream_id', headerName: 'Stream ID', width: 100 },
+    { field: 'externalId', headerName: 'Stream ID', width: 100 },
     { field: 'name', headerName: 'Name', width: 200, flex: 1 },
     {
-      field: 'is_adult',
+      field: 'isAdult',
       headerName: 'Adult',
       width: 80,
       renderCell: (params) => (params.value ? <Chip label="Adult" color="error" size="small" /> : '—'),
@@ -141,15 +141,15 @@ export default function CategoryDetail() {
         <Grid container spacing={2} alignItems="center">
           <Grid item xs={12} sm="auto">
             <Chip
-              label={category.category_type.toUpperCase()}
-              color={getCategoryTypeColor(category.category_type)}
+              label={category.type.toUpperCase()}
+              color={getCategoryTypeColor(category.type)}
               size="medium"
             />
           </Grid>
         </Grid>
 
         <Typography variant="h4" sx={{ mt: 2, mb: 1 }}>
-          {category.category_name}
+          {category.name}
         </Typography>
 
         <Divider sx={{ my: 2 }} />
@@ -159,7 +159,7 @@ export default function CategoryDetail() {
             <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
               Category ID
             </Typography>
-            <Typography variant="body1">{category.category_id}</Typography>
+            <Typography variant="body1">{category.externalId}</Typography>
           </Grid>
 
           <Grid item xs={12} sm={6}>
@@ -167,7 +167,7 @@ export default function CategoryDetail() {
               Type
             </Typography>
             <Typography variant="body1" sx={{ textTransform: 'capitalize' }}>
-              {category.category_type}
+              {category.type}
             </Typography>
           </Grid>
 
@@ -185,8 +185,8 @@ export default function CategoryDetail() {
             <ButtonGroup variant="outlined" size="small">
               <Button
                 startIcon={<CheckCircleIcon />}
-                variant={category.allow_deny === 'allow' ? 'contained' : 'outlined'}
-                color={category.allow_deny === 'allow' ? 'success' : 'inherit'}
+                variant={category.allowDeny === 'allow' ? 'contained' : 'outlined'}
+                color={category.allowDeny === 'allow' ? 'success' : 'inherit'}
                 onClick={() => updateAllowDenyMutation.mutate('allow')}
                 disabled={updateAllowDenyMutation.isPending}
               >
@@ -194,15 +194,15 @@ export default function CategoryDetail() {
               </Button>
               <Button
                 startIcon={<BlockIcon />}
-                variant={category.allow_deny === 'deny' ? 'contained' : 'outlined'}
-                color={category.allow_deny === 'deny' ? 'error' : 'inherit'}
+                variant={category.allowDeny === 'deny' ? 'contained' : 'outlined'}
+                color={category.allowDeny === 'deny' ? 'error' : 'inherit'}
                 onClick={() => updateAllowDenyMutation.mutate('deny')}
                 disabled={updateAllowDenyMutation.isPending}
               >
                 Deny
               </Button>
               <Button
-                variant={category.allow_deny === null ? 'contained' : 'outlined'}
+                variant={category.allowDeny === null ? 'contained' : 'outlined'}
                 onClick={() => updateAllowDenyMutation.mutate(null)}
                 disabled={updateAllowDenyMutation.isPending}
               >
@@ -211,12 +211,12 @@ export default function CategoryDetail() {
             </ButtonGroup>
           </Grid>
 
-          {category.parent_id && (
+          {category.parentId && (
             <Grid item xs={12} sm={6}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
                 Parent Category ID
               </Typography>
-              <Typography variant="body1">{category.parent_id}</Typography>
+              <Typography variant="body1">{category.parentId}</Typography>
             </Grid>
           )}
 
@@ -238,7 +238,7 @@ export default function CategoryDetail() {
               Created At
             </Typography>
             <Typography variant="body1">
-              {new Date(category.created_at).toLocaleDateString('en-US', {
+              {new Date(category.createdAt).toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric',
@@ -254,9 +254,9 @@ export default function CategoryDetail() {
       <Card>
         <Box sx={{ p: 3 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>
-            {category.category_type === 'live'
+            {category.type === 'live'
               ? 'Live Streams'
-              : category.category_type === 'vod'
+              : category.type === 'vod'
                 ? 'VOD Streams'
                 : 'Series'}{' '}
             ({streamsData?.pagination?.total || 0})
@@ -270,7 +270,7 @@ export default function CategoryDetail() {
 
           {!isLoadingStreams && streams.length === 0 && (
             <Alert severity="info">
-              No {category.category_type === 'live' ? 'live streams' : category.category_type === 'vod' ? 'VOD streams' : 'series'} in this category.
+              No {category.type === 'live' ? 'live streams' : category.type === 'vod' ? 'VOD streams' : 'series'} in this category.
             </Alert>
           )}
 
@@ -283,7 +283,7 @@ export default function CategoryDetail() {
                 disableSelectionOnClick
                 onRowClick={(params) => {
                   sessionStorage.setItem('streamDetailReferrer', window.location.pathname);
-                  navigate(`/streams/${params.row.id}/${category.category_type}`);
+                  navigate(`/streams/${params.row.id}/${category.type}`);
                 }}
                 sx={{
                   '& .MuiDataGrid-cell': { py: 1 },
