@@ -103,7 +103,8 @@ public class ClientsController extends BaseController {
       if (request.getSourceId() != null) client.setSourceId(request.getSourceId());
       if (request.getFilterId() != null) client.setFilterId(request.getFilterId());
       if (request.getUsername() != null) client.setUsername(request.getUsername());
-      if (request.getPassword() != null) client.setPassword(request.getPassword());
+      if (request.getPassword() != null && !request.getPassword().isBlank())
+        client.setPassword(request.getPassword());
       if (request.getName() != null) client.setName(request.getName());
       if (request.getEmail() != null) client.setEmail(request.getEmail());
       if (request.getExpiryDate() != null) client.setExpiryDate(request.getExpiryDate());

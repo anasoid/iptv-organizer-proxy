@@ -145,7 +145,7 @@ public class SourcesController extends BaseController {
       if (request.getUsername() != null) {
         source.setUsername(request.getUsername());
       }
-      if (request.getPassword() != null) {
+      if (request.getPassword() != null && !request.getPassword().isBlank()) {
         source.setPassword(request.getPassword());
       }
       if (request.getSyncInterval() != null) {
