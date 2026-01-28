@@ -196,9 +196,8 @@ public class StreamDataController {
   }
 
   private Response getStream(Client client, Source source, String streamUrl, UriInfo uriInfo) {
-    // Check if we should use direct proxy (without our proxy endpoint)
-    Boolean disableStreamProxy = source.getDisableStreamProxy();
-    if (disableStreamProxy != null && disableStreamProxy) {
+
+    if (clientService.resolveDisableStreamProxy(client, source)) {
       // Direct 302 redirect to source
       // Note: Client's player will follow any redirects automatically
       log.info("Direct stream proxy disabled, returning 302 redirect to: {}", streamUrl);

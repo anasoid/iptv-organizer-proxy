@@ -125,4 +125,108 @@ public class ClientService extends BaseService<Client, ClientRepository> {
     // Default: false (stream content)
     return false;
   }
+
+  /**
+   * Resolve isActive setting with priority: client -> source. Default: true
+   *
+   * @param client The client
+   * @param source The source
+   * @return true if client/source is active
+   */
+  public boolean resolveIsActive(Client client, Source source) {
+    // Priority 1: Client-level setting
+    if (client != null && client.getIsActive() != null) {
+      return client.getIsActive();
+    }
+
+    // Priority 2: Source-level setting
+    if (source != null && source.getIsActive() != null) {
+      return source.getIsActive();
+    }
+
+    // Default: true
+    return true;
+  }
+
+  /**
+   * Resolve hideAdultContent setting. Note: Only exists on Client level Default: false
+   *
+   * @param client The client
+   * @return true if adult content should be hidden
+   */
+  public boolean resolveHideAdultContent(Client client) {
+    // Only client-level setting exists
+    if (client != null && client.getHideAdultContent() != null) {
+      return client.getHideAdultContent();
+    }
+
+    // Default: false
+    return false;
+  }
+
+  /**
+   * Resolve enableProxy setting with priority: client -> source. Default: true
+   *
+   * @param client The client
+   * @param source The source
+   * @return true if proxy should be enabled
+   */
+  public boolean resolveEnableProxy(Client client, Source source) {
+    // Priority 1: Client-level setting
+    if (client != null && client.getEnableProxy() != null) {
+      return client.getEnableProxy();
+    }
+
+    // Priority 2: Source-level setting
+    if (source != null && source.getEnableProxy() != null) {
+      return source.getEnableProxy();
+    }
+
+    // Default: true
+    return true;
+  }
+
+  /**
+   * Resolve disableStreamProxy setting with priority: client -> source. Default: false
+   *
+   * @param client The client
+   * @param source The source
+   * @return true if stream proxy should be disabled
+   */
+  public boolean resolveDisableStreamProxy(Client client, Source source) {
+    // Priority 1: Client-level setting
+    if (client != null && client.getDisableStreamProxy() != null) {
+      return client.getDisableStreamProxy();
+    }
+
+    // Priority 2: Source-level setting
+    if (source != null && source.getDisableStreamProxy() != null) {
+      return source.getDisableStreamProxy();
+    }
+
+    // Default: false
+    return false;
+  }
+
+  /**
+   * Resolve streamFollowLocation setting with priority: client -> source. Default: false
+   *
+   * @param client The client
+   * @param source The source
+   * @return true if HTTP redirect following should be enabled for streams
+   */
+  public boolean resolveStreamFollowLocation(Client client, Source source) {
+    // Priority 1: Client-level setting
+    if (client != null && client.getStreamFollowLocation() != null) {
+      return client.getStreamFollowLocation();
+    }
+
+    // Priority 2: Source-level setting
+    if (source != null && source.getStreamFollowLocation() != null) {
+      return source.getStreamFollowLocation();
+    }
+
+    // Default: false
+    return false;
+  }
 }

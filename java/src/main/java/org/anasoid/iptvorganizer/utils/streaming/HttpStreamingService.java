@@ -207,7 +207,6 @@ public class HttpStreamingService {
     }
   }
 
-
   private HttpOptions createHttpOptions() {
     HttpOptions httpOptions = new HttpOptions();
     httpOptions.setTimeout(30000L);
