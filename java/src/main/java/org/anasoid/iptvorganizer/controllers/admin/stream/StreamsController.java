@@ -183,7 +183,8 @@ public class StreamsController extends BaseController {
         case "live":
           var liveStream = liveStreamService.getById(id);
           if (liveStream != null) {
-            liveStream.setAllowDeny(allowDeny);
+            liveStream.setAllowDeny(
+                allowDeny != null ? BaseStream.AllowDenyStatus.fromValue(allowDeny) : null);
             liveStreamService.update(liveStream);
             stream = liveStream;
           }
@@ -191,7 +192,8 @@ public class StreamsController extends BaseController {
         case "vod":
           var vodStream = vodStreamService.getById(id);
           if (vodStream != null) {
-            vodStream.setAllowDeny(allowDeny);
+            vodStream.setAllowDeny(
+                allowDeny != null ? BaseStream.AllowDenyStatus.fromValue(allowDeny) : null);
             vodStreamService.update(vodStream);
             stream = vodStream;
           }
@@ -199,7 +201,8 @@ public class StreamsController extends BaseController {
         case "series":
           var series = seriesService.getById(id);
           if (series != null) {
-            series.setAllowDeny(allowDeny);
+            series.setAllowDeny(
+                allowDeny != null ? BaseStream.AllowDenyStatus.fromValue(allowDeny) : null);
             seriesService.update(series);
             stream = series;
           }

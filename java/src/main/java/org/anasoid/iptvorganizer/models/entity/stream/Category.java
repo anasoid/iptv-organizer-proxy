@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import org.anasoid.iptvorganizer.models.entity.stream.BaseStream.AllowDenyStatus;
 
 @Data
 @NoArgsConstructor
@@ -17,7 +18,7 @@ public class Category extends SourcedEntity {
 
   private String name;
   private String type;
-  private String allowDeny;
+  private AllowDenyStatus allowDeny;
   private Integer parentId;
   private String labels;
 }

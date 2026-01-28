@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 
@@ -32,7 +33,8 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
       stmt.setString(3, category.getName());
       stmt.setString(4, category.getType());
       stmt.setObject(5, category.getNum());
-      stmt.setString(6, category.getAllowDeny());
+      stmt.setString(
+          6, category.getAllowDeny() != null ? category.getAllowDeny().getValue() : null);
       stmt.setObject(7, category.getParentId());
       stmt.setString(8, category.getLabels());
       stmt.executeUpdate();
@@ -55,7 +57,8 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
       stmt.setString(3, category.getName());
       stmt.setString(4, category.getType());
       stmt.setInt(5, category.getNum());
-      stmt.setString(6, category.getAllowDeny());
+      stmt.setString(
+          6, category.getAllowDeny() != null ? category.getAllowDeny().getValue() : null);
       stmt.setObject(7, category.getParentId());
       stmt.setString(8, category.getLabels());
       stmt.setLong(9, category.getId());
@@ -74,7 +77,7 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
         .name(rs.getString("name"))
         .type(rs.getString("type"))
         .num(rs.getInt("num"))
-        .allowDeny(rs.getString("allow_deny"))
+        .allowDeny(BaseStream.AllowDenyStatus.fromValue(rs.getString("allow_deny")))
         .parentId(rs.getObject("parent_id", Integer.class))
         .labels(rs.getString("labels"))
         .createdAt(rs.getObject("created_at", LocalDateTime.class))

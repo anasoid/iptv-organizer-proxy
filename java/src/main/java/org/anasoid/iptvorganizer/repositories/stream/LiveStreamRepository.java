@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.LiveStream;
 import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
 import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
@@ -39,7 +40,7 @@ public class LiveStreamRepository extends BaseStreamRepository<LiveStream> {
       stmt.setLong(1, stream.getSourceId());
       stmt.setInt(2, stream.getExternalId());
       stmt.setObject(3, stream.getNum());
-      stmt.setString(4, stream.getAllowDeny());
+      stmt.setString(4, stream.getAllowDeny() != null ? stream.getAllowDeny().getValue() : null);
       stmt.setString(5, stream.getName());
       stmt.setObject(6, stream.getCategoryId());
       stmt.setString(7, stream.getCategoryIds());
@@ -66,7 +67,7 @@ public class LiveStreamRepository extends BaseStreamRepository<LiveStream> {
       stmt.setLong(1, stream.getSourceId());
       stmt.setInt(2, stream.getExternalId());
       stmt.setInt(3, stream.getNum());
-      stmt.setString(4, stream.getAllowDeny());
+      stmt.setString(4, stream.getAllowDeny() != null ? stream.getAllowDeny().getValue() : null);
       stmt.setString(5, stream.getName());
       stmt.setInt(6, stream.getCategoryId());
       stmt.setString(7, stream.getCategoryIds());
@@ -89,7 +90,7 @@ public class LiveStreamRepository extends BaseStreamRepository<LiveStream> {
         .sourceId(rs.getLong("source_id"))
         .externalId(rs.getInt("external_id"))
         .num(rs.getInt("num"))
-        .allowDeny(rs.getString("allow_deny"))
+        .allowDeny(BaseStream.AllowDenyStatus.fromValue(rs.getString("allow_deny")))
         .name(rs.getString("name"))
         .categoryId(rs.getInt("category_id"))
         .categoryIds(rs.getString("category_ids"))

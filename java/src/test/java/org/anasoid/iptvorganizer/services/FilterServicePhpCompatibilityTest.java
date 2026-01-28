@@ -183,9 +183,10 @@ public class FilterServicePhpCompatibilityTest {
   @DisplayName("Priority 1 - Stream allow_deny='allow'")
   @Test
   public void testPriority1StreamAllow() {
-    BaseStream stream = LiveStream.builder().allowDeny("allow").isAdult(true).build();
+    BaseStream stream =
+        LiveStream.builder().allowDeny(BaseStream.AllowDenyStatus.ALLOW).isAdult(true).build();
 
-    Category category = Category.builder().allowDeny("deny").build();
+    Category category = Category.builder().allowDeny(BaseStream.AllowDenyStatus.DENY).build();
 
     // Even with adult content and category deny, stream allow wins
     assertTrue(filterService.shouldIncludeStream(stream, category, null, true));
@@ -194,9 +195,9 @@ public class FilterServicePhpCompatibilityTest {
   @DisplayName("Priority 2 - Stream allow_deny='deny'")
   @Test
   public void testPriority2StreamDeny() {
-    BaseStream stream = LiveStream.builder().allowDeny("deny").build();
+    BaseStream stream = LiveStream.builder().allowDeny(BaseStream.AllowDenyStatus.DENY).build();
 
-    Category category = Category.builder().allowDeny("allow").build();
+    Category category = Category.builder().allowDeny(BaseStream.AllowDenyStatus.ALLOW).build();
 
     // Stream deny overrides category allow
     assertFalse(filterService.shouldIncludeStream(stream, category, null, false));
@@ -207,7 +208,7 @@ public class FilterServicePhpCompatibilityTest {
   public void testPriority3CategoryAllow() {
     BaseStream stream = LiveStream.builder().build();
 
-    Category category = Category.builder().allowDeny("allow").build();
+    Category category = Category.builder().allowDeny(BaseStream.AllowDenyStatus.ALLOW).build();
 
     // Category allow includes stream
     assertTrue(filterService.shouldIncludeStream(stream, category, null, false));
@@ -218,7 +219,7 @@ public class FilterServicePhpCompatibilityTest {
   public void testPriority4CategoryDeny() {
     BaseStream stream = LiveStream.builder().build();
 
-    Category category = Category.builder().allowDeny("deny").build();
+    Category category = Category.builder().allowDeny(BaseStream.AllowDenyStatus.DENY).build();
 
     // Category deny excludes stream
     assertFalse(filterService.shouldIncludeStream(stream, category, null, false));
@@ -448,10 +449,20 @@ public class FilterServicePhpCompatibilityTest {
   @Test
   public void testApplyToStreamsPrioritySeparation() {
     LiveStream allowStream =
-        LiveStream.builder().externalId(1).categoryId(1).name("Allow").allowDeny("allow").build();
+        LiveStream.builder()
+            .externalId(1)
+            .categoryId(1)
+            .name("Allow")
+            .allowDeny(BaseStream.AllowDenyStatus.ALLOW)
+            .build();
 
     LiveStream denyStream =
-        LiveStream.builder().externalId(2).categoryId(1).name("Deny").allowDeny("deny").build();
+        LiveStream.builder()
+            .externalId(2)
+            .categoryId(1)
+            .name("Deny")
+            .allowDeny(BaseStream.AllowDenyStatus.DENY)
+            .build();
 
     LiveStream normalStream =
         LiveStream.builder().externalId(3).categoryId(1).name("Normal").build();

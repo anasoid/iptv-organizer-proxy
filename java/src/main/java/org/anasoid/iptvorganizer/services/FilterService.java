@@ -452,29 +452,30 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
 
     // Phase 1: Separate streams by allow_deny priority
     for (BaseStream stream : streams) {
-      String streamAllowDeny = stream.getAllowDeny();
+      BaseStream.AllowDenyStatus streamAllowDeny = stream.getAllowDeny();
       Category category = categoryCache.get(stream.getCategoryId());
-      String categoryAllowDeny = category != null ? category.getAllowDeny() : null;
+      BaseStream.AllowDenyStatus categoryAllowDeny =
+          category != null ? category.getAllowDeny() : null;
 
       // Priority 1: Stream allow_deny='allow' - ALWAYS INCLUDE
-      if (ALLOW.equalsIgnoreCase(streamAllowDeny)) {
+      if (streamAllowDeny == BaseStream.AllowDenyStatus.ALLOW) {
         allowed.add(stream);
         continue;
       }
 
       // Priority 2: Stream allow_deny='deny' - ALWAYS EXCLUDE
-      if (DENY.equalsIgnoreCase(streamAllowDeny)) {
+      if (streamAllowDeny == BaseStream.AllowDenyStatus.DENY) {
         continue; // Skip this stream
       }
 
       // Priority 3: Category allow_deny='allow' - INCLUDE STREAM
-      if (ALLOW.equalsIgnoreCase(categoryAllowDeny)) {
+      if (categoryAllowDeny == BaseStream.AllowDenyStatus.ALLOW) {
         allowed.add(stream);
         continue;
       }
 
       // Priority 4: Category allow_deny='deny' - EXCLUDE STREAM
-      if (DENY.equalsIgnoreCase(categoryAllowDeny)) {
+      if (categoryAllowDeny == BaseStream.AllowDenyStatus.DENY) {
         continue; // Skip this stream
       }
 
@@ -569,22 +570,22 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
       boolean hideAdultContent,
       Map<String, Boolean> categoryMatchCache) {
     // Priority 1: Stream allow_deny='allow' - ALWAYS INCLUDE
-    if (ALLOW.equalsIgnoreCase(stream.getAllowDeny())) {
+    if (stream.getAllowDeny() == BaseStream.AllowDenyStatus.ALLOW) {
       return true;
     }
 
     // Priority 2: Stream allow_deny='deny' - ALWAYS EXCLUDE
-    if (DENY.equalsIgnoreCase(stream.getAllowDeny())) {
+    if (stream.getAllowDeny() == BaseStream.AllowDenyStatus.DENY) {
       return false;
     }
 
     // Priority 3: Category allow_deny='allow' - INCLUDE
-    if (category != null && ALLOW.equalsIgnoreCase(category.getAllowDeny())) {
+    if (category != null && category.getAllowDeny() == BaseStream.AllowDenyStatus.ALLOW) {
       return true;
     }
 
     // Priority 4: Category allow_deny='deny' - EXCLUDE
-    if (category != null && DENY.equalsIgnoreCase(category.getAllowDeny())) {
+    if (category != null && category.getAllowDeny() == BaseStream.AllowDenyStatus.DENY) {
       return false;
     }
 

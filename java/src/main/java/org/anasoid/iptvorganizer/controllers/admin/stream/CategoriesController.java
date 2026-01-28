@@ -14,6 +14,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.anasoid.iptvorganizer.controllers.admin.BaseController;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
+import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
 import org.anasoid.iptvorganizer.utils.ResponseUtils;
 
@@ -78,7 +79,7 @@ public class CategoriesController extends BaseController {
       }
 
       if (request != null && request.get("allowDeny") != null) {
-        cat.setAllowDeny(request.get("allowDeny"));
+        cat.setAllowDeny(BaseStream.AllowDenyStatus.fromValue((String) request.get("allowDeny")));
         categoryService.update(cat);
       }
       return ResponseUtils.ok(cat);

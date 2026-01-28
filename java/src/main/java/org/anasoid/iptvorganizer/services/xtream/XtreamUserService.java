@@ -676,7 +676,7 @@ public class XtreamUserService {
         builder.isAdult(toBoolean(map.get("is_adult")));
       }
       if (map.containsKey("allow_deny")) {
-        builder.allowDeny(toString(map.get("allow_deny")));
+        builder.allowDeny(BaseStream.AllowDenyStatus.fromValue(toString(map.get("allow_deny"))));
       }
       if (map.containsKey("labels")) {
         builder.labels(toString(map.get("labels")));
