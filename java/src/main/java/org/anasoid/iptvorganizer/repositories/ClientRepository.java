@@ -22,7 +22,7 @@ public class ClientRepository extends BaseRepository<Client> {
   @Override
   public Long insert(Client client) {
     String sql =
-        "INSERT INTO clients (source_id, filter_id, username, password, name, email, expiry_date, is_active, hide_adult_content, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO clients (source_id, filter_id, username, password, name, email, expiry_date, is_active, hide_adult_content, use_redirect, use_redirect_xmltv, enableproxy, disablestreamproxy, stream_follow_location, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setLong(1, client.getSourceId());
@@ -34,7 +34,12 @@ public class ClientRepository extends BaseRepository<Client> {
       stmt.setObject(7, client.getExpiryDate());
       stmt.setBoolean(8, client.getIsActive());
       stmt.setBoolean(9, client.getHideAdultContent());
-      stmt.setString(10, client.getNotes());
+      stmt.setObject(10, client.getUseRedirect());
+      stmt.setObject(11, client.getUseRedirectXmltv());
+      stmt.setObject(12, client.getEnableProxy());
+      stmt.setObject(13, client.getDisableStreamProxy());
+      stmt.setObject(14, client.getStreamFollowLocation());
+      stmt.setString(15, client.getNotes());
       stmt.executeUpdate();
       return getGeneratedId(stmt);
     } catch (SQLException e) {
@@ -45,7 +50,7 @@ public class ClientRepository extends BaseRepository<Client> {
   @Override
   public void update(Client client) {
     String sql =
-        "UPDATE clients SET source_id = ?, filter_id = ?, username = ?, password = ?, name = ?, email = ?, expiry_date = ?, is_active = ?, hide_adult_content = ?, notes = ? WHERE id = ?";
+        "UPDATE clients SET source_id = ?, filter_id = ?, username = ?, password = ?, name = ?, email = ?, expiry_date = ?, is_active = ?, hide_adult_content = ?, use_redirect = ?, use_redirect_xmltv = ?, enableproxy = ?, disablestreamproxy = ?, stream_follow_location = ?, notes = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setLong(1, client.getSourceId());
@@ -57,8 +62,13 @@ public class ClientRepository extends BaseRepository<Client> {
       stmt.setObject(7, client.getExpiryDate());
       stmt.setBoolean(8, client.getIsActive());
       stmt.setBoolean(9, client.getHideAdultContent());
-      stmt.setString(10, client.getNotes());
-      stmt.setLong(11, client.getId());
+      stmt.setObject(10, client.getUseRedirect());
+      stmt.setObject(11, client.getUseRedirectXmltv());
+      stmt.setObject(12, client.getEnableProxy());
+      stmt.setObject(13, client.getDisableStreamProxy());
+      stmt.setObject(14, client.getStreamFollowLocation());
+      stmt.setString(15, client.getNotes());
+      stmt.setLong(16, client.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update client", e);
@@ -78,6 +88,11 @@ public class ClientRepository extends BaseRepository<Client> {
         .expiryDate(rs.getObject("expiry_date", LocalDate.class))
         .isActive(rs.getBoolean("is_active"))
         .hideAdultContent(rs.getBoolean("hide_adult_content"))
+        .useRedirect(rs.getObject("use_redirect", Boolean.class))
+        .useRedirectXmltv(rs.getObject("use_redirect_xmltv", Boolean.class))
+        .enableProxy(rs.getObject("enableproxy", Boolean.class))
+        .disableStreamProxy(rs.getObject("disablestreamproxy", Boolean.class))
+        .streamFollowLocation(rs.getObject("stream_follow_location", Boolean.class))
         .notes(rs.getString("notes"))
         .createdAt(rs.getObject("created_at", LocalDateTime.class))
         .updatedAt(rs.getObject("updated_at", LocalDateTime.class))

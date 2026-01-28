@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   DialogTitle,
   DialogContent,
@@ -28,6 +28,8 @@ export default function SourceForm({
   onSuccess,
   onCancel,
 }: SourceFormProps) {
+  const [showPassword, setShowPassword] = useState(false);
+
   const {
     register,
     handleSubmit,
@@ -41,14 +43,13 @@ export default function SourceForm({
       url: "",
       username: "",
       password: "",
-      sync_interval: 1,
-      is_active: 1,
-      sync_status: "idle",
-      enableproxy: null,
-      disablestreamproxy: null,
-      stream_follow_location: null,
-      use_redirect: null,
-      use_redirect_xmltv: null,
+      syncInterval: 1,
+      isActive: true,
+      enableProxy: null,
+      disableStreamProxy: null,
+      streamFollowLocation: null,
+      useRedirect: null,
+      useRedirectXmltv: null,
     },
   });
 
@@ -153,10 +154,25 @@ export default function SourceForm({
         <TextField
           label="Password"
           fullWidth
-          type="password"
+          type={showPassword ? "text" : "password"}
           {...register("password", { required: "Password is required" })}
           error={!!errors.password}
           helperText={errors.password?.message}
+        />
+
+        <FormControlLabel
+          control={<Checkbox checked={showPassword} onChange={(e) => setShowPassword(e.target.checked)} />}
+          label="Show password"
+        />
+
+        <FormControlLabel
+          control={
+            <Checkbox
+              {...register('isActive')}
+              defaultChecked={!source || source.isActive === true}
+            />
+          }
+          label="Active"
         />
 
         <TextField
@@ -164,12 +180,12 @@ export default function SourceForm({
           fullWidth
           type="number"
           inputProps={{ min: 1 }}
-          {...register("sync_interval", {
+          {...register("syncInterval", {
             required: "Sync interval is required",
             min: { value: 1, message: "Minimum is 1 day" },
           })}
-          error={!!errors.sync_interval}
-          helperText={errors.sync_interval?.message}
+          error={!!errors.syncInterval}
+          helperText={errors.syncInterval?.message}
         />
 
         <Box sx={{ borderTop: 1, borderColor: "divider", pt: 2, mt: 2 }}>
@@ -178,14 +194,14 @@ export default function SourceForm({
           </Typography>
 
           <Controller
-            name="enableproxy"
+            name="enableProxy"
             control={control}
             render={({ field }) => (
               <FormControlLabel
                 control={
                   <Checkbox
                     checked={Boolean(field.value)}
-                    onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                    onChange={(e) => field.onChange(e.target.checked ? true : false)}
                     indeterminate={field.value === null}
                   />
                 }
@@ -202,14 +218,14 @@ export default function SourceForm({
           </Typography>
 
           <Controller
-            name="disablestreamproxy"
+            name="disableStreamProxy"
             control={control}
             render={({ field }) => (
               <FormControlLabel
                 control={
                   <Checkbox
                     checked={Boolean(field.value)}
-                    onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                    onChange={(e) => field.onChange(e.target.checked ? true : false)}
                     indeterminate={field.value === null}
                   />
                 }
@@ -226,14 +242,14 @@ export default function SourceForm({
           </Typography>
 
           <Controller
-            name="stream_follow_location"
+            name="streamFollowLocation"
             control={control}
             render={({ field }) => (
               <FormControlLabel
                 control={
                   <Checkbox
                     checked={Boolean(field.value)}
-                    onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                    onChange={(e) => field.onChange(e.target.checked ? true : false)}
                     indeterminate={field.value === null}
                   />
                 }
@@ -256,14 +272,14 @@ export default function SourceForm({
           </Typography>
 
           <Controller
-            name="use_redirect"
+            name="useRedirect"
             control={control}
             render={({ field }) => (
               <FormControlLabel
                 control={
                   <Checkbox
                     checked={Boolean(field.value)}
-                    onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                    onChange={(e) => field.onChange(e.target.checked ? true : false)}
                     indeterminate={field.value === null}
                   />
                 }
@@ -279,14 +295,14 @@ export default function SourceForm({
           </Typography>
 
           <Controller
-            name="use_redirect_xmltv"
+            name="useRedirectXmltv"
             control={control}
             render={({ field }) => (
               <FormControlLabel
                 control={
                   <Checkbox
                     checked={Boolean(field.value)}
-                    onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                    onChange={(e) => field.onChange(e.target.checked ? true : false)}
                     indeterminate={field.value === null}
                   />
                 }

@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.models.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -17,9 +16,7 @@ public class Source extends BaseEntity {
   private String name;
   private String url;
   private String username;
-
-  @JsonIgnore private String password;
-
+  private String password;
   private Integer syncInterval;
   private LocalDateTime lastSync;
   private LocalDateTime nextSync;

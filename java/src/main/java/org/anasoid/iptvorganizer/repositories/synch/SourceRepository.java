@@ -42,7 +42,7 @@ public class SourceRepository extends BaseRepository<Source> {
   @Override
   public Long insert(Source source) {
     String sql =
-        "INSERT INTO sources (name, url, username, password, sync_interval, is_active, enableproxy, disablestreamproxy, stream_follow_location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO sources (name, url, username, password, sync_interval, is_active, enableproxy, disablestreamproxy, stream_follow_location, use_redirect, use_redirect_xmltv) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setString(1, source.getName());
@@ -54,6 +54,8 @@ public class SourceRepository extends BaseRepository<Source> {
       stmt.setBoolean(7, source.getEnableProxy());
       stmt.setBoolean(8, source.getDisableStreamProxy());
       stmt.setBoolean(9, source.getStreamFollowLocation());
+      stmt.setObject(10, source.getUseRedirect());
+      stmt.setObject(11, source.getUseRedirectXmltv());
       stmt.executeUpdate();
 
       // Get generated key using standard JDBC approach - works with MySQL, H2, SQLite
@@ -73,7 +75,7 @@ public class SourceRepository extends BaseRepository<Source> {
   @Override
   public void update(Source source) {
     String sql =
-        "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, enableproxy = ?, disablestreamproxy = ?, stream_follow_location = ? WHERE id = ?";
+        "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, enableproxy = ?, disablestreamproxy = ?, stream_follow_location = ?, use_redirect = ?, use_redirect_xmltv = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setString(1, source.getName());
@@ -87,7 +89,9 @@ public class SourceRepository extends BaseRepository<Source> {
       stmt.setBoolean(9, source.getEnableProxy());
       stmt.setBoolean(10, source.getDisableStreamProxy());
       stmt.setBoolean(11, source.getStreamFollowLocation());
-      stmt.setLong(12, source.getId());
+      stmt.setObject(12, source.getUseRedirect());
+      stmt.setObject(13, source.getUseRedirectXmltv());
+      stmt.setLong(14, source.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update source", e);
@@ -109,6 +113,8 @@ public class SourceRepository extends BaseRepository<Source> {
         .enableProxy(rs.getBoolean("enableproxy"))
         .disableStreamProxy(rs.getBoolean("disablestreamproxy"))
         .streamFollowLocation(rs.getBoolean("stream_follow_location"))
+        .useRedirect(rs.getObject("use_redirect", Boolean.class))
+        .useRedirectXmltv(rs.getObject("use_redirect_xmltv", Boolean.class))
         .createdAt(rs.getObject("created_at", LocalDateTime.class))
         .updatedAt(rs.getObject("updated_at", LocalDateTime.class))
         .build();

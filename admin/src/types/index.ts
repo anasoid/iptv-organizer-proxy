@@ -28,6 +28,7 @@ export interface Client {
   sourceId: number;
   filterId: number | null;
   username: string;
+  password: string | null;
   name: string | null;
   email: string | null;
   expiryDate: string | null;
@@ -49,6 +50,7 @@ export interface Source {
   name: string;
   url: string;
   username: string | null;
+  password: string | null;
   syncInterval: number;
   lastSync: string | null;
   nextSync: string | null;

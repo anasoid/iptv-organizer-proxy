@@ -46,23 +46,23 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
       username: '',
       password: '',
       name: '',
-      source_id: undefined,
-      filter_id: null,
+      sourceId: undefined,
+      filterId: null,
       email: '',
-      expiry_date: undefined,
-      is_active: 1,
-      hide_adult_content: 0,
-      use_redirect: null,
-      use_redirect_xmltv: null,
-      enableproxy: null,
-      disablestreamproxy: null,
-      stream_follow_location: null,
+      expiryDate: undefined,
+      isActive: true,
+      hideAdultContent: false,
+      useRedirect: null,
+      useRedirectXmltv: null,
+      enableProxy: null,
+      disableStreamProxy: null,
+      streamFollowLocation: null,
       notes: '',
     },
   });
 
-  const sourceId = watch('source_id');
-  const filterId = watch('filter_id');
+  const sourceId = watch('sourceId');
+  const filterId = watch('filterId');
 
   // Fetch sources for dropdown
   const { data: sourcesData } = useQuery({
@@ -144,9 +144,9 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           label="Source"
           fullWidth
           value={sourceId || ''}
-          {...register('source_id', { required: 'Source is required' })}
-          error={!!errors.source_id}
-          helperText={errors.source_id?.message}
+          {...register('sourceId', { required: 'Source is required' })}
+          error={!!errors.sourceId}
+          helperText={errors.sourceId?.message}
         >
           <MenuItem value="">Select a source</MenuItem>
           {sourcesData?.data?.map(
@@ -163,7 +163,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           label="Filter (Optional)"
           fullWidth
           value={filterId || ''}
-          {...register('filter_id')}
+          {...register('filterId')}
         >
           <MenuItem value="">None</MenuItem>
           {Array.isArray(filtersData?.data) &&
@@ -227,14 +227,14 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           fullWidth
           type="date"
           slotProps={{ input: { max: '2099-12-31' } }}
-          {...register('expiry_date')}
+          {...register('expiryDate')}
         />
 
         <FormControlLabel
           control={
             <Checkbox
-              {...register('is_active')}
-              defaultChecked={!client || client.is_active === 1}
+              {...register('isActive')}
+              defaultChecked={!client || client.isActive === true}
             />
           }
           label="Active"
@@ -243,8 +243,8 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
         <FormControlLabel
           control={
             <Checkbox
-              {...register('hide_adult_content')}
-              defaultChecked={client?.hide_adult_content === 1}
+              {...register('hideAdultContent')}
+              defaultChecked={client?.hideAdultContent === true}
             />
           }
           label="Hide Adult Content"
@@ -264,14 +264,14 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           </Typography>
 
           <Controller
-            name="use_redirect"
+            name="useRedirect"
             control={control}
             render={({ field }) => (
               <FormControlLabel
                 control={
                   <Checkbox
                     checked={Boolean(field.value)}
-                    onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                    onChange={(e) => field.onChange(e.target.checked ? true : false)}
                     indeterminate={field.value === null}
                   />
                 }
@@ -284,14 +284,14 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           </Typography>
 
           <Controller
-            name="use_redirect_xmltv"
+            name="useRedirectXmltv"
             control={control}
             render={({ field }) => (
               <FormControlLabel
                 control={
                   <Checkbox
                     checked={Boolean(field.value)}
-                    onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                    onChange={(e) => field.onChange(e.target.checked ? true : false)}
                     indeterminate={field.value === null}
                   />
                 }
@@ -309,14 +309,14 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
             </Typography>
 
             <Controller
-              name="enableproxy"
+              name="enableProxy"
               control={control}
               render={({ field }) => (
                 <FormControlLabel
                   control={
                     <Checkbox
                       checked={Boolean(field.value)}
-                      onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                      onChange={(e) => field.onChange(e.target.checked ? true : false)}
                       indeterminate={field.value === null}
                     />
                   }
@@ -326,14 +326,14 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
             />
 
             <Controller
-              name="disablestreamproxy"
+              name="disableStreamProxy"
               control={control}
               render={({ field }) => (
                 <FormControlLabel
                   control={
                     <Checkbox
                       checked={Boolean(field.value)}
-                      onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                      onChange={(e) => field.onChange(e.target.checked ? true : false)}
                       indeterminate={field.value === null}
                     />
                   }
@@ -343,14 +343,14 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
             />
 
             <Controller
-              name="stream_follow_location"
+              name="streamFollowLocation"
               control={control}
               render={({ field }) => (
                 <FormControlLabel
                   control={
                     <Checkbox
                       checked={Boolean(field.value)}
-                      onChange={(e) => field.onChange(e.target.checked ? 1 : null)}
+                      onChange={(e) => field.onChange(e.target.checked ? true : false)}
                       indeterminate={field.value === null}
                     />
                   }

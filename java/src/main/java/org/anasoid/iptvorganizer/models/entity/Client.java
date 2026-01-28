@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.models.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.*;
@@ -15,9 +14,7 @@ public class Client extends BaseEntity {
   private Long sourceId;
   private Long filterId;
   private String username;
-
-  @JsonIgnore private String password;
-
+  private String password;
   private String name;
   private String email;
   private LocalDate expiryDate;
