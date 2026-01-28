@@ -55,6 +55,7 @@ export interface Source {
   lastSync: string | null;
   nextSync: string | null;
   isActive: boolean;
+  proxyId: number | null;
   enableProxy: boolean;
   disableStreamProxy: boolean;
   streamFollowLocation: boolean;
@@ -119,6 +120,22 @@ export interface SyncLog {
   itemsDeleted: number | null;
   errorMessage: string | null;
   durationSeconds: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Proxy {
+  id: number;
+  name: string;
+  description: string | null;
+  proxyUrl: string | null;
+  proxyHost: string | null;
+  proxyPort: number | null;
+  proxyType: 'HTTP' | 'HTTPS' | 'SOCKS5' | null;
+  proxyUsername: string | null;
+  proxyPassword: string | null;
+  timeout: number | null;
+  maxRetries: number | null;
   createdAt: string;
   updatedAt: string;
 }

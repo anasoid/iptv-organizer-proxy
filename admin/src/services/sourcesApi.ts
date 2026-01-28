@@ -6,18 +6,19 @@ export interface Source {
   url: string;
   username: string;
   password: string;
-  sync_interval: number;
-  sync_status: 'idle' | 'syncing' | 'error';
-  last_sync?: string | null;
-  next_sync?: string | null;
-  is_active: number;
-  enableproxy?: number | null;
-  disablestreamproxy?: number | null;
-  stream_follow_location?: number | null;
-  use_redirect?: number | null;
-  use_redirect_xmltv?: number | null;
-  created_at?: string;
-  updated_at?: string;
+  syncInterval: number;
+  syncStatus?: 'idle' | 'syncing' | 'error';
+  lastSync?: string | null;
+  nextSync?: string | null;
+  isActive: number;
+  proxyId?: number | null;
+  enableProxy?: number | null;
+  disableStreamProxy?: number | null;
+  streamFollowLocation?: number | null;
+  useRedirect?: number | null;
+  useRedirectXmltv?: number | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface SyncLog {

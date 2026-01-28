@@ -94,7 +94,7 @@ export default function Sources() {
     { field: 'name', headerName: 'Name', width: 150, flex: 1 },
     { field: 'url', headerName: 'URL', width: 200, flex: 1 },
     {
-      field: 'sync_status',
+      field: 'syncStatus',
       headerName: 'Status',
       width: 100,
       renderCell: (params) => (
@@ -106,11 +106,17 @@ export default function Sources() {
       ),
     },
     {
-      field: 'last_sync',
+      field: 'lastSync',
       headerName: 'Last Sync',
       width: 150,
       renderCell: (params) =>
         params.value ? new Date(params.value).toLocaleString() : 'Never',
+    },
+    {
+      field: 'proxyId',
+      headerName: 'Proxy',
+      width: 80,
+      renderCell: (params) => params.value ? `#${params.value}` : 'None',
     },
     {
       field: 'actions',

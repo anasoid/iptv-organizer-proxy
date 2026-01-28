@@ -21,6 +21,7 @@ import LiveStreams from './pages/LiveStreams';
 import VodStreams from './pages/VodStreams';
 import SeriesStreams from './pages/SeriesStreams';
 import SyncLogs from './pages/SyncLogs';
+import Proxies from './pages/Proxies';
 import NotFound from './pages/NotFound';
 
 // Create React Query client
@@ -88,6 +89,7 @@ function App() {
                 <Route path="/vod-streams" element={<VodStreams />} />
                 <Route path="/series" element={<SeriesStreams />} />
                 <Route path="/sync-logs" element={<SyncLogs />} />
+                <Route path="/proxies" element={<Proxies />} />
               </Route>
 
               {/* 404 */}

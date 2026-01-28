@@ -154,6 +154,8 @@ public class SourcesController extends BaseController {
       if (request.getIsActive() != null) {
         source.setIsActive(request.getIsActive());
       }
+      // Set proxyId (can be null to remove proxy assignment)
+      source.setProxyId(request.getProxyId());
       if (request.getEnableProxy() != null) {
         source.setEnableProxy(request.getEnableProxy());
       }

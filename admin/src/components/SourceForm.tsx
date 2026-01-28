@@ -11,11 +11,16 @@ import {
   Checkbox,
   Box,
   Typography,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import { useForm, Controller } from "react-hook-form";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type { Source } from "../services/sourcesApi";
 import sourcesApi from "../services/sourcesApi";
+import proxiesApi from "../services/proxiesApi";
 
 interface SourceFormProps {
   source?: Source | null;
@@ -37,7 +42,7 @@ export default function SourceForm({
     reset,
     watch,
     control,
-  } = useForm<Source>({
+  } = useForm<any>({
     defaultValues: source || {
       name: "",
       url: "",
@@ -45,6 +50,7 @@ export default function SourceForm({
       password: "",
       syncInterval: 1,
       isActive: true,
+      proxyId: null,
       enableProxy: null,
       disableStreamProxy: null,
       streamFollowLocation: null,
@@ -75,13 +81,19 @@ export default function SourceForm({
     mutationFn: (id: number) => sourcesApi.testConnection(id),
   });
 
+  // Fetch proxies for dropdown
+  const { data: proxiesData } = useQuery({
+    queryKey: ['proxies'],
+    queryFn: () => proxiesApi.getProxies(1, 100),
+  });
+
   useEffect(() => {
     if (source) {
       reset(source);
     }
   }, [source, reset]);
 
-  const onSubmit = (data: Source) => {
+  const onSubmit = (data: any) => {
     if (source?.id) {
       updateMutation.mutate({
         id: source.id,
@@ -175,6 +187,33 @@ export default function SourceForm({
           label="Active"
         />
 
+        <Controller
+          name="proxyId"
+          control={control}
+          defaultValue={null}
+          render={({ field }) => (
+            <FormControl fullWidth>
+              <InputLabel>Proxy Configuration</InputLabel>
+              <Select
+                value={field.value ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  field.onChange(val === '' ? null : Number(val));
+                }}
+                label="Proxy Configuration"
+              >
+                <MenuItem value="">None (No Proxy)</MenuItem>
+                {Array.isArray(proxiesData?.data) &&
+                  proxiesData.data.map((proxy: any) => (
+                    <MenuItem key={proxy.id} value={proxy.id}>
+                      {proxy.name}
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
+          )}
+        />
+
         <TextField
           label="Sync Interval (days)"
           fullWidth
@@ -183,6 +222,7 @@ export default function SourceForm({
           {...register("syncInterval", {
             required: "Sync interval is required",
             min: { value: 1, message: "Minimum is 1 day" },
+            valueAsNumber: true,
           })}
           error={!!errors.syncInterval}
           helperText={errors.syncInterval?.message}
