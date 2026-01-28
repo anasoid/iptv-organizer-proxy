@@ -18,6 +18,7 @@ import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
+import org.anasoid.iptvorganizer.models.http.RedirectCheckResult;
 import org.anasoid.iptvorganizer.services.ClientService;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
 import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
@@ -26,6 +27,7 @@ import org.anasoid.iptvorganizer.services.stream.VodStreamService;
 import org.anasoid.iptvorganizer.services.xtream.ContentFilterService;
 import org.anasoid.iptvorganizer.services.xtream.FilterContext;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
+import org.anasoid.iptvorganizer.utils.streaming.StreamProxyHttpClient;
 
 /**
  * Stream Data Controller
@@ -48,6 +50,7 @@ public class StreamDataController {
   @Inject LiveStreamService liveStreamService;
   @Inject VodStreamService vodStreamService;
   @Inject SeriesService seriesService;
+  @Inject StreamProxyHttpClient streamProxyHttpClient;
 
   /**
    * Handle live stream request
@@ -167,7 +170,7 @@ public class StreamDataController {
           streamId,
           streamUrl);
 
-      return getStream(client, source, streamUrl, uriInfo);
+      return getStream(client, source, streamUrl, uriInfo, httpHeaders);
 
     } catch (UnauthorizedException ex) {
       log.warn("Stream request unauthorized", ex);
@@ -185,12 +188,13 @@ public class StreamDataController {
     // Check useRedirect setting with priority: client -> source -> environment
 
     // If useRedirect is enabled, return direct 302 redirect to original URL
-
-    if (clientService.resolveDisableStreamProxy(client, source)) {
+    boolean disableStreamProxy = clientService.resolveDisableStreamProxy(client, source);
+    boolean useRedirect = clientService.resolveUseRedirect(client, source);
+    if (disableStreamProxy) {
       // Direct 302 redirect to source
       // Note: Client's player will follow any redirects automatically
       log.info("Direct stream proxy disabled, returning 302 redirect to: {}", streamUrl);
-      if (clientService.resolveUseRedirect(client, source)) {
+      if (useRedirect) {
         log.info("useRedirect enabled, returning direct 302 redirect to: {}", streamUrl);
         return Response.seeOther(URI.create(streamUrl)).build();
       } else {
@@ -208,6 +212,50 @@ public class StreamDataController {
       log.info("Stream proxy enabled, redirecting to proxy: {}", proxyUrl);
       return Response.seeOther(URI.create(proxyUrl)).build();
     }
+  }
+
+  private Response getStream(
+      Client client, Source source, String streamUrl, UriInfo uriInfo, HttpHeaders httpHeaders) {
+    boolean disableStreamProxy = clientService.resolveDisableStreamProxy(client, source);
+    boolean useRedirect = clientService.resolveUseRedirect(client, source);
+
+    // Case 1: disableStreamProxy=true AND useRedirect=false
+    // Hide credentials by checking for upstream redirect
+    if (disableStreamProxy) {
+      if (useRedirect) {
+
+        return Response.seeOther(URI.create(streamUrl)).build();
+      } else {
+
+        RedirectCheckResult redirectCheck =
+            streamProxyHttpClient.checkForRedirect(streamUrl, client, source, httpHeaders);
+        if (redirectCheck.isError()) {
+          return Response.status(Response.Status.BAD_GATEWAY)
+              .entity("Upstream redirect check failed")
+              .build();
+        }
+
+        if (redirectCheck.isRedirect()) {
+          log.info("Returning upstream redirect location: {}", redirectCheck.getLocation());
+          return Response.seeOther(URI.create(redirectCheck.getLocation())).build();
+        } else {
+          // Upstream does NOT redirect - cannot hide credentials
+          log.warn(
+              "Upstream does not redirect, cannot hide credentials. Status: {}",
+              redirectCheck.getStatusCode());
+          return Response.status(Response.Status.BAD_GATEWAY)
+              .entity("Upstream does not provide credential-free redirect")
+              .build();
+        }
+      }
+    }
+    // Case 3: disableStreamProxy=false
+    // Use proxy mode - encode URL and redirect to /proxy endpoint
+    log.info("Proxy mode - encoding URL and redirecting to proxy");
+    String encodedUrl = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
+    String proxyUrl =
+        buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrl);
+    return Response.seeOther(URI.create(proxyUrl)).build();
   }
 
   /**

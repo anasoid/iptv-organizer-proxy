@@ -3,12 +3,14 @@ package org.anasoid.iptvorganizer.utils.streaming;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.core.HttpHeaders;
+import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
+import org.anasoid.iptvorganizer.models.http.RedirectCheckResult;
 import org.anasoid.iptvorganizer.services.ClientService;
 import org.anasoid.iptvorganizer.services.http.HeaderFilterService;
 
@@ -66,6 +68,88 @@ public class StreamProxyHttpClient {
     }
 
     return streamResponse;
+  }
+
+  /**
+   * Check if upstream URL redirects (for credential hiding)
+   *
+   * <p>Makes a GET request with followRedirects=false to detect redirects without exposing
+   * credentials to the client. Used when disableStreamProxy=true AND useRedirect=false to return
+   * the redirect location instead of the URL containing source credentials.
+   *
+   * @param upstreamUrl The upstream URL to check (contains source credentials)
+   * @param client The client (for configuration)
+   * @param source The source (for configuration)
+   * @param httpHeaders Client headers to forward
+   * @return RedirectCheckResult with redirect status and location
+   */
+  public RedirectCheckResult checkForRedirect(
+      String upstreamUrl, Client client, Source source, HttpHeaders httpHeaders) {
+
+    log.info("Checking upstream for redirect to hide credentials: {}", upstreamUrl);
+
+    // Extract and filter client headers
+    Map<String, String> requestHeaders = headerFilterService.filterRequestHeaders(httpHeaders);
+
+    // Build HTTP options with followRedirects=false
+    HttpOptions options =
+        HttpOptions.builder()
+            .timeout(10000L) // Short timeout for redirect check
+            .maxRetries(0) // No retries for redirect check
+            .followRedirects(false) // CRITICAL: don't follow redirects
+            .build();
+
+    try {
+      // Make GET request without following redirects
+      HttpStreamingResponse response =
+          httpStreamingService.streamHttpWithHeaders(upstreamUrl, options, requestHeaders);
+
+      int statusCode = response.getStatusCode();
+
+      // Check if it's a redirect status (301, 302, 307, 308)
+      if (statusCode == 301 || statusCode == 302 || statusCode == 307 || statusCode == 308) {
+        // Extract Location header (case-insensitive)
+        String location = extractLocationHeader(response.getHeaders());
+        if (location != null && !location.isEmpty()) {
+          log.info("Upstream redirects to: {}", location);
+          return RedirectCheckResult.redirect(location);
+        }
+      }
+
+      // Not a redirect
+      log.warn("Upstream does not redirect, credentials would be exposed (status: {})", statusCode);
+      return RedirectCheckResult.noRedirect(statusCode);
+
+    } catch (Exception ex) {
+      log.error("Error checking upstream redirect: {}", ex.getMessage(), ex);
+      return RedirectCheckResult.error(ex.getMessage());
+    }
+  }
+
+  /**
+   * Extract Location header from response headers (case-insensitive)
+   *
+   * @param headers Response headers map
+   * @return Location header value or null if not present
+   */
+  private String extractLocationHeader(Map<String, List<String>> headers) {
+    if (headers == null) {
+      return null;
+    }
+
+    // Try exact case match first
+    List<String> locationValues = headers.get("Location");
+    if (locationValues != null && !locationValues.isEmpty()) {
+      return locationValues.get(0);
+    }
+
+    // Try lowercase match
+    locationValues = headers.get("location");
+    if (locationValues != null && !locationValues.isEmpty()) {
+      return locationValues.get(0);
+    }
+
+    return null;
   }
 
   /**
