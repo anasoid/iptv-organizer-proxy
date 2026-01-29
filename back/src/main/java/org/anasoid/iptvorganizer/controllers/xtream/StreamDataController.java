@@ -13,7 +13,6 @@ import java.net.URI;
 import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
-import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
@@ -148,40 +147,28 @@ public class StreamDataController {
       UriInfo uriInfo,
       HttpHeaders httpHeaders) {
 
-    try {
-      // Validate and authenticate client
-      var authResult = xtreamUserService.authenticateAndValidateClient(username, password);
-      Client client = authResult.getClient();
-      Source source = authResult.getSource();
+    // Validate and authenticate client (throws UnauthorizedException if invalid)
+    var authResult = xtreamUserService.authenticateAndValidateClient(username, password);
+    Client client = authResult.getClient();
+    Source source = authResult.getSource();
 
-      // NEW: Validate stream access
-      if (!hasStreamAccess(client, source, streamId, streamType)) {
-        log.warn("Client {} attempted to access blocked stream: {}", username, streamId);
-        return Response.status(Response.Status.FORBIDDEN).build();
-      }
-
-      // Build stream URL from source
-      String streamUrl = buildStreamUrl(source, streamType, streamId, ext);
-
-      log.info(
-          "Stream request - user: {}, type: {}, streamId: {}, sourceUrl: {}",
-          username,
-          streamType,
-          streamId,
-          streamUrl);
-
-      return getStream(client, source, streamUrl, uriInfo, httpHeaders);
-
-    } catch (UnauthorizedException ex) {
-      log.warn("Stream request unauthorized", ex);
-      return Response.status(Response.Status.UNAUTHORIZED).build();
-    } catch (ForbiddenException ex) {
-      log.warn("Stream request forbidden", ex);
-      return Response.status(Response.Status.FORBIDDEN).build();
-    } catch (Exception ex) {
-      log.error("Error handling stream request", ex);
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+    // Validate stream access
+    if (!hasStreamAccess(client, source, streamId, streamType)) {
+      log.warn("Client {} attempted to access blocked stream: {}", username, streamId);
+      throw new ForbiddenException("Access to stream " + streamId + " is blocked");
     }
+
+    // Build stream URL from source
+    String streamUrl = buildStreamUrl(source, streamType, streamId, ext);
+
+    log.info(
+        "Stream request - user: {}, type: {}, streamId: {}, sourceUrl: {}",
+        username,
+        streamType,
+        streamId,
+        streamUrl);
+
+    return getStream(client, source, streamUrl, uriInfo, httpHeaders);
   }
 
   private Response getStream(

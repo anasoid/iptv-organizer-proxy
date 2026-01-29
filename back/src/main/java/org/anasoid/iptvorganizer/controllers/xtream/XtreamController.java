@@ -16,8 +16,6 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
-import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
-import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
@@ -69,39 +67,18 @@ public class XtreamController {
       @QueryParam("category_id") Long categoryId,
       @Context UriInfo uriInfo) {
 
-    try {
-      // If no action, treat as authenticate
-      if (action == null || action.isEmpty()) {
-        return authenticate(username, password, uriInfo);
-      }
-
-      // Validate and authenticate client
-      var authResult = xtreamUserService.authenticateAndValidateClient(username, password);
-      Client client = authResult.getClient();
-      Source source = authResult.getSource();
-
-      // Route to appropriate handler
-      return handleAction(action, client, source, categoryId);
-
-    } catch (UnauthorizedException ex) {
-      log.warn("Unauthorized Xtream API request", ex);
-      return Response.status(Response.Status.UNAUTHORIZED)
-          .entity("{\"error\":\"" + ex.getMessage() + "\"}")
-          .header("Content-Type", MediaType.APPLICATION_JSON)
-          .build();
-    } catch (ForbiddenException ex) {
-      log.warn("Forbidden Xtream API request", ex);
-      return Response.status(Response.Status.FORBIDDEN)
-          .entity("{\"error\":\"" + ex.getMessage() + "\"}")
-          .header("Content-Type", MediaType.APPLICATION_JSON)
-          .build();
-    } catch (Exception ex) {
-      log.error("Error in Xtream API request: ", ex);
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-          .entity("{\"error\":\"Internal server error\"}")
-          .header("Content-Type", MediaType.APPLICATION_JSON)
-          .build();
+    // If no action, treat as authenticate
+    if (action == null || action.isEmpty()) {
+      return authenticate(username, password, uriInfo);
     }
+
+    // Validate and authenticate client
+    var authResult = xtreamUserService.authenticateAndValidateClient(username, password);
+    Client client = authResult.getClient();
+    Source source = authResult.getSource();
+
+    // Route to appropriate handler
+    return handleAction(action, client, source, categoryId);
   }
 
   /**
@@ -113,22 +90,13 @@ public class XtreamController {
    * @return JSON response with authentication data
    */
   private Response authenticate(String username, String password, UriInfo uriInfo) {
-    try {
-      // Build proxy URL from request
-      String proxyUrl = buildProxyUrl(uriInfo);
+    // Build proxy URL from request
+    String proxyUrl = buildProxyUrl(uriInfo);
 
-      // Authenticate and get response
-      var authResponse = xtreamUserService.authenticate(username, password, proxyUrl);
+    // Authenticate and get response
+    var authResponse = xtreamUserService.authenticate(username, password, proxyUrl);
 
-      return Response.ok(authResponse).header("Content-Type", MediaType.APPLICATION_JSON).build();
-
-    } catch (RuntimeException ex) {
-      log.warn("Authentication failed", ex);
-      return Response.status(Response.Status.UNAUTHORIZED)
-          .entity("{\"error\":\"" + ex.getMessage() + "\"}")
-          .header("Content-Type", MediaType.APPLICATION_JSON)
-          .build();
-    }
+    return Response.ok(authResponse).header("Content-Type", MediaType.APPLICATION_JSON).build();
   }
 
   /**
@@ -141,39 +109,31 @@ public class XtreamController {
    * @return Response
    */
   private Response handleAction(String action, Client client, Source source, Long categoryId) {
-    try {
-      switch (action) {
-        case "get_live_categories":
-          return streamJsonArray(xtreamUserService.getLiveCategories(client, source));
+    switch (action) {
+      case "get_live_categories":
+        return streamJsonArray(xtreamUserService.getLiveCategories(client, source));
 
-        case "get_vod_categories":
-          return streamJsonArray(xtreamUserService.getVodCategories(client, source));
+      case "get_vod_categories":
+        return streamJsonArray(xtreamUserService.getVodCategories(client, source));
 
-        case "get_series_categories":
-          return streamJsonArray(xtreamUserService.getSeriesCategories(client, source));
+      case "get_series_categories":
+        return streamJsonArray(xtreamUserService.getSeriesCategories(client, source));
 
-        case "get_live_streams":
-          return streamJsonArray(xtreamUserService.getLiveStreams(client, source, categoryId));
+      case "get_live_streams":
+        return streamJsonArray(xtreamUserService.getLiveStreams(client, source, categoryId));
 
-        case "get_vod_streams":
-          return streamJsonArray(xtreamUserService.getVodStreams(client, source, categoryId));
+      case "get_vod_streams":
+        return streamJsonArray(xtreamUserService.getVodStreams(client, source, categoryId));
 
-        case "get_series":
-          return streamJsonArray(xtreamUserService.getSeries(client, source, categoryId));
+      case "get_series":
+        return streamJsonArray(xtreamUserService.getSeries(client, source, categoryId));
 
-        default:
-          log.warn("Unknown Xtream API action: {}", action);
-          return Response.status(Response.Status.BAD_REQUEST)
-              .entity("{\"error\":\"Unknown action\"}")
-              .header("Content-Type", MediaType.APPLICATION_JSON)
-              .build();
-      }
-    } catch (Exception ex) {
-      log.error("Error handling Xtream action: {}", action, ex);
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-          .entity("{\"error\":\"Internal server error\"}")
-          .header("Content-Type", MediaType.APPLICATION_JSON)
-          .build();
+      default:
+        log.warn("Unknown Xtream API action: {}", action);
+        return Response.status(Response.Status.BAD_REQUEST)
+            .entity("{\"error\":\"Unknown action\"}")
+            .header("Content-Type", MediaType.APPLICATION_JSON)
+            .build();
     }
   }
 

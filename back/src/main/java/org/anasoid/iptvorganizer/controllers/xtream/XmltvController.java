@@ -13,8 +13,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import lombok.extern.slf4j.Slf4j;
-import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
-import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
@@ -62,51 +60,30 @@ public class XmltvController {
   public Response getXmltv(
       @QueryParam("username") String username, @QueryParam("password") String password) {
 
-    try {
-      // Validate and authenticate client
-      var authResult = xtreamUserService.authenticateAndValidateClient(username, password);
-      Client client = authResult.getClient();
-      Source source = authResult.getSource();
+    // Validate and authenticate client
+    var authResult = xtreamUserService.authenticateAndValidateClient(username, password);
+    Client client = authResult.getClient();
+    Source source = authResult.getSource();
 
-      log.info("XMLTV request from client: {}", username);
+    log.info("XMLTV request from client: {}", username);
 
-      // Check useRedirectXmltv setting with priority: client -> source -> environment
-      boolean useRedirectXmltv = clientService.resolveUseRedirectXmltv(client, source);
-      log.info(
-          "useRedirectXmltv for XMLTV: {} (client: {}, source: {})",
-          useRedirectXmltv,
-          client.getUseRedirectXmltv(),
-          source.getUseRedirectXmltv());
+    // Check useRedirectXmltv setting with priority: client -> source -> environment
+    boolean useRedirectXmltv = clientService.resolveUseRedirectXmltv(client, source);
+    log.info(
+        "useRedirectXmltv for XMLTV: {} (client: {}, source: {})",
+        useRedirectXmltv,
+        client.getUseRedirectXmltv(),
+        source.getUseRedirectXmltv());
 
-      // If useRedirectXmltv is enabled, return direct 302 redirect to XMLTV URL
-      if (useRedirectXmltv) {
-        String xmltvUrl = buildXmltvUrl(source);
-        log.info("useRedirectXmltv enabled, returning direct 302 redirect to: {}", xmltvUrl);
-        return Response.seeOther(URI.create(xmltvUrl)).build();
-      }
-
-      // Stream XMLTV data from source
-      return streamXmltvData(source, client);
-
-    } catch (UnauthorizedException ex) {
-      log.warn("XMLTV request unauthorized: {}", ex.getMessage());
-      return Response.status(Response.Status.UNAUTHORIZED)
-          .entity("<?xml version=\"1.0\" encoding=\"UTF-8\"?><tv></tv>")
-          .header("Content-Type", MediaType.APPLICATION_XML)
-          .build();
-    } catch (ForbiddenException ex) {
-      log.warn("XMLTV request forbidden: {}", ex.getMessage());
-      return Response.status(Response.Status.FORBIDDEN)
-          .entity("<?xml version=\"1.0\" encoding=\"UTF-8\"?><tv></tv>")
-          .header("Content-Type", MediaType.APPLICATION_XML)
-          .build();
-    } catch (Exception ex) {
-      log.error("Error handling XMLTV request: {}", ex.getMessage());
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-          .entity("<?xml version=\"1.0\" encoding=\"UTF-8\"?><tv></tv>")
-          .header("Content-Type", MediaType.APPLICATION_XML)
-          .build();
+    // If useRedirectXmltv is enabled, return direct 302 redirect to XMLTV URL
+    if (useRedirectXmltv) {
+      String xmltvUrl = buildXmltvUrl(source);
+      log.info("useRedirectXmltv enabled, returning direct 302 redirect to: {}", xmltvUrl);
+      return Response.seeOther(URI.create(xmltvUrl)).build();
     }
+
+    // Stream XMLTV data from source
+    return streamXmltvData(source, client);
   }
 
   /**
