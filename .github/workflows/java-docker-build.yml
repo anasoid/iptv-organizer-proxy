@@ -1,14 +1,6 @@
 name: Java Docker Build & Push
 
-on:
-  push:
-    branches:
-      - java
-    tags:
-      - 'java-v*'
-  pull_request:
-    branches:
-      - java
+on: [ push, pull_request ]
 
 env:
   REGISTRY: ghcr.io
@@ -36,7 +28,7 @@ jobs:
 
       # 3. Grant execute permission for gradlew
       - name: Grant execute permission for gradlew
-        run: chmod +x java/gradlew
+        run: chmod +x back/gradlew
 
       # 4. Setup Docker Buildx (for multi-platform)
       - name: Set up Docker Buildx
@@ -80,7 +72,7 @@ jobs:
             -Dquarkus.container-image.tag=${{ steps.tag.outputs.tag }} \
             -Dquarkus.docker.buildx.platform=linux/amd64,linux/arm64,linux/arm/v7 \
             --no-daemon
-        working-directory: java
+        working-directory: back
         env:
           DOCKER_USERNAME: ${{ github.actor }}
           DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
@@ -96,7 +88,7 @@ jobs:
             -Dquarkus.container-image.build=true \
             -Dquarkus.container-image.push=false \
             --no-daemon
-        working-directory: java
+        working-directory: back
 
       # 9. Generate build summary
       - name: Generate build summary

@@ -53,3 +53,4 @@ buildSrc/build
 buildUtils/*/build
 target/
 /java/bin/
+/back/bin/
