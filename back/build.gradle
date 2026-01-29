@@ -3,6 +3,7 @@ plugins {
     id 'io.quarkus' version "${quarkusVersion}"
     id 'jacoco'
     id "com.diffplug.spotless" version "${spotlessVersion}"
+    id 'pmd'
 }
 
 repositories {
@@ -72,6 +73,30 @@ spotless {
     }
 }
 
+// PMD Configuration
+pmd {
+    ignoreFailures = false
+    toolVersion = '7.0.0'
+}
+
+pmdMain {
+    ruleSets = [file('pmd-rules.xml').absolutePath]
+    ignoreFailures = true  // Report violations but don't fail build - can be strictened gradually
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+pmdTest {
+    ruleSets = [file('pmd-rules.xml').absolutePath]
+    ignoreFailures = true  // Test code often has acceptable violations
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
 // Java configuration
 java {
     sourceCompatibility = JavaVersion.VERSION_21
@@ -124,4 +149,11 @@ jacocoTestCoverageVerification {
             }
         }
     }
+}
+
+// Convenience task to run all code quality checks
+tasks.register('codeQuality') {
+    dependsOn pmdMain, pmdTest, spotlessCheck, jacocoTestReport
+    description = 'Run all code quality checks (PMD, Spotless, JaCoCo)'
+    group = 'verification'
 }

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="IPTV Organizer PMD Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0
+                             http://pmd.sourceforge.net/ruleset_2_0_0.xsd">
+
+    <description>Custom PMD ruleset for IPTV Organizer Proxy</description>
+
+    <!-- Best Practices -->
+    <rule ref="category/java/bestpractices.xml">
+        <exclude name="MissingOverride"/>
+        <exclude name="ForLoopCanBeForeach"/>
+    </rule>
+
+    <!-- Code Style -->
+    <rule ref="category/java/codestyle.xml">
+        <!-- Exclude overly strict naming conventions -->
+        <exclude name="LongVariable"/>
+        <exclude name="ShortVariable"/>
+        <exclude name="ShortMethodName"/>
+        <!-- Allow method and local variable finality decisions -->
+        <exclude name="MethodArgumentCouldBeFinal"/>
+        <exclude name="LocalVariableCouldBeFinal"/>
+        <!-- Allow Lombok patterns -->
+        <exclude name="AtLeastOneConstructor"/>
+    </rule>
+
+    <!-- Design Rules -->
+    <rule ref="category/java/design.xml">
+        <!-- Allow dependency injection patterns -->
+        <exclude name="ExcessiveParameterList"/>
+        <!-- Allow large entity classes -->
+        <exclude name="TooManyFields"/>
+        <exclude name="TooManyMethods"/>
+    </rule>
+
+    <!-- Error Prone -->
+    <rule ref="category/java/errorprone.xml"/>
+
+    <!-- Performance -->
+    <rule ref="category/java/performance.xml"/>
+
+    <!-- Security -->
+    <rule ref="category/java/security.xml"/>
+
+</ruleset>
