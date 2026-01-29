@@ -184,7 +184,7 @@ export default function Sources() {
       </Box>
 
       {/* Source Form Modal */}
-      <Dialog open={open} onClose={handleCloseForm} maxWidth="sm" fullWidth>
+      <Dialog open={open} onClose={handleCloseForm} maxWidth="md" fullWidth>
         <SourceForm
           source={editingSource}
           onSuccess={handleFormSuccess}

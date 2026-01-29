@@ -5,20 +5,20 @@ export interface Client {
   username: string;
   password: string;
   name?: string | null;
-  source_id: number;
-  filter_id?: number | null;
+  sourceId?: number;
+  filterId?: number | null;
   email?: string | null;
-  expiry_date?: string | null;
-  is_active: number;
-  hide_adult_content?: number;
-  use_redirect?: number | null;
-  use_redirect_xmltv?: number | null;
-  enableproxy?: number | null;
-  disablestreamproxy?: number | null;
-  stream_follow_location?: number | null;
+  expiryDate?: string | null;
+  isActive: boolean;
+  hideAdultContent?: boolean;
+  useRedirect?: boolean | null;
+  useRedirectXmltv?: boolean | null;
+  enableProxy?: boolean | null;
+  disableStreamProxy?: boolean | null;
+  streamFollowLocation?: boolean | null;
   notes?: string | null;
-  created_at?: string;
-  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ConnectionLog {

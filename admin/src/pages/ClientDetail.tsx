@@ -97,9 +97,9 @@ export default function ClientDetail() {
   const client = clientResponse?.data;
 
   const { data: sourceResponse } = useQuery({
-    queryKey: ['source', client?.source_id],
-    queryFn: () => sourcesApi.getSource(Number(client?.source_id)),
-    enabled: isAuthenticated && !!client?.source_id,
+    queryKey: ['source', client?.sourceId],
+    queryFn: () => sourcesApi.getSource(Number(client?.sourceId)),
+    enabled: isAuthenticated && !!client?.sourceId,
   });
 
   const { data: allowedResponse, isLoading: allowedLoading } = useQuery({
@@ -343,8 +343,8 @@ export default function ClientDetail() {
         </Button>
         <Typography variant="h5">{client.username}</Typography>
         <Chip
-          label={client.is_active ? 'Active' : 'Inactive'}
-          color={client.is_active ? 'success' : 'default'}
+          label={client.isActive ? 'Active' : 'Inactive'}
+          color={client.isActive ? 'success' : 'default'}
           size="small"
         />
       </Box>
@@ -371,12 +371,12 @@ export default function ClientDetail() {
           </Grid>
           <Grid item xs={12} md={6}>
             <Typography>
-              <strong>Filter:</strong> {client.filter_id ? `Filter #${client.filter_id}` : 'None'}
+              <strong>Filter:</strong> {client.filterId ? `Filter #${client.filterId}` : 'None'}
             </Typography>
           </Grid>
           <Grid item xs={12} md={6}>
             <Typography>
-              <strong>Created:</strong> {client.created_at ? new Date(client.created_at).toLocaleString() : 'Unknown'}
+              <strong>Created:</strong> {client.createdAt ? new Date(client.createdAt).toLocaleString() : 'Unknown'}
             </Typography>
           </Grid>
           <Grid item xs={12} md={6}>
@@ -532,7 +532,7 @@ export default function ClientDetail() {
           {BLOCKED_TYPES.find((b) => b.type === selectedBlockedType)?.label || 'Blocked Items'}
         </DialogTitle>
         <DialogContent>
-          {!client?.filter_id ? (
+          {!client?.filterId ? (
             <Alert severity="info" sx={{ mt: 2 }}>
               No filter assigned to this client. All items are accessible.
             </Alert>

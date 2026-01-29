@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
   DialogTitle,
   DialogContent,
@@ -15,7 +15,6 @@ import {
 } from '@mui/material';
 import { useForm, Controller } from 'react-hook-form';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ContentCopy as CopyIcon } from '@mui/icons-material';
 import type { Client } from '../services/clientsApi';
 import clientsApi from '../services/clientsApi';
 import sourcesApi from '../services/sourcesApi';
@@ -28,10 +27,6 @@ interface ClientFormProps {
 }
 
 export default function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
-  const [showPassword, setShowPassword] = useState(false);
-  const [credentials, setCredentials] = useState<{ username: string; password: string } | null>(
-    null
-  );
 
   const {
     register,
@@ -39,7 +34,6 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
     formState: { errors },
     reset,
     watch,
-    setValue,
     control,
   } = useForm<Client>({
     defaultValues: client || {
@@ -107,24 +101,6 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
     }
   };
 
-  const generateCredentials = () => {
-    const newUsername = `client_${Date.now()}`;
-    const newPassword = Math.random().toString(36).substring(2, 15) +
-      Math.random().toString(36).substring(2, 15);
-
-    setCredentials({ username: newUsername, password: newPassword });
-    setValue('username', newUsername);
-    setValue('password', newPassword);
-  };
-
-  const copyToClipboard = () => {
-    if (sourceId && credentials) {
-      const connectionUrl = `http://proxy-url/player_api.php?username=${credentials.username}&password=${credentials.password}&source=${sourceId}`;
-      navigator.clipboard.writeText(connectionUrl).then(() => {
-        alert('Credentials copied to clipboard!');
-      });
-    }
-  };
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
   const error = createMutation.error || updateMutation.error;
@@ -132,9 +108,9 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
   return (
     <>
       <DialogTitle>{client ? 'Edit Client' : 'Add Client'}</DialogTitle>
-      <DialogContent sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <DialogContent sx={{ pt: 2, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
         {error && (
-          <Alert severity="error">
+          <Alert severity="error" sx={{ gridColumn: '1 / -1' }}>
             {error instanceof Error ? error.message : 'An error occurred'}
           </Alert>
         )}
@@ -187,20 +163,11 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
         <TextField
           label="Password"
           fullWidth
-          type={showPassword ? 'text' : 'password'}
+          type="text"
           {...register('password', { required: 'Password is required' })}
           error={!!errors.password}
           helperText={errors.password?.message}
         />
-
-        <FormControlLabel
-          control={<Checkbox checked={showPassword} onChange={(e) => setShowPassword(e.target.checked)} />}
-          label="Show password"
-        />
-
-        <Button onClick={generateCredentials} variant="outlined" fullWidth>
-          Generate Random Credentials
-        </Button>
 
         <TextField
           label="Email"
@@ -230,25 +197,30 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           {...register('expiryDate')}
         />
 
-        <FormControlLabel
-          control={
-            <Checkbox
-              {...register('isActive')}
-              defaultChecked={!client || client.isActive === true}
-            />
-          }
-          label="Active"
-        />
+        <Box sx={{ gridColumn: '1 / -1' }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                {...register('isActive')}
+                defaultChecked={!client || client.isActive === true}
+              />
+            }
+            label="Active"
+          />
+        </Box>
 
-        <FormControlLabel
-          control={
-            <Checkbox
-              {...register('hideAdultContent')}
-              defaultChecked={client?.hideAdultContent === true}
-            />
-          }
-          label="Hide Adult Content"
-        />
+        <Box sx={{ gridColumn: '1 / -1' }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                {...register('hideAdultContent')}
+                defaultChecked={client?.hideAdultContent === true}
+              />
+            }
+            label="Hide Adult Content"
+          />
+        </Box>
+
 
         <TextField
           label="Notes (Optional)"
@@ -256,132 +228,126 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           multiline
           rows={3}
           {...register('notes')}
+          sx={{ gridColumn: '1 / -1' }}
         />
 
-        <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2 }}>
+        <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2, gridColumn: '1 / -1' }}>
           <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
             Stream & XMLTV Redirect Settings (Optional - leave unchecked to inherit from source/env)
           </Typography>
 
-          <Controller
-            name="useRedirect"
-            control={control}
-            render={({ field }) => (
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={Boolean(field.value)}
-                    onChange={(e) => field.onChange(e.target.checked ? true : false)}
-                    indeterminate={field.value === null}
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            <Box>
+              <Controller
+                name="useRedirect"
+                control={control}
+                render={({ field }) => (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={Boolean(field.value)}
+                        onChange={(e) => field.onChange(e.target.checked ? true : false)}
+                        indeterminate={field.value === null}
+                      />
+                    }
+                    label="Enable Stream Direct Redirect (302)"
                   />
-                }
-                label="Enable Stream Direct Redirect (302)"
+                )}
               />
-            )}
-          />
-          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4, mb: 2 }}>
-            When enabled, stream requests return a direct 302 redirect instead of proxying through /proxy endpoint
-          </Typography>
+              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4 }}>
+                When enabled, stream requests return a direct 302 redirect instead of proxying through /proxy endpoint
+              </Typography>
+            </Box>
 
-          <Controller
-            name="useRedirectXmltv"
-            control={control}
-            render={({ field }) => (
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={Boolean(field.value)}
-                    onChange={(e) => field.onChange(e.target.checked ? true : false)}
-                    indeterminate={field.value === null}
+            <Box>
+              <Controller
+                name="useRedirectXmltv"
+                control={control}
+                render={({ field }) => (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={Boolean(field.value)}
+                        onChange={(e) => field.onChange(e.target.checked ? true : false)}
+                        indeterminate={field.value === null}
+                      />
+                    }
+                    label="Enable XMLTV Direct Redirect (302)"
                   />
-                }
-                label="Enable XMLTV Direct Redirect (302)"
+                )}
               />
-            )}
-          />
-          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4, mb: 2 }}>
-            When enabled, XMLTV EPG requests return a direct 302 redirect instead of streaming content
-          </Typography>
+              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4 }}>
+                When enabled, XMLTV EPG requests return a direct 302 redirect instead of streaming content
+              </Typography>
+            </Box>
+          </Box>
 
           <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2 }}>
             <Typography variant="caption" sx={{ fontWeight: 600 }}>
               Proxy Settings (Optional - leave unchecked to inherit from source)
             </Typography>
 
-            <Controller
-              name="enableProxy"
-              control={control}
-              render={({ field }) => (
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={Boolean(field.value)}
-                      onChange={(e) => field.onChange(e.target.checked ? true : false)}
-                      indeterminate={field.value === null}
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mt: 1 }}>
+              <Box>
+                <Controller
+                  name="enableProxy"
+                  control={control}
+                  render={({ field }) => (
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={Boolean(field.value)}
+                          onChange={(e) => field.onChange(e.target.checked ? true : false)}
+                          indeterminate={field.value === null}
+                        />
+                      }
+                      label="Enable HTTP Proxy"
                     />
-                  }
-                  label="Enable HTTP Proxy"
+                  )}
                 />
-              )}
-            />
+              </Box>
 
-            <Controller
-              name="disableStreamProxy"
-              control={control}
-              render={({ field }) => (
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={Boolean(field.value)}
-                      onChange={(e) => field.onChange(e.target.checked ? true : false)}
-                      indeterminate={field.value === null}
+              <Box>
+                <Controller
+                  name="disableStreamProxy"
+                  control={control}
+                  render={({ field }) => (
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={Boolean(field.value)}
+                          onChange={(e) => field.onChange(e.target.checked ? true : false)}
+                          indeterminate={field.value === null}
+                        />
+                      }
+                      label="Disable Stream Proxy"
                     />
-                  }
-                  label="Disable Stream Proxy"
+                  )}
                 />
-              )}
-            />
+              </Box>
 
-            <Controller
-              name="streamFollowLocation"
-              control={control}
-              render={({ field }) => (
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={Boolean(field.value)}
-                      onChange={(e) => field.onChange(e.target.checked ? true : false)}
-                      indeterminate={field.value === null}
+              <Box sx={{ gridColumn: '1 / -1' }}>
+                <Controller
+                  name="streamFollowLocation"
+                  control={control}
+                  render={({ field }) => (
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={Boolean(field.value)}
+                          onChange={(e) => field.onChange(e.target.checked ? true : false)}
+                          indeterminate={field.value === null}
+                        />
+                      }
+                      label="Follow HTTP Redirects"
                     />
-                  }
-                  label="Follow HTTP Redirects"
+                  )}
                 />
-              )}
-            />
+              </Box>
+            </Box>
           </Box>
         </Box>
 
-        {credentials && sourceId && (
-          <Box sx={{ p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
-            <Alert severity="info">
-              Connection URL:
-              <br />
-              <code style={{ wordBreak: 'break-all' }}>
-                http://proxy-url/player_api.php?username={credentials.username}&password=
-                {credentials.password}
-              </code>
-            </Alert>
-            <Button
-              startIcon={<CopyIcon />}
-              onClick={copyToClipboard}
-              variant="outlined"
-              size="small"
-              sx={{ mt: 1 }}
-            >
-              Copy URL
-            </Button>
-          </Box>
-        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onCancel}>Cancel</Button>
