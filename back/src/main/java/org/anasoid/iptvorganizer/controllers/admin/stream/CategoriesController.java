@@ -14,6 +14,8 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.anasoid.iptvorganizer.controllers.admin.BaseController;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
+import org.anasoid.iptvorganizer.exceptions.NotFoundException;
+import org.anasoid.iptvorganizer.exceptions.ValidationException;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
 import org.anasoid.iptvorganizer.utils.ResponseUtils;
@@ -39,52 +41,39 @@ public class CategoriesController extends BaseController {
       @QueryParam("limit") @DefaultValue("20") int limit) {
 
     if (sourceId == null) {
-      return ResponseUtils.badRequest("sourceId is required");
+      throw new ValidationException("sourceId is required");
     }
 
-    try {
-      var categories =
-          categoryService.findBySourceIdFiltered(sourceId, categoryType, search, page, limit);
-      long total = categoryService.countBySourceIdFiltered(sourceId, categoryType, search);
-      return ResponseUtils.okWithPagination(categories, PaginationMeta.of(page, limit, total));
-    } catch (Exception ex) {
-      return ResponseUtils.serverError("Failed to fetch categories: " + ex.getMessage());
-    }
+    var categories =
+        categoryService.findBySourceIdFiltered(sourceId, categoryType, search, page, limit);
+    long total = categoryService.countBySourceIdFiltered(sourceId, categoryType, search);
+    return ResponseUtils.okWithPagination(categories, PaginationMeta.of(page, limit, total));
   }
 
   /** Get category by ID GET /api/categories/:id?source_id= */
   @GET
   @Path("/{id}")
   public Response getCategory(@PathParam("id") Long id) {
-    try {
-      var cat = categoryService.getById(id);
-      if (cat != null) {
-        return ResponseUtils.ok(cat);
-      } else {
-        return ResponseUtils.notFound("Category not found");
-      }
-    } catch (Exception ex) {
-      return ResponseUtils.notFound("Category not found");
+    var cat = categoryService.getById(id);
+    if (cat == null) {
+      throw new NotFoundException("Category not found with ID: " + id);
     }
+    return ResponseUtils.ok(cat);
   }
 
   /** Update allow-deny status PATCH /api/categories/:id/allow-deny */
   @PATCH
   @Path("/{id}/allow-deny")
   public Response updateAllowDeny(@PathParam("id") Long id, java.util.Map<String, String> request) {
-    try {
-      var cat = categoryService.getById(id);
-      if (cat == null) {
-        return ResponseUtils.notFound("Category not found");
-      }
-
-      if (request != null && request.get("allowDeny") != null) {
-        cat.setAllowDeny(BaseStream.AllowDenyStatus.fromValue((String) request.get("allowDeny")));
-        categoryService.update(cat);
-      }
-      return ResponseUtils.ok(cat);
-    } catch (Exception ex) {
-      return ResponseUtils.serverError("Failed to update category: " + ex.getMessage());
+    var cat = categoryService.getById(id);
+    if (cat == null) {
+      throw new NotFoundException("Category not found with ID: " + id);
     }
+
+    if (request != null && request.get("allowDeny") != null) {
+      cat.setAllowDeny(BaseStream.AllowDenyStatus.fromValue((String) request.get("allowDeny")));
+      categoryService.update(cat);
+    }
+    return ResponseUtils.ok(cat);
   }
 }

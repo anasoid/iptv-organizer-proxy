@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.anasoid.iptvorganizer.dto.request.LoginRequest;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
+import org.anasoid.iptvorganizer.exceptions.ValidationException;
 import org.anasoid.iptvorganizer.models.entity.AdminUser;
 import org.anasoid.iptvorganizer.services.AdminUserService;
 import org.anasoid.iptvorganizer.services.auth.AuthService;
@@ -30,34 +31,26 @@ public class AuthController extends BaseController {
   @POST
   @Path("/login")
   public Response login(LoginRequest request) {
-    try {
-      if (request.getUsername() == null
-          || request.getUsername().isBlank()
-          || request.getPassword() == null
-          || request.getPassword().isBlank()) {
-        return Response.status(Response.Status.BAD_REQUEST)
-            .entity(ApiResponse.error("Username and password are required"))
-            .build();
-      }
-
-      Map<String, Object> loginResponse =
-          authService.login(request.getUsername(), request.getPassword());
-
-      // Extract token and user from login response
-      String token = (String) loginResponse.get("token");
-      AdminUser user = (AdminUser) loginResponse.get("user");
-
-      // Create response with token and user entity (direct, no DTO conversion)
-      Map<String, Object> responseData = new HashMap<>();
-      responseData.put("token", token);
-      responseData.put("user", user);
-
-      return Response.ok(responseData).build();
-    } catch (Exception ex) {
-      return Response.status(Response.Status.UNAUTHORIZED)
-          .entity(ApiResponse.error(ex.getMessage()))
-          .build();
+    if (request.getUsername() == null
+        || request.getUsername().isBlank()
+        || request.getPassword() == null
+        || request.getPassword().isBlank()) {
+      throw new ValidationException("Username and password are required");
     }
+
+    Map<String, Object> loginResponse =
+        authService.login(request.getUsername(), request.getPassword());
+
+    // Extract token and user from login response
+    String token = (String) loginResponse.get("token");
+    AdminUser user = (AdminUser) loginResponse.get("user");
+
+    // Create response with token and user entity (direct, no DTO conversion)
+    Map<String, Object> responseData = new HashMap<>();
+    responseData.put("token", token);
+    responseData.put("user", user);
+
+    return Response.ok(responseData).build();
   }
 
   /** Get current user info - PROTECTED GET /api/auth/me */
@@ -65,15 +58,9 @@ public class AuthController extends BaseController {
   @Path("/me")
   @RolesAllowed("admin")
   public Response getCurrentUser() {
-    try {
-      Long userId = getCurrentUserId();
-      AdminUser user = adminUserService.getById(userId);
-      return Response.ok(ApiResponse.success(user)).build();
-    } catch (Exception ex) {
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-          .entity(ApiResponse.error("Failed to get user info: " + ex.getMessage()))
-          .build();
-    }
+    Long userId = getCurrentUserId();
+    AdminUser user = adminUserService.getById(userId);
+    return Response.ok(ApiResponse.success(user)).build();
   }
 
   /** Logout endpoint - PROTECTED POST /api/auth/logout */

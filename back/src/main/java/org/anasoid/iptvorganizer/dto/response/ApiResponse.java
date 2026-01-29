@@ -20,6 +20,7 @@ public class ApiResponse<T> {
   private T data;
   private String message;
   private PaginationMeta pagination;
+  private ErrorDetails error;
 
   /** Create a success response with data */
   public static <T> ApiResponse<T> success(T data) {
@@ -36,8 +37,17 @@ public class ApiResponse<T> {
     return ApiResponse.<T>builder().success(true).data(data).pagination(pagination).build();
   }
 
-  /** Create an error response */
+  /** Create an error response with message (backward compatibility) */
   public static <T> ApiResponse<T> error(String message) {
     return ApiResponse.<T>builder().success(false).message(message).build();
+  }
+
+  /** Create an error response with detailed error information */
+  public static <T> ApiResponse<T> error(ErrorDetails errorDetails) {
+    return ApiResponse.<T>builder()
+        .success(false)
+        .message(errorDetails.getMessage())
+        .error(errorDetails)
+        .build();
   }
 }

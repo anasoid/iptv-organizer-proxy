@@ -1,16 +1,110 @@
 package org.anasoid.iptvorganizer.exceptions;
 
+import io.quarkus.runtime.LaunchMode;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
+import org.anasoid.iptvorganizer.dto.response.ErrorDetails;
+import org.jboss.logging.Logger;
 
 @Provider
 public class GeneralExceptionHandler implements ExceptionMapper<Exception> {
+  private static final Logger log = Logger.getLogger(GeneralExceptionHandler.class);
+  private static final int MAX_STACK_TRACE_FRAMES = 20;
+
+  @Context private UriInfo uriInfo;
+
   @Override
   public Response toResponse(Exception ex) {
-    return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-        .entity(ApiResponse.error("An unexpected error occurred"))
-        .build();
+    Response.Status status = Response.Status.INTERNAL_SERVER_ERROR;
+    String errorCode = "INTERNAL_ERROR";
+    int statusCode = 500;
+
+    // Determine status and error code based on exception type
+    if (ex instanceof ValidationException) {
+      status = Response.Status.BAD_REQUEST;
+      errorCode = "VALIDATION_ERROR";
+      statusCode = 400;
+    } else if (ex instanceof UnauthorizedException) {
+      status = Response.Status.UNAUTHORIZED;
+      errorCode = "UNAUTHORIZED";
+      statusCode = 401;
+    } else if (ex instanceof ForbiddenException) {
+      status = Response.Status.FORBIDDEN;
+      errorCode = "FORBIDDEN";
+      statusCode = 403;
+    } else if (ex instanceof NotFoundException) {
+      status = Response.Status.NOT_FOUND;
+      errorCode = "NOT_FOUND";
+      statusCode = 404;
+    } else if (ex instanceof FilterException) {
+      status = Response.Status.INTERNAL_SERVER_ERROR;
+      errorCode = "FILTER_ERROR";
+      statusCode = 500;
+    } else if (ex instanceof StreamingException) {
+      status = Response.Status.BAD_GATEWAY;
+      errorCode = "STREAMING_ERROR";
+      statusCode = 502;
+    }
+
+    // Extract stack trace if enabled (dev/test mode only)
+    List<String> stackTrace = null;
+    boolean isDevMode = LaunchMode.current().isDevOrTest();
+    if (isDevMode) {
+      stackTrace = extractStackTrace(ex);
+    }
+
+    // Build error details
+    ErrorDetails errorDetails =
+        ErrorDetails.builder()
+            .message(ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred")
+            .errorCode(errorCode)
+            .status(statusCode)
+            .exceptionType(ex.getClass().getName())
+            .stackTrace(stackTrace)
+            .timestamp(LocalDateTime.now())
+            .path(uriInfo != null ? uriInfo.getAbsolutePath().toString() : null)
+            .build();
+
+    // Log appropriately based on status
+    if (statusCode >= 500) {
+      log.errorf(
+          "Internal server error (%s): %s",
+          errorCode, ex.getMessage(), ex); // Log with full stack trace
+    } else {
+      log.warnf("Client error (%s): %s", errorCode, ex.getMessage()); // Log without stack trace
+    }
+
+    return Response.status(status).entity(ApiResponse.error(errorDetails)).build();
+  }
+
+  private List<String> extractStackTrace(Throwable ex) {
+    List<String> stackTrace = new ArrayList<>();
+    StackTraceElement[] elements = ex.getStackTrace();
+
+    int framesToInclude = Math.min(elements.length, MAX_STACK_TRACE_FRAMES);
+    for (int i = 0; i < framesToInclude; i++) {
+      StackTraceElement element = elements[i];
+      stackTrace.add(
+          String.format(
+              "%s.%s(%s:%d)",
+              element.getClassName(),
+              element.getMethodName(),
+              element.getFileName(),
+              element.getLineNumber()));
+    }
+
+    // Add indicator if truncated
+    if (elements.length > MAX_STACK_TRACE_FRAMES) {
+      stackTrace.add(String.format("... %d more frames", elements.length - MAX_STACK_TRACE_FRAMES));
+    }
+
+    return stackTrace;
   }
 }

@@ -22,6 +22,9 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
+import org.anasoid.iptvorganizer.exceptions.FilterException;
+import org.anasoid.iptvorganizer.exceptions.NotFoundException;
+import org.anasoid.iptvorganizer.exceptions.ValidationException;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
 import org.anasoid.iptvorganizer.services.SourceService;
@@ -53,190 +56,154 @@ public class SourcesController extends BaseController {
       @QueryParam("limit") @DefaultValue("20") int limit) {
 
     if (page < 1 || limit < 1) {
-      return ResponseUtils.badRequest("Page and limit must be greater than 0");
+      throw new ValidationException("Page and limit must be greater than 0");
     }
 
-    try {
-      List<Source> sources = sourceService.getAllPaged(page, limit);
-      long total = sourceService.count();
-      var pagination = PaginationMeta.of(page, limit, total);
-      return ResponseUtils.okWithPagination(sources, pagination);
-    } catch (Exception ex) {
-      log.error("Failed to fetch sources", ex);
-      return ResponseUtils.serverError("Failed to fetch sources: " + ex.getMessage());
-    }
+    List<Source> sources = sourceService.getAllPaged(page, limit);
+    long total = sourceService.count();
+    var pagination = PaginationMeta.of(page, limit, total);
+    return ResponseUtils.okWithPagination(sources, pagination);
   }
 
   /** Get source by ID GET /api/sources/:id */
   @GET
   @Path("/{id}")
   public Response getSource(@PathParam("id") Long id) {
-    try {
-      Source source = sourceService.getById(id);
-      if (source != null) {
-        return ResponseUtils.ok(source);
-      } else {
-        return ResponseUtils.notFound("Source not found");
-      }
-    } catch (Exception ex) {
-      log.error("Error fetching source: {}", id, ex);
-      return ResponseUtils.notFound("Source not found");
+    Source source = sourceService.getById(id);
+    if (source == null) {
+      throw new NotFoundException("Source not found with ID: " + id);
     }
+    return ResponseUtils.ok(source);
   }
 
   /** Create source POST /api/sources */
   @POST
   public Response createSource(Source request) {
     if (request.getName() == null || request.getName().isBlank()) {
-      return ResponseUtils.badRequest("Name is required");
+      throw new ValidationException("Name is required");
     }
     if (request.getUrl() == null || request.getUrl().isBlank()) {
-      return ResponseUtils.badRequest("URL is required");
+      throw new ValidationException("URL is required");
     }
     if (request.getPassword() == null || request.getPassword().isBlank()) {
-      return ResponseUtils.badRequest("Password is required");
+      throw new ValidationException("Password is required");
     }
 
-    try {
-      // Set defaults for new source
-      if (request.getSyncInterval() == null) {
-        request.setSyncInterval(1);
-      }
-      if (request.getIsActive() == null) {
-        request.setIsActive(true);
-      }
-      if (request.getEnableProxy() == null) {
-        request.setEnableProxy(false);
-      }
-      if (request.getDisableStreamProxy() == null) {
-        request.setDisableStreamProxy(false);
-      }
-      if (request.getStreamFollowLocation() == null) {
-        request.setStreamFollowLocation(false);
-      }
-      request.setCreatedAt(LocalDateTime.now());
-      request.setUpdatedAt(LocalDateTime.now());
-
-      Source savedSource = sourceService.save(request);
-      return ResponseUtils.created(savedSource);
-    } catch (Exception ex) {
-      log.error("Failed to create source", ex);
-      return ResponseUtils.serverError("Failed to create source: " + ex.getMessage());
+    // Set defaults for new source
+    if (request.getSyncInterval() == null) {
+      request.setSyncInterval(1);
     }
+    if (request.getIsActive() == null) {
+      request.setIsActive(true);
+    }
+    if (request.getEnableProxy() == null) {
+      request.setEnableProxy(false);
+    }
+    if (request.getDisableStreamProxy() == null) {
+      request.setDisableStreamProxy(false);
+    }
+    if (request.getStreamFollowLocation() == null) {
+      request.setStreamFollowLocation(false);
+    }
+    request.setCreatedAt(LocalDateTime.now());
+    request.setUpdatedAt(LocalDateTime.now());
+
+    Source savedSource = sourceService.save(request);
+    return ResponseUtils.created(savedSource);
   }
 
   /** Update source PUT /api/sources/:id */
   @PUT
   @Path("/{id}")
   public Response updateSource(@PathParam("id") Long id, Source request) {
-    try {
-      Source source = sourceService.getById(id);
-      if (source == null) {
-        return ResponseUtils.notFound("Source not found");
-      }
-
-      // Merge non-null fields from request into existing source
-      if (request.getName() != null) {
-        source.setName(request.getName());
-      }
-      if (request.getUrl() != null) {
-        source.setUrl(request.getUrl());
-      }
-      if (request.getUsername() != null) {
-        source.setUsername(request.getUsername());
-      }
-      if (request.getPassword() != null && !request.getPassword().isBlank()) {
-        source.setPassword(request.getPassword());
-      }
-      if (request.getSyncInterval() != null) {
-        source.setSyncInterval(request.getSyncInterval());
-      }
-      if (request.getIsActive() != null) {
-        source.setIsActive(request.getIsActive());
-      }
-      // Set proxyId (can be null to remove proxy assignment)
-      source.setProxyId(request.getProxyId());
-      if (request.getEnableProxy() != null) {
-        source.setEnableProxy(request.getEnableProxy());
-      }
-      if (request.getDisableStreamProxy() != null) {
-        source.setDisableStreamProxy(request.getDisableStreamProxy());
-      }
-      if (request.getStreamFollowLocation() != null) {
-        source.setStreamFollowLocation(request.getStreamFollowLocation());
-      }
-      // Allow setting to null for optional redirect settings
-      if (request.getUseRedirect() != null) {
-        source.setUseRedirect(request.getUseRedirect());
-      }
-      if (request.getUseRedirectXmltv() != null) {
-        source.setUseRedirectXmltv(request.getUseRedirectXmltv());
-      }
-
-      source.setUpdatedAt(LocalDateTime.now());
-      sourceService.update(source);
-      return ResponseUtils.ok(source);
-    } catch (Exception ex) {
-      log.error("Failed to update source: {}", id, ex);
-      return ResponseUtils.serverError("Failed to update source: " + ex.getMessage());
+    Source source = sourceService.getById(id);
+    if (source == null) {
+      throw new NotFoundException("Source not found with ID: " + id);
     }
+
+    // Merge non-null fields from request into existing source
+    if (request.getName() != null) {
+      source.setName(request.getName());
+    }
+    if (request.getUrl() != null) {
+      source.setUrl(request.getUrl());
+    }
+    if (request.getUsername() != null) {
+      source.setUsername(request.getUsername());
+    }
+    if (request.getPassword() != null && !request.getPassword().isBlank()) {
+      source.setPassword(request.getPassword());
+    }
+    if (request.getSyncInterval() != null) {
+      source.setSyncInterval(request.getSyncInterval());
+    }
+    if (request.getIsActive() != null) {
+      source.setIsActive(request.getIsActive());
+    }
+    // Set proxyId (can be null to remove proxy assignment)
+    source.setProxyId(request.getProxyId());
+    if (request.getEnableProxy() != null) {
+      source.setEnableProxy(request.getEnableProxy());
+    }
+    if (request.getDisableStreamProxy() != null) {
+      source.setDisableStreamProxy(request.getDisableStreamProxy());
+    }
+    if (request.getStreamFollowLocation() != null) {
+      source.setStreamFollowLocation(request.getStreamFollowLocation());
+    }
+    // Allow setting to null for optional redirect settings
+    if (request.getUseRedirect() != null) {
+      source.setUseRedirect(request.getUseRedirect());
+    }
+    if (request.getUseRedirectXmltv() != null) {
+      source.setUseRedirectXmltv(request.getUseRedirectXmltv());
+    }
+
+    source.setUpdatedAt(LocalDateTime.now());
+    sourceService.update(source);
+    return ResponseUtils.ok(source);
   }
 
   /** Delete source DELETE /api/sources/:id */
   @DELETE
   @Path("/{id}")
   public Response deleteSource(@PathParam("id") Long id) {
-    try {
-      sourceService.delete(id);
-      return ResponseUtils.okMessage("Source deleted successfully");
-    } catch (Exception ex) {
-      log.error("Failed to delete source: {}", id, ex);
-      return ResponseUtils.serverError("Failed to delete source: " + ex.getMessage());
-    }
+    sourceService.delete(id);
+    return ResponseUtils.okMessage("Source deleted successfully");
   }
 
   /** Test source connection POST /api/sources/:id/test */
   @POST
   @Path("/{id}/test")
   public Response testConnection(@PathParam("id") Long id) {
-    try {
-      Source source = sourceService.getById(id);
-      if (source == null) {
-        return ResponseUtils.notFound("Source not found");
-      }
-      // TODO: Implement connection test logic
-      return ResponseUtils.okMessage("Connection test passed");
-    } catch (Exception ex) {
-      log.error("Connection test failed for source: {}", id, ex);
-      return ResponseUtils.serverError("Connection test failed: " + ex.getMessage());
+    Source source = sourceService.getById(id);
+    if (source == null) {
+      throw new NotFoundException("Source not found with ID: " + id);
     }
+    // TODO: Implement connection test logic
+    return ResponseUtils.okMessage("Connection test passed");
   }
 
   /** Trigger full manual sync for a source POST /api/sources/:id/sync */
   @POST
   @Path("/{id}/sync")
   public Response syncSource(@PathParam("id") Long id) {
-    try {
-      Source source = sourceService.getById(id);
-      if (source == null) {
-        return ResponseUtils.notFound("Source not found");
-      }
+    Source source = sourceService.getById(id);
+    if (source == null) {
+      throw new NotFoundException("Source not found with ID: " + id);
+    }
 
-      try {
-        syncManager.triggerManualSync(source);
-        return ResponseUtils.okMessage("Full sync triggered for source: " + source.getName());
-      } catch (Exception ex) {
-        log.error("Failed to trigger sync for source: {}", id, ex);
-        if (ex.getMessage().contains("already syncing")) {
-          return Response.status(Response.Status.CONFLICT)
-              .entity(ApiResponse.error("Source is already syncing"))
-              .build();
-        }
-        return ResponseUtils.serverError("Failed to trigger sync: " + ex.getMessage());
-      }
+    try {
+      syncManager.triggerManualSync(source);
+      return ResponseUtils.okMessage("Full sync triggered for source: " + source.getName());
     } catch (Exception ex) {
       log.error("Failed to trigger sync for source: {}", id, ex);
-      return ResponseUtils.serverError("Failed to trigger sync: " + ex.getMessage());
+      if (ex.getMessage() != null && ex.getMessage().contains("already syncing")) {
+        return Response.status(Response.Status.CONFLICT)
+            .entity(ApiResponse.error("Source is already syncing"))
+            .build();
+      }
+      throw new FilterException("Failed to trigger sync: " + ex.getMessage(), ex);
     }
   }
 
@@ -257,32 +224,27 @@ public class SourcesController extends BaseController {
             "series_categories", "series");
 
     if (!validTaskTypes.contains(taskType)) {
-      return ResponseUtils.badRequest(
+      throw new ValidationException(
           "Invalid task type. Valid types: " + String.join(", ", validTaskTypes));
     }
 
-    try {
-      Source source = sourceService.getById(id);
-      if (source == null) {
-        return ResponseUtils.notFound("Source not found");
-      }
+    Source source = sourceService.getById(id);
+    if (source == null) {
+      throw new NotFoundException("Source not found with ID: " + id);
+    }
 
-      try {
-        syncManager.triggerManualSyncTask(source, taskType);
-        return ResponseUtils.okMessage(
-            "Sync triggered for " + taskType + " on source: " + source.getName());
-      } catch (Exception ex) {
-        log.error("Failed to trigger sync task {} for source: {}", taskType, id, ex);
-        if (ex.getMessage() != null && ex.getMessage().contains("already syncing")) {
-          return Response.status(Response.Status.CONFLICT)
-              .entity(ApiResponse.error("Source is already syncing"))
-              .build();
-        }
-        return ResponseUtils.serverError("Failed to trigger sync: " + ex.getMessage());
-      }
+    try {
+      syncManager.triggerManualSyncTask(source, taskType);
+      return ResponseUtils.okMessage(
+          "Sync triggered for " + taskType + " on source: " + source.getName());
     } catch (Exception ex) {
       log.error("Failed to trigger sync task {} for source: {}", taskType, id, ex);
-      return ResponseUtils.serverError("Failed to trigger sync: " + ex.getMessage());
+      if (ex.getMessage() != null && ex.getMessage().contains("already syncing")) {
+        return Response.status(Response.Status.CONFLICT)
+            .entity(ApiResponse.error("Source is already syncing"))
+            .build();
+      }
+      throw new FilterException("Failed to trigger sync: " + ex.getMessage(), ex);
     }
   }
 
@@ -290,28 +252,23 @@ public class SourcesController extends BaseController {
   @POST
   @Path("/{id}/sync-all")
   public Response syncSourceAll(@PathParam("id") Long id) {
-    try {
-      Source source = sourceService.getById(id);
-      if (source == null) {
-        return ResponseUtils.notFound("Source not found");
-      }
+    Source source = sourceService.getById(id);
+    if (source == null) {
+      throw new NotFoundException("Source not found with ID: " + id);
+    }
 
-      try {
-        syncManager.triggerFullSync(source);
-        return ResponseUtils.okMessage(
-            "Full sync triggered for all types on source: " + source.getName());
-      } catch (Exception ex) {
-        log.error("Failed to trigger full sync for source: {}", id, ex);
-        if (ex.getMessage().contains("already syncing")) {
-          return Response.status(Response.Status.CONFLICT)
-              .entity(ApiResponse.error("Source is already syncing"))
-              .build();
-        }
-        return ResponseUtils.serverError("Failed to trigger full sync: " + ex.getMessage());
-      }
+    try {
+      syncManager.triggerFullSync(source);
+      return ResponseUtils.okMessage(
+          "Full sync triggered for all types on source: " + source.getName());
     } catch (Exception ex) {
       log.error("Failed to trigger full sync for source: {}", id, ex);
-      return ResponseUtils.serverError("Failed to trigger full sync: " + ex.getMessage());
+      if (ex.getMessage() != null && ex.getMessage().contains("already syncing")) {
+        return Response.status(Response.Status.CONFLICT)
+            .entity(ApiResponse.error("Source is already syncing"))
+            .build();
+      }
+      throw new FilterException("Failed to trigger full sync: " + ex.getMessage(), ex);
     }
   }
 
@@ -320,85 +277,70 @@ public class SourcesController extends BaseController {
   @Path("/{id}/sync-logs")
   public Response getSyncLogs(
       @PathParam("id") Long id, @QueryParam("limit") @DefaultValue("20") int limit) {
-    try {
-      List<SyncLog> logs = syncLogService.findBySourceId(id);
-      if (logs.size() > limit) {
-        logs = logs.subList(0, limit);
-      }
-      return ResponseUtils.ok(logs);
-    } catch (Exception ex) {
-      log.error("Failed to fetch sync logs for source: {}", id, ex);
-      return ResponseUtils.serverError("Failed to fetch sync logs: " + ex.getMessage());
+    List<SyncLog> logs = syncLogService.findBySourceId(id);
+    if (logs.size() > limit) {
+      logs = logs.subList(0, limit);
     }
+    return ResponseUtils.ok(logs);
   }
 
   /** Get sync status for all sources GET /api/sync/status */
   @GET
   @Path("/../sync/status")
   public Response getSyncStatus() {
-    try {
-      List<Source> sources = sourceService.getAll();
-      var statusList =
-          sources.stream()
-              .map(
-                  s -> {
-                    var status = new HashMap<String, Object>();
-                    status.put("sourceId", s.getId());
-                    status.put("name", s.getName());
+    List<Source> sources = sourceService.getAll();
+    var statusList =
+        sources.stream()
+            .map(
+                s -> {
+                  var status = new HashMap<String, Object>();
+                  status.put("sourceId", s.getId());
+                  status.put("name", s.getName());
 
-                    // Check if currently syncing from in-memory lock manager
-                    boolean isCurrentlySyncing = syncLockManager.isLocked(s.getId());
-                    status.put("isSyncing", isCurrentlySyncing);
+                  // Check if currently syncing from in-memory lock manager
+                  boolean isCurrentlySyncing = syncLockManager.isLocked(s.getId());
+                  status.put("isSyncing", isCurrentlySyncing);
 
-                    // Include metadata if syncing
-                    if (isCurrentlySyncing) {
-                      syncLockManager
-                          .getSyncMetadata(s.getId())
-                          .ifPresent(
-                              metadata -> {
-                                status.put("currentSyncType", metadata.getSyncType());
-                                status.put("syncStartTime", metadata.getStartTime());
-                              });
-                    }
+                  // Include metadata if syncing
+                  if (isCurrentlySyncing) {
+                    syncLockManager
+                        .getSyncMetadata(s.getId())
+                        .ifPresent(
+                            metadata -> {
+                              status.put("currentSyncType", metadata.getSyncType());
+                              status.put("syncStartTime", metadata.getStartTime());
+                            });
+                  }
 
-                    status.put("lastSync", s.getLastSync());
-                    status.put("nextSync", s.getNextSync());
-                    return status;
-                  })
-              .toList();
-      return ResponseUtils.ok(statusList);
-    } catch (Exception ex) {
-      log.error("Failed to fetch sync status", ex);
-      return ResponseUtils.serverError("Failed to fetch sync status: " + ex.getMessage());
-    }
+                  status.put("lastSync", s.getLastSync());
+                  status.put("nextSync", s.getNextSync());
+                  return status;
+                })
+            .toList();
+    return ResponseUtils.ok(statusList);
   }
 
   /** Get currently active sync operations GET /api/sync/active */
   @GET
   @Path("/../sync/active")
   public Response getActiveSyncs() {
-    try {
-      var activeSyncs = syncLockManager.getActiveSyncs();
+    var activeSyncs = syncLockManager.getActiveSyncs();
 
-      var response =
-          activeSyncs.stream()
-              .map(
-                  metadata -> {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("sourceId", metadata.getSourceId());
-                    map.put("syncType", metadata.getSyncType());
-                    map.put("startTime", metadata.getStartTime());
-                    map.put(
-                        "durationSeconds",
-                        ChronoUnit.SECONDS.between(metadata.getStartTime(), LocalDateTime.now()));
-                    return map;
-                  })
-              .toList();
+    var response =
+        activeSyncs.stream()
+            .map(
+                metadata -> {
+                  Map<String, Object> map = new HashMap<>();
+                  map.put("sourceId", metadata.getSourceId());
+                  map.put("syncType", metadata.getSyncType());
+                  map.put("startTime", metadata.getStartTime());
+                  map.put(
+                      "durationSeconds",
+                      ChronoUnit.SECONDS.between(metadata.getStartTime(), LocalDateTime.now()));
+                  return map;
+                })
+            .toList();
 
-      return ResponseUtils.ok(response);
-    } catch (Exception ex) {
-      log.error("Failed to fetch active syncs", ex);
-      return ResponseUtils.serverError("Failed to fetch active syncs: " + ex.getMessage());
-    }
+    return ResponseUtils.ok(response);
   }
 }

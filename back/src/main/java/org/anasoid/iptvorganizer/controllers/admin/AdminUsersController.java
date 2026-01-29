@@ -7,6 +7,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
+import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.ValidationException;
 import org.anasoid.iptvorganizer.models.entity.AdminUser;
 import org.anasoid.iptvorganizer.services.AdminUserService;
@@ -31,72 +32,57 @@ public class AdminUsersController extends BaseController {
       @QueryParam("limit") @DefaultValue("20") int limit) {
 
     if (page < 1 || limit < 1) {
-      return ResponseUtils.badRequest("Page and limit must be greater than 0");
+      throw new ValidationException("Page and limit must be greater than 0");
     }
 
-    try {
-      var users = adminUserService.getAllPaged(page, limit);
-      long total = adminUserService.count();
-      var pagination = PaginationMeta.of(page, limit, total);
-      return ResponseUtils.okWithPagination(users, pagination);
-    } catch (Exception ex) {
-      return ResponseUtils.serverError("Failed to fetch admin users: " + ex.getMessage());
-    }
+    var users = adminUserService.getAllPaged(page, limit);
+    long total = adminUserService.count();
+    var pagination = PaginationMeta.of(page, limit, total);
+    return ResponseUtils.okWithPagination(users, pagination);
   }
 
   /** Get admin user by ID GET /api/admin-users/:id */
   @GET
   @Path("/{id}")
   public Response getAdminUser(@PathParam("id") Long id) {
-    try {
-      AdminUser user = adminUserService.getById(id);
-      if (user != null) {
-        return ResponseUtils.ok(user);
-      } else {
-        return ResponseUtils.notFound("Admin user not found");
-      }
-    } catch (Exception ex) {
-      return ResponseUtils.notFound("Admin user not found");
+    AdminUser user = adminUserService.getById(id);
+    if (user == null) {
+      throw new NotFoundException("Admin user not found with ID: " + id);
     }
+    return ResponseUtils.ok(user);
   }
 
   /** Create admin user POST /api/admin-users */
   @POST
   public Response createAdminUser(AdminUser request) {
     if (request.getUsername() == null || request.getUsername().isBlank()) {
-      return ResponseUtils.badRequest("Username is required");
+      throw new ValidationException("Username is required");
     }
     if (request.getPasswordHash() == null || request.getPasswordHash().isBlank()) {
-      return ResponseUtils.badRequest("Password is required");
+      throw new ValidationException("Password is required");
     }
     if (request.getEmail() == null || request.getEmail().isBlank()) {
-      return ResponseUtils.badRequest("Email is required");
+      throw new ValidationException("Email is required");
     }
 
-    try {
-      // Check if username already exists
-      if (adminUserService.existsByUsername(request.getUsername())) {
-        throw new ValidationException("Username already exists");
-      }
-
-      // Hash the password (plain password is passed as passwordHash initially)
-      String hashedPassword = passwordService.hashPassword(request.getPasswordHash());
-      request.setPasswordHash(hashedPassword);
-
-      // Set defaults
-      if (request.getIsActive() == null) {
-        request.setIsActive(true);
-      }
-      request.setCreatedAt(LocalDateTime.now());
-      request.setUpdatedAt(LocalDateTime.now());
-
-      AdminUser savedUser = adminUserService.save(request);
-      return ResponseUtils.created(savedUser);
-    } catch (ValidationException ex) {
-      return ResponseUtils.badRequest(ex.getMessage());
-    } catch (Exception ex) {
-      return ResponseUtils.serverError("Failed to create admin user: " + ex.getMessage());
+    // Check if username already exists
+    if (adminUserService.existsByUsername(request.getUsername())) {
+      throw new ValidationException("Username already exists");
     }
+
+    // Hash the password (plain password is passed as passwordHash initially)
+    String hashedPassword = passwordService.hashPassword(request.getPasswordHash());
+    request.setPasswordHash(hashedPassword);
+
+    // Set defaults
+    if (request.getIsActive() == null) {
+      request.setIsActive(true);
+    }
+    request.setCreatedAt(LocalDateTime.now());
+    request.setUpdatedAt(LocalDateTime.now());
+
+    AdminUser savedUser = adminUserService.save(request);
+    return ResponseUtils.created(savedUser);
   }
 
   /** Update admin user PUT /api/admin-users/:id */
@@ -105,33 +91,29 @@ public class AdminUsersController extends BaseController {
   public Response updateAdminUser(@PathParam("id") Long id, AdminUser request) {
     Long currentUserId = getCurrentUserId();
 
-    try {
-      AdminUser user = adminUserService.getById(id);
-      if (user == null) {
-        return ResponseUtils.notFound("Admin user not found");
-      }
-
-      // Merge non-null fields from request
-      if (request.getEmail() != null && !request.getEmail().isBlank()) {
-        user.setEmail(request.getEmail());
-      }
-
-      if (request.getIsActive() != null) {
-        user.setIsActive(request.getIsActive());
-      }
-
-      // If passwordHash is provided (plain password from request), hash it
-      if (request.getPasswordHash() != null && !request.getPasswordHash().isBlank()) {
-        String hashedPassword = passwordService.hashPassword(request.getPasswordHash());
-        user.setPasswordHash(hashedPassword);
-      }
-
-      user.setUpdatedAt(LocalDateTime.now());
-      adminUserService.update(user);
-      return ResponseUtils.ok(user);
-    } catch (Exception ex) {
-      return ResponseUtils.serverError("Failed to update admin user: " + ex.getMessage());
+    AdminUser user = adminUserService.getById(id);
+    if (user == null) {
+      throw new NotFoundException("Admin user not found with ID: " + id);
     }
+
+    // Merge non-null fields from request
+    if (request.getEmail() != null && !request.getEmail().isBlank()) {
+      user.setEmail(request.getEmail());
+    }
+
+    if (request.getIsActive() != null) {
+      user.setIsActive(request.getIsActive());
+    }
+
+    // If passwordHash is provided (plain password from request), hash it
+    if (request.getPasswordHash() != null && !request.getPasswordHash().isBlank()) {
+      String hashedPassword = passwordService.hashPassword(request.getPasswordHash());
+      user.setPasswordHash(hashedPassword);
+    }
+
+    user.setUpdatedAt(LocalDateTime.now());
+    adminUserService.update(user);
+    return ResponseUtils.ok(user);
   }
 
   /** Delete admin user DELETE /api/admin-users/:id */
@@ -142,14 +124,10 @@ public class AdminUsersController extends BaseController {
 
     // Prevent self-deletion
     if (id.equals(currentUserId)) {
-      return ResponseUtils.badRequest("Cannot delete your own user account");
+      throw new ValidationException("Cannot delete your own user account");
     }
 
-    try {
-      adminUserService.delete(id);
-      return ResponseUtils.okMessage("Admin user deleted successfully");
-    } catch (Exception ex) {
-      return ResponseUtils.serverError("Failed to delete admin user: " + ex.getMessage());
-    }
+    adminUserService.delete(id);
+    return ResponseUtils.okMessage("Admin user deleted successfully");
   }
 }

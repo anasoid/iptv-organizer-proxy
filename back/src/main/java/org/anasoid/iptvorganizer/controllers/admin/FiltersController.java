@@ -7,6 +7,8 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
+import org.anasoid.iptvorganizer.exceptions.NotFoundException;
+import org.anasoid.iptvorganizer.exceptions.ValidationException;
 import org.anasoid.iptvorganizer.models.entity.Filter;
 import org.anasoid.iptvorganizer.services.FilterService;
 import org.anasoid.iptvorganizer.utils.ResponseUtils;
@@ -27,93 +29,72 @@ public class FiltersController extends BaseController {
       @QueryParam("limit") @DefaultValue("20") int limit) {
 
     if (page < 1 || limit < 1) {
-      return ResponseUtils.badRequest("Page and limit must be greater than 0");
+      throw new ValidationException("Page and limit must be greater than 0");
     }
 
-    try {
-      var filters = filterService.getAllPaged(page, limit);
-      long total = filterService.count();
-      var pagination = PaginationMeta.of(page, limit, total);
-      return ResponseUtils.okWithPagination(filters, pagination);
-    } catch (Exception ex) {
-      return ResponseUtils.serverError("Failed to fetch filters: " + ex.getMessage());
-    }
+    var filters = filterService.getAllPaged(page, limit);
+    long total = filterService.count();
+    var pagination = PaginationMeta.of(page, limit, total);
+    return ResponseUtils.okWithPagination(filters, pagination);
   }
 
   /** Get filter by ID GET /api/filters/:id */
   @GET
   @Path("/{id}")
   public Response getFilter(@PathParam("id") Long id) {
-    try {
-      Filter filter = filterService.getById(id);
-      if (filter != null) {
-        return ResponseUtils.ok(filter);
-      } else {
-        return ResponseUtils.notFound("Filter not found");
-      }
-    } catch (Exception ex) {
-      return ResponseUtils.notFound("Filter not found");
+    Filter filter = filterService.getById(id);
+    if (filter == null) {
+      throw new NotFoundException("Filter not found with ID: " + id);
     }
+    return ResponseUtils.ok(filter);
   }
 
   /** Create filter POST /api/filters */
   @POST
   public Response createFilter(Filter request) {
     if (request.getName() == null || request.getName().isBlank()) {
-      return ResponseUtils.badRequest("Name is required");
+      throw new ValidationException("Name is required");
     }
 
-    try {
-      // Set defaults for new filter
-      if (request.getUseSourceFilter() == null) {
-        request.setUseSourceFilter(false);
-      }
-      request.setCreatedAt(LocalDateTime.now());
-      request.setUpdatedAt(LocalDateTime.now());
-
-      Filter savedFilter = filterService.save(request);
-      return ResponseUtils.created(savedFilter);
-    } catch (Exception ex) {
-      return ResponseUtils.serverError("Failed to create filter: " + ex.getMessage());
+    // Set defaults for new filter
+    if (request.getUseSourceFilter() == null) {
+      request.setUseSourceFilter(false);
     }
+    request.setCreatedAt(LocalDateTime.now());
+    request.setUpdatedAt(LocalDateTime.now());
+
+    Filter savedFilter = filterService.save(request);
+    return ResponseUtils.created(savedFilter);
   }
 
   /** Update filter PUT /api/filters/:id */
   @PUT
   @Path("/{id}")
   public Response updateFilter(@PathParam("id") Long id, Filter request) {
-    try {
-      Filter filter = filterService.getById(id);
-      if (filter == null) {
-        return ResponseUtils.notFound("Filter not found");
-      }
-
-      // Merge non-null fields from request
-      if (request.getName() != null) filter.setName(request.getName());
-      if (request.getDescription() != null) filter.setDescription(request.getDescription());
-      if (request.getFilterConfig() != null) filter.setFilterConfig(request.getFilterConfig());
-      if (request.getUseSourceFilter() != null)
-        filter.setUseSourceFilter(request.getUseSourceFilter());
-      if (request.getFavoris() != null) filter.setFavoris(request.getFavoris());
-      filter.setUpdatedAt(LocalDateTime.now());
-
-      filterService.update(filter);
-      return ResponseUtils.ok(filter);
-    } catch (Exception ex) {
-      return ResponseUtils.serverError("Failed to update filter: " + ex.getMessage());
+    Filter filter = filterService.getById(id);
+    if (filter == null) {
+      throw new NotFoundException("Filter not found with ID: " + id);
     }
+
+    // Merge non-null fields from request
+    if (request.getName() != null) filter.setName(request.getName());
+    if (request.getDescription() != null) filter.setDescription(request.getDescription());
+    if (request.getFilterConfig() != null) filter.setFilterConfig(request.getFilterConfig());
+    if (request.getUseSourceFilter() != null)
+      filter.setUseSourceFilter(request.getUseSourceFilter());
+    if (request.getFavoris() != null) filter.setFavoris(request.getFavoris());
+    filter.setUpdatedAt(LocalDateTime.now());
+
+    filterService.update(filter);
+    return ResponseUtils.ok(filter);
   }
 
   /** Delete filter DELETE /api/filters/:id */
   @DELETE
   @Path("/{id}")
   public Response deleteFilter(@PathParam("id") Long id) {
-    try {
-      filterService.delete(id);
-      return ResponseUtils.okMessage("Filter deleted successfully");
-    } catch (Exception ex) {
-      return ResponseUtils.serverError("Failed to delete filter: " + ex.getMessage());
-    }
+    filterService.delete(id);
+    return ResponseUtils.okMessage("Filter deleted successfully");
   }
 
   /** Toggle use source filter flag PATCH /api/filters/:id/use-source-filter */
@@ -121,20 +102,16 @@ public class FiltersController extends BaseController {
   @Path("/{id}/use-source-filter")
   public Response toggleUseSourceFilter(
       @PathParam("id") Long id, java.util.Map<String, Boolean> request) {
-    try {
-      Filter filter = filterService.getById(id);
-      if (filter == null) {
-        return ResponseUtils.notFound("Filter not found");
-      }
-
-      if (request != null && request.get("useSourceFilter") != null) {
-        filter.setUseSourceFilter(request.get("useSourceFilter"));
-        filter.setUpdatedAt(LocalDateTime.now());
-        filterService.update(filter);
-      }
-      return ResponseUtils.ok(filter);
-    } catch (Exception ex) {
-      return ResponseUtils.serverError("Failed to update filter: " + ex.getMessage());
+    Filter filter = filterService.getById(id);
+    if (filter == null) {
+      throw new NotFoundException("Filter not found with ID: " + id);
     }
+
+    if (request != null && request.get("useSourceFilter") != null) {
+      filter.setUseSourceFilter(request.get("useSourceFilter"));
+      filter.setUpdatedAt(LocalDateTime.now());
+      filterService.update(filter);
+    }
+    return ResponseUtils.ok(filter);
   }
 }
