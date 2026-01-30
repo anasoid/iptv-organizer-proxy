@@ -46,8 +46,8 @@ jobs:
         with:
           name: test-results-jdk-${{ matrix.java-version }}
           path: |
-            java/build/test-results/test/*.xml
-            java/build/reports/tests/test/
+            back/build/test-results/test/*.xml
+            back/build/reports/tests/test/
           retention-days: 7
 
       - name: Upload JaCoCo coverage report
@@ -55,15 +55,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-report-jdk-${{ matrix.java-version }}
-          path: |
-            java/build/reports/jacoco/test/
+          path: back/build/reports/jacoco/test/
           retention-days: 7
 
       - name: Upload coverage to Codecov
         if: matrix.java-version == '21'
         uses: codecov/codecov-action@v4
         with:
-          files: ./java/build/reports/jacoco/test/jacocoTestReport.xml
+          files: ./back/build/reports/jacoco/test/jacocoTestReport.xml
           flags: java
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}

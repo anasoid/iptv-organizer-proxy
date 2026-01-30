@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --skipLibCheck && vite build",
+    "build:java": "tsc --skipLibCheck && VITE_BASE_PATH=/admin/ vite build",
     "build:php": "tsc --skipLibCheck && VITE_BASE_PATH=/admin/ vite build && rm -rf ../back/public/admin/* && mkdir -p ../back/public/admin && cp -r dist/* ../back/public/admin/",
     "build:prod": "tsc --skipLibCheck && VITE_BASE_PATH=/admin/ VITE_API_BASE_URL=https://freeforever4584.free.nf vite build && rm -rf ../back/public/admin/* && mkdir -p ../back/public/admin && cp -r dist/* ../back/public/admin/",
     "lint": "eslint .",

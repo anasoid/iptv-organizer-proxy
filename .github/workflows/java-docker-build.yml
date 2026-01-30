@@ -18,6 +18,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 1.5. Setup Node.js for Admin UI build
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: admin/package-lock.json
+
+      # 1.6. Build admin UI
+      - name: Build admin UI
+        working-directory: admin
+        run: |
+          npm ci
+          npm run build:java
+
+      # 1.7. Copy admin UI to Quarkus resources
+      - name: Copy admin UI to Quarkus resources
+        run: |
+          mkdir -p back/src/main/resources/META-INF/resources/admin
+          cp -r admin/dist/* back/src/main/resources/META-INF/resources/admin/
+
       # 2. Setup JDK 21 with Gradle cache
       - name: Setup JDK 21
         uses: actions/setup-java@v4
