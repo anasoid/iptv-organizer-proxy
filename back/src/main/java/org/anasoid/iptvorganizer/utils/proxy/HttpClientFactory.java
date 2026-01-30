@@ -30,21 +30,50 @@ import org.anasoid.iptvorganizer.services.ProxyConfigService;
 public class HttpClientFactory {
 
   private static final long DEFAULT_TIMEOUT_MS = 30000;
-  private static final HttpClient DEFAULT_CLIENT =
-      HttpClient.newBuilder()
-          .connectTimeout(Duration.ofMillis(DEFAULT_TIMEOUT_MS))
-          .followRedirects(HttpClient.Redirect.NORMAL)
-          .build();
-  private static final HttpClient DEFAULT_CLIENT_NO_REDIRECTS =
-      HttpClient.newBuilder()
-          .connectTimeout(Duration.ofMillis(DEFAULT_TIMEOUT_MS))
-          .followRedirects(HttpClient.Redirect.NEVER)
-          .build();
+  // Lazy-initialized static clients (for GraalVM native image compatibility)
+  private static volatile HttpClient defaultClient;
+  private static volatile HttpClient defaultClientNoRedirects;
 
   @Inject ProxyConfigService proxyConfigService;
 
   // Cache: key = cacheKey, value = HttpClient instance
   private final ConcurrentHashMap<String, HttpClient> clientCache = new ConcurrentHashMap<>();
+
+  /**
+   * Get or create default HTTP client (lazy initialization for native image)
+   */
+  private static HttpClient getDefaultClient() {
+    if (defaultClient == null) {
+      synchronized (HttpClientFactory.class) {
+        if (defaultClient == null) {
+          defaultClient =
+              HttpClient.newBuilder()
+                  .connectTimeout(Duration.ofMillis(DEFAULT_TIMEOUT_MS))
+                  .followRedirects(HttpClient.Redirect.NORMAL)
+                  .build();
+        }
+      }
+    }
+    return defaultClient;
+  }
+
+  /**
+   * Get or create default HTTP client without redirects (lazy initialization for native image)
+   */
+  private static HttpClient getDefaultClientNoRedirects() {
+    if (defaultClientNoRedirects == null) {
+      synchronized (HttpClientFactory.class) {
+        if (defaultClientNoRedirects == null) {
+          defaultClientNoRedirects =
+              HttpClient.newBuilder()
+                  .connectTimeout(Duration.ofMillis(DEFAULT_TIMEOUT_MS))
+                  .followRedirects(HttpClient.Redirect.NEVER)
+                  .build();
+        }
+      }
+    }
+    return defaultClientNoRedirects;
+  }
 
   /**
    * Create or retrieve a cached HttpClient for the given source and redirect policy.
@@ -62,7 +91,7 @@ public class HttpClientFactory {
     // If no proxy configured, return default client
     if (proxyConfig == null) {
       log.debug("No proxy configured for source, using default HttpClient");
-      return followRedirects ? DEFAULT_CLIENT : DEFAULT_CLIENT_NO_REDIRECTS;
+      return followRedirects ? getDefaultClient() : getDefaultClientNoRedirects();
     }
 
     // Build cache key from proxy configuration
