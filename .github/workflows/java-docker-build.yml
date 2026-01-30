@@ -77,16 +77,18 @@ jobs:
             echo "tag=java-pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
           fi
 
-      # 7. Build and push container image with Quarkus native
+      # 7. Build and push container image with Quarkus native (optimized for embedded/OpenWrt)
       - name: Build and push container image (native)
         if: github.event_name != 'pull_request'
         run: |
-          export GRADLE_OPTS="-Xmx12g"
+          export GRADLE_OPTS="-Xmx3g"
+          export DOCKER_BUILDKIT=1
           ./gradlew build \
             -PbuildingNativeImage \
             -Dquarkus.package.type=native \
             -Dquarkus.native.container-build=true \
-            -Dquarkus.native.container-runtime-options=--memory=14g \
+            -Dquarkus.native.compression=all \
+            -Dquarkus.native.container-runtime-options=--memory=4g \
             -Dquarkus.container-image.build=true \
             -Dquarkus.container-image.push=true \
             -Dquarkus.container-image.registry=${{ env.REGISTRY }} \
@@ -104,12 +106,14 @@ jobs:
       - name: Build container image (PR - native)
         if: github.event_name == 'pull_request'
         run: |
-          export GRADLE_OPTS="-Xmx12g"
+          export GRADLE_OPTS="-Xmx3g"
+          export DOCKER_BUILDKIT=1
           ./gradlew build \
             -PbuildingNativeImage \
             -Dquarkus.package.type=native \
             -Dquarkus.native.container-build=true \
-            -Dquarkus.native.container-runtime-options=--memory=14g \
+            -Dquarkus.native.compression=all \
+            -Dquarkus.native.container-runtime-options=--memory=4g \
             -Dquarkus.container-image.build=true \
             -Dquarkus.container-image.push=false \
             --no-daemon
