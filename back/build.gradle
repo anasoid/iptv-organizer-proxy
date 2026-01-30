@@ -62,8 +62,10 @@ dependencies {
     // AssertJ for fluent assertions
     testImplementation 'org.assertj:assertj-core:3.25.1'
 
-    // JaCoCo for code coverage with Quarkus
-    testImplementation 'io.quarkus:quarkus-jacoco'
+    // JaCoCo for code coverage with Quarkus (excluded from native builds)
+    if (!project.hasProperty('buildingNativeImage')) {
+        testImplementation 'io.quarkus:quarkus-jacoco'
+    }
 
     // Container image extension for Docker builds
     implementation 'io.quarkus:quarkus-container-image-docker'

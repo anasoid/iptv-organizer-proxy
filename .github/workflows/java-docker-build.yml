@@ -83,6 +83,7 @@ jobs:
         run: |
           export GRADLE_OPTS="-Xmx7g"
           ./gradlew build \
+            -PbuildingNativeImage \
             -Dquarkus.package.type=native \
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.container-runtime-options=--memory=8g \
@@ -105,6 +106,7 @@ jobs:
         run: |
           export GRADLE_OPTS="-Xmx7g"
           ./gradlew build \
+            -PbuildingNativeImage \
             -Dquarkus.package.type=native \
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.container-runtime-options=--memory=8g \
