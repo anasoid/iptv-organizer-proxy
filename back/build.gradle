@@ -56,6 +56,12 @@ dependencies {
     testImplementation 'org.mockito:mockito-core'
     testImplementation 'org.mockito:mockito-junit-jupiter'
 
+    // WireMock for HTTP mocking
+    testImplementation 'org.wiremock:wiremock-standalone:3.3.1'
+
+    // AssertJ for fluent assertions
+    testImplementation 'org.assertj:assertj-core:3.25.1'
+
     // JaCoCo for code coverage with Quarkus
     testImplementation 'io.quarkus:quarkus-jacoco'
 
