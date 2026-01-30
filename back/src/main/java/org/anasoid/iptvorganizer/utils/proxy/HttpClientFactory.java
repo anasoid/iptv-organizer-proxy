@@ -39,9 +39,7 @@ public class HttpClientFactory {
   // Cache: key = cacheKey, value = HttpClient instance
   private final ConcurrentHashMap<String, HttpClient> clientCache = new ConcurrentHashMap<>();
 
-  /**
-   * Get or create default HTTP client (lazy initialization for native image)
-   */
+  /** Get or create default HTTP client (lazy initialization for native image) */
   private static HttpClient getDefaultClient() {
     if (defaultClient == null) {
       synchronized (HttpClientFactory.class) {
@@ -57,9 +55,7 @@ public class HttpClientFactory {
     return defaultClient;
   }
 
-  /**
-   * Get or create default HTTP client without redirects (lazy initialization for native image)
-   */
+  /** Get or create default HTTP client without redirects (lazy initialization for native image) */
   private static HttpClient getDefaultClientNoRedirects() {
     if (defaultClientNoRedirects == null) {
       synchronized (HttpClientFactory.class) {
