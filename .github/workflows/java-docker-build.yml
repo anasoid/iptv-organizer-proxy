@@ -92,7 +92,7 @@ jobs:
             -Dquarkus.container-image.group=${{ github.repository_owner }} \
             -Dquarkus.container-image.name=iptv-organizer-proxy \
             -Dquarkus.container-image.tag=${{ steps.tag.outputs.tag }} \
-            -Dquarkus.docker.buildx.platform=linux/amd64,linux/arm64,linux/arm/v7 \
+            -Dquarkus.docker.buildx.platform=linux/amd64 \
             --no-daemon
         working-directory: back
         env:
