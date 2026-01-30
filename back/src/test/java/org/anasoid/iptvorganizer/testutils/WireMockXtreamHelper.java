@@ -35,7 +35,8 @@ public class WireMockXtreamHelper {
   public static void stubAuthenticationFailure(WireMockExtension wireMock) {
     wireMock.stubFor(
         get(urlPathEqualTo("/player_api.php"))
-            .willReturn(aResponse().withStatus(401).withBody("{\"error\": \"Invalid credentials\"}")));
+            .willReturn(
+                aResponse().withStatus(401).withBody("{\"error\": \"Invalid credentials\"}")));
   }
 
   /**
@@ -127,9 +128,7 @@ public class WireMockXtreamHelper {
     wireMock.stubFor(
         get(urlPathEqualTo("/player_api.php"))
             .willReturn(
-                aResponse()
-                    .withStatus(500)
-                    .withBody("{\"error\": \"Internal Server Error\"}")));
+                aResponse().withStatus(500).withBody("{\"error\": \"Internal Server Error\"}")));
   }
 
   /**
@@ -141,9 +140,7 @@ public class WireMockXtreamHelper {
     wireMock.stubFor(
         get(urlPathEqualTo("/player_api.php"))
             .willReturn(
-                aResponse()
-                    .withStatus(503)
-                    .withBody("{\"error\": \"Service Unavailable\"}")));
+                aResponse().withStatus(503).withBody("{\"error\": \"Service Unavailable\"}")));
   }
 
   /**

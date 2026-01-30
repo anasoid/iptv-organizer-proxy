@@ -65,15 +65,12 @@ class XtreamUserServiceTest {
     // Mock upstream authentication response
     Map<String, Object> upstreamAuth = createUpstreamAuthResponse();
     when(httpStreamingService.fetchJsonObject(
-            contains("upstream_user"),
-            any(HttpOptions.class),
-            eq(testSource)))
+            contains("upstream_user"), any(HttpOptions.class), eq(testSource)))
         .thenReturn(upstreamAuth);
 
     // When: Authenticate via proxy
     Map<String, Object> result =
-        xtreamUserService.authenticate(
-            "testclient", "clientpass", "http://proxy.local:9000");
+        xtreamUserService.authenticate("testclient", "clientpass", "http://proxy.local:9000");
 
     // Then: Verify server_info and user_info replaced
     assertThat(result).isNotNull();
@@ -88,7 +85,9 @@ class XtreamUserServiceTest {
 
     @SuppressWarnings("unchecked")
     Map<String, Object> userInfo = (Map<String, Object>) result.get("user_info");
-    assertThat(userInfo).containsEntry("username", "testclient").containsEntry("password", "clientpass");
+    assertThat(userInfo)
+        .containsEntry("username", "testclient")
+        .containsEntry("password", "clientpass");
   }
 
   @Test
@@ -99,14 +98,12 @@ class XtreamUserServiceTest {
     when(sourceRepository.findById(1L)).thenReturn(testSource);
 
     Map<String, Object> upstreamAuth = createUpstreamAuthResponse();
-    when(httpStreamingService.fetchJsonObject(
-            anyString(), any(HttpOptions.class), eq(testSource)))
+    when(httpStreamingService.fetchJsonObject(anyString(), any(HttpOptions.class), eq(testSource)))
         .thenReturn(upstreamAuth);
 
     // When: Authenticate with HTTPS proxy
     Map<String, Object> result =
-        xtreamUserService.authenticate(
-            "testclient", "clientpass", "https://proxy.local:8443");
+        xtreamUserService.authenticate("testclient", "clientpass", "https://proxy.local:8443");
 
     // Then: Verify HTTPS port mapping
     @SuppressWarnings("unchecked")
@@ -153,16 +150,14 @@ class XtreamUserServiceTest {
   @Test
   void testAuthenticateAndValidateClient_EmptyUsername() {
     // When/Then: Empty username should throw UnauthorizedException
-    assertThatThrownBy(
-            () -> xtreamUserService.authenticateAndValidateClient("", "password"))
+    assertThatThrownBy(() -> xtreamUserService.authenticateAndValidateClient("", "password"))
         .isInstanceOf(org.anasoid.iptvorganizer.exceptions.UnauthorizedException.class);
   }
 
   @Test
   void testAuthenticateAndValidateClient_NullPassword() {
     // When/Then: Null password should throw UnauthorizedException
-    assertThatThrownBy(
-            () -> xtreamUserService.authenticateAndValidateClient("username", null))
+    assertThatThrownBy(() -> xtreamUserService.authenticateAndValidateClient("username", null))
         .isInstanceOf(org.anasoid.iptvorganizer.exceptions.UnauthorizedException.class);
   }
 
@@ -173,8 +168,7 @@ class XtreamUserServiceTest {
         .thenThrow(new RuntimeException("Client not found"));
 
     // When/Then: Should throw exception
-    assertThatThrownBy(
-            () -> xtreamUserService.authenticateAndValidateClient("invalid", "password"))
+    assertThatThrownBy(() -> xtreamUserService.authenticateAndValidateClient("invalid", "password"))
         .isInstanceOf(RuntimeException.class);
   }
 
@@ -201,8 +195,7 @@ class XtreamUserServiceTest {
 
     Map<String, Object> invalidResponse = new HashMap<>();
     invalidResponse.put("invalid_field", "value");
-    when(httpStreamingService.fetchJsonObject(
-            anyString(), any(HttpOptions.class), eq(testSource)))
+    when(httpStreamingService.fetchJsonObject(anyString(), any(HttpOptions.class), eq(testSource)))
         .thenReturn(invalidResponse);
 
     // When/Then: Should throw exception

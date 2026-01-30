@@ -154,14 +154,13 @@ class ContentFilterServiceTest {
     List<Category> result = contentFilterService.getAllowedCategories(context, 1L, "live");
 
     // Then: Should include allowed category
-    assertThat(result)
-        .extracting(Category::getExternalId)
-        .contains(1);
+    assertThat(result).extracting(Category::getExternalId).contains(1);
   }
 
   @Test
   void testGetAllowedCategories_WithExplicitDeny() {
-    // Given: One category with explicit deny, one with explicit allow, enable adult content hiding to trigger filtering
+    // Given: One category with explicit deny, one with explicit allow, enable adult content hiding
+    // to trigger filtering
     FilterContext context = new FilterContext();
     context.setHideAdultContent(true); // Enable some filtering
 
@@ -204,8 +203,7 @@ class ContentFilterServiceTest {
     Category category = createTestCategory(1, "Category 1");
 
     // Mock the filter service to allow the stream
-    when(filterService.shouldIncludeStream(stream, category, null, false))
-        .thenReturn(true);
+    when(filterService.shouldIncludeStream(stream, category, null, false)).thenReturn(true);
 
     // When: Check stream inclusion
     boolean result = contentFilterService.shouldIncludeStream(context, stream, category);
@@ -252,8 +250,7 @@ class ContentFilterServiceTest {
     BaseStream stream = createTestStream(1, "Adult Stream", true);
     Category category = createTestCategory(1, "Category 1");
 
-    when(filterService.shouldIncludeStream(stream, category, null, false))
-        .thenReturn(true);
+    when(filterService.shouldIncludeStream(stream, category, null, false)).thenReturn(true);
 
     // When: Check stream inclusion
     boolean result = contentFilterService.shouldIncludeStream(context, stream, category);
@@ -271,8 +268,8 @@ class ContentFilterServiceTest {
     Map<Integer, Category> categoryCache = new HashMap<>();
 
     // When: Check category inclusion
-    boolean result = contentFilterService.shouldIncludeCategory(
-        context, category, 1L, "live", categoryCache);
+    boolean result =
+        contentFilterService.shouldIncludeCategory(context, category, 1L, "live", categoryCache);
 
     // Then: Should return true
     assertThat(result).isTrue();
@@ -287,8 +284,8 @@ class ContentFilterServiceTest {
     Map<Integer, Category> categoryCache = new HashMap<>();
 
     // When: Check category inclusion
-    boolean result = contentFilterService.shouldIncludeCategory(
-        context, category, 1L, "live", categoryCache);
+    boolean result =
+        contentFilterService.shouldIncludeCategory(context, category, 1L, "live", categoryCache);
 
     // Then: Should return false
     assertThat(result).isFalse();
@@ -335,15 +332,16 @@ class ContentFilterServiceTest {
    * @return Stream
    */
   private BaseStream createTestStream(int externalId, String name, boolean isAdult) {
-    LiveStream stream = LiveStream.builder()
-        .id((long) externalId)
-        .externalId(externalId)
-        .name(name)
-        .sourceId(1L)
-        .isAdult(isAdult)
-        .categoryId(1)
-        .allowDeny(null)
-        .build();
+    LiveStream stream =
+        LiveStream.builder()
+            .id((long) externalId)
+            .externalId(externalId)
+            .name(name)
+            .sourceId(1L)
+            .isAdult(isAdult)
+            .categoryId(1)
+            .allowDeny(null)
+            .build();
     return stream;
   }
 }

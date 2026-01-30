@@ -3,7 +3,6 @@ package org.anasoid.iptvorganizer.utils.xtream;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import org.anasoid.iptvorganizer.models.entity.Source;
@@ -42,10 +41,7 @@ class XtreamClientTest {
   void testGetLiveCategories_CorrectUrl() {
     // Given: Mock streaming service
     JsonStreamResult<Map<?, ?>> mockResult =
-        new JsonStreamResult<>(
-            java.util.Collections.emptyIterator(),
-            new AtomicLong(0),
-            () -> {});
+        new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
     when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
@@ -68,10 +64,7 @@ class XtreamClientTest {
   void testGetVodCategories_CorrectUrl() {
     // Given: Mock streaming service
     JsonStreamResult<Map<?, ?>> mockResult =
-        new JsonStreamResult<>(
-            java.util.Collections.emptyIterator(),
-            new AtomicLong(0),
-            () -> {});
+        new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
     when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
@@ -90,10 +83,7 @@ class XtreamClientTest {
   void testGetSeriesCategories_CorrectUrl() {
     // Given: Mock streaming service
     JsonStreamResult<Map<?, ?>> mockResult =
-        new JsonStreamResult<>(
-            java.util.Collections.emptyIterator(),
-            new AtomicLong(0),
-            () -> {});
+        new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
     when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
@@ -112,10 +102,7 @@ class XtreamClientTest {
   void testGetLiveStreams_CorrectUrl() {
     // Given: Mock streaming service
     JsonStreamResult<Map<?, ?>> mockResult =
-        new JsonStreamResult<>(
-            java.util.Collections.emptyIterator(),
-            new AtomicLong(0),
-            () -> {});
+        new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
     when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
@@ -134,10 +121,7 @@ class XtreamClientTest {
   void testGetVodStreams_CorrectUrl() {
     // Given: Mock streaming service
     JsonStreamResult<Map<?, ?>> mockResult =
-        new JsonStreamResult<>(
-            java.util.Collections.emptyIterator(),
-            new AtomicLong(0),
-            () -> {});
+        new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
     when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
@@ -156,10 +140,7 @@ class XtreamClientTest {
   void testGetSeries_CorrectUrl() {
     // Given: Mock streaming service
     JsonStreamResult<Map<?, ?>> mockResult =
-        new JsonStreamResult<>(
-            java.util.Collections.emptyIterator(),
-            new AtomicLong(0),
-            () -> {});
+        new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
     when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
@@ -180,10 +161,7 @@ class XtreamClientTest {
     testSource.setUrl("http://upstream.example.com/");
 
     JsonStreamResult<Map<?, ?>> mockResult =
-        new JsonStreamResult<>(
-            java.util.Collections.emptyIterator(),
-            new AtomicLong(0),
-            () -> {});
+        new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
     when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
@@ -204,10 +182,7 @@ class XtreamClientTest {
   void testHttpOptions_DefaultTimeout() {
     // Given: Mock streaming service
     JsonStreamResult<Map<?, ?>> mockResult =
-        new JsonStreamResult<>(
-            java.util.Collections.emptyIterator(),
-            new AtomicLong(0),
-            () -> {});
+        new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
     when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
@@ -216,7 +191,8 @@ class XtreamClientTest {
 
     // Then: Verify default timeout is set
     ArgumentCaptor<HttpOptions> optionsCaptor = ArgumentCaptor.forClass(HttpOptions.class);
-    verify(httpStreamingService).streamJsonArray(anyString(), optionsCaptor.capture(), eq(testSource));
+    verify(httpStreamingService)
+        .streamJsonArray(anyString(), optionsCaptor.capture(), eq(testSource));
 
     HttpOptions capturedOptions = optionsCaptor.getValue();
     assertThat(capturedOptions).isNotNull();
@@ -228,10 +204,7 @@ class XtreamClientTest {
   void testLiveCategories_ReturnsStreamResult() {
     // Given: Mock streaming service with test data
     JsonStreamResult<Map<?, ?>> mockResult =
-        new JsonStreamResult<>(
-            java.util.Collections.emptyIterator(),
-            new AtomicLong(0),
-            () -> {});
+        new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
     when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
