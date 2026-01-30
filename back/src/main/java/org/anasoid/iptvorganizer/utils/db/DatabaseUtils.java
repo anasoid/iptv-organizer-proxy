@@ -122,6 +122,7 @@ public class DatabaseUtils {
 
     } catch (SQLException e) {
       log.error("Failed to detect database vendor from connection metadata", e);
+      cachedVendor = DatabaseVendor.UNKNOWN;
       return DatabaseVendor.UNKNOWN;
     }
   }

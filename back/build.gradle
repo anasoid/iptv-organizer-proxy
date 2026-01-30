@@ -47,9 +47,8 @@ dependencies {
     testImplementation 'io.quarkus:quarkus-junit5'
     testImplementation 'io.rest-assured:rest-assured'
 
-    // H2 database for testing (in-memory)
-    testImplementation 'io.quarkus:quarkus-jdbc-h2'
-    testImplementation 'com.h2database:h2'
+    // SQLite database for testing (in-memory)
+    testImplementation 'org.xerial:sqlite-jdbc:3.46.0.0'
 
     // Mockito for mocking in tests
     testImplementation 'org.mockito:mockito-core'
