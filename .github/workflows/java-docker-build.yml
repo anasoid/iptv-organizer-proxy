@@ -81,11 +81,11 @@ jobs:
       - name: Build and push container image (native)
         if: github.event_name != 'pull_request'
         run: |
-          export GRADLE_OPTS="-Xmx6g"
+          export GRADLE_OPTS="-Xmx7g"
           ./gradlew build \
             -Dquarkus.package.type=native \
             -Dquarkus.native.container-build=true \
-            -Dquarkus.native.container-runtime-options=--memory=7g \
+            -Dquarkus.native.container-runtime-options=--memory=8g \
             -Dquarkus.container-image.build=true \
             -Dquarkus.container-image.push=true \
             -Dquarkus.container-image.registry=${{ env.REGISTRY }} \
@@ -103,11 +103,11 @@ jobs:
       - name: Build container image (PR - native)
         if: github.event_name == 'pull_request'
         run: |
-          export GRADLE_OPTS="-Xmx6g"
+          export GRADLE_OPTS="-Xmx7g"
           ./gradlew build \
             -Dquarkus.package.type=native \
             -Dquarkus.native.container-build=true \
-            -Dquarkus.native.container-runtime-options=--memory=7g \
+            -Dquarkus.native.container-runtime-options=--memory=8g \
             -Dquarkus.container-image.build=true \
             -Dquarkus.container-image.push=false \
             --no-daemon
