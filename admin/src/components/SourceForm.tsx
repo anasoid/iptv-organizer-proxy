@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   DialogTitle,
   DialogContent,
@@ -28,6 +28,15 @@ interface SourceFormProps {
   onCancel: () => void;
 }
 
+interface SourceFormData extends Omit<Source, "id" | "created_at" | "updated_at"> {
+  proxyId?: number | null;
+}
+
+interface Proxy {
+  id: number;
+  name: string;
+}
+
 export default function SourceForm({
   source,
   onSuccess,
@@ -41,7 +50,7 @@ export default function SourceForm({
     reset,
     watch,
     control,
-  } = useForm<any>({
+  } = useForm<SourceFormData>({
     defaultValues: source || {
       name: "",
       url: "",
@@ -92,7 +101,7 @@ export default function SourceForm({
     }
   }, [source, reset]);
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: SourceFormData) => {
     if (source?.id) {
       updateMutation.mutate({
         id: source.id,
@@ -215,7 +224,7 @@ export default function SourceForm({
               >
                 <MenuItem value="">None (No Proxy)</MenuItem>
                 {Array.isArray(proxiesData?.data) &&
-                  proxiesData.data.map((proxy: any) => (
+                  proxiesData.data.map((proxy: Proxy) => (
                     <MenuItem key={proxy.id} value={proxy.id}>
                       {proxy.name}
                     </MenuItem>

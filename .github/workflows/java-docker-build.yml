@@ -85,6 +85,7 @@ jobs:
           ./gradlew build \
             -Dquarkus.package.type=native \
             -Dquarkus.native.container-build=true \
+            -Dquarkus.native.container-runtime-options=--memory=7g \
             -Dquarkus.container-image.build=true \
             -Dquarkus.container-image.push=true \
             -Dquarkus.container-image.registry=${{ env.REGISTRY }} \
@@ -106,6 +107,7 @@ jobs:
           ./gradlew build \
             -Dquarkus.package.type=native \
             -Dquarkus.native.container-build=true \
+            -Dquarkus.native.container-runtime-options=--memory=7g \
             -Dquarkus.container-image.build=true \
             -Dquarkus.container-image.push=false \
             --no-daemon
