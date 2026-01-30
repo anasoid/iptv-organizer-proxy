@@ -27,7 +27,6 @@ dependencies {
 
     // JSON/YAML Processing
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
-    implementation "org.yaml:snakeyaml:${snakeyamlVersion}"
 
     // Security & JWT
     implementation 'io.quarkus:quarkus-smallrye-jwt'
@@ -67,8 +66,8 @@ dependencies {
         testImplementation 'io.quarkus:quarkus-jacoco'
     }
 
-    // Container image extension for Docker builds
-    implementation 'io.quarkus:quarkus-container-image-docker'
+    // Container image extension for Docker builds (only used during build, not runtime)
+    compileOnly 'io.quarkus:quarkus-container-image-docker'
 }
 
 spotless {
