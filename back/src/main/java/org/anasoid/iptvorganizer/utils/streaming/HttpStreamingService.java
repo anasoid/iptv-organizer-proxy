@@ -14,9 +14,12 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.exceptions.ProxyException;
 import org.anasoid.iptvorganizer.exceptions.StreamingException;
+import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
+import org.anasoid.iptvorganizer.utils.proxy.HttpClientFactory;
 
 @Slf4j
 @ApplicationScoped
@@ -26,20 +29,15 @@ public class HttpStreamingService {
 
   @Inject ObjectMapper objectMapper;
 
-  private final HttpClient httpClient =
-      HttpClient.newBuilder()
-          .connectTimeout(Duration.ofSeconds(30))
-          .followRedirects(HttpClient.Redirect.NORMAL)
-          .build();
+  @Inject HttpClientFactory httpClientFactory;
 
-  private final HttpClient httpClientNoRedirects =
-      HttpClient.newBuilder()
-          .connectTimeout(Duration.ofSeconds(30))
-          .followRedirects(HttpClient.Redirect.NEVER)
-          .build();
-
-  /** Stream HTTP response as InputStream */
+  /** Stream HTTP response as InputStream (backward compatible - no proxy support) */
   public InputStream streamHttp(String url, HttpOptions options) {
+    return streamHttp(url, options, null);
+  }
+
+  /** Stream HTTP response as InputStream with optional proxy support */
+  public InputStream streamHttp(String url, HttpOptions options, Source source) {
     if (options == null) {
       options = new HttpOptions();
     }
@@ -53,7 +51,7 @@ public class HttpStreamingService {
     Exception lastException = null;
     for (int attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        return performHttpRequest(url, finalOptions);
+        return performHttpRequest(url, finalOptions, source);
       } catch (Exception e) {
         lastException = e;
         if (attempt < maxRetries) {
@@ -69,11 +67,32 @@ public class HttpStreamingService {
 
   /** Perform actual HTTP request and return response body as InputStream */
   private InputStream performHttpRequest(String url, HttpOptions options) {
+    return performHttpRequest(url, options, null);
+  }
+
+  /** Perform actual HTTP request with optional proxy support */
+  private InputStream performHttpRequest(String url, HttpOptions options, Source source) {
     try {
-      // Choose client based on followRedirects option (default: follow redirects)
-      HttpClient clientToUse = httpClient;
-      if (options.getFollowRedirects() != null && !options.getFollowRedirects()) {
-        clientToUse = httpClientNoRedirects;
+      // Determine redirect policy
+      boolean followRedirects =
+          options.getFollowRedirects() == null || options.getFollowRedirects();
+
+      // Get HttpClient with proxy configuration if source is provided
+      HttpClient clientToUse;
+      if (source != null) {
+        clientToUse = httpClientFactory.createClient(source, followRedirects);
+      } else {
+        // Backward compatibility: use default client behavior
+        clientToUse =
+            followRedirects
+                ? HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .followRedirects(HttpClient.Redirect.NORMAL)
+                    .build()
+                : HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .followRedirects(HttpClient.Redirect.NEVER)
+                    .build();
       }
 
       HttpRequest.Builder requestBuilder = HttpRequest.newBuilder().uri(new URI(url)).GET();
@@ -100,6 +119,9 @@ public class HttpStreamingService {
 
       log.info("HTTP request successful for: {}, status: {}", url, response.statusCode());
       return response.body();
+    } catch (ProxyException e) {
+      log.error("Proxy error during HTTP request for: {}, error: {}", url, e.getMessage());
+      throw e;
     } catch (IOException | InterruptedException | URISyntaxException e) {
       log.error("HTTP request failed for: {}, error: {}", url, e.getMessage());
       throw new RuntimeException(e);
@@ -119,6 +141,21 @@ public class HttpStreamingService {
    */
   public HttpStreamingResponse streamHttpWithHeaders(
       String url, HttpOptions options, Map<String, String> requestHeaders) {
+    return streamHttpWithHeaders(url, options, requestHeaders, null);
+  }
+
+  /**
+   * Stream HTTP response with request header forwarding and response header capture, with optional
+   * proxy support.
+   *
+   * @param url The URL to stream from
+   * @param options HTTP options (timeout, retries, headers)
+   * @param requestHeaders Headers to forward to upstream (client headers)
+   * @param source The source for proxy configuration (optional)
+   * @return HttpStreamingResponse with status, headers, and body
+   */
+  public HttpStreamingResponse streamHttpWithHeaders(
+      String url, HttpOptions options, Map<String, String> requestHeaders, Source source) {
     if (options == null) {
       options = createHttpOptions();
     }
@@ -132,7 +169,7 @@ public class HttpStreamingService {
     Exception lastException = null;
     for (int attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        return performHttpRequestWithHeaders(url, finalOptions, requestHeaders);
+        return performHttpRequestWithHeaders(url, finalOptions, requestHeaders, source);
       } catch (Exception e) {
         lastException = e;
         if (attempt < maxRetries) {
@@ -156,11 +193,41 @@ public class HttpStreamingService {
    */
   private HttpStreamingResponse performHttpRequestWithHeaders(
       String url, HttpOptions options, Map<String, String> requestHeaders) {
+    return performHttpRequestWithHeaders(url, options, requestHeaders, null);
+  }
+
+  /**
+   * Perform actual HTTP request with request headers and optional proxy support.
+   *
+   * @param url The URL to request
+   * @param options HTTP options
+   * @param requestHeaders Headers to forward
+   * @param source The source for proxy configuration (optional)
+   * @return HttpStreamingResponse with status, headers, and body
+   */
+  private HttpStreamingResponse performHttpRequestWithHeaders(
+      String url, HttpOptions options, Map<String, String> requestHeaders, Source source) {
     try {
-      // Choose client based on followRedirects option (default: follow redirects)
-      HttpClient clientToUse = httpClient;
-      if (options.getFollowRedirects() != null && !options.getFollowRedirects()) {
-        clientToUse = httpClientNoRedirects;
+      // Determine redirect policy
+      boolean followRedirects =
+          options.getFollowRedirects() == null || options.getFollowRedirects();
+
+      // Get HttpClient with proxy configuration if source is provided
+      HttpClient clientToUse;
+      if (source != null) {
+        clientToUse = httpClientFactory.createClient(source, followRedirects);
+      } else {
+        // Backward compatibility: use default client behavior
+        clientToUse =
+            followRedirects
+                ? HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .followRedirects(HttpClient.Redirect.NORMAL)
+                    .build()
+                : HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .followRedirects(HttpClient.Redirect.NEVER)
+                    .build();
       }
 
       HttpRequest.Builder requestBuilder = HttpRequest.newBuilder().uri(new URI(url)).GET();
@@ -201,6 +268,10 @@ public class HttpStreamingService {
           .headers(response.headers().map())
           .body(response.body())
           .build();
+    } catch (ProxyException e) {
+      log.error(
+          "Proxy error during HTTP request with headers for: {}, error: {}", url, e.getMessage());
+      throw e;
     } catch (IOException | InterruptedException | URISyntaxException e) {
       log.error("HTTP request with headers failed for: {}, error: {}", url, e.getMessage());
       throw new RuntimeException(e);
@@ -222,6 +293,19 @@ public class HttpStreamingService {
    * @return JsonStreamResult with lazy Iterator for streaming items
    */
   public JsonStreamResult<Map<?, ?>> streamJsonArray(String url, HttpOptions options) {
+    return streamJsonArray(url, options, null);
+  }
+
+  /**
+   * Stream HTTP response as JSON objects with automatic parsing and optional proxy support.
+   *
+   * @param url The URL to stream from
+   * @param options HTTP options (timeout, retries, headers)
+   * @param source The source for proxy configuration (optional)
+   * @return JsonStreamResult with lazy Iterator for streaming items
+   */
+  public JsonStreamResult<Map<?, ?>> streamJsonArray(
+      String url, HttpOptions options, Source source) {
     if (options == null) {
       options = createHttpOptions();
     }
@@ -230,7 +314,7 @@ public class HttpStreamingService {
 
     try {
       // Fetch HTTP response as InputStream
-      InputStream is = streamHttp(url, options);
+      InputStream is = streamHttp(url, options, source);
 
       // Parse JSON array from InputStream using Iterator-based streaming
       @SuppressWarnings("unchecked")
@@ -255,13 +339,26 @@ public class HttpStreamingService {
    * @throws Exception if fetch or parsing fails
    */
   public Map<String, Object> fetchJsonObject(String url, HttpOptions options) {
+    return fetchJsonObject(url, options, null);
+  }
+
+  /**
+   * Fetch single JSON object from HTTP endpoint with optional proxy support.
+   *
+   * @param url The URL to fetch from
+   * @param options HTTP options (timeout, retries, headers)
+   * @param source The source for proxy configuration (optional)
+   * @return Map containing the JSON object
+   * @throws Exception if fetch or parsing fails
+   */
+  public Map<String, Object> fetchJsonObject(String url, HttpOptions options, Source source) {
     if (options == null) {
       options = createHttpOptions();
     }
 
     log.info("Fetching JSON object from URL: {}", url);
 
-    InputStream is = performHttpRequest(url, options);
+    InputStream is = performHttpRequest(url, options, source);
     try {
       Map<String, Object> result = objectMapper.readValue(is, new TypeReference<>() {});
       log.info("Successfully fetched JSON object from: {}", url);

@@ -230,7 +230,8 @@ public class XtreamUserService {
     // Fetch from upstream
     HttpOptions options = HttpOptions.builder().timeout(30000L).maxRetries(1).build();
 
-    Map<String, Object> authData = httpStreamingService.fetchJsonObject(upstreamUrl, options);
+    Map<String, Object> authData =
+        httpStreamingService.fetchJsonObject(upstreamUrl, options, source);
 
     // Validate structure
     if (!authData.containsKey("user_info") || !authData.containsKey("server_info")) {

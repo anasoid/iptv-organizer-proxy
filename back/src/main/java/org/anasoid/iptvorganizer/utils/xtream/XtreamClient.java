@@ -102,7 +102,7 @@ public class XtreamClient {
             "Fetching %s categories for source: %s", type.getStreamTypeName(), source.getName()));
 
     try {
-      return httpStreamingService.streamJsonArray(url, createDefaultHttpOptions());
+      return httpStreamingService.streamJsonArray(url, createDefaultHttpOptions(), source);
     } catch (Exception ex) {
       log.error(
           String.format(
@@ -127,7 +127,7 @@ public class XtreamClient {
         String.format("Fetching %s for source: %s", type.getStreamTypeName(), source.getName()));
 
     try {
-      return httpStreamingService.streamJsonArray(url, createDefaultHttpOptions());
+      return httpStreamingService.streamJsonArray(url, createDefaultHttpOptions(), source);
     } catch (Exception ex) {
       log.error(
           String.format(
