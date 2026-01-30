@@ -19,16 +19,6 @@ export interface StreamResponse {
 
 type StreamType = 'live' | 'vod' | 'series';
 
-interface StreamsParams {
-  sourceId: number;
-  type: StreamType;
-  page: number;
-  limit: number;
-  categoryId?: number;
-  search?: string;
-  streamId?: number | string;
-}
-
 class StreamsApi {
   /**
    * Get all streams by source and type (paginated)

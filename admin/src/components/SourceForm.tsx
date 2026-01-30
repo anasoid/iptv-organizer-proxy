@@ -67,7 +67,6 @@ export default function SourceForm({
     },
   });
 
-  // eslint-disable-next-line react-hooks/incompatible-library
   const urlValue = watch("url");
 
   // Create mutation
