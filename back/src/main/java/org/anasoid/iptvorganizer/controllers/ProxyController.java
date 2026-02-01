@@ -135,9 +135,9 @@ public class ProxyController {
   private Response streamFromUpstream(
       String upstreamUrl, Client client, Source source, HttpHeaders httpHeaders) {
     try {
-      // Load stream from upstream via HTTP proxy client
+      // Load stream from upstream via HTTP proxy client with forced redirect following
       HttpStreamingResponse streamResponse =
-          streamProxyHttpClient.loadStreamWithProxy(upstreamUrl, client, source, httpHeaders);
+          streamProxyHttpClient.loadStreamWithProxy(upstreamUrl, client, source, httpHeaders, true);
 
       // Check for HTTP errors
       if (streamResponse.getStatusCode() >= 400) {
