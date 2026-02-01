@@ -77,10 +77,10 @@ public class HttpStreamingService {
       boolean followRedirects =
           options.getFollowRedirects() == null || options.getFollowRedirects();
 
-      // Get HttpClient with proxy configuration if source is provided
+      // Get HttpClient with proxy configuration if proxy is configured in options
       HttpClient clientToUse;
-      if (source != null) {
-        clientToUse = httpClientFactory.createClient(source, followRedirects);
+      if (options.getProxy() != null) {
+        clientToUse = httpClientFactory.createClientWithProxy(options.getProxy(), followRedirects);
       } else {
         // Backward compatibility: use default client behavior
         clientToUse =
@@ -212,10 +212,10 @@ public class HttpStreamingService {
       boolean followRedirects =
           options.getFollowRedirects() == null || options.getFollowRedirects();
 
-      // Get HttpClient with proxy configuration if source is provided
+      // Get HttpClient with proxy configuration if proxy is configured in options
       HttpClient clientToUse;
-      if (source != null) {
-        clientToUse = httpClientFactory.createClient(source, followRedirects);
+      if (options.getProxy() != null) {
+        clientToUse = httpClientFactory.createClientWithProxy(options.getProxy(), followRedirects);
       } else {
         // Backward compatibility: use default client behavior
         clientToUse =

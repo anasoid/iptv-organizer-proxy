@@ -105,7 +105,7 @@ public class HttpClientFactory {
    * @param followRedirects Whether to follow HTTP redirects
    * @return Configured HttpClient instance
    */
-  private HttpClient createClientWithProxy(Proxy proxy, boolean followRedirects) {
+  public HttpClient createClientWithProxy(Proxy proxy, boolean followRedirects) {
     try {
       HttpClient.Builder builder = HttpClient.newBuilder();
 

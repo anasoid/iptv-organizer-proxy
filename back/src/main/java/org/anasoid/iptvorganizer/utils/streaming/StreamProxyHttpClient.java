@@ -7,11 +7,13 @@ import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.entity.Client;
+import org.anasoid.iptvorganizer.models.entity.Proxy;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
 import org.anasoid.iptvorganizer.models.http.RedirectCheckResult;
 import org.anasoid.iptvorganizer.services.ClientService;
+import org.anasoid.iptvorganizer.services.ProxyConfigService;
 import org.anasoid.iptvorganizer.services.http.HeaderFilterService;
 
 /**
@@ -32,6 +34,7 @@ public class StreamProxyHttpClient {
   @Inject HttpStreamingService httpStreamingService;
   @Inject HeaderFilterService headerFilterService;
   @Inject ClientService clientService;
+  @Inject ProxyConfigService proxyConfigService;
 
   /**
    * Load stream from upstream URL via proxy with header forwarding and redirect following
@@ -54,7 +57,7 @@ public class StreamProxyHttpClient {
     // Extract and filter client headers to forward
     Map<String, String> requestHeaders = headerFilterService.filterRequestHeaders(httpHeaders);
 
-    // Build HTTP options with redirect following based on client/source config
+    // Build HTTP options with redirect following and proxy config based on client/source config
     HttpOptions options = buildHttpOptions(client, source);
 
     // Stream content from upstream with header forwarding
@@ -165,12 +168,19 @@ public class StreamProxyHttpClient {
     // Resolve followRedirects setting: client -> source -> default false
     boolean followRedirects = clientService.resolveStreamFollowLocation(client, source);
 
-    log.debug("HTTP proxy options - followRedirects: {}", followRedirects);
+    // Get proxy configuration from source
+    Proxy proxy = proxyConfigService.getProxyConfig(source);
+
+    log.debug(
+        "HTTP proxy options - followRedirects: {}, proxy configured: {}",
+        followRedirects,
+        proxy != null);
 
     return HttpOptions.builder()
         .timeout(30000L)
         .maxRetries(1)
         .followRedirects(followRedirects)
+        .proxy(proxy)
         .build();
   }
 }
