@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   DialogTitle,
   DialogContent,
@@ -22,20 +22,81 @@ interface ProxyFormProps {
   onCancel: () => void;
 }
 
+// Helper function to extract proxy type from URL
+function detectProxyTypeFromUrl(url: string): 'HTTP' | 'HTTPS' | 'SOCKS5' | '' {
+  if (!url) return '';
+  const urlLower = url.toLowerCase();
+  if (urlLower.startsWith('socks5://')) return 'SOCKS5';
+  if (urlLower.startsWith('https://')) return 'HTTPS';
+  if (urlLower.startsWith('http://')) return 'HTTP';
+  return '';
+}
+
+// Helper function to get property value (handles both camelCase and snake_case)
+function getProperty(obj: any, camelCase: string, snakeCase: string): any {
+  return obj?.[camelCase] ?? obj?.[snakeCase] ?? undefined;
+}
+
 export default function ProxyForm({ proxy, onSuccess, onCancel }: ProxyFormProps) {
-  const [name, setName] = useState(proxy?.name || '');
-  const [description, setDescription] = useState(proxy?.description || '');
-  const [proxyUrl, setProxyUrl] = useState(proxy?.proxy_url || '');
-  const [proxyHost, setProxyHost] = useState(proxy?.proxy_host || '');
-  const [proxyPort, setProxyPort] = useState(proxy?.proxy_port?.toString() || '');
-  const [proxyType, setProxyType] = useState<'HTTP' | 'HTTPS' | 'SOCKS5' | ''>(
-    proxy?.proxy_type || ''
-  );
-  const [proxyUsername, setProxyUsername] = useState(proxy?.proxy_username || '');
-  const [proxyPassword, setProxyPassword] = useState(proxy?.proxy_password || '');
-  const [timeout, setTimeout] = useState(proxy?.timeout?.toString() || '');
-  const [maxRetries, setMaxRetries] = useState(proxy?.max_retries?.toString() || '');
+  // Initialize with empty state - will be populated by useEffect
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [proxyUrl, setProxyUrl] = useState('');
+  const [proxyHost, setProxyHost] = useState('');
+  const [proxyPort, setProxyPort] = useState('');
+  const [proxyType, setProxyType] = useState<'HTTP' | 'HTTPS' | 'SOCKS5' | ''>('');
+  const [proxyUsername, setProxyUsername] = useState('');
+  const [proxyPassword, setProxyPassword] = useState('');
+  const [timeout, setTimeout] = useState('');
+  const [maxRetries, setMaxRetries] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // Update form when proxy prop changes (for edit mode)
+  useEffect(() => {
+    if (proxy) {
+      const nameVal = getProperty(proxy, 'name', 'name');
+      const descVal = getProperty(proxy, 'description', 'description');
+      const urlVal = getProperty(proxy, 'proxyUrl', 'proxy_url');
+      const hostVal = getProperty(proxy, 'proxyHost', 'proxy_host');
+      const portVal = getProperty(proxy, 'proxyPort', 'proxy_port');
+      const typeVal = getProperty(proxy, 'proxyType', 'proxy_type');
+      const usernameVal = getProperty(proxy, 'proxyUsername', 'proxy_username');
+      const passwordVal = getProperty(proxy, 'proxyPassword', 'proxy_password');
+      const timeoutVal = getProperty(proxy, 'timeout', 'timeout');
+      const retriesVal = getProperty(proxy, 'maxRetries', 'max_retries');
+
+      setName(nameVal || '');
+      setDescription(descVal || '');
+      setProxyUrl(urlVal || '');
+      setProxyHost(hostVal || '');
+      setProxyPort(portVal ? String(portVal) : '');
+      setProxyType(detectProxyTypeFromUrl(urlVal || '') || typeVal || '');
+      setProxyUsername(usernameVal || '');
+      setProxyPassword(passwordVal || '');
+      setTimeout(timeoutVal ? String(timeoutVal) : '');
+      setMaxRetries(retriesVal ? String(retriesVal) : '');
+    } else {
+      // Clear form for create mode
+      setName('');
+      setDescription('');
+      setProxyUrl('');
+      setProxyHost('');
+      setProxyPort('');
+      setProxyType('');
+      setProxyUsername('');
+      setProxyPassword('');
+      setTimeout('');
+      setMaxRetries('');
+    }
+  }, [proxy]);
+
+  // Auto-detect proxy type when proxyUrl changes
+  useEffect(() => {
+    const detectedType = detectProxyTypeFromUrl(proxyUrl);
+    if (detectedType) {
+      setProxyType(detectedType);
+    }
+  }, [proxyUrl]);
 
   const createMutation = useMutation({
     mutationFn: (data: Parameters<typeof proxiesApi.createProxy>[0]) =>
@@ -66,6 +127,20 @@ export default function ProxyForm({ proxy, onSuccess, onCancel }: ProxyFormProps
       return;
     }
 
+    const hasProxyUrl = proxyUrl.trim();
+    const hasProxyHost = proxyHost.trim();
+
+    // Validate that either proxyUrl or proxyHost is provided, but not both
+    if (!hasProxyUrl && !hasProxyHost) {
+      setError('Either Proxy URL or Proxy Host must be provided');
+      return;
+    }
+
+    if (hasProxyUrl && hasProxyHost) {
+      setError('Cannot use both Proxy URL and Proxy Host/Port. Choose one configuration method.');
+      return;
+    }
+
     // Validate port if provided
     if (proxyPort && (isNaN(Number(proxyPort)) || Number(proxyPort) < 1 || Number(proxyPort) > 65535)) {
       setError('Port must be a number between 1 and 65535');
@@ -84,23 +159,19 @@ export default function ProxyForm({ proxy, onSuccess, onCancel }: ProxyFormProps
       return;
     }
 
-    // Validate that either proxyUrl or proxyHost is provided
-    if (!proxyUrl.trim() && !proxyHost.trim()) {
-      setError('Either Proxy URL or Proxy Host must be provided');
-      return;
-    }
-
     setError(null);
 
+    // Build proxy data
+    // Note: Server checks "if != null" so we must send actual values (including empty string) not null
     const proxyData = {
       name: name.trim(),
       description: description.trim() || null,
-      proxyUrl: proxyUrl.trim() || null,
-      proxyHost: proxyHost.trim() || null,
+      proxyUrl: proxyUrl.trim(),  // Send empty string to clear, null to skip update
+      proxyHost: proxyHost.trim(),  // Send empty string to clear, null to skip update
       proxyPort: proxyPort ? Number(proxyPort) : null,
       proxyType: proxyType || null,
-      proxyUsername: proxyUsername.trim() || null,
-      proxyPassword: proxyPassword.trim() || null,
+      proxyUsername: proxyUsername.trim(),  // Send empty string to clear
+      proxyPassword: proxyPassword.trim(),  // Send empty string to clear
       timeout: timeout ? Number(timeout) : null,
       maxRetries: maxRetries ? Number(maxRetries) : null,
     };
