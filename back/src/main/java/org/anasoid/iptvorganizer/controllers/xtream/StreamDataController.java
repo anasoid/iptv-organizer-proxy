@@ -17,6 +17,7 @@ import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
+import org.anasoid.iptvorganizer.models.enums.ConnectXtreamStreamMode;
 import org.anasoid.iptvorganizer.models.http.RedirectCheckResult;
 import org.anasoid.iptvorganizer.services.ClientService;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
@@ -173,17 +174,15 @@ public class StreamDataController {
 
   private Response getStream(
       Client client, Source source, String streamUrl, UriInfo uriInfo, HttpHeaders httpHeaders) {
-    boolean disableStreamProxy = clientService.resolveDisableStreamProxy(client, source);
-    boolean useRedirect = clientService.resolveUseRedirect(client, source);
+    ConnectXtreamStreamMode streamMode = clientService.resolveConnectXtreamStream(client, source);
 
-    // Case 1: disableStreamProxy=true AND useRedirect=false
-    // Hide credentials by checking for upstream redirect
-    if (disableStreamProxy) {
-      if (useRedirect) {
-
+    switch (streamMode) {
+      case REDIRECT:
+        log.info("Redirect mode - sending 302 redirect to upstream");
         return Response.seeOther(URI.create(streamUrl)).build();
-      } else {
 
+      case DIRECT:
+        log.info("Direct mode - checking for upstream redirect to hide credentials");
         RedirectCheckResult redirectCheck =
             streamProxyHttpClient.checkForRedirect(streamUrl, client, source, httpHeaders);
         if (redirectCheck.isError()) {
@@ -204,15 +203,37 @@ public class StreamDataController {
               .entity("Upstream does not provide credential-free redirect")
               .build();
         }
-      }
+
+      case PROXY:
+        log.info("Proxy mode - encoding URL and redirecting to proxy");
+        String encodedUrl = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
+        String proxyUrl =
+            buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrl);
+        return Response.seeOther(URI.create(proxyUrl)).build();
+
+      case TUNNEL:
+        log.info("Tunnel mode - using application-level tunneling");
+        // TODO: Implement tunnel mode
+        // For now, fall back to proxy mode
+        String encodedUrlTunnel = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
+        String proxyUrlTunnel =
+            buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrlTunnel);
+        return Response.seeOther(URI.create(proxyUrlTunnel)).build();
+
+      case DEFAULT:
+        // Should not happen - default should be resolved by service
+        log.warn("Unexpected DEFAULT mode in getStream");
+        String encodedUrlDefault = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
+        String proxyUrlDefault =
+            buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrlDefault);
+        return Response.seeOther(URI.create(proxyUrlDefault)).build();
+
+      default:
+        log.warn("Unknown stream mode: {}", streamMode);
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+            .entity("Unknown stream mode")
+            .build();
     }
-    // Case 3: disableStreamProxy=false
-    // Use proxy mode - encode URL and redirect to /proxy endpoint
-    log.info("Proxy mode - encoding URL and redirecting to proxy");
-    String encodedUrl = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
-    String proxyUrl =
-        buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrl);
-    return Response.seeOther(URI.create(proxyUrl)).build();
   }
 
   /**

@@ -15,6 +15,7 @@ import java.net.URI;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.enums.ConnectXmltvMode;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
@@ -67,23 +68,37 @@ public class XmltvController {
 
     log.info("XMLTV request from client: {}", username);
 
-    // Check useRedirectXmltv setting with priority: client -> source -> environment
-    boolean useRedirectXmltv = clientService.resolveUseRedirectXmltv(client, source);
-    log.info(
-        "useRedirectXmltv for XMLTV: {} (client: {}, source: {})",
-        useRedirectXmltv,
-        client.getUseRedirectXmltv(),
-        source.getUseRedirectXmltv());
+    // Resolve XMLTV connection mode
+    ConnectXmltvMode xmltvMode = clientService.resolveConnectXmltv(client, source);
+    log.info("XMLTV connection mode: {}", xmltvMode);
 
-    // If useRedirectXmltv is enabled, return direct 302 redirect to XMLTV URL
-    if (useRedirectXmltv) {
-      String xmltvUrl = buildXmltvUrl(source);
-      log.info("useRedirectXmltv enabled, returning direct 302 redirect to: {}", xmltvUrl);
-      return Response.seeOther(URI.create(xmltvUrl)).build();
+    switch (xmltvMode) {
+      case REDIRECT:
+        String xmltvUrl = buildXmltvUrl(source);
+        log.info("REDIRECT mode - returning direct 302 redirect to: {}", xmltvUrl);
+        return Response.seeOther(URI.create(xmltvUrl)).build();
+
+      case PROXY:
+        log.info("PROXY mode - streaming XMLTV data from source");
+        return streamXmltvData(source, client);
+
+      case TUNNEL:
+        log.info("TUNNEL mode - using application-level tunneling for XMLTV");
+        // TODO: Implement tunnel mode for XMLTV
+        // For now, fall back to PROXY mode
+        return streamXmltvData(source, client);
+
+      case DEFAULT:
+        // Should not happen - default should be resolved by service
+        log.warn("Unexpected DEFAULT mode in getXmltv");
+        return streamXmltvData(source, client);
+
+      default:
+        log.warn("Unknown XMLTV mode: {}", xmltvMode);
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+            .entity("Unknown XMLTV mode")
+            .build();
     }
-
-    // Stream XMLTV data from source
-    return streamXmltvData(source, client);
   }
 
   /**

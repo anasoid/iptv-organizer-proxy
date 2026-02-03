@@ -5,14 +5,16 @@ import jakarta.inject.Inject;
 import java.util.List;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.enums.ClientConnectXmltvMode;
+import org.anasoid.iptvorganizer.models.enums.ClientConnectXtreamApiMode;
+import org.anasoid.iptvorganizer.models.enums.ClientConnectXtreamStreamMode;
+import org.anasoid.iptvorganizer.models.enums.ConnectXmltvMode;
+import org.anasoid.iptvorganizer.models.enums.ConnectXtreamApiMode;
+import org.anasoid.iptvorganizer.models.enums.ConnectXtreamStreamMode;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 
 @ApplicationScoped
 public class ClientService extends BaseService<Client, ClientRepository> {
-
-  // Environment variable names
-  private static final String ENV_STREAM_USE_REDIRECT = "STREAM_USE_REDIRECT";
-  private static final String ENV_STREAM_USE_REDIRECT_XMLTV = "STREAM_USE_REDIRECT_XMLTV";
 
   @Inject ClientRepository repository;
 
@@ -49,81 +51,81 @@ public class ClientService extends BaseService<Client, ClientRepository> {
   }
 
   /**
-   * Check if client has useRedirect configuration
-   *
-   * @param client The client
-   * @return true if useRedirect is explicitly set (not null)
-   */
-  public boolean hasUseRedirectConfig(Client client) {
-    return client != null && client.getUseRedirect() != null;
-  }
-
-  /**
-   * Check if client has useRedirectXmltv configuration
-   *
-   * @param client The client
-   * @return true if useRedirectXmltv is explicitly set (not null)
-   */
-  public boolean hasUseRedirectXmltvConfig(Client client) {
-    return client != null && client.getUseRedirectXmltv() != null;
-  }
-
-  /**
-   * Resolve useRedirect setting with priority: client -> source -> environment variable Uses
-   * STREAM_USE_REDIRECT environment variable
+   * Resolve connectXtreamApi setting with priority: client -> source -> default
    *
    * @param client The client
    * @param source The source
-   * @return true if redirect should be used
+   * @return Resolved ConnectXtreamApiMode
    */
-  public boolean resolveUseRedirect(Client client, Source source) {
-    // Priority 1: Client-level setting
-    if (hasUseRedirectConfig(client)) {
-      return client.getUseRedirect();
+  public ConnectXtreamApiMode resolveConnectXtreamApi(Client client, Source source) {
+    // Priority 1: Client-level setting (if not INHERITED)
+    if (client != null
+        && client.getConnectXtreamApi() != null
+        && client.getConnectXtreamApi() != ClientConnectXtreamApiMode.INHERITED) {
+      return client.getConnectXtreamApi().toSourceMode().resolve();
     }
 
     // Priority 2: Source-level setting
-    if (source != null && source.getUseRedirect() != null) {
-      return source.getUseRedirect();
+    if (source != null && source.getConnectXtreamApi() != null) {
+      return source.getConnectXtreamApi().resolve();
     }
 
-    // Priority 3: Environment variable
-    String envValue = System.getenv(ENV_STREAM_USE_REDIRECT);
-    if (envValue != null) {
-      return Boolean.parseBoolean(envValue);
-    }
-
-    // Default: false (use proxy)
-    return false;
+    // Default
+    return ConnectXtreamApiMode.DEFAULT.resolve();
   }
 
   /**
-   * Resolve useRedirectXmltv setting with priority: client -> source -> environment variable Uses
-   * STREAM_USE_REDIRECT_XMLTV environment variable
+   * Resolve connectXtreamStream setting with priority: client -> source -> inherit from API
    *
    * @param client The client
    * @param source The source
-   * @return true if redirect should be used for XMLTV
+   * @return Resolved ConnectXtreamStreamMode
    */
-  public boolean resolveUseRedirectXmltv(Client client, Source source) {
-    // Priority 1: Client-level setting
-    if (hasUseRedirectXmltvConfig(client)) {
-      return client.getUseRedirectXmltv();
+  public ConnectXtreamStreamMode resolveConnectXtreamStream(Client client, Source source) {
+    // Get resolved API mode for DEFAULT resolution
+    ConnectXtreamApiMode resolvedApiMode = resolveConnectXtreamApi(client, source);
+
+    // Priority 1: Client-level setting (if not INHERITED)
+    if (client != null
+        && client.getConnectXtreamStream() != null
+        && client.getConnectXtreamStream() != ClientConnectXtreamStreamMode.INHERITED) {
+      return client.getConnectXtreamStream().toSourceMode().resolve(resolvedApiMode);
     }
 
     // Priority 2: Source-level setting
-    if (source != null && source.getUseRedirectXmltv() != null) {
-      return source.getUseRedirectXmltv();
+    if (source != null && source.getConnectXtreamStream() != null) {
+      return source.getConnectXtreamStream().resolve(resolvedApiMode);
     }
 
-    // Priority 3: Environment variable
-    String envValue = System.getenv(ENV_STREAM_USE_REDIRECT_XMLTV);
-    if (envValue != null) {
-      return Boolean.parseBoolean(envValue);
+    // Default: resolve to API mode
+    return ConnectXtreamStreamMode.DEFAULT.resolve(resolvedApiMode);
+  }
+
+  /**
+   * Resolve connectXmltv setting with priority: client -> source -> inherit from stream
+   *
+   * @param client The client
+   * @param source The source
+   * @return Resolved ConnectXmltvMode
+   */
+  public ConnectXmltvMode resolveConnectXmltv(Client client, Source source) {
+    // Get resolved stream mode for DEFAULT resolution
+    ConnectXtreamStreamMode resolvedStreamMode = resolveConnectXtreamStream(client, source);
+
+    // Priority 1: Client-level setting (if not INHERITED)
+    if (client != null
+        && client.getConnectXmltv() != null
+        && client.getConnectXmltv() != ClientConnectXmltvMode.INHERITED) {
+      return client.getConnectXmltv().toSourceMode().resolve(resolvedStreamMode);
     }
 
-    // Default: false (stream content)
-    return false;
+    // Priority 2: Source-level setting
+    if (source != null && source.getConnectXmltv() != null) {
+      return source.getConnectXmltv().resolve(resolvedStreamMode);
+    }
+
+    // Default: resolve to stream mode
+    return ConnectXmltvMode.DEFAULT.resolve(resolvedStreamMode);
   }
 
   /**
@@ -158,72 +160,6 @@ public class ClientService extends BaseService<Client, ClientRepository> {
     // Only client-level setting exists
     if (client != null && client.getHideAdultContent() != null) {
       return client.getHideAdultContent();
-    }
-
-    // Default: false
-    return false;
-  }
-
-  /**
-   * Resolve enableProxy setting with priority: client -> source. Default: true
-   *
-   * @param client The client
-   * @param source The source
-   * @return true if proxy should be enabled
-   */
-  public boolean resolveEnableProxy(Client client, Source source) {
-    // Priority 1: Client-level setting
-    if (client != null && client.getEnableProxy() != null) {
-      return client.getEnableProxy();
-    }
-
-    // Priority 2: Source-level setting
-    if (source != null && source.getEnableProxy() != null) {
-      return source.getEnableProxy();
-    }
-
-    // Default: true
-    return true;
-  }
-
-  /**
-   * Resolve disableStreamProxy setting with priority: client -> source. Default: false
-   *
-   * @param client The client
-   * @param source The source
-   * @return true if stream proxy should be disabled
-   */
-  public boolean resolveDisableStreamProxy(Client client, Source source) {
-    // Priority 1: Client-level setting
-    if (client != null && client.getDisableStreamProxy() != null) {
-      return client.getDisableStreamProxy();
-    }
-
-    // Priority 2: Source-level setting
-    if (source != null && source.getDisableStreamProxy() != null) {
-      return source.getDisableStreamProxy();
-    }
-
-    // Default: false
-    return false;
-  }
-
-  /**
-   * Resolve streamFollowLocation setting with priority: client -> source. Default: false
-   *
-   * @param client The client
-   * @param source The source
-   * @return true if HTTP redirect following should be enabled for streams
-   */
-  public boolean resolveStreamFollowLocation(Client client, Source source) {
-    // Priority 1: Client-level setting
-    if (client != null && client.getStreamFollowLocation() != null) {
-      return client.getStreamFollowLocation();
-    }
-
-    // Priority 2: Source-level setting
-    if (source != null && source.getStreamFollowLocation() != null) {
-      return source.getStreamFollowLocation();
     }
 
     // Default: false

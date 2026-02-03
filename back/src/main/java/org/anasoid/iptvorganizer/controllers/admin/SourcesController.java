@@ -96,14 +96,16 @@ public class SourcesController extends BaseController {
     if (request.getIsActive() == null) {
       request.setIsActive(true);
     }
-    if (request.getEnableProxy() == null) {
-      request.setEnableProxy(false);
+    if (request.getConnectXtreamApi() == null) {
+      request.setConnectXtreamApi(
+          org.anasoid.iptvorganizer.models.enums.ConnectXtreamApiMode.DEFAULT);
     }
-    if (request.getDisableStreamProxy() == null) {
-      request.setDisableStreamProxy(false);
+    if (request.getConnectXtreamStream() == null) {
+      request.setConnectXtreamStream(
+          org.anasoid.iptvorganizer.models.enums.ConnectXtreamStreamMode.DEFAULT);
     }
-    if (request.getStreamFollowLocation() == null) {
-      request.setStreamFollowLocation(false);
+    if (request.getConnectXmltv() == null) {
+      request.setConnectXmltv(org.anasoid.iptvorganizer.models.enums.ConnectXmltvMode.DEFAULT);
     }
     request.setCreatedAt(LocalDateTime.now());
     request.setUpdatedAt(LocalDateTime.now());
@@ -142,21 +144,14 @@ public class SourcesController extends BaseController {
     }
     // Set proxyId (can be null to remove proxy assignment)
     source.setProxyId(request.getProxyId());
-    if (request.getEnableProxy() != null) {
-      source.setEnableProxy(request.getEnableProxy());
+    if (request.getConnectXtreamApi() != null) {
+      source.setConnectXtreamApi(request.getConnectXtreamApi());
     }
-    if (request.getDisableStreamProxy() != null) {
-      source.setDisableStreamProxy(request.getDisableStreamProxy());
+    if (request.getConnectXtreamStream() != null) {
+      source.setConnectXtreamStream(request.getConnectXtreamStream());
     }
-    if (request.getStreamFollowLocation() != null) {
-      source.setStreamFollowLocation(request.getStreamFollowLocation());
-    }
-    // Allow setting to null for optional redirect settings
-    if (request.getUseRedirect() != null) {
-      source.setUseRedirect(request.getUseRedirect());
-    }
-    if (request.getUseRedirectXmltv() != null) {
-      source.setUseRedirectXmltv(request.getUseRedirectXmltv());
+    if (request.getConnectXmltv() != null) {
+      source.setConnectXmltv(request.getConnectXmltv());
     }
 
     source.setUpdatedAt(LocalDateTime.now());

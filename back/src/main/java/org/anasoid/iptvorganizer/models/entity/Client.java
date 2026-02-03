@@ -4,6 +4,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.anasoid.iptvorganizer.models.enums.ClientConnectXmltvMode;
+import org.anasoid.iptvorganizer.models.enums.ClientConnectXtreamApiMode;
+import org.anasoid.iptvorganizer.models.enums.ClientConnectXtreamStreamMode;
 
 @Data
 @NoArgsConstructor
@@ -20,11 +23,9 @@ public class Client extends BaseEntity {
   private LocalDate expiryDate;
   private Boolean isActive;
   private Boolean hideAdultContent;
-  private Boolean useRedirect;
-  private Boolean useRedirectXmltv;
-  private Boolean enableProxy;
-  private Boolean disableStreamProxy;
-  private Boolean streamFollowLocation;
   private String notes;
   private LocalDateTime lastLogin;
+  private ClientConnectXtreamApiMode connectXtreamApi;
+  private ClientConnectXtreamStreamMode connectXtreamStream;
+  private ClientConnectXmltvMode connectXmltv;
 }

@@ -6,6 +6,9 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import org.anasoid.iptvorganizer.models.enums.ConnectXmltvMode;
+import org.anasoid.iptvorganizer.models.enums.ConnectXtreamApiMode;
+import org.anasoid.iptvorganizer.models.enums.ConnectXtreamStreamMode;
 
 @Data
 @NoArgsConstructor
@@ -22,9 +25,7 @@ public class Source extends BaseEntity {
   private LocalDateTime nextSync;
   private Boolean isActive;
   private Long proxyId;
-  private Boolean enableProxy;
-  private Boolean disableStreamProxy;
-  private Boolean streamFollowLocation;
-  private Boolean useRedirect;
-  private Boolean useRedirectXmltv;
+  private ConnectXtreamApiMode connectXtreamApi;
+  private ConnectXtreamStreamMode connectXtreamStream;
+  private ConnectXmltvMode connectXmltv;
 }

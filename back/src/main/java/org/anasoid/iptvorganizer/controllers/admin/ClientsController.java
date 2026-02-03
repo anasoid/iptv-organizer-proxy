@@ -119,15 +119,12 @@ public class ClientsController extends BaseController {
     if (request.getIsActive() != null) client.setIsActive(request.getIsActive());
     if (request.getHideAdultContent() != null)
       client.setHideAdultContent(request.getHideAdultContent());
-    // Allow setting to null for optional redirect/proxy settings
-    if (request.getUseRedirect() != null) client.setUseRedirect(request.getUseRedirect());
-    if (request.getUseRedirectXmltv() != null)
-      client.setUseRedirectXmltv(request.getUseRedirectXmltv());
-    if (request.getEnableProxy() != null) client.setEnableProxy(request.getEnableProxy());
-    if (request.getDisableStreamProxy() != null)
-      client.setDisableStreamProxy(request.getDisableStreamProxy());
-    if (request.getStreamFollowLocation() != null)
-      client.setStreamFollowLocation(request.getStreamFollowLocation());
+    // Allow setting to null for optional enum settings
+    if (request.getConnectXtreamApi() != null)
+      client.setConnectXtreamApi(request.getConnectXtreamApi());
+    if (request.getConnectXtreamStream() != null)
+      client.setConnectXtreamStream(request.getConnectXtreamStream());
+    if (request.getConnectXmltv() != null) client.setConnectXmltv(request.getConnectXmltv());
     if (request.getNotes() != null) client.setNotes(request.getNotes());
     client.setUpdatedAt(LocalDateTime.now());
 

@@ -9,9 +9,9 @@ import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.repositories.ProxyRepository;
 
 /**
- * Service for loading proxy configuration from a Source entity. Resolution order: 1. Check if proxy
- * is explicitly disabled via enableProxy flag 2. Try to load proxy from database using Source's
- * proxyId 3. Fall back to environment variables (one per proxy attribute)
+ * Service for loading proxy configuration from a Source entity. Resolution order: 1. Try to load
+ * proxy from database using Source's proxyId 2. Fall back to environment variables (one per proxy
+ * attribute)
  */
 @ApplicationScoped
 public class ProxyConfigService {
@@ -23,20 +23,13 @@ public class ProxyConfigService {
   /**
    * Get proxy configuration for a given source.
    *
-   * <p>Resolution logic: 1. If source.enableProxy is false, returns null 2. If source.proxyId is
-   * set, attempts to load from database 3. Falls back to environment variables (one per proxy
-   * attribute) 4. Returns null if no configuration is found
+   * <p>Resolution logic: 1. If source.proxyId is set, attempts to load from database 2. Falls back
+   * to environment variables (one per proxy attribute) 3. Returns null if no configuration is found
    *
    * @param source the Source entity to resolve proxy for
    * @return Proxy object from database or environment variables, or null if no proxy is configured
    */
   public Proxy getProxyConfig(Source source) {
-
-    // If enableProxy is explicitly false, return null (proxy disabled)
-    if (source.getEnableProxy() != null && !source.getEnableProxy()) {
-      return null;
-    }
-
     // Try to load proxy from database if proxyId is set
     if (source.getProxyId() != null) {
       Proxy proxy = proxyRepository.findById(source.getProxyId());

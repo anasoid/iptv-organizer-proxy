@@ -10,6 +10,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.enums.ConnectXmltvMode;
+import org.anasoid.iptvorganizer.models.enums.ConnectXtreamApiMode;
+import org.anasoid.iptvorganizer.models.enums.ConnectXtreamStreamMode;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
 @ApplicationScoped
@@ -42,7 +45,7 @@ public class SourceRepository extends BaseRepository<Source> {
   @Override
   public Long insert(Source source) {
     String sql =
-        "INSERT INTO sources (name, url, username, password, sync_interval, is_active, proxy_id, enableproxy, disablestreamproxy, stream_follow_location, use_redirect, use_redirect_xmltv) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO sources (name, url, username, password, sync_interval, is_active, proxy_id, connect_xtream_api, connect_xtream_stream, connect_xmltv) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setString(1, source.getName());
@@ -52,11 +55,16 @@ public class SourceRepository extends BaseRepository<Source> {
       stmt.setInt(5, source.getSyncInterval());
       stmt.setBoolean(6, source.getIsActive());
       stmt.setObject(7, source.getProxyId());
-      stmt.setBoolean(8, source.getEnableProxy());
-      stmt.setBoolean(9, source.getDisableStreamProxy());
-      stmt.setBoolean(10, source.getStreamFollowLocation());
-      stmt.setObject(11, source.getUseRedirect());
-      stmt.setObject(12, source.getUseRedirectXmltv());
+      stmt.setString(
+          8,
+          source.getConnectXtreamApi() != null ? source.getConnectXtreamApi().name() : "DEFAULT");
+      stmt.setString(
+          9,
+          source.getConnectXtreamStream() != null
+              ? source.getConnectXtreamStream().name()
+              : "DEFAULT");
+      stmt.setString(
+          10, source.getConnectXmltv() != null ? source.getConnectXmltv().name() : "DEFAULT");
       stmt.executeUpdate();
 
       // Get generated key using standard JDBC approach - works with MySQL, H2, SQLite
@@ -76,7 +84,7 @@ public class SourceRepository extends BaseRepository<Source> {
   @Override
   public void update(Source source) {
     String sql =
-        "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, proxy_id = ?, enableproxy = ?, disablestreamproxy = ?, stream_follow_location = ?, use_redirect = ?, use_redirect_xmltv = ? WHERE id = ?";
+        "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, proxy_id = ?, connect_xtream_api = ?, connect_xtream_stream = ?, connect_xmltv = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setString(1, source.getName());
@@ -88,12 +96,17 @@ public class SourceRepository extends BaseRepository<Source> {
       stmt.setObject(7, source.getNextSync());
       stmt.setBoolean(8, source.getIsActive());
       stmt.setObject(9, source.getProxyId());
-      stmt.setBoolean(10, source.getEnableProxy());
-      stmt.setBoolean(11, source.getDisableStreamProxy());
-      stmt.setBoolean(12, source.getStreamFollowLocation());
-      stmt.setObject(13, source.getUseRedirect());
-      stmt.setObject(14, source.getUseRedirectXmltv());
-      stmt.setLong(15, source.getId());
+      stmt.setString(
+          10,
+          source.getConnectXtreamApi() != null ? source.getConnectXtreamApi().name() : "DEFAULT");
+      stmt.setString(
+          11,
+          source.getConnectXtreamStream() != null
+              ? source.getConnectXtreamStream().name()
+              : "DEFAULT");
+      stmt.setString(
+          12, source.getConnectXmltv() != null ? source.getConnectXmltv().name() : "DEFAULT");
+      stmt.setLong(13, source.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update source", e);
@@ -113,6 +126,37 @@ public class SourceRepository extends BaseRepository<Source> {
       }
     }
 
+    // Parse enum fields
+    ConnectXtreamApiMode connectXtreamApi = null;
+    String apiModeStr = rs.getString("connect_xtream_api");
+    if (apiModeStr != null) {
+      try {
+        connectXtreamApi = ConnectXtreamApiMode.valueOf(apiModeStr);
+      } catch (IllegalArgumentException e) {
+        connectXtreamApi = ConnectXtreamApiMode.DEFAULT;
+      }
+    }
+
+    ConnectXtreamStreamMode connectXtreamStream = null;
+    String streamModeStr = rs.getString("connect_xtream_stream");
+    if (streamModeStr != null) {
+      try {
+        connectXtreamStream = ConnectXtreamStreamMode.valueOf(streamModeStr);
+      } catch (IllegalArgumentException e) {
+        connectXtreamStream = ConnectXtreamStreamMode.DEFAULT;
+      }
+    }
+
+    ConnectXmltvMode connectXmltv = null;
+    String xmltvModeStr = rs.getString("connect_xmltv");
+    if (xmltvModeStr != null) {
+      try {
+        connectXmltv = ConnectXmltvMode.valueOf(xmltvModeStr);
+      } catch (IllegalArgumentException e) {
+        connectXmltv = ConnectXmltvMode.DEFAULT;
+      }
+    }
+
     return Source.builder()
         .id(rs.getLong("id"))
         .name(rs.getString("name"))
@@ -124,11 +168,9 @@ public class SourceRepository extends BaseRepository<Source> {
         .nextSync(rs.getObject("next_sync", LocalDateTime.class))
         .isActive(rs.getBoolean("is_active"))
         .proxyId(proxyId)
-        .enableProxy(rs.getBoolean("enableproxy"))
-        .disableStreamProxy(rs.getBoolean("disablestreamproxy"))
-        .streamFollowLocation(rs.getBoolean("stream_follow_location"))
-        .useRedirect(rs.getObject("use_redirect", Boolean.class))
-        .useRedirectXmltv(rs.getObject("use_redirect_xmltv", Boolean.class))
+        .connectXtreamApi(connectXtreamApi)
+        .connectXtreamStream(connectXtreamStream)
+        .connectXmltv(connectXmltv)
         .createdAt(rs.getObject("created_at", LocalDateTime.class))
         .updatedAt(rs.getObject("updated_at", LocalDateTime.class))
         .build();
