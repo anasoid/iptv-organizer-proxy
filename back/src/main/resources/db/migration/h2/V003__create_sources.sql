@@ -13,6 +13,11 @@ CREATE TABLE IF NOT EXISTS sources (
     stream_follow_location BOOLEAN NOT NULL DEFAULT TRUE,
     use_redirect BOOLEAN,
     use_redirect_xmltv BOOLEAN,
+    enable_proxy BOOLEAN,
+    enable_tunnel BOOLEAN,
+    connect_xtream_api VARCHAR(20) NOT NULL DEFAULT 'DEFAULT',
+    connect_xtream_stream VARCHAR(20) NOT NULL DEFAULT 'DEFAULT',
+    connect_xmltv VARCHAR(20) NOT NULL DEFAULT 'DEFAULT',
     proxy_id INT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

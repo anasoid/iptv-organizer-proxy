@@ -13,6 +13,11 @@ CREATE TABLE IF NOT EXISTS sources (
     stream_follow_location INTEGER NOT NULL DEFAULT 1 CHECK(stream_follow_location IN (0, 1)),
     use_redirect INTEGER,
     use_redirect_xmltv INTEGER,
+    enable_proxy INTEGER,
+    enable_tunnel INTEGER,
+    connect_xtream_api TEXT DEFAULT 'DEFAULT',
+    connect_xtream_stream TEXT DEFAULT 'DEFAULT',
+    connect_xmltv TEXT DEFAULT 'DEFAULT',
     proxy_id INTEGER REFERENCES proxies(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

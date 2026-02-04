@@ -1,33 +1,3 @@
--- Add new proxy control boolean columns to sources table
-ALTER TABLE sources
-ADD COLUMN enable_proxy BOOLEAN;
-
-ALTER TABLE sources
-ADD COLUMN enable_tunnel BOOLEAN;
-
--- Add new connection mode enum columns to sources table
-ALTER TABLE sources
-ADD COLUMN connect_xtream_api VARCHAR(20) NOT NULL DEFAULT 'DEFAULT';
-
-ALTER TABLE sources
-ADD COLUMN connect_xtream_stream VARCHAR(20) NOT NULL DEFAULT 'DEFAULT';
-
-ALTER TABLE sources
-ADD COLUMN connect_xmltv VARCHAR(20) NOT NULL DEFAULT 'DEFAULT';
-
--- Add new proxy control boolean columns to clients table
-ALTER TABLE clients
-ADD COLUMN enable_proxy BOOLEAN;
-
-ALTER TABLE clients
-ADD COLUMN enable_tunnel BOOLEAN;
-
--- Add new connection mode enum columns to clients table
-ALTER TABLE clients
-ADD COLUMN connect_xtream_api VARCHAR(20) NOT NULL DEFAULT 'INHERITED';
-
-ALTER TABLE clients
-ADD COLUMN connect_xtream_stream VARCHAR(20) NOT NULL DEFAULT 'INHERITED';
-
-ALTER TABLE clients
-ADD COLUMN connect_xmltv VARCHAR(20) NOT NULL DEFAULT 'INHERITED';
+-- Migration V013 is now deprecated
+-- All columns (enable_proxy, enable_tunnel, connect_xtream_api, connect_xtream_stream, connect_xmltv)
+-- are now included in the original table creation scripts (V003 and V005)
