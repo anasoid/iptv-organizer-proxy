@@ -59,8 +59,8 @@ export default function SourceForm({
       syncInterval: 1,
       isActive: true,
       proxyId: null,
-      enableProxy: null,
-      enableTunnel: null,
+      enableProxy: false,
+      enableTunnel: false,
       connectXtreamApi: null,
       connectXtreamStream: null,
       connectXmltv: null,
@@ -247,9 +247,8 @@ export default function SourceForm({
                   <FormControlLabel
                     control={
                       <Checkbox
-                        checked={Boolean(field.value)}
-                        onChange={(e) => field.onChange(e.target.checked ? true : false)}
-                        indeterminate={field.value === null}
+                        checked={field.value === true}
+                        onChange={(e) => field.onChange(e.target.checked)}
                       />
                     }
                     label="Enable HTTP Proxy"
@@ -272,9 +271,8 @@ export default function SourceForm({
                   <FormControlLabel
                     control={
                       <Checkbox
-                        checked={Boolean(field.value)}
-                        onChange={(e) => field.onChange(e.target.checked ? true : false)}
-                        indeterminate={field.value === null}
+                        checked={field.value === true}
+                        onChange={(e) => field.onChange(e.target.checked)}
                       />
                     }
                     label="Enable Tunnel"

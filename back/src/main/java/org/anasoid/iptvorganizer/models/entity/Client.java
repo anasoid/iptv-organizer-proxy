@@ -23,8 +23,8 @@ public class Client extends BaseEntity {
   private LocalDate expiryDate;
   private Boolean isActive;
   private Boolean hideAdultContent;
-  private Boolean enableProxy;
-  private Boolean enableTunnel;
+  private Boolean enableProxy; // NOT NULL, default false
+  private Boolean enableTunnel; // NOT NULL, default false
   private String notes;
   private LocalDateTime lastLogin;
   private ClientConnectXtreamApiMode connectXtreamApi;

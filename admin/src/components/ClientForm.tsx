@@ -38,6 +38,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
     reset,
     watch,
     control,
+    getValues,
   } = useForm<Client>({
     defaultValues: client || {
       username: '',
@@ -60,6 +61,8 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
 
   const sourceId = watch('sourceId');
   const filterId = watch('filterId');
+  const enableProxy = watch('enableProxy');
+  const enableTunnel = watch('enableTunnel');
 
   // Fetch sources for dropdown
   const { data: sourcesData } = useQuery({
@@ -89,18 +92,34 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
 
   useEffect(() => {
     if (client) {
-      reset(client);
+      // Reset form with client data, preserving null values for three-state checkboxes
+      reset({
+        ...client,
+        enableProxy: client.enableProxy ?? null,
+        enableTunnel: client.enableTunnel ?? null,
+      });
     }
   }, [client, reset]);
 
   const onSubmit = (data: Client) => {
+    // Ensure null values are preserved in the submission
+    // enableProxy and enableTunnel can be null (for inheritance) or true/false
+    const clientData = {
+      ...data,
+      // Explicitly preserve null values
+      enableProxy: data.enableProxy === undefined ? null : data.enableProxy,
+      enableTunnel: data.enableTunnel === undefined ? null : data.enableTunnel,
+    };
+
+    console.log('Submitting client data:', clientData);
+
     if (client?.id) {
       updateMutation.mutate({
         id: client.id,
-        client: data,
+        client: clientData,
       });
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(clientData);
     }
   };
 
@@ -226,7 +245,10 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
 
         <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2, gridColumn: '1 / -1' }}>
           <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-            Proxy Settings (Optional - leave unchecked to inherit from source)
+            Proxy Settings (Optional)
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mb: 2 }}>
+            Indeterminate (unchecked) = inherit from source, Checked = enable, Unchecked = disable
           </Typography>
 
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
@@ -234,13 +256,27 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
               <Controller
                 name="enableProxy"
                 control={control}
+                shouldUnregister={false}
                 render={({ field }) => (
                   <FormControlLabel
                     control={
                       <Checkbox
-                        checked={Boolean(field.value)}
-                        onChange={(e) => field.onChange(e.target.checked ? true : false)}
+                        checked={field.value === true}
                         indeterminate={field.value === null}
+                        onChange={(e) => {
+                          const currentValue = field.value;
+                          // Three-state cycle: null -> true -> false -> null
+                          let newValue: boolean | null;
+                          if (currentValue === null) {
+                            newValue = true;
+                          } else if (currentValue === true) {
+                            newValue = false;
+                          } else {
+                            newValue = null;
+                          }
+                          field.onChange(newValue);
+                        }}
+                        inputProps={{ 'data-testid': field.name }}
                       />
                     }
                     label="Enable HTTP Proxy"
@@ -256,13 +292,27 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
               <Controller
                 name="enableTunnel"
                 control={control}
+                shouldUnregister={false}
                 render={({ field }) => (
                   <FormControlLabel
                     control={
                       <Checkbox
-                        checked={Boolean(field.value)}
-                        onChange={(e) => field.onChange(e.target.checked ? true : false)}
+                        checked={field.value === true}
                         indeterminate={field.value === null}
+                        onChange={(e) => {
+                          const currentValue = field.value;
+                          // Three-state cycle: null -> true -> false -> null
+                          let newValue: boolean | null;
+                          if (currentValue === null) {
+                            newValue = true;
+                          } else if (currentValue === true) {
+                            newValue = false;
+                          } else {
+                            newValue = null;
+                          }
+                          field.onChange(newValue);
+                        }}
+                        inputProps={{ 'data-testid': field.name }}
                       />
                     }
                     label="Enable Tunnel"
