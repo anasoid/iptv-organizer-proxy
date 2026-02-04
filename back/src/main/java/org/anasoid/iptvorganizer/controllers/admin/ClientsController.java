@@ -119,7 +119,8 @@ public class ClientsController extends BaseController {
     if (request.getIsActive() != null) client.setIsActive(request.getIsActive());
     if (request.getHideAdultContent() != null)
       client.setHideAdultContent(request.getHideAdultContent());
-    // Allow setting to null for optional enum settings
+    if (request.getEnableProxy() != null) client.setEnableProxy(request.getEnableProxy());
+    if (request.getEnableTunnel() != null) client.setEnableTunnel(request.getEnableTunnel());
     if (request.getConnectXtreamApi() != null)
       client.setConnectXtreamApi(request.getConnectXtreamApi());
     if (request.getConnectXtreamStream() != null)

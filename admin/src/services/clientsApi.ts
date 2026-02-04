@@ -11,11 +11,11 @@ export interface Client {
   expiryDate?: string | null;
   isActive: boolean;
   hideAdultContent?: boolean;
-  useRedirect?: boolean | null;
-  useRedirectXmltv?: boolean | null;
   enableProxy?: boolean | null;
-  disableStreamProxy?: boolean | null;
-  streamFollowLocation?: boolean | null;
+  enableTunnel?: boolean | null;
+  connectXtreamApi?: 'INHERITED' | 'DEFAULT' | 'TUNNEL' | 'PROXY' | null;
+  connectXtreamStream?: 'INHERITED' | 'DIRECT' | 'TUNNEL' | 'PROXY' | 'REDIRECT' | 'DEFAULT' | null;
+  connectXmltv?: 'INHERITED' | 'REDIRECT' | 'TUNNEL' | 'PROXY' | 'DEFAULT' | null;
   notes?: string | null;
   createdAt?: string;
   updatedAt?: string;

@@ -12,11 +12,11 @@ export interface Source {
   nextSync?: string | null;
   isActive: number;
   proxyId?: number | null;
-  enableProxy?: number | null;
-  disableStreamProxy?: number | null;
-  streamFollowLocation?: number | null;
-  useRedirect?: number | null;
-  useRedirectXmltv?: number | null;
+  enableProxy?: boolean | null;
+  enableTunnel?: boolean | null;
+  connectXtreamApi?: 'DEFAULT' | 'TUNNEL' | 'PROXY' | null;
+  connectXtreamStream?: 'DIRECT' | 'TUNNEL' | 'PROXY' | 'REDIRECT' | 'DEFAULT' | null;
+  connectXmltv?: 'REDIRECT' | 'TUNNEL' | 'PROXY' | 'DEFAULT' | null;
   createdAt?: string;
   updatedAt?: string;
 }

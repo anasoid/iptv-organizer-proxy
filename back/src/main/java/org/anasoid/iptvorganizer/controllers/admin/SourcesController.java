@@ -144,6 +144,12 @@ public class SourcesController extends BaseController {
     }
     // Set proxyId (can be null to remove proxy assignment)
     source.setProxyId(request.getProxyId());
+    if (request.getEnableProxy() != null) {
+      source.setEnableProxy(request.getEnableProxy());
+    }
+    if (request.getEnableTunnel() != null) {
+      source.setEnableTunnel(request.getEnableTunnel());
+    }
     if (request.getConnectXtreamApi() != null) {
       source.setConnectXtreamApi(request.getConnectXtreamApi());
     }

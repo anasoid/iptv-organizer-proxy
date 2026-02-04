@@ -12,6 +12,9 @@ import {
   Checkbox,
   MenuItem,
   Typography,
+  FormControl,
+  InputLabel,
+  Select,
 } from '@mui/material';
 import { useForm, Controller } from 'react-hook-form';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -46,11 +49,11 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
       expiryDate: undefined,
       isActive: true,
       hideAdultContent: false,
-      useRedirect: null,
-      useRedirectXmltv: null,
       enableProxy: null,
-      disableStreamProxy: null,
-      streamFollowLocation: null,
+      enableTunnel: null,
+      connectXtreamApi: null,
+      connectXtreamStream: null,
+      connectXmltv: null,
       notes: '',
     },
   });
@@ -221,6 +224,140 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           />
         </Box>
 
+        <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2, gridColumn: '1 / -1' }}>
+          <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+            Proxy Settings (Optional - leave unchecked to inherit from source)
+          </Typography>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            <Box>
+              <Controller
+                name="enableProxy"
+                control={control}
+                render={({ field }) => (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={Boolean(field.value)}
+                        onChange={(e) => field.onChange(e.target.checked ? true : false)}
+                        indeterminate={field.value === null}
+                      />
+                    }
+                    label="Enable HTTP Proxy"
+                  />
+                )}
+              />
+              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4 }}>
+                Use HTTP proxy for upstream requests
+              </Typography>
+            </Box>
+
+            <Box>
+              <Controller
+                name="enableTunnel"
+                control={control}
+                render={({ field }) => (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={Boolean(field.value)}
+                        onChange={(e) => field.onChange(e.target.checked ? true : false)}
+                        indeterminate={field.value === null}
+                      />
+                    }
+                    label="Enable Tunnel"
+                  />
+                )}
+              />
+              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4 }}>
+                Use reverse proxy tunnel
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+
+        <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2, gridColumn: '1 / -1' }}>
+          <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+            Connection Mode Settings (Optional - leave empty to inherit from source)
+          </Typography>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
+            <Controller
+              name="connectXtreamApi"
+              control={control}
+              render={({ field }) => (
+                <FormControl fullWidth>
+                  <InputLabel>Xtream API Mode</InputLabel>
+                  <Select
+                    value={field.value ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      field.onChange(val === '' ? null : val);
+                    }}
+                    label="Xtream API Mode"
+                  >
+                    <MenuItem value="">Inherit from Source</MenuItem>
+                    <MenuItem value="INHERITED">Force Inherit</MenuItem>
+                    <MenuItem value="DEFAULT">Default</MenuItem>
+                    <MenuItem value="TUNNEL">Tunnel</MenuItem>
+                    <MenuItem value="PROXY">Proxy</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+            />
+
+            <Controller
+              name="connectXtreamStream"
+              control={control}
+              render={({ field }) => (
+                <FormControl fullWidth>
+                  <InputLabel>Xtream Stream Mode</InputLabel>
+                  <Select
+                    value={field.value ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      field.onChange(val === '' ? null : val);
+                    }}
+                    label="Xtream Stream Mode"
+                  >
+                    <MenuItem value="">Inherit from Source</MenuItem>
+                    <MenuItem value="INHERITED">Force Inherit</MenuItem>
+                    <MenuItem value="DIRECT">Direct</MenuItem>
+                    <MenuItem value="TUNNEL">Tunnel</MenuItem>
+                    <MenuItem value="PROXY">Proxy</MenuItem>
+                    <MenuItem value="REDIRECT">Redirect</MenuItem>
+                    <MenuItem value="DEFAULT">Default</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+            />
+
+            <Controller
+              name="connectXmltv"
+              control={control}
+              render={({ field }) => (
+                <FormControl fullWidth>
+                  <InputLabel>XMLTV Mode</InputLabel>
+                  <Select
+                    value={field.value ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      field.onChange(val === '' ? null : val);
+                    }}
+                    label="XMLTV Mode"
+                  >
+                    <MenuItem value="">Inherit from Source</MenuItem>
+                    <MenuItem value="INHERITED">Force Inherit</MenuItem>
+                    <MenuItem value="REDIRECT">Redirect</MenuItem>
+                    <MenuItem value="TUNNEL">Tunnel</MenuItem>
+                    <MenuItem value="PROXY">Proxy</MenuItem>
+                    <MenuItem value="DEFAULT">Default</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+            />
+          </Box>
+        </Box>
 
         <TextField
           label="Notes (Optional)"
@@ -231,122 +368,6 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           sx={{ gridColumn: '1 / -1' }}
         />
 
-        <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2, gridColumn: '1 / -1' }}>
-          <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-            Stream & XMLTV Redirect Settings (Optional - leave unchecked to inherit from source/env)
-          </Typography>
-
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-            <Box>
-              <Controller
-                name="useRedirect"
-                control={control}
-                render={({ field }) => (
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={Boolean(field.value)}
-                        onChange={(e) => field.onChange(e.target.checked ? true : false)}
-                        indeterminate={field.value === null}
-                      />
-                    }
-                    label="Enable Stream Direct Redirect (302)"
-                  />
-                )}
-              />
-              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4 }}>
-                When enabled, stream requests return a direct 302 redirect instead of proxying through /proxy endpoint
-              </Typography>
-            </Box>
-
-            <Box>
-              <Controller
-                name="useRedirectXmltv"
-                control={control}
-                render={({ field }) => (
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={Boolean(field.value)}
-                        onChange={(e) => field.onChange(e.target.checked ? true : false)}
-                        indeterminate={field.value === null}
-                      />
-                    }
-                    label="Enable XMLTV Direct Redirect (302)"
-                  />
-                )}
-              />
-              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4 }}>
-                When enabled, XMLTV EPG requests return a direct 302 redirect instead of streaming content
-              </Typography>
-            </Box>
-          </Box>
-
-          <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2 }}>
-            <Typography variant="caption" sx={{ fontWeight: 600 }}>
-              Proxy Settings (Optional - leave unchecked to inherit from source)
-            </Typography>
-
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mt: 1 }}>
-              <Box>
-                <Controller
-                  name="enableProxy"
-                  control={control}
-                  render={({ field }) => (
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={Boolean(field.value)}
-                          onChange={(e) => field.onChange(e.target.checked ? true : false)}
-                          indeterminate={field.value === null}
-                        />
-                      }
-                      label="Enable HTTP Proxy"
-                    />
-                  )}
-                />
-              </Box>
-
-              <Box>
-                <Controller
-                  name="disableStreamProxy"
-                  control={control}
-                  render={({ field }) => (
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={Boolean(field.value)}
-                          onChange={(e) => field.onChange(e.target.checked ? true : false)}
-                          indeterminate={field.value === null}
-                        />
-                      }
-                      label="Disable Stream Proxy"
-                    />
-                  )}
-                />
-              </Box>
-
-              <Box sx={{ gridColumn: '1 / -1' }}>
-                <Controller
-                  name="streamFollowLocation"
-                  control={control}
-                  render={({ field }) => (
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={Boolean(field.value)}
-                          onChange={(e) => field.onChange(e.target.checked ? true : false)}
-                          indeterminate={field.value === null}
-                        />
-                      }
-                      label="Follow HTTP Redirects"
-                    />
-                  )}
-                />
-              </Box>
-            </Box>
-          </Box>
-        </Box>
 
       </DialogContent>
       <DialogActions>
