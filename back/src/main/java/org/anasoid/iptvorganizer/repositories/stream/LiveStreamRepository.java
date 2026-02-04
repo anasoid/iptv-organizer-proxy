@@ -32,7 +32,7 @@ public class LiveStreamRepository extends BaseStreamRepository<LiveStream> {
   }
 
   @Override
-  public Long insert(LiveStream stream) {
+  protected Long internalInsert(LiveStream stream) {
     String sql =
         "INSERT INTO live_streams (source_id, external_id, num, allow_deny, name, category_id, category_ids, is_adult, labels, data, added_date, release_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
@@ -59,7 +59,7 @@ public class LiveStreamRepository extends BaseStreamRepository<LiveStream> {
   }
 
   @Override
-  public void update(LiveStream stream) {
+  protected void internalUpdate(LiveStream stream) {
     String sql =
         "UPDATE live_streams SET source_id = ?, external_id = ?, num = ?, allow_deny = ?, name = ?, category_id = ?, category_ids = ?, is_adult = ?, labels = ?, data = ?, added_date = ?, release_date = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();

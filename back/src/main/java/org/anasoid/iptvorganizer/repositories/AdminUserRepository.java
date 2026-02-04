@@ -18,7 +18,7 @@ public class AdminUserRepository extends BaseRepository<AdminUser> {
   }
 
   @Override
-  public Long insert(AdminUser user) {
+  protected Long internalInsert(AdminUser user) {
     String sql =
         "INSERT INTO admin_users (username, password_hash, email, is_active) VALUES (?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
@@ -35,7 +35,7 @@ public class AdminUserRepository extends BaseRepository<AdminUser> {
   }
 
   @Override
-  public void update(AdminUser user) {
+  protected void internalUpdate(AdminUser user) {
     String sql =
         "UPDATE admin_users SET username = ?, password_hash = ?, email = ?, is_active = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();

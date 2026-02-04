@@ -23,7 +23,7 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
   }
 
   @Override
-  public Long insert(Category category) {
+  protected Long internalInsert(Category category) {
     String sql =
         "INSERT INTO categories (source_id, external_id, name, type, num, allow_deny, parent_id, labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
@@ -47,7 +47,7 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
   }
 
   @Override
-  public void update(Category category) {
+  protected void internalUpdate(Category category) {
     String sql =
         "UPDATE categories SET source_id = ?, external_id = ?, name = ?, type = ?, num = ?, allow_deny = ?, parent_id = ?, labels = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();

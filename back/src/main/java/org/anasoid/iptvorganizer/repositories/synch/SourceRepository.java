@@ -43,7 +43,7 @@ public class SourceRepository extends BaseRepository<Source> {
   }
 
   @Override
-  public Long insert(Source source) {
+  protected Long internalInsert(Source source) {
     String sql =
         "INSERT INTO sources (name, url, username, password, sync_interval, is_active, proxy_id, enable_proxy, enable_tunnel, connect_xtream_api, connect_xtream_stream, connect_xmltv) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
@@ -84,7 +84,7 @@ public class SourceRepository extends BaseRepository<Source> {
   }
 
   @Override
-  public void update(Source source) {
+  protected void internalUpdate(Source source) {
     String sql =
         "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, proxy_id = ?, enable_proxy = ?, enable_tunnel = ?, connect_xtream_api = ?, connect_xtream_stream = ?, connect_xmltv = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();

@@ -107,8 +107,6 @@ public class SourcesController extends BaseController {
     if (request.getConnectXmltv() == null) {
       request.setConnectXmltv(org.anasoid.iptvorganizer.models.enums.ConnectXmltvMode.DEFAULT);
     }
-    request.setCreatedAt(LocalDateTime.now());
-    request.setUpdatedAt(LocalDateTime.now());
 
     Source savedSource = sourceService.save(request);
     return ResponseUtils.created(savedSource);
@@ -160,7 +158,6 @@ public class SourcesController extends BaseController {
       source.setConnectXmltv(request.getConnectXmltv());
     }
 
-    source.setUpdatedAt(LocalDateTime.now());
     sourceService.update(source);
     return ResponseUtils.ok(source);
   }

@@ -22,7 +22,7 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
   }
 
   @Override
-  public Long insert(SyncLog syncLog) {
+  protected Long internalInsert(SyncLog syncLog) {
     String sql =
         "INSERT INTO sync_logs (source_id, sync_type, started_at, completed_at, status, items_added, items_updated, items_deleted, error_message, duration_seconds, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
@@ -58,7 +58,7 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
   }
 
   @Override
-  public void update(SyncLog syncLog) {
+  protected void internalUpdate(SyncLog syncLog) {
     String sql =
         "UPDATE sync_logs SET source_id = ?, sync_type = ?, started_at = ?, completed_at = ?, status = ?, items_added = ?, items_updated = ?, items_deleted = ?, error_message = ?, duration_seconds = ?, updated_at = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();

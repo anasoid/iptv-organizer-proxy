@@ -18,7 +18,7 @@ public class ConnectionLogRepository extends BaseRepository<ConnectionLog> {
   }
 
   @Override
-  public Long insert(ConnectionLog log) {
+  protected Long internalInsert(ConnectionLog log) {
     String sql =
         "INSERT INTO connection_logs (client_id, action, ip_address, user_agent) VALUES (?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
@@ -35,7 +35,7 @@ public class ConnectionLogRepository extends BaseRepository<ConnectionLog> {
   }
 
   @Override
-  public void update(ConnectionLog log) {
+  protected void internalUpdate(ConnectionLog log) {
     String sql =
         "UPDATE connection_logs SET client_id = ?, action = ?, ip_address = ?, user_agent = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();

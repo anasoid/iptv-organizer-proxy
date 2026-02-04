@@ -1,7 +1,6 @@
 package org.anasoid.iptvorganizer.services;
 
 import jakarta.transaction.Transactional;
-import java.time.LocalDateTime;
 import java.util.List;
 import org.anasoid.iptvorganizer.models.entity.BaseEntity;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
@@ -24,7 +23,6 @@ public abstract class BaseService<T extends BaseEntity, R extends BaseRepository
     if (entity.getId() == null) {
       throw new IllegalArgumentException("ID is required for update");
     }
-    entity.setUpdatedAt(LocalDateTime.now());
     getRepository().update(entity);
   }
 
@@ -45,8 +43,6 @@ public abstract class BaseService<T extends BaseEntity, R extends BaseRepository
     if (entity.getId() == null) {
       Long id = create(entity);
       entity.setId(id);
-      entity.setUpdatedAt(LocalDateTime.now());
-      entity.setCreatedAt(LocalDateTime.now());
       return entity;
     } else {
       update(entity);

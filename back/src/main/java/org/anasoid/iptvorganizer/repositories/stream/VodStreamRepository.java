@@ -32,7 +32,7 @@ public class VodStreamRepository extends BaseStreamRepository<VodStream> {
   }
 
   @Override
-  public Long insert(VodStream stream) {
+  protected Long internalInsert(VodStream stream) {
     String sql =
         "INSERT INTO vod_streams (source_id, external_id, num, allow_deny, name, category_id, category_ids, is_adult, labels, data, added_date, release_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
@@ -59,7 +59,7 @@ public class VodStreamRepository extends BaseStreamRepository<VodStream> {
   }
 
   @Override
-  public void update(VodStream stream) {
+  protected void internalUpdate(VodStream stream) {
     String sql =
         "UPDATE vod_streams SET source_id = ?, external_id = ?, num = ?, allow_deny = ?, name = ?, category_id = ?, category_ids = ?, is_adult = ?, labels = ?, data = ?, added_date = ?, release_date = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();

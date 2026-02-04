@@ -5,6 +5,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
@@ -46,9 +47,20 @@ public abstract class BaseRepository<T extends BaseEntity> {
     return results;
   }
 
-  public abstract Long insert(T entity);
+  public final Long insert(T entity) {
+    entity.setUpdatedAt(LocalDateTime.now());
+    entity.setCreatedAt(LocalDateTime.now());
+    return internalInsert(entity);
+  }
 
-  public abstract void update(T entity);
+  public final void update(T entity) {
+    entity.setUpdatedAt(LocalDateTime.now());
+    internalUpdate(entity);
+  }
+
+  protected abstract Long internalInsert(T entity);
+
+  protected abstract void internalUpdate(T entity);
 
   public void delete(Long id) {
     String sql = "DELETE FROM " + getTableName() + " WHERE id = ?";

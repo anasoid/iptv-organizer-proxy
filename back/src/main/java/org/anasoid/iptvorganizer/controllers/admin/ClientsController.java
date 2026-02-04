@@ -5,7 +5,6 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
@@ -91,8 +90,6 @@ public class ClientsController extends BaseController {
     if (request.getHideAdultContent() == null) {
       request.setHideAdultContent(false);
     }
-    request.setCreatedAt(LocalDateTime.now());
-    request.setUpdatedAt(LocalDateTime.now());
 
     Client savedClient = clientService.save(request);
     return ResponseUtils.created(savedClient);
@@ -127,7 +124,6 @@ public class ClientsController extends BaseController {
       client.setConnectXtreamStream(request.getConnectXtreamStream());
     if (request.getConnectXmltv() != null) client.setConnectXmltv(request.getConnectXmltv());
     if (request.getNotes() != null) client.setNotes(request.getNotes());
-    client.setUpdatedAt(LocalDateTime.now());
 
     clientService.update(client);
     return ResponseUtils.ok(client);

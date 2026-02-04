@@ -5,7 +5,6 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.ValidationException;
@@ -60,8 +59,6 @@ public class FiltersController extends BaseController {
     if (request.getUseSourceFilter() == null) {
       request.setUseSourceFilter(false);
     }
-    request.setCreatedAt(LocalDateTime.now());
-    request.setUpdatedAt(LocalDateTime.now());
 
     Filter savedFilter = filterService.save(request);
     return ResponseUtils.created(savedFilter);
@@ -83,7 +80,6 @@ public class FiltersController extends BaseController {
     if (request.getUseSourceFilter() != null)
       filter.setUseSourceFilter(request.getUseSourceFilter());
     if (request.getFavoris() != null) filter.setFavoris(request.getFavoris());
-    filter.setUpdatedAt(LocalDateTime.now());
 
     filterService.update(filter);
     return ResponseUtils.ok(filter);
@@ -109,7 +105,6 @@ public class FiltersController extends BaseController {
 
     if (request != null && request.get("useSourceFilter") != null) {
       filter.setUseSourceFilter(request.get("useSourceFilter"));
-      filter.setUpdatedAt(LocalDateTime.now());
       filterService.update(filter);
     }
     return ResponseUtils.ok(filter);

@@ -5,7 +5,6 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.ValidationException;
@@ -78,8 +77,6 @@ public class AdminUsersController extends BaseController {
     if (request.getIsActive() == null) {
       request.setIsActive(true);
     }
-    request.setCreatedAt(LocalDateTime.now());
-    request.setUpdatedAt(LocalDateTime.now());
 
     AdminUser savedUser = adminUserService.save(request);
     return ResponseUtils.created(savedUser);
@@ -111,7 +108,6 @@ public class AdminUsersController extends BaseController {
       user.setPasswordHash(hashedPassword);
     }
 
-    user.setUpdatedAt(LocalDateTime.now());
     adminUserService.update(user);
     return ResponseUtils.ok(user);
   }

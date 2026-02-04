@@ -18,7 +18,7 @@ public class FilterRepository extends BaseRepository<Filter> {
   }
 
   @Override
-  public Long insert(Filter filter) {
+  protected Long internalInsert(Filter filter) {
     String sql =
         "INSERT INTO filters (name, description, filter_config, use_source_filter, favoris) VALUES (?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
@@ -36,7 +36,7 @@ public class FilterRepository extends BaseRepository<Filter> {
   }
 
   @Override
-  public void update(Filter filter) {
+  protected void internalUpdate(Filter filter) {
     String sql =
         "UPDATE filters SET name = ?, description = ?, filter_config = ?, use_source_filter = ?, favoris = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();

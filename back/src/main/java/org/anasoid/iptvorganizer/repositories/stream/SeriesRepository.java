@@ -31,7 +31,7 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
   }
 
   @Override
-  public Long insert(Series series) {
+  protected Long internalInsert(Series series) {
     String sql =
         "INSERT INTO series (source_id, external_id, num, allow_deny, name, category_id, category_ids, is_adult, labels, data, added_date, release_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
@@ -58,7 +58,7 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
   }
 
   @Override
-  public void update(Series series) {
+  protected void internalUpdate(Series series) {
     String sql =
         "UPDATE series SET source_id = ?, external_id = ?, num = ?, allow_deny = ?, name = ?, category_id = ?, category_ids = ?, is_adult = ?, labels = ?, data = ?, added_date = ?, release_date = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();

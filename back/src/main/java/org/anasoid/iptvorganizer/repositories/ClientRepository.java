@@ -23,7 +23,7 @@ public class ClientRepository extends BaseRepository<Client> {
   }
 
   @Override
-  public Long insert(Client client) {
+  protected Long internalInsert(Client client) {
     String sql =
         "INSERT INTO clients (source_id, filter_id, username, password, name, email, expiry_date, is_active, hide_adult_content, enable_proxy, enable_tunnel, notes, connect_xtream_api, connect_xtream_stream, connect_xmltv) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
@@ -58,7 +58,7 @@ public class ClientRepository extends BaseRepository<Client> {
   }
 
   @Override
-  public void update(Client client) {
+  protected void internalUpdate(Client client) {
     String sql =
         "UPDATE clients SET source_id = ?, filter_id = ?, username = ?, password = ?, name = ?, email = ?, expiry_date = ?, is_active = ?, hide_adult_content = ?, enable_proxy = ?, enable_tunnel = ?, notes = ?, connect_xtream_api = ?, connect_xtream_stream = ?, connect_xmltv = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();

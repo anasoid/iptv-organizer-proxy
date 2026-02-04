@@ -5,7 +5,6 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.ValidationException;
@@ -53,9 +52,6 @@ public class ProxiesController extends BaseController {
   @POST
   public Response createProxy(Proxy request) {
     // Set defaults
-    request.setCreatedAt(LocalDateTime.now());
-    request.setUpdatedAt(LocalDateTime.now());
-
     Long id = proxyService.create(request);
     request.setId(id);
     return ResponseUtils.created(request);
@@ -116,7 +112,6 @@ public class ProxiesController extends BaseController {
       proxy.setMaxRetries(request.getMaxRetries());
     }
 
-    proxy.setUpdatedAt(LocalDateTime.now());
     proxyService.update(proxy);
     return ResponseUtils.ok(proxy);
   }

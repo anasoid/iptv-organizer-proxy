@@ -20,7 +20,7 @@ public class ProxyRepository extends BaseRepository<Proxy> {
   }
 
   @Override
-  public Long insert(Proxy proxy) {
+  protected Long internalInsert(Proxy proxy) {
     String sql =
         "INSERT INTO proxies (name, description, proxy_url, proxy_host, proxy_port, proxy_type, "
             + "proxy_username, proxy_password, timeout, max_retries, created_at, updated_at) "
@@ -49,7 +49,7 @@ public class ProxyRepository extends BaseRepository<Proxy> {
   }
 
   @Override
-  public void update(Proxy proxy) {
+  protected void internalUpdate(Proxy proxy) {
     String sql =
         "UPDATE proxies SET name = ?, description = ?, proxy_url = ?, proxy_host = ?, "
             + "proxy_port = ?, proxy_type = ?, proxy_username = ?, proxy_password = ?, "
