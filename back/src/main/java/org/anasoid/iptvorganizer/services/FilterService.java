@@ -203,9 +203,21 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
     // Check if pattern contains wildcards
     if (pattern.contains("*") || pattern.contains("?")) {
       // Convert wildcard pattern to regex
+      // First escape all regex special chars except * and ?
       String regex =
           pattern
+              .replace("\\", "\\\\") // Escape backslash first (must be before other escapes)
               .replace(".", "\\.") // Escape dots
+              .replace("|", "\\|") // Escape pipes
+              .replace("^", "\\^") // Escape caret
+              .replace("$", "\\$") // Escape dollar
+              .replace("+", "\\+") // Escape plus
+              .replace("[", "\\[") // Escape opening bracket
+              .replace("]", "\\]") // Escape closing bracket
+              .replace("{", "\\{") // Escape opening brace
+              .replace("}", "\\}") // Escape closing brace
+              .replace("(", "\\(") // Escape opening paren
+              .replace(")", "\\)") // Escape closing paren
               .replace("*", ".*") // Replace * with .*
               .replace("?", "."); // Replace ? with .
       return text.matches(regex);
