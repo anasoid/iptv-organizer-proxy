@@ -199,7 +199,7 @@ public class StreamProxyHttpClient {
         proxy != null);
 
     return HttpOptions.builder()
-        .timeout(30000L)
+        .timeout(300000L)
         .maxRetries(1)
         .followRedirects(followRedirects)
         .proxy(proxy)
