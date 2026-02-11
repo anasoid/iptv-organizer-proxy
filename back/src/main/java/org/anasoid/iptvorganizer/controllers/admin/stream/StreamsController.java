@@ -54,45 +54,58 @@ public class StreamsController extends BaseController {
     }
 
     List<? extends BaseStream> streams = Collections.emptyList();
+    long total = 0;
 
-    // Fetch streams by type
+    // Fetch streams by type - use paginated queries for memory efficiency
     switch (type.toLowerCase()) {
       case "live":
         if (categoryId != null) {
           streams = liveStreamService.findBySourceAndCategory(sourceId, categoryId, limit);
+          total = streams.size(); // No total count for category queries
         } else if (streamId != null) {
           var stream = liveStreamService.findBySourceAndStreamId(sourceId, streamId);
           streams = stream != null ? List.of(stream) : Collections.emptyList();
+          total = streams.size();
         } else {
-          streams = liveStreamService.findBySourceId(sourceId);
+          // Use paginated query instead of loading all streams
+          streams = liveStreamService.findBySourceIdPaged(sourceId, page, limit);
+          total = liveStreamService.countBySourceId(sourceId);
         }
         break;
       case "vod":
         if (categoryId != null) {
           streams = vodStreamService.findBySourceAndCategory(sourceId, categoryId, limit);
+          total = streams.size(); // No total count for category queries
         } else if (streamId != null) {
           var stream = vodStreamService.findBySourceAndStreamId(sourceId, streamId);
           streams = stream != null ? List.of(stream) : Collections.emptyList();
+          total = streams.size();
         } else {
-          streams = vodStreamService.findBySourceId(sourceId);
+          // Use paginated query instead of loading all streams
+          streams = vodStreamService.findBySourceIdPaged(sourceId, page, limit);
+          total = vodStreamService.countBySourceId(sourceId);
         }
         break;
       case "series":
         if (categoryId != null) {
           streams = seriesService.findBySourceAndCategory(sourceId, categoryId, limit);
+          total = streams.size(); // No total count for category queries
         } else if (streamId != null) {
           var stream = seriesService.findBySourceAndStreamId(sourceId, streamId);
           streams = stream != null ? List.of(stream) : Collections.emptyList();
+          total = streams.size();
         } else {
-          streams = seriesService.findBySourceId(sourceId);
+          // Use paginated query instead of loading all streams
+          streams = seriesService.findBySourceIdPaged(sourceId, page, limit);
+          total = seriesService.countBySourceId(sourceId);
         }
         break;
       default:
         throw new ValidationException("Invalid type. Must be 'live', 'vod', or 'series'");
     }
 
-    // Apply search filter if provided
-    if (search != null && !search.isBlank()) {
+    // Apply search filter if provided (only when no pagination was done in database)
+    if (search != null && !search.isBlank() && categoryId == null && streamId == null) {
       final String searchTerm = search.toLowerCase();
       streams =
           streams.stream()
@@ -102,16 +115,11 @@ public class StreamsController extends BaseController {
                           || (s.getLabels() != null
                               && s.getLabels().toLowerCase().contains(searchTerm)))
               .collect(Collectors.toList());
+      // Recalculate total after search filter
+      total = streams.size();
     }
 
-    // Apply pagination
-    long total = streams.size();
-    int startIdx = (page - 1) * limit;
-    int endIdx = Math.min(startIdx + limit, (int) total);
-    List<? extends BaseStream> paginatedStreams =
-        startIdx < streams.size() ? streams.subList(startIdx, endIdx) : Collections.emptyList();
-
-    return ResponseUtils.okWithPagination(paginatedStreams, PaginationMeta.of(page, limit, total));
+    return ResponseUtils.okWithPagination(streams, PaginationMeta.of(page, limit, total));
   }
 
   /** Get stream by ID GET /api/streams/:id?type= */

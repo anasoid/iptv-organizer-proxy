@@ -48,4 +48,14 @@ public class LiveStreamService extends BaseService<LiveStream, LiveStreamReposit
   public LiveStream findBySourceAndStreamId(Long sourceId, Integer streamId) {
     return repository.findBySourceAndStreamId(sourceId, streamId);
   }
+
+  /** Find streams by source ID with pagination from database */
+  public java.util.List<LiveStream> findBySourceIdPaged(Long sourceId, int page, int limit) {
+    return repository.findBySourceIdPaged(sourceId, page, limit);
+  }
+
+  /** Count total streams by source ID */
+  public long countBySourceId(Long sourceId) {
+    return repository.countBySourceId(sourceId);
+  }
 }

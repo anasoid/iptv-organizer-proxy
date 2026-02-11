@@ -148,4 +148,58 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
     }
     return 0;
   }
+
+  /**
+   * Find streams by source ID with pagination. Used for listing streams with pagination support.
+   *
+   * @param sourceId The source ID
+   * @param page The page number (1-indexed)
+   * @param limit The number of results per page
+   * @return List of streams for the page
+   */
+  public List<T> findBySourceIdPaged(Long sourceId, int page, int limit) {
+    List<T> results = new ArrayList<>();
+    int offset = (page - 1) * limit;
+    String sql =
+        "SELECT * FROM "
+            + getTableName()
+            + " WHERE source_id = ? ORDER BY num ASC, id DESC LIMIT ? OFFSET ?";
+    try (java.sql.Connection conn = dataSource.getConnection();
+        java.sql.PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+      stmt.setInt(2, limit);
+      stmt.setInt(3, offset);
+      try (java.sql.ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          results.add(mapRow(rs));
+        }
+      }
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException(
+          "Failed to find by source ID with pagination in " + getTableName(), e);
+    }
+    return results;
+  }
+
+  /**
+   * Count all streams for a source ID.
+   *
+   * @param sourceId The source ID
+   * @return Total count of streams
+   */
+  public long countBySourceId(Long sourceId) {
+    String sql = "SELECT COUNT(*) FROM " + getTableName() + " WHERE source_id = ?";
+    try (java.sql.Connection conn = dataSource.getConnection();
+        java.sql.PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+      try (java.sql.ResultSet rs = stmt.executeQuery()) {
+        if (rs.next()) {
+          return rs.getLong(1);
+        }
+      }
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException("Failed to count by source ID in " + getTableName(), e);
+    }
+    return 0;
+  }
 }
