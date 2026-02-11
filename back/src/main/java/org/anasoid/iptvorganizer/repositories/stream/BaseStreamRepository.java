@@ -104,4 +104,48 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
 
     return false;
   }
+
+  /**
+   * Delete all streams for a specific category. Used during blacklist cleanup.
+   *
+   * @param sourceId Source ID
+   * @param categoryId Category external ID
+   * @return Number of streams deleted
+   */
+  public int deleteByCategory(Long sourceId, Integer categoryId) {
+    String sql = "DELETE FROM " + getTableName() + " WHERE source_id = ? AND category_id = ?";
+    try (java.sql.Connection conn = dataSource.getConnection();
+        java.sql.PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+      stmt.setInt(2, categoryId);
+      return stmt.executeUpdate();
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException("Failed to delete by category in " + getTableName(), e);
+    }
+  }
+
+  /**
+   * Count streams for a specific category. Used to check if streams exist before deletion.
+   *
+   * @param sourceId Source ID
+   * @param categoryId Category external ID
+   * @return Number of streams in category
+   */
+  public long countByCategory(Long sourceId, Integer categoryId) {
+    String sql =
+        "SELECT COUNT(*) FROM " + getTableName() + " WHERE source_id = ? AND category_id = ?";
+    try (java.sql.Connection conn = dataSource.getConnection();
+        java.sql.PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+      stmt.setInt(2, categoryId);
+      try (java.sql.ResultSet rs = stmt.executeQuery()) {
+        if (rs.next()) {
+          return rs.getLong(1);
+        }
+      }
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException("Failed to count by category in " + getTableName(), e);
+    }
+    return 0;
+  }
 }

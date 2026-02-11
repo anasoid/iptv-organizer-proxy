@@ -1,6 +1,7 @@
 package org.anasoid.iptvorganizer.models.entity.stream;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonValue;
 import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -56,6 +57,7 @@ public abstract class BaseStream extends SourcedEntity {
       this.value = value;
     }
 
+    @JsonValue
     public String getValue() {
       return value;
     }

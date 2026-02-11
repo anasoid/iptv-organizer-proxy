@@ -8,7 +8,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
@@ -260,5 +262,49 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
     }
 
     return false;
+  }
+
+  /**
+   * Find all categories for a source where blackList status indicates hiding. Returns categories
+   * with HIDE or FORCE_HIDE status.
+   *
+   * @param sourceId Source ID
+   * @param type Category type (live, vod, series)
+   * @return List of blacklisted categories
+   */
+  public List<Category> findBlacklistedBySourceAndType(Long sourceId, String type) {
+    List<Category> results = new ArrayList<>();
+    String sql =
+        "SELECT * FROM categories WHERE source_id = ? AND type = ? AND (black_list = 'hide' OR black_list = 'force_hide')";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+      stmt.setString(2, type);
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          results.add(mapRow(rs));
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find blacklisted categories", e);
+    }
+    return results;
+  }
+
+  /**
+   * Build a map of all categories for a source by external ID. Used for efficient category lookups
+   * during stream import.
+   *
+   * @param sourceId Source ID
+   * @param type Category type (live, vod, series)
+   * @return Map of externalId -> Category
+   */
+  public Map<Integer, Category> findBySourceAndTypeAsMap(Long sourceId, String type) {
+    Map<Integer, Category> categoryMap = new HashMap<>();
+    List<Category> categories = findBySourceIdFiltered(sourceId, type, null, 1, Integer.MAX_VALUE);
+    for (Category category : categories) {
+      categoryMap.put(category.getExternalId(), category);
+    }
+    return categoryMap;
   }
 }

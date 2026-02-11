@@ -12,10 +12,14 @@ import {
   Divider,
   ButtonGroup,
   Snackbar,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
-import { ArrowBack as ArrowBackIcon, CheckCircle as CheckCircleIcon, Block as BlockIcon } from '@mui/icons-material';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { ArrowBack as ArrowBackIcon, CheckCircle as CheckCircleIcon, Block as BlockIcon, VisibilityOff as VisibilityOffIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import categoriesApi from '../services/categoriesApi';
 import streamsApi from '../services/streamsApi';
@@ -24,6 +28,7 @@ export default function CategoryDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
+  const queryClient = useQueryClient();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
@@ -37,6 +42,8 @@ export default function CategoryDetail() {
   });
 
   const category = categoryData?.data;
+  // Convert to lowercase to match MenuItem values (backend returns uppercase)
+  const blackListValue = category ? ((category as any).blackList || (category as any).black_list || 'default').toLowerCase() : 'default';
 
   // Mutation for updating allow_deny
   const updateAllowDenyMutation = useMutation({
@@ -49,6 +56,22 @@ export default function CategoryDetail() {
     },
     onError: () => {
       setSnackbarMessage('Failed to update Allow/Deny status');
+      setSnackbarOpen(true);
+    },
+  });
+
+  // Mutation for updating blacklist
+  const updateBlackListMutation = useMutation({
+    mutationFn: (blackList: string) =>
+      categoriesApi.updateBlackList(categoryId!, blackList as 'default' | 'hide' | 'visible' | 'force_hide' | 'force_visible'),
+    onSuccess: () => {
+      setSnackbarMessage('Blacklist status updated successfully');
+      setSnackbarOpen(true);
+      queryClient.invalidateQueries({ queryKey: ['category', categoryId] });
+      refetchCategory();
+    },
+    onError: () => {
+      setSnackbarMessage('Failed to update blacklist status');
       setSnackbarOpen(true);
     },
   });
@@ -209,6 +232,41 @@ export default function CategoryDetail() {
                 Default
               </Button>
             </ButtonGroup>
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary', mb: 1 }}>
+              Blacklist Status
+            </Typography>
+            <FormControl fullWidth size="small" disabled={updateBlackListMutation.isPending}>
+              <InputLabel>Blacklist</InputLabel>
+              <Select
+                value={blackListValue}
+                label="Blacklist"
+                onChange={(e) => {
+                  updateBlackListMutation.mutate(e.target.value as string);
+                }}
+              >
+                <MenuItem value="default">Default</MenuItem>
+                <MenuItem value="hide">Hide</MenuItem>
+                <MenuItem value="visible">Visible</MenuItem>
+                <MenuItem value="force_hide">Force Hide</MenuItem>
+                <MenuItem value="force_visible">Force Visible</MenuItem>
+              </Select>
+            </FormControl>
+            {blackListValue && blackListValue !== 'default' && (
+              <Box sx={{ mt: 1, display: 'flex', gap: 0.5 }}>
+                <Chip
+                  icon={blackListValue === 'hide' || blackListValue === 'force_hide' ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  label={blackListValue.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                  color={blackListValue === 'hide' || blackListValue === 'force_hide' ? 'error' : 'success'}
+                  size="small"
+                />
+                {(blackListValue === 'force_hide' || blackListValue === 'force_visible') && (
+                  <Chip label="Forced" size="small" variant="outlined" color="warning" />
+                )}
+              </Box>
+            )}
           </Grid>
 
           {category.parentId && (

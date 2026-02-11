@@ -1,6 +1,7 @@
 package org.anasoid.iptvorganizer.models.entity.stream;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -38,6 +39,7 @@ public class Category extends SourcedEntity {
       this.hide = hide;
     }
 
+    @JsonValue
     public String getValue() {
       return value;
     }

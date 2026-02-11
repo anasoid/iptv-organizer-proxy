@@ -14,7 +14,7 @@ public class PaginationMeta {
   private int page;
   private int limit;
   private long total;
-  private int totalPages;
+  private int pages;
 
   /** Create pagination metadata from page, limit, and total count */
   public static PaginationMeta of(int page, int limit, long total) {
@@ -22,7 +22,7 @@ public class PaginationMeta {
         .page(page)
         .limit(limit)
         .total(total)
-        .totalPages((int) Math.ceil((double) total / limit))
+        .pages((int) Math.ceil((double) total / limit))
         .build();
   }
 }

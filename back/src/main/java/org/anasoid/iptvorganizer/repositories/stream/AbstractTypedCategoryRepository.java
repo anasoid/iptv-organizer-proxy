@@ -44,6 +44,18 @@ public abstract class AbstractTypedCategoryRepository
     return categoryRepository.getOrCreateUnknownCategory(sourceId, getType().getCategoryType());
   }
 
+  /**
+   * Build a map of all categories for a source by external ID. Used for efficient category lookups
+   * during stream import.
+   *
+   * @param sourceId Source ID
+   * @param type Category type (live, vod, series)
+   * @return Map of externalId -> Category
+   */
+  public Map<Integer, Category> findBySourceAndTypeAsMap(Long sourceId, String type) {
+    return categoryRepository.findBySourceAndTypeAsMap(sourceId, type);
+  }
+
   public abstract StreamType getType();
 
   @Override

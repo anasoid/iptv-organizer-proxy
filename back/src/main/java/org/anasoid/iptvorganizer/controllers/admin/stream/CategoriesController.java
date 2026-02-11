@@ -76,4 +76,22 @@ public class CategoriesController extends BaseController {
     }
     return ResponseUtils.ok(cat);
   }
+
+  /** Update blacklist status PATCH /api/categories/:id/blacklist */
+  @PATCH
+  @Path("/{id}/blacklist")
+  public Response updateBlackList(@PathParam("id") Long id, java.util.Map<String, String> request) {
+    var cat = categoryService.getById(id);
+    if (cat == null) {
+      throw new NotFoundException("Category not found with ID: " + id);
+    }
+
+    if (request != null && request.get("blackList") != null) {
+      cat.setBlackList(
+          org.anasoid.iptvorganizer.models.entity.stream.Category.BlackListStatus.fromValue(
+              (String) request.get("blackList")));
+      categoryService.update(cat);
+    }
+    return ResponseUtils.ok(cat);
+  }
 }

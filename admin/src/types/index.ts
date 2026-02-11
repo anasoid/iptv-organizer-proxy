@@ -75,6 +75,7 @@ export interface Category {
   allowDeny: 'allow' | 'deny' | null;
   parentId: number | null;
   labels: string | null;
+  blackList: 'default' | 'hide' | 'visible' | 'force_hide' | 'force_visible' | null;
   createdAt: string;
   updatedAt: string;
 }

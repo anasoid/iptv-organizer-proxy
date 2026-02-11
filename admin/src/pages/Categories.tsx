@@ -32,11 +32,12 @@ export default function Categories() {
   const sourceId = useSourceStore((state) => state.selectedSourceId);
   const setSourceId = useSourceStore((state) => state.setSelectedSourceId);
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
+  const [limit, setLimit] = useState(20);
   const [view, setView] = useState<ViewMode>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryType, setCategoryType] = useState<'live' | 'vod' | 'series' | ''>('');
   const [allowDenyFilter, setAllowDenyFilter] = useState<'allow' | 'deny' | 'default' | 'all'>('all');
+  const [blackListFilter, setBlackListFilter] = useState<'all' | 'hidden' | 'visible' | 'force_hidden'>('all');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
@@ -62,6 +63,21 @@ export default function Categories() {
     },
   });
 
+  // Mutation for updating blacklist
+  const updateBlackListMutation = useMutation({
+    mutationFn: ({ id, blackList }: { id: number; blackList: string }) =>
+      categoriesApi.updateBlackList(id, blackList as 'default' | 'hide' | 'visible' | 'force_hide' | 'force_visible'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      setSnackbarMessage('Blacklist status updated successfully');
+      setSnackbarOpen(true);
+    },
+    onError: () => {
+      setSnackbarMessage('Failed to update blacklist status');
+      setSnackbarOpen(true);
+    },
+  });
+
   let categories = data?.data || [];
   const pagination = data?.pagination;
 
@@ -72,6 +88,22 @@ export default function Categories() {
         return cat.allowDeny === null;
       }
       return cat.allowDeny === allowDenyFilter;
+    });
+  }
+
+  // Apply blacklist filter
+  if (blackListFilter !== 'all') {
+    categories = categories.filter((cat) => {
+      if (blackListFilter === 'hidden') {
+        return cat.blackList === 'hide' || cat.blackList === 'force_hide';
+      }
+      if (blackListFilter === 'visible') {
+        return cat.blackList === 'visible' || cat.blackList === 'force_visible';
+      }
+      if (blackListFilter === 'force_hidden') {
+        return cat.blackList === 'force_hide' || cat.blackList === 'force_visible';
+      }
+      return true;
     });
   }
 
@@ -174,6 +206,84 @@ export default function Categories() {
         );
       },
     },
+    {
+      field: 'blackList',
+      headerName: 'Blacklist',
+      width: 140,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => {
+        const category = params.row as any;
+        const isLoading = updateBlackListMutation.isPending;
+        // Handle both camelCase (blackList) and snake_case (black_list) from API
+        // Convert to lowercase to match MenuItem values
+        const rawValue = (category.blackList || category.black_list || 'default').toLowerCase();
+        const value = rawValue === 'default' ? 'default' : rawValue;
+
+        const getBlackListColor = (val: string): 'success' | 'error' | 'warning' | 'info' | 'default' => {
+          switch (val) {
+            case 'hide':
+            case 'force_hide':
+              return 'error';
+            case 'visible':
+            case 'force_visible':
+              return 'success';
+            default:
+              return 'default';
+          }
+        };
+
+        const getBgColor = (val: string) => {
+          switch (val) {
+            case 'hide':
+              return '#ffebee';
+            case 'force_hide':
+              return '#ef5350';
+            case 'visible':
+              return '#e8f5e9';
+            case 'force_visible':
+              return '#66bb6a';
+            default:
+              return '#f5f5f5';
+          }
+        };
+
+        return (
+          <FormControl size="small" sx={{ width: '100%' }} disabled={isLoading}>
+            <Select
+              value={value}
+              onChange={(e) => {
+                e.stopPropagation();
+                updateBlackListMutation.mutate({
+                  id: category.id,
+                  blackList: e.target.value as string,
+                });
+              }}
+              sx={{
+                height: 32,
+                fontSize: '0.875rem',
+                backgroundColor: getBgColor(value),
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: getBlackListColor(value) === 'error' ? '#f44336' : getBlackListColor(value) === 'success' ? '#4caf50' : '#bdbdbd',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: getBlackListColor(value) === 'error' ? '#f44336' : getBlackListColor(value) === 'success' ? '#4caf50' : '#bdbdbd',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: getBlackListColor(value) === 'error' ? '#f44336' : getBlackListColor(value) === 'success' ? '#4caf50' : '#bdbdbd',
+                },
+              }}
+            >
+              <MenuItem value="default">Default</MenuItem>
+              <MenuItem value="hide">Hide</MenuItem>
+              <MenuItem value="visible">Visible</MenuItem>
+              <MenuItem value="force_hide">Force Hide</MenuItem>
+              <MenuItem value="force_visible">Force Visible</MenuItem>
+            </Select>
+          </FormControl>
+        );
+      },
+    },
   ];
 
   const CategoryGridCard = ({ category }: { category: Category }) => (
@@ -213,6 +323,13 @@ export default function Categories() {
             <Chip
               label={category.allowDeny.charAt(0).toUpperCase() + category.allowDeny.slice(1)}
               color={category.allowDeny === 'allow' ? 'success' : 'error'}
+              size="small"
+            />
+          )}
+          {category.blackList && category.blackList !== 'default' && (
+            <Chip
+              label={category.blackList.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+              color={category.blackList === 'hide' || category.blackList === 'force_hide' ? 'error' : 'success'}
               size="small"
             />
           )}
@@ -304,6 +421,26 @@ export default function Categories() {
               </Select>
             </FormControl>
           )}
+
+          {sourceId && (
+            <FormControl sx={{ flex: '0 0 auto', minWidth: 160 }}>
+              <InputLabel>Filter by Blacklist</InputLabel>
+              <Select
+                value={blackListFilter}
+                label="Filter by Blacklist"
+                onChange={(e) => {
+                  setBlackListFilter(e.target.value as 'all' | 'hidden' | 'visible' | 'force_hidden');
+                  setPage(1);
+                }}
+                size="small"
+              >
+                <MenuItem value="all">All</MenuItem>
+                <MenuItem value="hidden">Hidden</MenuItem>
+                <MenuItem value="visible">Visible</MenuItem>
+                <MenuItem value="force_hidden">Force (Hidden/Visible)</MenuItem>
+              </Select>
+            </FormControl>
+          )}
         </Box>
       </Card>
 
@@ -339,55 +476,100 @@ export default function Categories() {
       )}
 
       {/* List View */}
-      {!isLoading && sourceId && view === 'list' && categories.length > 0 && (
+      {!isLoading && sourceId && view === 'list' && (
         <>
-          <Box sx={{ height: 500, width: '100%' }}>
-            <DataGrid
-              rows={categories}
-              columns={columns}
-              pageSizeOptions={[10, 20, 50]}
-              disableSelectionOnClick
-              onRowClick={(params) => navigate(`/categories/${params.row.id}`)}
-              sx={{
-                '& .MuiDataGrid-cell': { py: 1 },
-                '& .MuiDataGrid-row': { cursor: 'pointer' },
-              }}
-              initialState={{
-                pagination: { paginationModel: { pageSize: limit } },
-              }}
-            />
-          </Box>
+          {categories.length > 0 ? (
+            <>
+              <Box sx={{ height: 500, width: '100%' }}>
+                <DataGrid
+                  rows={categories}
+                  columns={columns}
+                  disableSelectionOnClick
+                  onRowClick={(params) => navigate(`/categories/${params.row.id}`)}
+                  hideFooter
+                  sx={{
+                    '& .MuiDataGrid-cell': { py: 1 },
+                    '& .MuiDataGrid-row': { cursor: 'pointer' },
+                  }}
+                />
+              </Box>
+            </>
+          ) : null}
           {pagination && pagination.pages > 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-              <Pagination
-                count={pagination.pages}
-                page={page}
-                onChange={(_, value) => setPage(value)}
-                color="primary"
-              />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'center', flex: 1 }}>
+                <Pagination
+                  count={pagination.pages}
+                  page={page}
+                  onChange={(_, value) => setPage(value)}
+                  color="primary"
+                />
+              </Box>
+              <Box sx={{ ml: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ mr: 1 }}>Page size:</Typography>
+                <FormControl sx={{ minWidth: 80 }} size="small">
+                  <Select
+                    value={limit}
+                    onChange={(e) => {
+                      setLimit(Number(e.target.value));
+                      setPage(1);
+                    }}
+                  >
+                    <MenuItem value={10}>10</MenuItem>
+                    <MenuItem value={20}>20</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
             </Box>
           )}
         </>
       )}
 
       {/* Grid View */}
-      {!isLoading && sourceId && view === 'grid' && categories.length > 0 && (
+      {!isLoading && sourceId && view === 'grid' && (
         <>
-          <Grid container spacing={2}>
-            {categories.map((category) => (
-              <Grid item xs={12} sm={6} md={4} lg={3} key={category.id}>
-                <CategoryGridCard category={category} />
+          {categories.length > 0 ? (
+            <>
+              <Grid container spacing={2}>
+                {categories.map((category) => (
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={category.id}>
+                    <CategoryGridCard category={category} />
+                  </Grid>
+                ))}
               </Grid>
-            ))}
-          </Grid>
+            </>
+          ) : (
+            <Alert severity="info">
+              {searchQuery ? 'No categories match your search.' : 'No categories found for the selected source.'}
+            </Alert>
+          )}
           {pagination && pagination.pages > 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-              <Pagination
-                count={pagination.pages}
-                page={page}
-                onChange={(_, value) => setPage(value)}
-                color="primary"
-              />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'center', flex: 1 }}>
+                <Pagination
+                  count={pagination.pages}
+                  page={page}
+                  onChange={(_, value) => setPage(value)}
+                  color="primary"
+                />
+              </Box>
+              <Box sx={{ ml: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ mr: 1 }}>Page size:</Typography>
+                <FormControl sx={{ minWidth: 80 }} size="small">
+                  <Select
+                    value={limit}
+                    onChange={(e) => {
+                      setLimit(Number(e.target.value));
+                      setPage(1);
+                    }}
+                  >
+                    <MenuItem value={10}>10</MenuItem>
+                    <MenuItem value={20}>20</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
             </Box>
           )}
         </>

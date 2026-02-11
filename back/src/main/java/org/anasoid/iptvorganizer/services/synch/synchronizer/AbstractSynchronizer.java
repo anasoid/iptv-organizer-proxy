@@ -11,6 +11,7 @@ import org.anasoid.iptvorganizer.config.SyncConfig;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
+import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.SourcedEntity;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamLike;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
@@ -20,6 +21,7 @@ import org.anasoid.iptvorganizer.repositories.stream.SynchronizedItemRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SyncLogRepository;
 import org.anasoid.iptvorganizer.services.FilterService;
+import org.anasoid.iptvorganizer.services.synch.BlackListCleanupService;
 import org.anasoid.iptvorganizer.services.synch.SyncLockManager;
 import org.anasoid.iptvorganizer.services.synch.mapper.AbstractSyncMapper;
 import org.anasoid.iptvorganizer.services.synch.mapper.SynchronizedItemMapParameter;
@@ -47,6 +49,8 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
 
   @Inject SyncConfig syncConfig;
 
+  @Inject BlackListCleanupService blackListCleanupService;
+
   protected BaseStreamRepository<T> streamRepository;
   protected AbstractTypedCategoryRepository typedCategoryRepository;
 
@@ -63,6 +67,16 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
   public List<SyncLog> syncAll(Source source) {
     List<SyncLog> result = new ArrayList<>();
     result.add(syncCategories(source));
+
+    // Clean up streams for blacklisted categories after category sync
+    int deletedStreams =
+        blackListCleanupService.cleanupBlacklistedStreams(
+            source, getStreamType(), streamRepository);
+
+    if (deletedStreams > 0) {
+      log.info("Pre-sync cleanup: Removed {} streams from blacklisted categories", deletedStreams);
+    }
+
     result.add(syncStreams(source));
     return result;
   }
@@ -100,6 +114,17 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
       // Get or create unknown category
       Integer unknownCategoryId =
           typedCategoryRepository.getOrCreateUnknownCategory(source.getId());
+
+      // Build category cache for efficient lookups during stream filtering
+      // Only apply blacklist filtering for stream items (not categories)
+      Map<Integer, Category> categoryCache = new HashMap<>();
+      if (synchronizedItemRepository instanceof BaseStreamRepository) {
+        categoryCache =
+            typedCategoryRepository.findBySourceAndTypeAsMap(
+                source.getId(), type.getCategoryType());
+        log.debug("Built category cache with {} categories", categoryCache.size());
+      }
+
       long startStep = System.currentTimeMillis();
       long startByteStep = 0;
       int batchSize = syncConfig.getBatchSize();
@@ -132,6 +157,25 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
           }
 
           log.debug("Processing {} ID: {}", type.getStreamTypeName(), item.getExternalId());
+
+          // Check if stream belongs to blacklisted category (only for BaseStream items)
+          if (synchronizedItemRepository instanceof BaseStreamRepository
+              && item instanceof BaseStream) {
+            BaseStream stream = (BaseStream) item;
+            Integer categoryId = stream.getCategoryId();
+            Category category = categoryCache.get(categoryId);
+            if (category != null
+                && category.getBlackList() != null
+                && category.getBlackList().isHide()) {
+              log.debug(
+                  "Skipping {} ID {} - belongs to blacklisted category: {} ({})",
+                  type.getStreamTypeName(),
+                  item.getExternalId(),
+                  category.getName(),
+                  category.getBlackList());
+              continue; // Skip this stream
+            }
+          }
 
           batch.add(item);
 
@@ -204,19 +248,31 @@ public abstract class AbstractSynchronizer<T extends BaseStream & StreamLike> {
         }
       }
 
+      // Final cleanup: Remove any streams from blacklisted categories (safety net)
+      // Only cleanup streams, not categories
+      int blacklistDeleted = 0;
+      if (synchronizedItemRepository instanceof BaseStreamRepository) {
+        @SuppressWarnings("unchecked")
+        BaseStreamRepository<? extends BaseStream> streamRepo =
+            (BaseStreamRepository<? extends BaseStream>) synchronizedItemRepository;
+        blacklistDeleted =
+            blackListCleanupService.cleanupBlacklistedStreams(source, type, streamRepo);
+      }
+
       long duration = (System.currentTimeMillis() - startTime) / 1000;
       log.info(
-          "{} - Added: {}, Updated: {}, Deleted: {}, Duration(s): {}, Bytes read: {}kb",
+          "{} - Added: {}, Updated: {}, Deleted: {} (orphaned) + {} (blacklisted), Duration(s): {}, Bytes read: {}kb",
           type.getStreamTypeName(),
           added,
           updated,
           toDeleteIds.size(),
+          blacklistDeleted,
           duration,
           bytesRead / 1000);
 
       syncLog.setItemsAdded(syncLog.getItemsAdded() + added);
       syncLog.setItemsUpdated(syncLog.getItemsUpdated() + updated);
-      syncLog.setItemsDeleted(syncLog.getItemsDeleted() + toDeleteIds.size());
+      syncLog.setItemsDeleted(syncLog.getItemsDeleted() + toDeleteIds.size() + blacklistDeleted);
 
       finalizeSyncLog(syncLog, syncStartTime, null);
     } catch (Exception e) {

@@ -14,11 +14,12 @@ import {
   Chip,
   Divider,
 } from '@mui/material';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { ArrowBack, Sync as SyncIcon, PlayArrow, Download as DownloadIcon } from '@mui/icons-material';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ArrowBack, Sync as SyncIcon, PlayArrow, Download as DownloadIcon, BlockOutlined as BlockIcon } from '@mui/icons-material';
 import sourcesApi, { SYNC_TASK_TYPES } from '../services/sourcesApi';
 import { useAuthStore } from '../stores/authStore';
 import AccessControlModal from '../components/AccessControlModal';
+import SourceBlackListForm from '../components/SourceBlackListForm';
 
 // Type definitions for error handling
 interface ApiErrorResponse {
@@ -37,10 +38,12 @@ interface SyncResponse {
 export default function SourceDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
   const [syncingTask, setSyncingTask] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error' | 'warning'; message: string } | null>(null);
   const [accessControlModalOpen, setAccessControlModalOpen] = useState(false);
+  const [blackListModalOpen, setBlackListModalOpen] = useState(false);
 
   const { data: source, isLoading, error } = useQuery({
     queryKey: ['source', id],
@@ -165,13 +168,22 @@ export default function SourceDetail() {
             size="small"
           />
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={<DownloadIcon />}
-          onClick={() => setAccessControlModalOpen(true)}
-        >
-          Access Control
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<BlockIcon />}
+            onClick={() => setBlackListModalOpen(true)}
+          >
+            Blacklist Filter
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={() => setAccessControlModalOpen(true)}
+          >
+            Access Control
+          </Button>
+        </Box>
       </Box>
 
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -266,6 +278,16 @@ export default function SourceDetail() {
         open={accessControlModalOpen}
         onClose={() => setAccessControlModalOpen(false)}
         sourceId={Number(id)}
+      />
+
+      {/* Blacklist Filter Modal */}
+      <SourceBlackListForm
+        open={blackListModalOpen}
+        onClose={() => setBlackListModalOpen(false)}
+        source={source?.data || null}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['source', id] });
+        }}
       />
     </Box>
   );

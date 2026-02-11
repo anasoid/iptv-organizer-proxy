@@ -1,3 +1,0 @@
--- Migration V013 is now deprecated
--- All columns (enable_proxy, enable_tunnel, connect_xtream_api, connect_xtream_stream, connect_xmltv)
--- are now included in the original table creation scripts (V003 and V005)

@@ -17,6 +17,7 @@ export interface Source {
   connectXtreamApi?: 'DEFAULT' | 'TUNNEL' | 'PROXY' | null;
   connectXtreamStream?: 'DIRECT' | 'TUNNEL' | 'PROXY' | 'REDIRECT' | 'DEFAULT' | null;
   connectXmltv?: 'REDIRECT' | 'TUNNEL' | 'PROXY' | 'DEFAULT' | null;
+  blackListFilter?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

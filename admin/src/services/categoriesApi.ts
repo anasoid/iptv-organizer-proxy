@@ -54,6 +54,16 @@ class CategoriesApi {
     const response = await api.patch(`/categories/${id}/allow-deny`, { allowDeny });
     return response.data as CategoryResponse;
   }
+
+  /**
+   * Update category blacklist status
+   * @param id - category database ID
+   * @param blackList - 'hide', 'visible', 'force_hide', 'force_visible', or 'default'
+   */
+  async updateBlackList(id: number, blackList: 'default' | 'hide' | 'visible' | 'force_hide' | 'force_visible') {
+    const response = await api.patch(`/categories/${id}/blacklist`, { blackList });
+    return response.data as CategoryResponse;
+  }
 }
 
 export default new CategoriesApi();

@@ -154,6 +154,8 @@ public class SourcesController extends BaseController {
     if (request.getConnectXmltv() != null) {
       source.setConnectXmltv(request.getConnectXmltv());
     }
+    // Set blackListFilter (can be null to remove filter)
+    source.setBlackListFilter(request.getBlackListFilter());
 
     sourceService.update(source);
     return ResponseUtils.ok(source);
