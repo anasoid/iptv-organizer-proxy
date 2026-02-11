@@ -3,6 +3,8 @@ package org.anasoid.iptvorganizer.services;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.logging.Logger;
+import org.anasoid.iptvorganizer.models.ProxyTunnelStatus;
+import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Proxy;
 import org.anasoid.iptvorganizer.models.entity.ProxyType;
 import org.anasoid.iptvorganizer.models.entity.Source;
@@ -42,6 +44,88 @@ public class ProxyConfigService {
 
     // Fall back to environment variables
     return buildProxyFromEnv();
+  }
+
+  /**
+   * Get proxy configuration for a given client and source, respecting enable flags.
+   *
+   * <p>Resolution logic: 1. Check if proxy is enabled (via client→source inheritance) 2. If
+   * disabled, return null immediately 3. If enabled, load proxy configuration (database →
+   * environment → null)
+   *
+   * @param client The client (can be null)
+   * @param source The source entity to resolve proxy for
+   * @return Proxy object if enabled and configured, null otherwise
+   */
+  public Proxy getProxyConfig(Client client, Source source) {
+    // Check if proxy is enabled
+    if (!resolveEnableProxy(client, source)) {
+      logger.fine("Proxy is disabled for client/source - returning null");
+      return null;
+    }
+
+    // Proxy is enabled - delegate to existing logic
+    return getProxyConfig(source);
+  }
+
+  /**
+   * Check if proxy and tunnel are enabled for a client and source combination.
+   *
+   * <p>Resolution logic (inheritance pattern): - If client value is not null: use client value - If
+   * client value is null: inherit from source value - Default: false (matches schema default)
+   *
+   * @param client The client (can be null)
+   * @param source The source (can be null)
+   * @return ProxyTunnelStatus object with resolved enableProxy and enableTunnel flags
+   */
+  public ProxyTunnelStatus checkProxyTunnelEnabled(Client client, Source source) {
+    boolean enableProxy = resolveEnableProxy(client, source);
+    boolean enableTunnel = resolveEnableTunnel(client, source);
+    return new ProxyTunnelStatus(enableProxy, enableTunnel);
+  }
+
+  /**
+   * Resolve enableProxy setting with priority: client -> source -> default false
+   *
+   * @param client The client (can be null)
+   * @param source The source (can be null)
+   * @return true if proxy is enabled
+   */
+  public boolean resolveEnableProxy(Client client, Source source) {
+    // Priority 1: Client-level setting (if not null)
+    if (client != null && client.getEnableProxy() != null) {
+      return client.getEnableProxy();
+    }
+
+    // Priority 2: Source-level setting
+    if (source != null && source.getEnableProxy() != null) {
+      return source.getEnableProxy();
+    }
+
+    // Default: false (matches schema default)
+    return false;
+  }
+
+  /**
+   * Resolve enableTunnel setting with priority: client -> source -> default false
+   *
+   * @param client The client (can be null)
+   * @param source The source (can be null)
+   * @return true if tunnel is enabled
+   */
+  public boolean resolveEnableTunnel(Client client, Source source) {
+    // Priority 1: Client-level setting (if not null)
+    if (client != null && client.getEnableTunnel() != null) {
+      return client.getEnableTunnel();
+    }
+
+    // Priority 2: Source-level setting
+    if (source != null && source.getEnableTunnel() != null) {
+      return source.getEnableTunnel();
+    }
+
+    // Default: false (matches schema default)
+    return false;
   }
 
   /**

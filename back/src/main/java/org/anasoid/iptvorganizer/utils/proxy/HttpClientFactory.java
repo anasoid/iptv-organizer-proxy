@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ProxyException;
+import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Proxy;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.services.ProxyConfigService;
@@ -72,21 +73,22 @@ public class HttpClientFactory {
   }
 
   /**
-   * Create or retrieve a cached HttpClient for the given source and redirect policy.
+   * Create or retrieve a cached HttpClient for the given client, source and redirect policy.
    *
-   * <p>If no proxy is configured for the source, returns the default HttpClient.
+   * <p>If no proxy is configured for the client/source, returns the default HttpClient.
    *
+   * @param client The client entity (may override proxy settings)
    * @param source The source entity (may contain proxy configuration)
    * @param followRedirects Whether to follow HTTP redirects
    * @return HttpClient configured with proxy settings or default if no proxy
    */
-  public HttpClient createClient(Source source, boolean followRedirects) {
-    // Get proxy configuration for source
-    Proxy proxyConfig = proxyConfigService.getProxyConfig(source);
+  public HttpClient createClient(Client client, Source source, boolean followRedirects) {
+    // Get proxy configuration for client/source, respecting enable flags
+    Proxy proxyConfig = proxyConfigService.getProxyConfig(client, source);
 
     // If no proxy configured, return default client
     if (proxyConfig == null) {
-      log.debug("No proxy configured for source, using default HttpClient");
+      log.debug("No proxy configured for client/source, using default HttpClient");
       return followRedirects ? getDefaultClient() : getDefaultClientNoRedirects();
     }
 
@@ -96,6 +98,22 @@ public class HttpClientFactory {
     // Return cached client or create new one
     return clientCache.computeIfAbsent(
         cacheKey, key -> createClientWithProxy(proxyConfig, followRedirects));
+  }
+
+  /**
+   * Create or retrieve a cached HttpClient for the given source and redirect policy.
+   *
+   * <p>If no proxy is configured for the source, returns the default HttpClient.
+   *
+   * <p><strong>Deprecated:</strong> Use {@link #createClient(Client, Source, boolean)} to respect
+   * client-level enable flags. This method is maintained for backward compatibility.
+   *
+   * @param source The source entity (may contain proxy configuration)
+   * @param followRedirects Whether to follow HTTP redirects
+   * @return HttpClient configured with proxy settings or default if no proxy
+   */
+  public HttpClient createClient(Source source, boolean followRedirects) {
+    return createClient(null, source, followRedirects);
   }
 
   /**

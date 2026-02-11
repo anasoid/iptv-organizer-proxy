@@ -190,8 +190,8 @@ public class StreamProxyHttpClient {
     // Note: streamFollowLocation has been removed in favor of enum-based connection modes
     boolean followRedirects = forceFollowRedirects || true; // Default to true for HTTP redirects
 
-    // Get proxy configuration from source
-    Proxy proxy = proxyConfigService.getProxyConfig(source);
+    // Get proxy configuration from source, respecting client enable flags
+    Proxy proxy = proxyConfigService.getProxyConfig(client, source);
 
     log.debug(
         "HTTP proxy options - followRedirects: {}, proxy configured: {}",
