@@ -219,29 +219,25 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           {...register('expiryDate')}
         />
 
-        <Box sx={{ gridColumn: '1 / -1' }}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                {...register('isActive')}
-                defaultChecked={!client || client.isActive === true}
-              />
-            }
-            label="Active"
-          />
-        </Box>
+        <FormControlLabel
+          control={
+            <Checkbox
+              {...register('isActive')}
+              defaultChecked={!client || client.isActive === true}
+            />
+          }
+          label="Active"
+        />
 
-        <Box sx={{ gridColumn: '1 / -1' }}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                {...register('hideAdultContent')}
-                defaultChecked={client?.hideAdultContent === true}
-              />
-            }
-            label="Hide Adult Content"
-          />
-        </Box>
+        <FormControlLabel
+          control={
+            <Checkbox
+              {...register('hideAdultContent')}
+              defaultChecked={client?.hideAdultContent === true}
+            />
+          }
+          label="Hide Adult Content"
+        />
 
         <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2, gridColumn: '1 / -1' }}>
           <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
