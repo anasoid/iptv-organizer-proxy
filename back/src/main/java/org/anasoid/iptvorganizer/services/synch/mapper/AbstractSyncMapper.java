@@ -8,11 +8,14 @@ import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamLike;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
+import org.anasoid.iptvorganizer.services.synch.BlackListFilterService;
 
 @ApplicationScoped
 public abstract class AbstractSyncMapper<T extends BaseStream & StreamLike> {
 
   @Inject LabelExtractorHelper labelExtractor;
+
+  @Inject BlackListFilterService blackListFilterService;
 
   public Category mapToCategory(SynchronizedItemMapParameter param) {
 
@@ -24,6 +27,11 @@ public abstract class AbstractSyncMapper<T extends BaseStream & StreamLike> {
     category.setNum(param.getNum());
     category.setParentId(getIntValue(param.getData(), "parent_id"));
     category.setLabels(labelExtractor.extractLabels(category.getName()));
+
+    // Apply blacklist filter during import
+    Category.BlackListStatus blackListStatus =
+        blackListFilterService.applyBlackListFilter(category, param.getSource());
+    category.setBlackList(blackListStatus);
 
     return category;
   }

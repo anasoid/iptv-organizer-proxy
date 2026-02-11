@@ -25,7 +25,7 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
   @Override
   protected Long internalInsert(Category category) {
     String sql =
-        "INSERT INTO categories (source_id, external_id, name, type, num, allow_deny, parent_id, labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO categories (source_id, external_id, name, type, num, allow_deny, parent_id, labels, black_list) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setLong(1, category.getSourceId());
@@ -37,6 +37,11 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
           6, category.getAllowDeny() != null ? category.getAllowDeny().getValue() : null);
       stmt.setObject(7, category.getParentId());
       stmt.setString(8, category.getLabels());
+      stmt.setString(
+          9,
+          category.getBlackList() != null
+              ? category.getBlackList().getValue()
+              : Category.BlackListStatus.DEFAULT.getValue());
       stmt.executeUpdate();
       Long id = getGeneratedId(stmt);
       category.setId(id);
@@ -49,7 +54,7 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
   @Override
   protected void internalUpdate(Category category) {
     String sql =
-        "UPDATE categories SET source_id = ?, external_id = ?, name = ?, type = ?, num = ?, allow_deny = ?, parent_id = ?, labels = ? WHERE id = ?";
+        "UPDATE categories SET source_id = ?, external_id = ?, name = ?, type = ?, num = ?, allow_deny = ?, parent_id = ?, labels = ?, black_list = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setLong(1, category.getSourceId());
@@ -61,7 +66,12 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
           6, category.getAllowDeny() != null ? category.getAllowDeny().getValue() : null);
       stmt.setObject(7, category.getParentId());
       stmt.setString(8, category.getLabels());
-      stmt.setLong(9, category.getId());
+      stmt.setString(
+          9,
+          category.getBlackList() != null
+              ? category.getBlackList().getValue()
+              : Category.BlackListStatus.DEFAULT.getValue());
+      stmt.setLong(10, category.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update category", e);
@@ -80,6 +90,7 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
         .allowDeny(BaseStream.AllowDenyStatus.fromValue(rs.getString("allow_deny")))
         .parentId(rs.getObject("parent_id", Integer.class))
         .labels(rs.getString("labels"))
+        .blackList(Category.BlackListStatus.fromValue(rs.getString("black_list")))
         .createdAt(rs.getObject("created_at", LocalDateTime.class))
         .updatedAt(rs.getObject("updated_at", LocalDateTime.class))
         .build();
@@ -239,6 +250,14 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
     if (!Objects.equals(newEntity.getAllowDeny(), existingEntity.getAllowDeny())) return true;
     if (!Objects.equals(newEntity.getParentId(), existingEntity.getParentId())) return true;
     if (!Objects.equals(newEntity.getLabels(), existingEntity.getLabels())) return true;
+
+    // For blackList: Only update if existing is not a FORCE_* override
+    if (existingEntity.getBlackList() != Category.BlackListStatus.FORCE_HIDE
+        && existingEntity.getBlackList() != Category.BlackListStatus.FORCE_VISIBLE) {
+      if (!Objects.equals(newEntity.getBlackList(), existingEntity.getBlackList())) {
+        return true;
+      }
+    }
 
     return false;
   }

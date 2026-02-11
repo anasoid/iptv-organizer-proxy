@@ -30,4 +30,5 @@ public class Source extends BaseEntity {
   private ConnectXtreamApiMode connectXtreamApi;
   private ConnectXtreamStreamMode connectXtreamStream;
   private ConnectXmltvMode connectXmltv;
+  private String blackListFilter;
 }

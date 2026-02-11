@@ -45,7 +45,7 @@ public class SourceRepository extends BaseRepository<Source> {
   @Override
   protected Long internalInsert(Source source) {
     String sql =
-        "INSERT INTO sources (name, url, username, password, sync_interval, is_active, proxy_id, enable_proxy, enable_tunnel, connect_xtream_api, connect_xtream_stream, connect_xmltv) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO sources (name, url, username, password, sync_interval, is_active, proxy_id, enable_proxy, enable_tunnel, connect_xtream_api, connect_xtream_stream, connect_xmltv, black_list_filter) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setString(1, source.getName());
@@ -67,6 +67,7 @@ public class SourceRepository extends BaseRepository<Source> {
               : "DEFAULT");
       stmt.setString(
           12, source.getConnectXmltv() != null ? source.getConnectXmltv().name() : "DEFAULT");
+      stmt.setString(13, source.getBlackListFilter());
       stmt.executeUpdate();
 
       // Get generated key using standard JDBC approach - works with MySQL, H2, SQLite
@@ -86,7 +87,7 @@ public class SourceRepository extends BaseRepository<Source> {
   @Override
   protected void internalUpdate(Source source) {
     String sql =
-        "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, proxy_id = ?, enable_proxy = ?, enable_tunnel = ?, connect_xtream_api = ?, connect_xtream_stream = ?, connect_xmltv = ? WHERE id = ?";
+        "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, proxy_id = ?, enable_proxy = ?, enable_tunnel = ?, connect_xtream_api = ?, connect_xtream_stream = ?, connect_xmltv = ?, black_list_filter = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setString(1, source.getName());
@@ -110,7 +111,8 @@ public class SourceRepository extends BaseRepository<Source> {
               : "DEFAULT");
       stmt.setString(
           14, source.getConnectXmltv() != null ? source.getConnectXmltv().name() : "DEFAULT");
-      stmt.setLong(15, source.getId());
+      stmt.setString(15, source.getBlackListFilter());
+      stmt.setLong(16, source.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update source", e);
@@ -177,6 +179,7 @@ public class SourceRepository extends BaseRepository<Source> {
         .connectXtreamApi(connectXtreamApi)
         .connectXtreamStream(connectXtreamStream)
         .connectXmltv(connectXmltv)
+        .blackListFilter(rs.getString("black_list_filter"))
         .createdAt(rs.getObject("created_at", LocalDateTime.class))
         .updatedAt(rs.getObject("updated_at", LocalDateTime.class))
         .build();

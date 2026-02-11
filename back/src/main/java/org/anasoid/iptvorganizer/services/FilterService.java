@@ -307,7 +307,7 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
    * @param criteria Category matching criteria
    * @return true if category matches criteria
    */
-  protected boolean matchesCategoryCriteria(
+  public boolean matchesCategoryCriteria(
       String categoryName, String categoryLabelsStr, CategoryMatch criteria) {
     categoryName = categoryName != null ? categoryName.toLowerCase() : "";
     List<String> categoryLabels = parseLabels(categoryLabelsStr);
