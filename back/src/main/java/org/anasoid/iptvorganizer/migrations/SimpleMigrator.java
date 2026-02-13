@@ -40,8 +40,7 @@ public class SimpleMigrator {
           "V009__create_series.sql",
           "V010__create_sync_logs.sql",
           "V011__create_connection_logs.sql",
-          "V012__create_proxies.sql",
-          "V014__add_category_blacklist.sql");
+          "V012__create_proxies.sql");
 
   public void startMigrations() {
     log.info("Starting database migrations for: " + dbKind);

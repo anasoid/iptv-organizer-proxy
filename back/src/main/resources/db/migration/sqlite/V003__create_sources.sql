@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS sources (
     connect_xtream_stream TEXT DEFAULT 'DEFAULT',
     connect_xmltv TEXT DEFAULT 'DEFAULT',
     proxy_id INTEGER REFERENCES proxies(id) ON DELETE SET NULL,
+    black_list_filter TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

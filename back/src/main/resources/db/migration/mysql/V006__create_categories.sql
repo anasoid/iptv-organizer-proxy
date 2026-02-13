@@ -8,11 +8,13 @@ CREATE TABLE IF NOT EXISTS categories (
     allow_deny ENUM('allow', 'deny'),
     parent_id INT,
     labels TEXT,
+    black_list VARCHAR(20) NOT NULL DEFAULT 'default' CHECK(black_list IN ('default', 'hide', 'visible', 'force_hide', 'force_visible')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     UNIQUE KEY unique_category (source_id, external_id, type),
     INDEX idx_categories_source_category_num (source_id, external_id, num),
     INDEX idx_categories_allow_deny (allow_deny),
-    INDEX idx_categories_parent_id (parent_id)
+    INDEX idx_categories_parent_id (parent_id),
+    INDEX idx_categories_black_list (black_list)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

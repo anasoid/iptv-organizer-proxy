@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS sources (
     connect_xtream_stream VARCHAR(20) NOT NULL DEFAULT 'DEFAULT',
     connect_xmltv VARCHAR(20) NOT NULL DEFAULT 'DEFAULT',
     proxy_id INT NULL,
+    black_list_filter LONGTEXT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_source_is_active (is_active),
