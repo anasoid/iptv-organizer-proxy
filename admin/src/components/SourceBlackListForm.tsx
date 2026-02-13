@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   Box,
   Button,
-  TextField,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -11,8 +10,6 @@ import {
   Stack,
   IconButton,
   Typography,
-  FormControlLabel,
-  Switch,
   Tabs,
   Tab,
 } from '@mui/material';
@@ -101,14 +98,12 @@ export default function SourceBlackListForm({
   const [tabIndex, setTabIndex] = useState(0);
 
   useEffect(() => {
-    if (source?.blackListFilter) {
-      setRulesYaml(source.blackListFilter);
-    } else {
-      setRulesYaml('');
-    }
+    const rulesValue = source?.blackListFilter || '';
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRulesYaml(rulesValue);
     setError(null);
     setTabIndex(0);
-  }, [source, open]);
+  }, [source?.blackListFilter, open]);
 
   const updateMutation = useMutation({
     mutationFn: (data: Partial<Source>) => sourcesApi.updateSource(source!.id!, data),

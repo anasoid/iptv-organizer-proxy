@@ -21,7 +21,7 @@ import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { ArrowBack as ArrowBackIcon, CheckCircle as CheckCircleIcon, Block as BlockIcon, VisibilityOff as VisibilityOffIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
-import categoriesApi from '../services/categoriesApi';
+import categoriesApi, { type Category } from '../services/categoriesApi';
 import streamsApi from '../services/streamsApi';
 
 export default function CategoryDetail() {
@@ -41,9 +41,9 @@ export default function CategoryDetail() {
     enabled: isAuthenticated && categoryId !== null,
   });
 
-  const category = categoryData?.data;
+  const category = categoryData?.data as Category | undefined;
   // Convert to lowercase to match MenuItem values (backend returns uppercase)
-  const blackListValue = category ? ((category as any).blackList || (category as any).black_list || 'default').toLowerCase() : 'default';
+  const blackListValue = category ? ((category.blackList || category.black_list || 'default').toLowerCase()) : 'default';
 
   // Mutation for updating allow_deny
   const updateAllowDenyMutation = useMutation({

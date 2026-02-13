@@ -213,7 +213,7 @@ export default function Categories() {
       sortable: false,
       filterable: false,
       renderCell: (params) => {
-        const category = params.row as any;
+        const category = params.row as Category;
         const isLoading = updateBlackListMutation.isPending;
         // Handle both camelCase (blackList) and snake_case (black_list) from API
         // Convert to lowercase to match MenuItem values

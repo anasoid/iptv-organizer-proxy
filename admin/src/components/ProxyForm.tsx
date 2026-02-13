@@ -33,7 +33,11 @@ function detectProxyTypeFromUrl(url: string): 'HTTP' | 'HTTPS' | 'SOCKS5' | '' {
 }
 
 // Helper function to get property value (handles both camelCase and snake_case)
-function getProperty(obj: any, camelCase: string, snakeCase: string): any {
+function getProperty(
+  obj: Record<string, unknown> | null | undefined,
+  camelCase: string,
+  snakeCase: string
+): unknown {
   return obj?.[camelCase] ?? obj?.[snakeCase] ?? undefined;
 }
 
@@ -65,14 +69,18 @@ export default function ProxyForm({ proxy, onSuccess, onCancel }: ProxyFormProps
       const timeoutVal = getProperty(proxy, 'timeout', 'timeout');
       const retriesVal = getProperty(proxy, 'maxRetries', 'max_retries');
 
-      setName(nameVal || '');
-      setDescription(descVal || '');
-      setProxyUrl(urlVal || '');
-      setProxyHost(hostVal || '');
+      const urlString = String(urlVal || '');
+      const detectedType = detectProxyTypeFromUrl(urlString);
+
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setName(String(nameVal || ''));
+      setDescription(String(descVal || ''));
+      setProxyUrl(urlString);
+      setProxyHost(String(hostVal || ''));
       setProxyPort(portVal ? String(portVal) : '');
-      setProxyType(detectProxyTypeFromUrl(urlVal || '') || typeVal || '');
-      setProxyUsername(usernameVal || '');
-      setProxyPassword(passwordVal || '');
+      setProxyType(detectedType || String(typeVal || ''));
+      setProxyUsername(String(usernameVal || ''));
+      setProxyPassword(String(passwordVal || ''));
       setTimeout(timeoutVal ? String(timeoutVal) : '');
       setMaxRetries(retriesVal ? String(retriesVal) : '');
     } else {
@@ -89,14 +97,6 @@ export default function ProxyForm({ proxy, onSuccess, onCancel }: ProxyFormProps
       setMaxRetries('');
     }
   }, [proxy]);
-
-  // Auto-detect proxy type when proxyUrl changes
-  useEffect(() => {
-    const detectedType = detectProxyTypeFromUrl(proxyUrl);
-    if (detectedType) {
-      setProxyType(detectedType);
-    }
-  }, [proxyUrl]);
 
   const createMutation = useMutation({
     mutationFn: (data: Parameters<typeof proxiesApi.createProxy>[0]) =>
@@ -218,7 +218,14 @@ export default function ProxyForm({ proxy, onSuccess, onCancel }: ProxyFormProps
           label="Proxy URL"
           placeholder="http://user:pass@proxy.example.com:8080"
           value={proxyUrl}
-          onChange={(e) => setProxyUrl(e.target.value)}
+          onChange={(e) => {
+            const newUrl = e.target.value;
+            setProxyUrl(newUrl);
+            const detectedType = detectProxyTypeFromUrl(newUrl);
+            if (detectedType) {
+              setProxyType(detectedType);
+            }
+          }}
           margin="normal"
           disabled={isLoading}
           helperText="Optional: Full proxy URL (alternative to separate host/port)"

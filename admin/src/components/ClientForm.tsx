@@ -36,9 +36,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
     handleSubmit,
     formState: { errors },
     reset,
-    watch,
     control,
-    getValues,
   } = useForm<Client>({
     defaultValues: client || {
       username: '',
@@ -61,8 +59,6 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
 
   const sourceId = watch('sourceId');
   const filterId = watch('filterId');
-  const enableProxy = watch('enableProxy');
-  const enableTunnel = watch('enableTunnel');
 
   // Fetch sources for dropdown
   const { data: sourcesData } = useQuery({
@@ -259,7 +255,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
                       <Checkbox
                         checked={field.value === true}
                         indeterminate={field.value === null}
-                        onChange={(e) => {
+                        onChange={() => {
                           const currentValue = field.value;
                           // Three-state cycle: null -> true -> false -> null
                           let newValue: boolean | null;
@@ -295,7 +291,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
                       <Checkbox
                         checked={field.value === true}
                         indeterminate={field.value === null}
-                        onChange={(e) => {
+                        onChange={() => {
                           const currentValue = field.value;
                           // Three-state cycle: null -> true -> false -> null
                           let newValue: boolean | null;
