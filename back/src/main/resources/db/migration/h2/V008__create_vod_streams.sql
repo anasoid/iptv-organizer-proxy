@@ -20,6 +20,3 @@ CREATE TABLE IF NOT EXISTS vod_streams (
 
 CREATE INDEX IF NOT EXISTS idx_vod_source_category_num ON vod_streams(source_id, category_id, num);
 CREATE INDEX IF NOT EXISTS idx_vod_source_num ON vod_streams(source_id, num);
-CREATE INDEX IF NOT EXISTS idx_vod_allow_deny ON vod_streams(allow_deny);
-CREATE INDEX IF NOT EXISTS idx_vod_added_date ON vod_streams(added_date);
-CREATE INDEX IF NOT EXISTS idx_vod_release_date ON vod_streams(release_date);

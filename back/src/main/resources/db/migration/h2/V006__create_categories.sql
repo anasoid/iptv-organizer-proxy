@@ -16,6 +16,4 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 CREATE INDEX IF NOT EXISTS idx_categories_source_category_num ON categories(source_id, external_id, num);
-CREATE INDEX IF NOT EXISTS idx_categories_allow_deny ON categories(allow_deny);
-CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);
-CREATE INDEX IF NOT EXISTS idx_categories_black_list ON categories(black_list);
+
