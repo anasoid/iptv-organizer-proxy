@@ -13,11 +13,15 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.StreamingOutput;
 import jakarta.ws.rs.core.UriInfo;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Iterator;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
+import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
@@ -35,7 +39,7 @@ import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
  * /player_api.php?action=get_series_categories - List series categories -
  * /player_api.php?action=get_live_streams - List live streams -
  * /player_api.php?action=get_vod_streams - List VOD streams - /player_api.php?action=get_series -
- * List series
+ * List series - /player_api.php?action=get_series_info - Get detailed series info with episodes
  */
 @Slf4j
 @Path("/player_api.php")
@@ -55,6 +59,8 @@ public class XtreamController {
    * @param username Client username
    * @param password Client password
    * @param action Optional action parameter (empty means authenticate)
+   * @param categoryId Optional category filter
+   * @param seriesId Optional series ID for get_series_info
    * @param uriInfo Request URI info for proxy URL construction
    * @return JSON response with user_info and server_info
    */
@@ -65,6 +71,7 @@ public class XtreamController {
       @QueryParam("password") String password,
       @QueryParam("action") String action,
       @QueryParam("category_id") Long categoryId,
+      @QueryParam("series_id") Integer seriesId,
       @Context UriInfo uriInfo) {
 
     // If no action, treat as authenticate
@@ -78,7 +85,7 @@ public class XtreamController {
     Source source = authResult.getSource();
 
     // Route to appropriate handler
-    return handleAction(action, client, source, categoryId);
+    return handleAction(action, client, source, categoryId, seriesId);
   }
 
   /**
@@ -106,9 +113,11 @@ public class XtreamController {
    * @param client The authenticated client
    * @param source The source
    * @param categoryId Optional category filter
+   * @param seriesId Optional series ID for get_series_info
    * @return Response
    */
-  private Response handleAction(String action, Client client, Source source, Long categoryId) {
+  private Response handleAction(
+      String action, Client client, Source source, Long categoryId, Integer seriesId) {
     switch (action) {
       case "get_live_categories":
         return streamJsonArray(xtreamUserService.getLiveCategories(client, source));
@@ -127,6 +136,15 @@ public class XtreamController {
 
       case "get_series":
         return streamJsonArray(xtreamUserService.getSeries(client, source, categoryId));
+
+      case "get_series_info":
+        if (seriesId == null) {
+          return Response.status(Response.Status.BAD_REQUEST)
+              .entity("{\"error\":\"series_id parameter required\"}")
+              .header("Content-Type", MediaType.APPLICATION_JSON)
+              .build();
+        }
+        return streamSeriesInfo(client, source, seriesId);
 
       default:
         log.warn("Unknown Xtream API action: {}", action);
@@ -185,6 +203,53 @@ public class XtreamController {
                 })
         .header("Content-Type", MediaType.APPLICATION_JSON)
         .build();
+  }
+
+  /**
+   * Stream series info response (proxy passthrough).
+   *
+   * @param client The authenticated client
+   * @param source The source
+   * @param seriesId The series ID
+   * @return Response with streamed JSON
+   */
+  private Response streamSeriesInfo(Client client, Source source, Integer seriesId) {
+    try {
+      HttpStreamingResponse streamResponse =
+          xtreamUserService.getSeriesInfoRaw(client, source, seriesId);
+
+      return Response.ok(
+              (StreamingOutput)
+                  os -> {
+                    try (InputStream is = streamResponse.getBody()) {
+                      byte[] buffer = new byte[8192];
+                      int bytesRead;
+                      while ((bytesRead = is.read(buffer)) != -1) {
+                        os.write(buffer, 0, bytesRead);
+                      }
+                      os.flush();
+                    } catch (IOException ex) {
+                      if (ex.getMessage() != null
+                          && !ex.getMessage().contains("Stream is closed")) {
+                        log.error("Error streaming series info", ex);
+                      }
+                    }
+                  })
+          .header("Content-Type", MediaType.APPLICATION_JSON)
+          .build();
+
+    } catch (NotFoundException ex) {
+      return Response.status(Response.Status.NOT_FOUND)
+          .entity("{\"error\":\"Series not found\"}")
+          .header("Content-Type", MediaType.APPLICATION_JSON)
+          .build();
+
+    } catch (ForbiddenException ex) {
+      return Response.status(Response.Status.FORBIDDEN)
+          .entity("{\"error\":\"Access denied\"}")
+          .header("Content-Type", MediaType.APPLICATION_JSON)
+          .build();
+    }
   }
 
   /**

@@ -3,10 +3,12 @@ package org.anasoid.iptvorganizer.utils.xtream;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import java.io.ByteArrayInputStream;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
+import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
 import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
 import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -214,5 +216,34 @@ class XtreamClientTest {
     // Then: Should return the stream result
     assertThat(result).isNotNull();
     assertThat(result).isEqualTo(mockResult);
+  }
+
+  @Test
+  void testGetSeriesInfoRaw_CorrectUrl() {
+    // Given: Mock streaming service
+    HttpStreamingResponse mockResponse =
+        HttpStreamingResponse.builder()
+            .statusCode(200)
+            .body(new ByteArrayInputStream("{}".getBytes()))
+            .build();
+    when(httpStreamingService.streamHttpWithHeaders(
+            anyString(), any(HttpOptions.class), isNull(), eq(testSource)))
+        .thenReturn(mockResponse);
+
+    // When: Get series info
+    HttpStreamingResponse result = xtreamClient.getSeriesInfoRaw(testSource, 123);
+
+    // Then: Verify correct URL constructed
+    ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(httpStreamingService)
+        .streamHttpWithHeaders(urlCaptor.capture(), any(), isNull(), eq(testSource));
+
+    String capturedUrl = urlCaptor.getValue();
+    assertThat(capturedUrl)
+        .contains("http://upstream.example.com/player_api.php")
+        .contains("action=get_series_info")
+        .contains("series_id=123")
+        .contains("username=upstream_user")
+        .contains("password=upstream_pass");
   }
 }

@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
+import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
 import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
 import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
 
@@ -87,6 +88,34 @@ public class XtreamClient {
   }
 
   /**
+   * Fetch detailed series info as raw streaming response (proxy passthrough).
+   *
+   * @param source The source configuration containing credentials and URL
+   * @param seriesId The series ID to fetch info for
+   * @return HttpStreamingResponse with raw response stream
+   */
+  public HttpStreamingResponse getSeriesInfoRaw(Source source, Integer seriesId) {
+    String url = buildApiUrlWithParam(source, "get_series_info", "series_id", seriesId);
+
+    log.info(
+        "Fetching series info (proxy) for series_id={} from source: {}",
+        seriesId,
+        source.getName());
+
+    try {
+      return httpStreamingService.streamHttpWithHeaders(
+          url, createDefaultHttpOptions(), null, source);
+    } catch (Exception ex) {
+      log.error(
+          "Failed to fetch series info for series_id={} from source {}: {}",
+          seriesId,
+          source.getName(),
+          ex.getMessage());
+      throw ex;
+    }
+  }
+
+  /**
    * Generic method to fetch categories for a given stream type using lazy streaming.
    *
    * @param source The source configuration
@@ -151,6 +180,26 @@ public class XtreamClient {
     return String.format(
         "%s/player_api.php?action=%s&username=%s&password=%s",
         baseUrl, action, source.getUsername(), source.getPassword());
+  }
+
+  /**
+   * Build Xtream Codes API URL with authentication and additional parameter.
+   *
+   * <p>Format:
+   * {baseUrl}/player_api.php?action={action}&username={username}&password={password}&{paramName}={paramValue}
+   *
+   * @param source The source configuration containing base URL and credentials
+   * @param action The Xtream API action (e.g., "get_series_info")
+   * @param paramName Additional parameter name (e.g., "series_id")
+   * @param paramValue Additional parameter value
+   * @return Fully constructed API URL
+   */
+  private String buildApiUrlWithParam(
+      Source source, String action, String paramName, Object paramValue) {
+    String baseUrl = source.getUrl().replaceAll("/$", "");
+    return String.format(
+        "%s/player_api.php?action=%s&username=%s&password=%s&%s=%s",
+        baseUrl, action, source.getUsername(), source.getPassword(), paramName, paramValue);
   }
 
   /**

@@ -12,14 +12,17 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
+import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.LiveStream;
+import org.anasoid.iptvorganizer.models.entity.stream.Series;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
+import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
@@ -28,6 +31,7 @@ import org.anasoid.iptvorganizer.services.stream.SeriesService;
 import org.anasoid.iptvorganizer.services.stream.VodStreamService;
 import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
 import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
+import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 
 /** Service for Xtream Codes API user operations */
 @Slf4j
@@ -43,6 +47,7 @@ public class XtreamUserService {
   @Inject ContentFilterService contentFilterService;
   @Inject ObjectMapper objectMapper;
   @Inject HttpStreamingService httpStreamingService;
+  @Inject XtreamClient xtreamClient;
 
   /**
    * Authenticate client and return server/user info as JSON Map
@@ -211,6 +216,46 @@ public class XtreamUserService {
   public JsonStreamResult<Map<?, ?>> getSeries(Client client, Source source, Long categoryId) {
 
     return getFilteredStreamsByType(client, source, StreamType.SERIES, categoryId);
+  }
+
+  /**
+   * Get detailed series info with access control (proxy passthrough).
+   *
+   * @param client The authenticated client
+   * @param source The source
+   * @param seriesId The series ID to fetch info for
+   * @return HttpStreamingResponse with raw upstream response
+   * @throws NotFoundException if series not in database
+   * @throws ForbiddenException if client access denied
+   */
+  public HttpStreamingResponse getSeriesInfoRaw(Client client, Source source, Integer seriesId) {
+    // Load series from database for filtering check
+    Series series = seriesService.findBySourceAndStreamId(source.getId(), seriesId);
+
+    if (series == null) {
+      log.warn("Series {} not found in database for source {}", seriesId, source.getName());
+      throw new NotFoundException("Series not found");
+    }
+
+    // Load category for filtering
+    Category category = null;
+    if (series.getCategoryId() != null) {
+      category =
+          categoryService.findBySourceAndCategoryId(
+              source.getId(), series.getCategoryId(), "series");
+    }
+
+    // Build filtering context and check access
+    FilterContext context = contentFilterService.buildFilterContext(client);
+    Map<String, Boolean> categoryMatchCache = new HashMap<>();
+
+    if (!contentFilterService.shouldIncludeStream(context, series, category, categoryMatchCache)) {
+      log.warn("Client {} denied access to series {}", client.getUsername(), seriesId);
+      throw new ForbiddenException("Access denied to this series");
+    }
+
+    // Fetch raw response from upstream (proxy passthrough)
+    return xtreamClient.getSeriesInfoRaw(source, seriesId);
   }
 
   /**

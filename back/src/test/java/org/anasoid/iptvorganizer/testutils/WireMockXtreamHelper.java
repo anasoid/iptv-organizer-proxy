@@ -240,4 +240,59 @@ public class WireMockXtreamHelper {
     sb.append("]");
     return sb.toString();
   }
+
+  /**
+   * Stub series info response.
+   *
+   * @param wireMock WireMock server instance
+   * @param seriesId Series ID to stub
+   */
+  public static void stubSeriesInfo(WireMockExtension wireMock, int seriesId) {
+    wireMock.stubFor(
+        get(urlPathEqualTo("/player_api.php"))
+            .withQueryParam("action", equalTo("get_series_info"))
+            .withQueryParam("series_id", equalTo(String.valueOf(seriesId)))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(createSeriesInfoJson(seriesId))));
+  }
+
+  /**
+   * Create JSON for series info response.
+   *
+   * @param seriesId Series ID
+   * @return JSON string
+   */
+  private static String createSeriesInfoJson(int seriesId) {
+    return String.format(
+        """
+        {
+          "episodes": {
+            "1": [
+              {
+                "id": "1001",
+                "season": "1",
+                "episode_num": "1",
+                "title": "Episode 1",
+                "container_extension": "mp4",
+                "info": {
+                  "duration": "45 min",
+                  "plot": "Episode plot"
+                }
+              }
+            ]
+          },
+          "info": {
+            "name": "Test Series %d",
+            "plot": "Test series plot",
+            "cast": "Actor1, Actor2",
+            "genre": "Drama",
+            "rating": "8.5"
+          }
+        }
+        """,
+        seriesId);
+  }
 }
