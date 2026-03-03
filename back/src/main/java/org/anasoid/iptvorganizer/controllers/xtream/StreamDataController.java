@@ -74,7 +74,7 @@ public class StreamDataController {
       @PathParam("ext") String ext,
       @Context UriInfo uriInfo,
       @Context HttpHeaders httpHeaders) {
-    return handleStreamRequest(username, password, streamId, ext, "live", uriInfo, httpHeaders);
+    return handleStreamRequest(username, password, streamId, ext, "live", uriInfo, httpHeaders,true);
   }
 
   /**
@@ -99,7 +99,7 @@ public class StreamDataController {
       @PathParam("ext") String ext,
       @Context UriInfo uriInfo,
       @Context HttpHeaders httpHeaders) {
-    return handleStreamRequest(username, password, streamId, ext, "movie", uriInfo, httpHeaders);
+    return handleStreamRequest(username, password, streamId, ext, "movie", uriInfo, httpHeaders,true);
   }
 
   /**
@@ -124,7 +124,7 @@ public class StreamDataController {
       @PathParam("ext") String ext,
       @Context UriInfo uriInfo,
       @Context HttpHeaders httpHeaders) {
-    return handleStreamRequest(username, password, streamId, ext, "series", uriInfo, httpHeaders);
+    return handleStreamRequest(username, password, streamId, ext, "series", uriInfo, httpHeaders,false);
   }
 
   /**
@@ -146,7 +146,8 @@ public class StreamDataController {
       String ext,
       String streamType,
       UriInfo uriInfo,
-      HttpHeaders httpHeaders) {
+      HttpHeaders httpHeaders,
+      boolean checkAccess) {
 
     // Validate and authenticate client (throws UnauthorizedException if invalid)
     var authResult = xtreamUserService.authenticateAndValidateClient(username, password);
@@ -154,7 +155,7 @@ public class StreamDataController {
     Source source = authResult.getSource();
 
     // Validate stream access
-    if (!hasStreamAccess(client, source, streamId, streamType)) {
+    if (checkAccess && !hasStreamAccess(client, source, streamId, streamType)) {
       log.warn("Client {} attempted to access blocked stream: {}", username, streamId);
       throw new ForbiddenException("Access to stream " + streamId + " is blocked");
     }
