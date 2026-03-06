@@ -74,7 +74,8 @@ public class StreamDataController {
       @PathParam("ext") String ext,
       @Context UriInfo uriInfo,
       @Context HttpHeaders httpHeaders) {
-    return handleStreamRequest(username, password, streamId, ext, "live", uriInfo, httpHeaders,true);
+    return handleStreamRequest(
+        username, password, streamId, ext, "live", uriInfo, httpHeaders, true);
   }
 
   /**
@@ -99,7 +100,8 @@ public class StreamDataController {
       @PathParam("ext") String ext,
       @Context UriInfo uriInfo,
       @Context HttpHeaders httpHeaders) {
-    return handleStreamRequest(username, password, streamId, ext, "movie", uriInfo, httpHeaders,true);
+    return handleStreamRequest(
+        username, password, streamId, ext, "movie", uriInfo, httpHeaders, true);
   }
 
   /**
@@ -124,7 +126,8 @@ public class StreamDataController {
       @PathParam("ext") String ext,
       @Context UriInfo uriInfo,
       @Context HttpHeaders httpHeaders) {
-    return handleStreamRequest(username, password, streamId, ext, "series", uriInfo, httpHeaders,false);
+    return handleStreamRequest(
+        username, password, streamId, ext, "series", uriInfo, httpHeaders, false);
   }
 
   /**
