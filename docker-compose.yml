@@ -1,44 +1,80 @@
+version: '3.8'
 
+# Docker Compose for IPTV Organizer Proxy
+# Full stack: Quarkus Java backend + React admin panel + SQLite database
+# Usage: docker-compose up --build
 
 services:
   app:
-    # Use pre-built image from GitHub Container Registry
-    image: ghcr.io/anasoid/iptv-organizer-proxy:${APP_VERSION:-latest}
+    # Build from Dockerfile using the new Quarkus Java backend
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     container_name: iptv-organizer-proxy
 
     ports:
       - "${APP_PORT:-9090}:9090"
-    volumes:
-      - app-data:/app/data
-      - app-logs:/logs
+
     environment:
-      - APP_URL=http://192.168.8.1:9090
-      - SYNC_ENABLED=${SYNC_ENABLED:-true}
-      - SYNC_CHECK_INTERVAL=${SYNC_CHECK_INTERVAL:-10800}
-      - SYNC_LOCK_TIMEOUT=${SYNC_LOCK_TIMEOUT:-600}
-      - PROXY_URL=http://mitmproxy:8080
-      - PROXY_ENABLED=true
+      # Quarkus HTTP Configuration
+      QUARKUS_HTTP_PORT: 9090
+      QUARKUS_HTTP_HOST: 0.0.0.0
+
+      # Database Configuration - SQLite
+      QUARKUS_DATASOURCE_DB_KIND: sqlite
+      QUARKUS_DATASOURCE_JDBC_URL: "jdbc:sqlite:/app/data/app.sqlite"
+      QUARKUS_DATASOURCE_USERNAME: sa
+      QUARKUS_DATASOURCE_PASSWORD: ""
+
+      # Application URLs
+      APP_URL: "${APP_URL:-http://192.168.8.1:9090}"
+
+      # Security - REQUIRED: Set these in production!
+      JWT_SECRET: "${JWT_SECRET:-changeme-this-is-insecure-in-dev-mode}"
+      SESSION_SECRET: "${SESSION_SECRET:-changeme-this-is-insecure-in-dev-mode}"
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-*}"
+
+      # Feature Flags
+      SYNC_ENABLED: "${SYNC_ENABLED:-true}"
+      SYNC_CHECK_INTERVAL: "${SYNC_CHECK_INTERVAL:-10800}"  # 3 hours
+      SYNC_LOCK_TIMEOUT: "${SYNC_LOCK_TIMEOUT:-600}"        # 10 minutes
+
+      # Proxy Configuration (optional)
+      PROXY_URL: "${PROXY_URL:-http://mitmproxy:8080}"
+      PROXY_ENABLED: "${PROXY_ENABLED:-false}"
+
+      # Logging Configuration
+      QUARKUS_LOG_LEVEL: "${QUARKUS_LOG_LEVEL:-INFO}"
+      QUARKUS_LOG_CONSOLE_FORMAT: "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{2.}] (%t) %s%e%n"
+
+      # Memory and Performance
+      JAVA_OPTS: "-Xms32m -Xmx256m -XX:+UseG1GC"
+
+    volumes:
+      # Persistent SQLite database
+      - app-data:/app/data
+      # Application logs
+      - app-logs:/logs
+
+    restart: unless-stopped
+
+    # Health check for the Quarkus application
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "http://localhost:9090/health",
-        ]
+      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
-  mitmproxy:
-    image: mitmproxy/mitmproxy
-    command: mitmweb --web-host 0.0.0.0 --web-port 8081
-    ports:
-      - "9080:8080" # proxy
-      - "9081:8081" # web UI
+  # Optional: mitmproxy for request/response interception
+  # Uncomment to enable proxy features
+  # mitmproxy:
+  #   image: mitmproxy/mitmproxy:latest
+  #   command: mitmweb --web-host 0.0.0.0 --web-port 8081
+  #   ports:
+  #     - "9080:8080"   # proxy port
+  #     - "9081:8081"   # web UI
+  #   restart: unless-stopped
 
 volumes:
   app-data:

@@ -192,4 +192,26 @@ public abstract class BaseRepository<T extends BaseEntity> {
     }
     return ids;
   }
+
+  /**
+   * Safely converts a ResultSet column value to Boolean, handling SQLite's integer 0/1
+   * representation as well as native Boolean types.
+   *
+   * @param rs the ResultSet
+   * @param column the column name
+   * @return Boolean value, or null if the column is SQL NULL
+   */
+  protected Boolean toBoolean(ResultSet rs, String column) throws SQLException {
+    Object value = rs.getObject(column);
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Boolean) {
+      return (Boolean) value;
+    }
+    if (value instanceof Number) {
+      return ((Number) value).intValue() != 0;
+    }
+    return Boolean.parseBoolean(value.toString());
+  }
 }

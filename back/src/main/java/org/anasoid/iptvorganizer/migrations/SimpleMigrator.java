@@ -22,7 +22,7 @@ public class SimpleMigrator {
   @Inject DataSource dataSource;
 
   @Inject
-  @ConfigProperty(name = "quarkus.datasource.db-kind")
+  @ConfigProperty(name = "app.datasource.dialect", defaultValue = "mysql")
   String dbKind;
 
   // Hardcoded migration list for native image compatibility
@@ -42,10 +42,17 @@ public class SimpleMigrator {
           "V011__create_connection_logs.sql",
           "V012__create_proxies.sql");
 
+  private volatile boolean migrationDone = false;
+
+  public boolean isMigrationDone() {
+    return migrationDone;
+  }
+
   public void startMigrations() {
     log.info("Starting database migrations for: " + dbKind);
     try {
       runMigrations();
+      migrationDone = true;
     } catch (Exception e) {
       log.error("Migration failed", e);
       throw new RuntimeException("Database migration failed", e);
@@ -116,7 +123,7 @@ public class SimpleMigrator {
 
     try (Connection conn = dataSource.getConnection();
         Statement stmt = conn.createStatement()) {
-      stmt.execute(createTableSql);
+      stmt.execute(createTableSql.trim());
       log.debug("schema_version table ensured");
     }
   }
@@ -145,8 +152,8 @@ public class SimpleMigrator {
     try (Connection conn = dataSource.getConnection()) {
       conn.setAutoCommit(false);
       try {
-        // Split SQL by semicolon and execute each statement
-        String[] sqlStatements = sql.split(";");
+        // Split SQL into statements, respecting BEGIN...END blocks (triggers)
+        List<String> sqlStatements = splitSqlStatements(sql);
         Statement stmt = conn.createStatement();
 
         for (String statement : sqlStatements) {
@@ -200,6 +207,75 @@ public class SimpleMigrator {
     } catch (Exception e) {
       throw new RuntimeException("Failed to calculate checksum", e);
     }
+  }
+
+  /**
+   * Splits a SQL script into individual statements, correctly handling multi-statement blocks such
+   * as triggers that contain BEGIN...END with their own semicolons.
+   */
+  private List<String> splitSqlStatements(String sql) {
+    List<String> statements = new ArrayList<>();
+    StringBuilder current = new StringBuilder();
+    int depth = 0; // tracks BEGIN...END nesting depth
+
+    // Normalize line endings
+    String normalized = sql.replace("\r\n", "\n");
+    String[] lines = normalized.split("\n");
+
+    for (String line : lines) {
+      String trimmedLine = line.trim();
+
+      // Skip single-line comments
+      if (trimmedLine.startsWith("--")) {
+        continue;
+      }
+
+      String upperLine = trimmedLine.toUpperCase();
+
+      // Detect BEGIN keyword (trigger body start)
+      if (upperLine.equals("BEGIN") || upperLine.startsWith("BEGIN ")) {
+        depth++;
+      }
+
+      current.append(line).append("\n");
+
+      // Detect END keyword (trigger body end)
+      if (upperLine.equals("END;") || upperLine.equals("END ;")) {
+        depth--;
+        if (depth == 0) {
+          String stmt = current.toString().trim();
+          // Remove trailing semicolon from END; so we add it cleanly
+          if (stmt.endsWith(";")) {
+            stmt = stmt.substring(0, stmt.length() - 1).trim();
+          }
+          if (!stmt.isEmpty()) {
+            statements.add(stmt);
+          }
+          current = new StringBuilder();
+        }
+        continue;
+      }
+
+      // When not inside a BEGIN...END block, split on semicolons
+      if (depth == 0 && trimmedLine.endsWith(";")) {
+        String stmt = current.toString().trim();
+        if (stmt.endsWith(";")) {
+          stmt = stmt.substring(0, stmt.length() - 1).trim();
+        }
+        if (!stmt.isEmpty()) {
+          statements.add(stmt);
+        }
+        current = new StringBuilder();
+      }
+    }
+
+    // Handle any remaining content without trailing semicolon
+    String remaining = current.toString().trim();
+    if (!remaining.isEmpty()) {
+      statements.add(remaining);
+    }
+
+    return statements;
   }
 
   private String getVersion(String filename) {

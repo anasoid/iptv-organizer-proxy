@@ -9,13 +9,13 @@ import jakarta.ws.rs.ext.Provider;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.dto.response.ApiResponse;
 import org.anasoid.iptvorganizer.dto.response.ErrorDetails;
-import org.jboss.logging.Logger;
 
 @Provider
+@Slf4j
 public class GeneralExceptionHandler implements ExceptionMapper<Exception> {
-  private static final Logger log = Logger.getLogger(GeneralExceptionHandler.class);
   private static final int MAX_STACK_TRACE_FRAMES = 20;
 
   @Context private UriInfo uriInfo;
@@ -74,11 +74,13 @@ public class GeneralExceptionHandler implements ExceptionMapper<Exception> {
 
     // Log appropriately based on status
     if (statusCode >= 500) {
-      log.errorf(
-          "Internal server error (%s): %s",
-          errorCode, ex.getMessage(), ex); // Log with full stack trace
+      log.error(
+          "Internal server error ( {} ): {}",
+          errorCode,
+          ex.getMessage(),
+          ex); // Log with full stack trace
     } else {
-      log.warnf("Client error (%s): %s", errorCode, ex.getMessage()); // Log without stack trace
+      log.warn("Client error ( {} )", errorCode, ex.getMessage()); // Log without stack trace
     }
 
     return Response.status(status).entity(ApiResponse.error(errorDetails)).build();

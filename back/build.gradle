@@ -21,6 +21,8 @@ dependencies {
     implementation 'io.quarkus:quarkus-datasource'
     implementation 'io.quarkus:quarkus-jdbc-mysql'
     implementation 'io.quarkus:quarkus-jdbc-postgresql'
+    // SQLite JDBC driver - loaded at runtime via db-kind=other + explicit driver class
+    implementation 'org.xerial:sqlite-jdbc:3.46.0.0'
 
     // Transaction Management
     implementation 'io.quarkus:quarkus-narayana-jta'
@@ -47,8 +49,6 @@ dependencies {
     testImplementation 'io.quarkus:quarkus-junit5'
     testImplementation 'io.rest-assured:rest-assured'
 
-    // SQLite database for testing (in-memory)
-    testImplementation 'org.xerial:sqlite-jdbc:3.46.0.0'
 
     // Mockito for mocking in tests
     testImplementation 'org.mockito:mockito-core'

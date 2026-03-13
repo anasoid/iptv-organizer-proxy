@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.migrations.SimpleMigrator;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
@@ -24,6 +25,8 @@ public class SyncManager {
 
   @Inject SourceRepository sourceRepository;
 
+  @Inject SimpleMigrator simpleMigrator;
+
   @Inject LiveSynchronizer liveSynchronizer;
   @Inject VodSynchronizer vodSynchronizer;
   @Inject SeriesSynchronizer seriesSynchronizer;
@@ -31,6 +34,9 @@ public class SyncManager {
   @Inject SyncLockManager syncLockManager;
 
   public void scheduledSync() {
+    if (!waitForMigration()) {
+      return;
+    }
     log.info("Starting scheduled sync check");
 
     try {
@@ -173,5 +179,39 @@ public class SyncManager {
   /** Trigger full sync (alias for triggerManualSync) */
   public void triggerFullSync(Source source) {
     triggerManualSync(source);
+  }
+
+  /**
+   * Waits up to 60 seconds for database migration to complete, checking every 5 seconds.
+   *
+   * @return true if migration is done, false if timed out or interrupted
+   */
+  private boolean waitForMigration() {
+    if (simpleMigrator.isMigrationDone()) {
+      return true;
+    }
+    log.info("Scheduled sync: waiting for database migration to complete...");
+    int waited = 0;
+    int maxWaitMs = 60_000;
+    int intervalMs = 5_000;
+    while (!simpleMigrator.isMigrationDone() && waited < maxWaitMs) {
+      try {
+        Thread.sleep(intervalMs);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        log.warn("Scheduled sync interrupted while waiting for migration");
+        return false;
+      }
+      waited += intervalMs;
+      log.info("Scheduled sync: still waiting for migration... ({}s elapsed)", waited / 1000);
+    }
+    if (!simpleMigrator.isMigrationDone()) {
+      log.error(
+          "Scheduled sync: migration did not complete within {}s, skipping this run",
+          maxWaitMs / 1000);
+      return false;
+    }
+    log.info("Scheduled sync: migration complete, proceeding");
+    return true;
   }
 }

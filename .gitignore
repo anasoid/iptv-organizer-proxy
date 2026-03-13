@@ -54,3 +54,4 @@ buildUtils/*/build
 target/
 /java/bin/
 /back/bin/
+/back/src/main/resources/META-INF/resources/admin/
