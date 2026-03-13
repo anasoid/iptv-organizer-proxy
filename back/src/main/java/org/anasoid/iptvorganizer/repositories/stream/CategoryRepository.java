@@ -90,7 +90,7 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
         .type(rs.getString("type"))
         .num(rs.getInt("num"))
         .allowDeny(BaseStream.AllowDenyStatus.fromValue(rs.getString("allow_deny")))
-        .parentId(rs.getObject("parent_id", Integer.class))
+        .parentId((Integer) rs.getObject("parent_id"))
         .labels(rs.getString("labels"))
         .blackList(Category.BlackListStatus.fromValue(rs.getString("black_list")))
         .createdAt(rs.getObject("created_at", LocalDateTime.class))
