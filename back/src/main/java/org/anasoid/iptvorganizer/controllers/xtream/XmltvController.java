@@ -66,11 +66,11 @@ public class XmltvController {
     Client client = authResult.getClient();
     Source source = authResult.getSource();
 
-    log.info("XMLTV request from client: {}", username);
+
 
     // Resolve XMLTV connection mode
     ConnectXmltvMode xmltvMode = clientService.resolveConnectXmltv(client, source);
-    log.info("XMLTV connection mode: {}", xmltvMode);
+    log.info("XMLTV request from client: {},mode: {}", username,xmltvMode);
 
     switch (xmltvMode) {
       case REDIRECT:

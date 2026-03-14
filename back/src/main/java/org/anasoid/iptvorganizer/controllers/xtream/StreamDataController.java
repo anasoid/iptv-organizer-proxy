@@ -9,8 +9,6 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
-import java.net.URI;
-import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.models.entity.Client;
@@ -18,7 +16,6 @@ import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.enums.ConnectXtreamStreamMode;
-import org.anasoid.iptvorganizer.models.http.RedirectCheckResult;
 import org.anasoid.iptvorganizer.services.ClientService;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
 import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
@@ -27,7 +24,7 @@ import org.anasoid.iptvorganizer.services.stream.VodStreamService;
 import org.anasoid.iptvorganizer.services.xtream.ContentFilterService;
 import org.anasoid.iptvorganizer.services.xtream.FilterContext;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
-import org.anasoid.iptvorganizer.utils.streaming.StreamProxyHttpClient;
+import org.anasoid.iptvorganizer.utils.streaming.StreamModeHandler;
 
 /**
  * Stream Data Controller
@@ -50,7 +47,7 @@ public class StreamDataController {
   @Inject LiveStreamService liveStreamService;
   @Inject VodStreamService vodStreamService;
   @Inject SeriesService seriesService;
-  @Inject StreamProxyHttpClient streamProxyHttpClient;
+  @Inject StreamModeHandler streamModeHandler;
 
   /**
    * Handle live stream request
@@ -166,75 +163,39 @@ public class StreamDataController {
     // Build stream URL from source
     String streamUrl = buildStreamUrl(source, streamType, streamId, ext);
 
+    ConnectXtreamStreamMode streamMode = clientService.resolveConnectXtreamStream(client, source);
     log.info(
-        "Stream request - user: {}, type: {}, streamId: {}, sourceUrl: {}",
+        "Stream request - user: {},mode: {}, type: {}, streamId: {}, sourceUrl: {}",
         username,
+        streamMode,
         streamType,
         streamId,
         streamUrl);
-
-    return getStream(client, source, streamUrl, uriInfo, httpHeaders);
+    return getStream(client, source, streamUrl, streamMode, uriInfo, httpHeaders);
   }
 
   private Response getStream(
-      Client client, Source source, String streamUrl, UriInfo uriInfo, HttpHeaders httpHeaders) {
-    ConnectXtreamStreamMode streamMode = clientService.resolveConnectXtreamStream(client, source);
+      Client client,
+      Source source,
+      String streamUrl,
+      ConnectXtreamStreamMode streamMode,
+      UriInfo uriInfo,
+      HttpHeaders httpHeaders) {
 
-    switch (streamMode) {
-      case REDIRECT:
-        log.info("Redirect mode - sending 302 redirect to upstream");
-        return Response.seeOther(URI.create(streamUrl)).build();
-
-      case DIRECT:
-        log.info("Direct mode - checking for upstream redirect to hide credentials");
-        RedirectCheckResult redirectCheck =
-            streamProxyHttpClient.checkForRedirect(streamUrl, client, source, httpHeaders);
-        if (redirectCheck.isError()) {
-          return Response.status(Response.Status.BAD_GATEWAY)
-              .entity("Upstream redirect check failed")
-              .build();
-        }
-
-        if (redirectCheck.isRedirect()) {
-          log.info("Returning upstream redirect location: {}", redirectCheck.getLocation());
-          return Response.seeOther(URI.create(redirectCheck.getLocation())).build();
-        } else {
-          // Upstream does NOT redirect - cannot hide credentials
-          log.warn(
-              "Upstream does not redirect, cannot hide credentials. Status: {}",
-              redirectCheck.getStatusCode());
-          return Response.status(Response.Status.BAD_GATEWAY)
-              .entity("Upstream does not provide credential-free redirect")
-              .build();
-        }
-
-      case PROXY:
-        log.info("Proxy mode - encoding URL and redirecting to proxy");
-        String proxyUrl =
-            buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), streamUrl);
-        return Response.seeOther(URI.create(proxyUrl)).build();
-
-      case TUNNEL:
-        log.info("Tunnel mode - using application-level tunneling");
-        // TODO: Implement tunnel mode
-        // For now, fall back to proxy mode
-        String proxyUrlTunnel =
-            buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), streamUrl);
-        return Response.seeOther(URI.create(proxyUrlTunnel)).build();
-
-      case DEFAULT:
-        // Should not happen - default should be resolved by service
-        log.warn("Unexpected DEFAULT mode in getStream");
-        String proxyUrlDefault =
-            buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), streamUrl);
-        return Response.seeOther(URI.create(proxyUrlDefault)).build();
-
-      default:
-        log.warn("Unknown stream mode: {}", streamMode);
-        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-            .entity("Unknown stream mode")
-            .build();
-    }
+    return switch (streamMode) {
+      case REDIRECT -> streamModeHandler.handleRedirectMode(streamUrl);
+      case DIRECT -> streamModeHandler.handleDirectMode(streamUrl, client, source, httpHeaders);
+      case PROXY ->
+          streamModeHandler.handleProxyMode(
+              uriInfo, client.getUsername(), client.getPassword(), streamUrl);
+      case TUNNEL ->
+          streamModeHandler.handleTunnelMode(
+              uriInfo, client.getUsername(), client.getPassword(), streamUrl);
+      case DEFAULT ->
+          streamModeHandler.handleProxyMode(
+              uriInfo, client.getUsername(), client.getPassword(), streamUrl);
+      default -> streamModeHandler.handleUnknownMode(streamMode.toString());
+    };
   }
 
   /**
@@ -251,30 +212,6 @@ public class StreamDataController {
     return String.format(
         "%s/%s/%s/%s/%s.%s",
         baseUrl, streamType, source.getUsername(), source.getPassword(), streamId, ext);
-  }
-
-  /**
-   * Build proxy redirect URL
-   *
-   * @param uriInfo Request URI info
-   * @param username Client username
-   * @param password Client password
-   * @param url stream URL
-   * @return Proxy URL
-   */
-  private String buildProxyUrl(UriInfo uriInfo, String username, String password, String url) {
-    String encodedUrl = Base64.getUrlEncoder().encodeToString(url.getBytes());
-    var baseUri = uriInfo.getBaseUri();
-    String baseUrl =
-        baseUri.getScheme()
-            + "://"
-            + baseUri.getHost()
-            + (baseUri.getPort() > 0
-                    && baseUri.getPort() != (baseUri.getScheme().equals("https") ? 443 : 80)
-                ? ":" + baseUri.getPort()
-                : "");
-
-    return baseUrl + "/proxy/" + username + "/" + password + "?url=" + encodedUrl;
   }
 
   /**
