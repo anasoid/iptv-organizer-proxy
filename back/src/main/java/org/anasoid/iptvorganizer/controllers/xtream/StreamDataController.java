@@ -210,26 +210,23 @@ public class StreamDataController {
 
       case PROXY:
         log.info("Proxy mode - encoding URL and redirecting to proxy");
-        String encodedUrl = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
         String proxyUrl =
-            buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrl);
+            buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), streamUrl);
         return Response.seeOther(URI.create(proxyUrl)).build();
 
       case TUNNEL:
         log.info("Tunnel mode - using application-level tunneling");
         // TODO: Implement tunnel mode
         // For now, fall back to proxy mode
-        String encodedUrlTunnel = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
         String proxyUrlTunnel =
-            buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrlTunnel);
+            buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), streamUrl);
         return Response.seeOther(URI.create(proxyUrlTunnel)).build();
 
       case DEFAULT:
         // Should not happen - default should be resolved by service
         log.warn("Unexpected DEFAULT mode in getStream");
-        String encodedUrlDefault = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
         String proxyUrlDefault =
-            buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrlDefault);
+            buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), streamUrl);
         return Response.seeOther(URI.create(proxyUrlDefault)).build();
 
       default:
@@ -262,11 +259,11 @@ public class StreamDataController {
    * @param uriInfo Request URI info
    * @param username Client username
    * @param password Client password
-   * @param encodedUrl Base64 encoded stream URL
+   * @param url stream URL
    * @return Proxy URL
    */
-  private String buildProxyUrl(
-      UriInfo uriInfo, String username, String password, String encodedUrl) {
+  private String buildProxyUrl(UriInfo uriInfo, String username, String password, String url) {
+    String encodedUrl = Base64.getUrlEncoder().encodeToString(url.getBytes());
     var baseUri = uriInfo.getBaseUri();
     String baseUrl =
         baseUri.getScheme()
