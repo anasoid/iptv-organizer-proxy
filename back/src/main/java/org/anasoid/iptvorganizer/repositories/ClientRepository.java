@@ -29,7 +29,7 @@ public class ClientRepository extends BaseRepository<Client> {
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setLong(1, client.getSourceId());
-      stmt.setLong(2, client.getFilterId());
+      stmt.setObject(2, client.getFilterId());
       stmt.setString(3, client.getUsername());
       stmt.setString(4, client.getPassword());
       stmt.setString(5, client.getName());
@@ -64,7 +64,7 @@ public class ClientRepository extends BaseRepository<Client> {
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setLong(1, client.getSourceId());
-      stmt.setLong(2, client.getFilterId());
+      stmt.setObject(2, client.getFilterId());
       stmt.setString(3, client.getUsername());
       stmt.setString(4, client.getPassword());
       stmt.setString(5, client.getName());
