@@ -16,7 +16,7 @@ import {
   InputLabel,
   Select,
 } from '@mui/material';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useWatch } from 'react-hook-form';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import type { Client } from '../services/clientsApi';
 import clientsApi from '../services/clientsApi';
@@ -37,6 +37,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
     formState: { errors },
     reset,
     control,
+    watch,
   } = useForm<Client>({
     defaultValues: client || {
       username: '',

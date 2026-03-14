@@ -19,6 +19,7 @@ services:
 
       # Database - SQLite (db-kind=other + org.sqlite.JDBC baked in at build time)
       # Override the path here if needed
+      QUARKUS_DATASOURCE_DB_KIND: other
       QUARKUS_DATASOURCE_JDBC_URL: "jdbc:sqlite:/app/data/app.sqlite"
       QUARKUS_DATASOURCE_USERNAME: ""
       QUARKUS_DATASOURCE_PASSWORD: ""
