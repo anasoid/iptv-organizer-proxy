@@ -117,7 +117,7 @@ public class DatabaseUtils {
 
       // Cache the detected vendor for future use
       cachedVendor = vendor;
-      log.info("Detected and cached database vendor: {} (product name: {})", vendor, productName);
+      log.debug("Detected and cached database vendor: {} (product name: {})", vendor, productName);
       return vendor;
 
     } catch (SQLException e) {
