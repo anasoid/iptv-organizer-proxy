@@ -39,7 +39,6 @@ import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 public class XmltvController {
 
   private static final int CHUNK_SIZE = 8192;
-  private static final String XMLTV_ACTION = "get_xmltv";
 
   @Inject XtreamUserService xtreamUserService;
   @Inject ClientService clientService;
@@ -66,11 +65,9 @@ public class XmltvController {
     Client client = authResult.getClient();
     Source source = authResult.getSource();
 
-
-
     // Resolve XMLTV connection mode
     ConnectXmltvMode xmltvMode = clientService.resolveConnectXmltv(client, source);
-    log.info("XMLTV request from client: {},mode: {}", username,xmltvMode);
+    log.info("XMLTV request from client: {},mode: {}", username, xmltvMode);
 
     switch (xmltvMode) {
       case REDIRECT:
@@ -156,7 +153,7 @@ public class XmltvController {
                           ex.getMessage());
                     }
                   } catch (Exception ex) {
-                    log.error("Error streaming XMLTV: {}", ex.getMessage());
+                    log.error("Error streaming XMLTV: {}", ex);
                   } finally {
                     if (inputStream != null) {
                       try {
@@ -181,8 +178,8 @@ public class XmltvController {
   private String buildXmltvUrl(Source source) {
     String baseUrl = source.getUrl().replaceAll("/$", "");
     return String.format(
-        "%s/player_api.php?action=%s&username=%s&password=%s",
-        baseUrl, XMLTV_ACTION, source.getUsername(), source.getPassword());
+        "%s/xmltv.php?username=%s&password=%s",
+        baseUrl, source.getUsername(), source.getPassword());
   }
 
   /**
