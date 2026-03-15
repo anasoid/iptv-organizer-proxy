@@ -75,4 +75,6 @@ public abstract class BaseStream extends SourcedEntity {
       throw new IllegalArgumentException("Unknown allow/deny status: " + value);
     }
   }
+
+  public abstract StreamType getStreamType();
 }

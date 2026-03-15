@@ -116,6 +116,34 @@ public class XtreamClient {
   }
 
   /**
+   * Fetch detailed series info as raw streaming response (proxy passthrough).
+   *
+   * @param source The source configuration containing credentials and URL
+   * @param streamId The series ID to fetch info for
+   * @return HttpStreamingResponse with raw response stream
+   */
+  public HttpStreamingResponse getLiveSimpleDataTableRaw(Source source, Integer streamId) {
+    String url = buildApiUrlWithParam(source, "get_simple_data_table", "stream_id", streamId);
+
+    log.info(
+            "Fetching simple datatable info (proxy) for stream_id={} from source: {}",
+            streamId,
+            source.getName());
+
+    try {
+      return httpStreamingService.streamHttpWithHeaders(
+              url, createDefaultHttpOptions(), null, source);
+    } catch (Exception ex) {
+      log.error(
+              "Failed to fetch simple datatable info for stream_id={} from source {}: {}",
+              streamId,
+              source.getName(),
+              ex.getMessage());
+      throw ex;
+    }
+  }
+
+  /**
    * Generic method to fetch categories for a given stream type using lazy streaming.
    *
    * @param source The source configuration

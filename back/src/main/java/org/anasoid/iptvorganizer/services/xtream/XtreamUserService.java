@@ -223,6 +223,30 @@ public class XtreamUserService {
    *
    * @param client The authenticated client
    * @param source The source
+   * @return HttpStreamingResponse with raw upstream response
+   * @throws NotFoundException if series not in database
+   * @throws ForbiddenException if client access denied
+   */
+  public HttpStreamingResponse getLiveSimpleDataTableRaw(
+      Client client, Source source, Integer streamId) {
+    // Load series from database for filtering check
+    LiveStream stream = liveStreamService.findBySourceAndStreamId(source.getId(), streamId);
+    if (stream == null) {
+      log.warn("stream {} not found in database for source {}", streamId, source.getName());
+      throw new NotFoundException("Series not found");
+    }
+    checkStreamAccess(stream, client, source);
+    // Fetch raw response from upstream (proxy passthrough)
+    return xtreamClient.getLiveSimpleDataTableRaw(source, streamId);
+  }
+
+
+
+  /**
+   * detailed series info with access control (proxy passthrough).
+   *
+   * @param client The authenticated client
+   * @param source The source
    * @param seriesId The series ID to fetch info for
    * @return HttpStreamingResponse with raw upstream response
    * @throws NotFoundException if series not in database
@@ -230,34 +254,37 @@ public class XtreamUserService {
    */
   public HttpStreamingResponse getSeriesInfoRaw(Client client, Source source, Integer seriesId) {
     // Load series from database for filtering check
-    Series series = seriesService.findBySourceAndStreamId(source.getId(), seriesId);
+    Series stream = seriesService.findBySourceAndStreamId(source.getId(), seriesId);
 
-    if (series == null) {
+    if (stream == null) {
       log.warn("Series {} not found in database for source {}", seriesId, source.getName());
       throw new NotFoundException("Series not found");
     }
 
+    checkStreamAccess(stream, client, source);
+    // Fetch raw response from upstream (proxy passthrough)
+    return xtreamClient.getSeriesInfoRaw(source, seriesId);
+  }
+
+  private void checkStreamAccess(BaseStream stream, Client client, Source source) {
+
     // Load category for filtering
     Category category = null;
-    if (series.getCategoryId() != null) {
+    if (stream.getCategoryId() != null) {
       category =
-          categoryService.findBySourceAndCategoryId(
-              source.getId(), series.getCategoryId(), "series");
+              categoryService.findBySourceAndCategoryId(
+                      source.getId(), stream.getCategoryId(), stream.getStreamType().getCategoryType());
     }
 
     // Build filtering context and check access
     FilterContext context = contentFilterService.buildFilterContext(client);
     Map<String, Boolean> categoryMatchCache = new HashMap<>();
 
-    if (!contentFilterService.shouldIncludeStream(context, series, category, categoryMatchCache)) {
-      log.warn("Client {} denied access to series {}", client.getUsername(), seriesId);
+    if (!contentFilterService.shouldIncludeStream(context, stream, category, categoryMatchCache)) {
+      log.warn("Client {} denied access to series {}", client.getUsername(), stream);
       throw new ForbiddenException("Access denied to this series");
     }
-
-    // Fetch raw response from upstream (proxy passthrough)
-    return xtreamClient.getSeriesInfoRaw(source, seriesId);
   }
-
   /**
    * Fetch authentication data from upstream source
    *

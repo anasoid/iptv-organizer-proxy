@@ -8,5 +8,8 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
 public class LiveStream extends BaseStream implements StreamLike {
-  // All fields are inherited from BaseStream
+  @Override
+  public StreamType getStreamType() {
+    return StreamType.LIVE;
+  }
 }
