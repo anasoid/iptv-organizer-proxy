@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Box,
@@ -14,12 +14,18 @@ import {
   Alert,
   IconButton,
   Chip,
+  TableSortLabel,
 } from '@mui/material';
 import { Refresh as RefreshIcon } from '@mui/icons-material';
 import { cacheApi, type CacheStat } from '../services/cacheApi';
 
+type OrderBy = 'cacheName' | 'size' | 'maxSize' | 'hits' | 'misses' | 'hitRate' | 'puts' | 'sizeEvictions' | 'expiredEvictions' | 'totalEvictions' | 'invalidations' | 'clears';
+type Order = 'asc' | 'desc';
+
 export default function CacheStats() {
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [orderBy, setOrderBy] = useState<OrderBy>('cacheName');
+  const [order, setOrder] = useState<Order>('asc');
 
   const { data: cacheStats, isLoading, error, refetch } = useQuery({
     queryKey: ['cacheStats', lastRefresh],
@@ -30,6 +36,39 @@ export default function CacheStats() {
     setLastRefresh(new Date());
     refetch();
   };
+
+  const handleSort = (column: OrderBy) => {
+    const isAsc = orderBy === column && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(column);
+  };
+
+  const sortedCacheStats = useMemo(() => {
+    if (!cacheStats) return [];
+    
+    return [...cacheStats].sort((a, b) => {
+      let aVal: number | string;
+      let bVal: number | string;
+
+      if (orderBy === 'hitRate') {
+        aVal = a.hits + a.misses > 0 ? a.hits / (a.hits + a.misses) : 0;
+        bVal = b.hits + b.misses > 0 ? b.hits / (b.hits + b.misses) : 0;
+      } else if (orderBy === 'totalEvictions') {
+        aVal = a.sizeEvictions + a.expiredEvictions;
+        bVal = b.sizeEvictions + b.expiredEvictions;
+      } else if (orderBy === 'cacheName') {
+        aVal = a.cacheName;
+        bVal = b.cacheName;
+      } else {
+        aVal = a[orderBy];
+        bVal = b[orderBy];
+      }
+
+      if (aVal < bVal) return order === 'asc' ? -1 : 1;
+      if (aVal > bVal) return order === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [cacheStats, orderBy, order]);
 
   const formatNumber = (num: number): string => {
     return num.toLocaleString();
@@ -64,27 +103,123 @@ export default function CacheStats() {
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
           <CircularProgress />
         </Box>
-      ) : cacheStats && cacheStats.length > 0 ? (
+      ) : sortedCacheStats && sortedCacheStats.length > 0 ? (
         <TableContainer component={Paper}>
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell><strong>Cache Name</strong></TableCell>
-                <TableCell align="right"><strong>Size</strong></TableCell>
-                <TableCell align="right"><strong>Max Size</strong></TableCell>
-                <TableCell align="right"><strong>Hits</strong></TableCell>
-                <TableCell align="right"><strong>Misses</strong></TableCell>
-                <TableCell align="right"><strong>Hit Rate</strong></TableCell>
-                <TableCell align="right"><strong>Puts</strong></TableCell>
-                <TableCell align="right"><strong>Size Evictions</strong></TableCell>
-                <TableCell align="right"><strong>Expired Evictions</strong></TableCell>
-                <TableCell align="right"><strong>Total Evictions</strong></TableCell>
-                <TableCell align="right"><strong>Invalidations</strong></TableCell>
-                <TableCell align="right"><strong>Clears</strong></TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={orderBy === 'cacheName'}
+                    direction={orderBy === 'cacheName' ? order : 'asc'}
+                    onClick={() => handleSort('cacheName')}
+                  >
+                    <strong>Cache Name</strong>
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right">
+                  <TableSortLabel
+                    active={orderBy === 'size'}
+                    direction={orderBy === 'size' ? order : 'asc'}
+                    onClick={() => handleSort('size')}
+                  >
+                    <strong>Size</strong>
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right">
+                  <TableSortLabel
+                    active={orderBy === 'maxSize'}
+                    direction={orderBy === 'maxSize' ? order : 'asc'}
+                    onClick={() => handleSort('maxSize')}
+                  >
+                    <strong>Max Size</strong>
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right">
+                  <TableSortLabel
+                    active={orderBy === 'hits'}
+                    direction={orderBy === 'hits' ? order : 'asc'}
+                    onClick={() => handleSort('hits')}
+                  >
+                    <strong>Hits</strong>
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right">
+                  <TableSortLabel
+                    active={orderBy === 'misses'}
+                    direction={orderBy === 'misses' ? order : 'asc'}
+                    onClick={() => handleSort('misses')}
+                  >
+                    <strong>Misses</strong>
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right">
+                  <TableSortLabel
+                    active={orderBy === 'hitRate'}
+                    direction={orderBy === 'hitRate' ? order : 'asc'}
+                    onClick={() => handleSort('hitRate')}
+                  >
+                    <strong>Hit Rate</strong>
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right">
+                  <TableSortLabel
+                    active={orderBy === 'puts'}
+                    direction={orderBy === 'puts' ? order : 'asc'}
+                    onClick={() => handleSort('puts')}
+                  >
+                    <strong>Puts</strong>
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right">
+                  <TableSortLabel
+                    active={orderBy === 'sizeEvictions'}
+                    direction={orderBy === 'sizeEvictions' ? order : 'asc'}
+                    onClick={() => handleSort('sizeEvictions')}
+                  >
+                    <strong>Size Evictions</strong>
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right">
+                  <TableSortLabel
+                    active={orderBy === 'expiredEvictions'}
+                    direction={orderBy === 'expiredEvictions' ? order : 'asc'}
+                    onClick={() => handleSort('expiredEvictions')}
+                  >
+                    <strong>Expired Evictions</strong>
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right">
+                  <TableSortLabel
+                    active={orderBy === 'totalEvictions'}
+                    direction={orderBy === 'totalEvictions' ? order : 'asc'}
+                    onClick={() => handleSort('totalEvictions')}
+                  >
+                    <strong>Total Evictions</strong>
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right">
+                  <TableSortLabel
+                    active={orderBy === 'invalidations'}
+                    direction={orderBy === 'invalidations' ? order : 'asc'}
+                    onClick={() => handleSort('invalidations')}
+                  >
+                    <strong>Invalidations</strong>
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right">
+                  <TableSortLabel
+                    active={orderBy === 'clears'}
+                    direction={orderBy === 'clears' ? order : 'asc'}
+                    onClick={() => handleSort('clears')}
+                  >
+                    <strong>Clears</strong>
+                  </TableSortLabel>
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {cacheStats.map((stat: CacheStat) => {
+              {sortedCacheStats.map((stat: CacheStat) => {
                 const hitRate = stat.hits + stat.misses > 0 
                   ? stat.hits / (stat.hits + stat.misses) 
                   : 0;

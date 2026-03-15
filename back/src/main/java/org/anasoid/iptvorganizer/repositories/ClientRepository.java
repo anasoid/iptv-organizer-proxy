@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.enums.ClientConnectXmltvMode;
 import org.anasoid.iptvorganizer.models.enums.ClientConnectXtreamApiMode;
@@ -165,12 +166,18 @@ public class ClientRepository extends BaseRepository<Client> {
 
   /** Find client by username */
   public Client findByUsername(String username) {
+    Optional<Client> cacheOpt = getCache().get(username);
+    if (cacheOpt.isPresent()) {
+      return cacheOpt.get();
+    }
     String sql = "SELECT * FROM clients WHERE username = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setString(1, username);
       try (ResultSet rs = stmt.executeQuery()) {
-        return rs.next() ? mapRow(rs) : null;
+        Client client = rs.next() ? mapRow(rs) : null;
+        getCache().put(username, client.getId(), client);
+        return client;
       }
     } catch (SQLException e) {
       throw new RuntimeException("Failed to find client by username: " + username, e);
