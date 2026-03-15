@@ -1,4 +1,4 @@
-package org.anasoid.iptvorganizer.controllers;
+package org.anasoid.iptvorganizer.controllers.proxy;
 
 import io.vertx.core.http.HttpClosedException;
 import jakarta.enterprise.context.ApplicationScoped;
