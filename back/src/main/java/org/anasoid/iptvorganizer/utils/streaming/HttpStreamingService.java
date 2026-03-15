@@ -163,7 +163,7 @@ public class HttpStreamingService {
     final HttpOptions finalOptions = options;
     int maxRetries = finalOptions.getMaxRetries() != null ? finalOptions.getMaxRetries() : 1;
 
-    log.info("Starting HTTP stream request with headers to: {}", url);
+    log.debug("Starting HTTP stream request with headers to: {}", url);
 
     // Sequential retry logic
     Exception lastException = null;
@@ -260,7 +260,7 @@ public class HttpStreamingService {
         log.warn("HTTP error response: {} for URL: {}", response.statusCode(), url);
       }
 
-      log.info(
+      log.debug(
           "HTTP request with headers successful for: {}, status: {}", url, response.statusCode());
 
       return HttpStreamingResponse.builder()
