@@ -106,7 +106,8 @@ public class ClientsController extends BaseController {
 
     // Merge non-null fields from request into existing client
     if (request.getSourceId() != null) client.setSourceId(request.getSourceId());
-    if (request.getFilterId() != null) client.setFilterId(request.getFilterId());
+    // Always update filterId (can be null to clear the filter)
+    client.setFilterId(request.getFilterId());
     if (request.getUsername() != null) client.setUsername(request.getUsername());
     if (request.getPassword() != null && !request.getPassword().isBlank())
       client.setPassword(request.getPassword());

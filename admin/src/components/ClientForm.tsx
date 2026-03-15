@@ -38,8 +38,9 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
     reset,
     control,
     watch,
+    setValue,
   } = useForm<Client>({
-    defaultValues: client || {
+    defaultValues: {
       username: '',
       password: '',
       name: '',
@@ -89,23 +90,55 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
 
   useEffect(() => {
     if (client) {
-      // Reset form with client data, preserving null values for three-state checkboxes
+      // Reset form with client data, preserving null values
       reset({
-        ...client,
+        username: client.username,
+        password: client.password,
+        name: client.name || '',
+        sourceId: client.sourceId,
+        filterId: client.filterId || null,
+        email: client.email || '',
+        expiryDate: client.expiryDate || undefined,
+        isActive: client.isActive,
+        hideAdultContent: client.hideAdultContent || false,
         enableProxy: client.enableProxy ?? null,
         enableTunnel: client.enableTunnel ?? null,
+        connectXtreamApi: client.connectXtreamApi || null,
+        connectXtreamStream: client.connectXtreamStream || null,
+        connectXmltv: client.connectXmltv || null,
+        notes: client.notes || '',
+      });
+    } else {
+      // Reset to default values for new client
+      reset({
+        username: '',
+        password: '',
+        name: '',
+        sourceId: undefined,
+        filterId: null,
+        email: '',
+        expiryDate: undefined,
+        isActive: true,
+        hideAdultContent: false,
+        enableProxy: null,
+        enableTunnel: null,
+        connectXtreamApi: null,
+        connectXtreamStream: null,
+        connectXmltv: null,
+        notes: '',
       });
     }
   }, [client, reset]);
 
   const onSubmit = (data: Client) => {
+    console.log('Form data before processing:', data);
+    
     // Ensure null values are preserved in the submission
-    // enableProxy and enableTunnel can be null (for inheritance) or true/false
     const clientData = {
       ...data,
-      // Explicitly preserve null values
       enableProxy: data.enableProxy === undefined ? null : data.enableProxy,
       enableTunnel: data.enableTunnel === undefined ? null : data.enableTunnel,
+      filterId: !data.filterId ? null : Number(data.filterId),
     };
 
     console.log('Submitting client data:', clientData);
@@ -153,23 +186,37 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           )}
         </TextField>
 
-        <TextField
-          select
-          label="Filter (Optional)"
-          fullWidth
-          value={filterId || ''}
-          {...register('filterId')}
-        >
-          <MenuItem value="">None</MenuItem>
-          {Array.isArray(filtersData?.data) &&
-            filtersData.data.map(
-              (filter: { id: number; name: string }) => (
-                <MenuItem key={filter.id} value={filter.id}>
-                  {filter.name}
-                </MenuItem>
-              )
-            )}
-        </TextField>
+        <Controller
+          name="filterId"
+          control={control}
+          render={({ field }) => (
+            <TextField
+              select
+              label="Filter (Optional)"
+              fullWidth
+              value={field.value ?? ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                console.log('Filter changed to:', val, 'type:', typeof val);
+                if (val === '' || val === 'None') {
+                  field.onChange(null);
+                } else {
+                  field.onChange(Number(val));
+                }
+              }}
+            >
+              <MenuItem value="">None</MenuItem>
+              {Array.isArray(filtersData?.data) &&
+                filtersData.data.map(
+                  (filter: { id: number; name: string }) => (
+                    <MenuItem key={filter.id} value={filter.id}>
+                      {filter.name}
+                    </MenuItem>
+                  )
+                )}
+            </TextField>
+          )}
+        />
 
         <TextField
           label="Username"
