@@ -10,8 +10,6 @@ import lombok.Getter;
  * Named cache facade that delegates to {@link CacheManager} without requiring the caller to pass a
  * cache name on every operation.
  *
- * <p>Obtain an instance via {@link CacheManager#getCache(String)}:
- *
  * <pre>{@code
  * @Inject CacheManager cacheManager;
  *
@@ -24,14 +22,23 @@ public class Cache {
 
   /** Logical name of this cache. */
   @Getter private final String name;
+
   private final CacheManager manager;
+
   /** Maximum number of live entries; 0 means unlimited. */
   @Getter private final int maxSize;
 
-  Cache(String name, CacheManager manager, int maxSize) {
+  /**
+   * Default TTL applied to every {@code put} and {@code getOrLoad} call that does not supply an
+   * explicit duration. {@code null} means entries are stored permanently by default.
+   */
+  @Getter private final Duration ttl;
+
+  Cache(String name, CacheManager manager, int maxSize, Duration ttl) {
     this.name = name;
     this.manager = manager;
     this.maxSize = maxSize;
+    this.ttl = ttl;
   }
 
   // -------------------------------------------------------------------------
@@ -39,35 +46,23 @@ public class Cache {
   // -------------------------------------------------------------------------
 
   /**
-   * Stores {@code value} under the given keys with a TTL.
-   * At least one of {@code stringKey} / {@code longKey} must be non-null.
-   */
-  public void put(String stringKey, Long longKey, Object value, Duration ttl) {
-    manager.put(name, stringKey, longKey, value, ttl);
-  }
-
-  /**
-   * Stores {@code value} permanently (no expiry) under the given keys.
-   * At least one of {@code stringKey} / {@code longKey} must be non-null.
+   * Stores {@code value} under the given keys using the cache's default TTL (permanent if none). At
+   * least one of {@code stringKey} / {@code longKey} must be non-null.
    */
   public void put(String stringKey, Long longKey, Object value) {
-    manager.put(name, stringKey, longKey, value);
+    manager.put(name, stringKey, longKey, value, ttl);
   }
 
   // -------------------------------------------------------------------------
   // Get
   // -------------------------------------------------------------------------
 
-  /**
-   * Returns the cached value by string key if present and not expired.
-   */
+  /** Returns the cached value by string key if present and not expired. */
   public <V> Optional<V> get(String stringKey, Class<V> type) {
     return manager.get(name, stringKey, type);
   }
 
-  /**
-   * Returns the cached value by long key if present and not expired.
-   */
+  /** Returns the cached value by long key if present and not expired. */
   public <V> Optional<V> get(Long longKey, Class<V> type) {
     return manager.get(name, longKey, type);
   }
@@ -77,22 +72,11 @@ public class Cache {
   // -------------------------------------------------------------------------
 
   /**
-   * Returns the cached value if present and not expired, otherwise invokes {@code loader},
-   * stores the result under both keys with the given TTL, and returns it.
-   *
-   * <p>Lookup order: string key first (if non-null), then long key (if non-null).
-   */
-  public <V> V getOrLoad(String stringKey, Long longKey, Class<V> type,
-      Supplier<V> loader, Duration ttl) {
-    return manager.getOrLoad(name, stringKey, longKey, type, loader, ttl);
-  }
-
-  /**
-   * Returns the cached value if present and not expired, otherwise invokes {@code loader},
-   * stores the result permanently under both keys, and returns it.
+   * Returns the cached value if present and not expired, otherwise invokes {@code loader}, stores
+   * the result using the cache's default TTL (permanent if none), and returns it.
    */
   public <V> V getOrLoad(String stringKey, Long longKey, Class<V> type, Supplier<V> loader) {
-    return manager.getOrLoad(name, stringKey, longKey, type, loader);
+    return manager.getOrLoad(name, stringKey, longKey, type, loader, ttl);
   }
 
   // -------------------------------------------------------------------------
@@ -132,8 +116,8 @@ public class Cache {
   }
 
   /**
-   * Removes the entry matching either key.
-   * At least one of {@code stringKey} / {@code longKey} must be non-null.
+   * Removes the entry matching either key. At least one of {@code stringKey} / {@code longKey} must
+   * be non-null.
    *
    * @return {@code true} if an entry was actually removed
    */
@@ -151,8 +135,8 @@ public class Cache {
   // -------------------------------------------------------------------------
 
   /**
-   * Returns the number of unique, non-expired logical entries in this cache.
-   * An entry stored under both a string and a long key counts as one.
+   * Returns the number of unique, non-expired logical entries in this cache. An entry stored under
+   * both a string and a long key counts as one.
    */
   public long size() {
     return manager.size(name);
@@ -170,6 +154,8 @@ public class Cache {
         + size()
         + ", maxSize="
         + (maxSize == 0 ? "unlimited" : maxSize)
+        + ", ttl="
+        + (ttl == null ? "permanent" : ttl)
         + '}';
   }
 
@@ -178,4 +164,3 @@ public class Cache {
     return manager.cacheNames();
   }
 }
-

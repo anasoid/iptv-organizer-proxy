@@ -13,10 +13,13 @@ import lombok.Getter;
 public class CacheEntry<V> {
 
   private final V value;
+
   /** Absolute instant at which this entry expires, or {@code null} for no expiry. */
   private final Instant expiresAt;
+
   /** String index key – may be {@code null} if the entry was stored with a Long key only. */
   private final String stringKey;
+
   /** Long index key – may be {@code null} if the entry was stored with a String key only. */
   private final Long longKey;
 
