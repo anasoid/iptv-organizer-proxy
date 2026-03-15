@@ -8,6 +8,9 @@ import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Proxy;
 import org.anasoid.iptvorganizer.models.entity.ProxyType;
 import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.enums.ConnectXmltvMode;
+import org.anasoid.iptvorganizer.models.enums.ConnectXtreamApiMode;
+import org.anasoid.iptvorganizer.models.enums.ConnectXtreamStreamMode;
 import org.anasoid.iptvorganizer.repositories.ProxyRepository;
 
 /**
@@ -21,6 +24,7 @@ public class ProxyConfigService {
   private static final Logger logger = Logger.getLogger(ProxyConfigService.class.getName());
 
   @Inject ProxyRepository proxyRepository;
+  @Inject ClientService clientService;
 
   /**
    * Get proxy configuration for a given source.
@@ -91,18 +95,52 @@ public class ProxyConfigService {
    * @return true if proxy is enabled
    */
   public boolean resolveEnableProxy(Client client, Source source) {
-    // Priority 1: Client-level setting (if not null)
     if (client != null && client.getEnableProxy() != null) {
       return client.getEnableProxy();
     }
-
-    // Priority 2: Source-level setting
     if (source != null && source.getEnableProxy() != null) {
       return source.getEnableProxy();
     }
-
-    // Default: false (matches schema default)
     return false;
+  }
+
+  public boolean resolveEnableProxyApi(Client client, Source source) {
+    boolean enable = resolveEnableProxy(client, source);
+    if (!enable) {
+      return false;
+    }
+    ConnectXtreamApiMode mode = clientService.resolveConnectXtreamApi(client, source);
+    switch (mode) {
+      case NO_PROXY:
+        return false;
+    }
+    return true;
+  }
+
+  public boolean resolveEnableProxyStream(Client client, Source source) {
+    boolean enable = resolveEnableProxy(client, source);
+    if (!enable) {
+      return false;
+    }
+    ConnectXtreamStreamMode mode = clientService.resolveConnectXtreamStream(client, source);
+    switch (mode) {
+      case NO_PROXY:
+        return false;
+    }
+    return true;
+  }
+
+  public boolean resolveEnableProxyXmltv(Client client, Source source) {
+    boolean enable = resolveEnableProxy(client, source);
+    if (!enable) {
+      return false;
+    }
+    ConnectXmltvMode mode = clientService.resolveConnectXmltv(client, source);
+    switch (mode) {
+      case NO_PROXY:
+        return false;
+    }
+    return true;
   }
 
   /**
