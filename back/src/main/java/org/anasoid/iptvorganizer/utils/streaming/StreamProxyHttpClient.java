@@ -86,7 +86,7 @@ public class StreamProxyHttpClient {
   public RedirectCheckResult checkForRedirect(
       String upstreamUrl, Client client, Source source, HttpHeaders httpHeaders) {
 
-    log.info("Checking upstream for redirect to hide credentials: {}", upstreamUrl);
+    log.debug("Checking upstream for redirect to hide credentials: {}", upstreamUrl);
 
     // Extract and filter client headers
     Map<String, String> requestHeaders = headerFilterService.filterRequestHeaders(httpHeaders);
@@ -111,7 +111,7 @@ public class StreamProxyHttpClient {
         // Extract Location header (case-insensitive)
         String location = extractLocationHeader(response.getHeaders());
         if (location != null && !location.isEmpty()) {
-          log.info("Upstream redirects to: {}", location);
+          log.debug("Upstream redirects to: {}", location);
           return RedirectCheckResult.redirect(location);
         }
       }

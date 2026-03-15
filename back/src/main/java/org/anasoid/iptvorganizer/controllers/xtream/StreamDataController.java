@@ -13,18 +13,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
-import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
-import org.anasoid.iptvorganizer.models.entity.stream.Category;
+import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.models.enums.ConnectXtreamStreamMode;
 import org.anasoid.iptvorganizer.services.ClientService;
-import org.anasoid.iptvorganizer.services.stream.CategoryService;
-import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
-import org.anasoid.iptvorganizer.services.stream.SeriesService;
-import org.anasoid.iptvorganizer.services.stream.VodStreamService;
-import org.anasoid.iptvorganizer.services.xtream.ContentFilterService;
-import org.anasoid.iptvorganizer.services.xtream.FilterContext;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
-import org.anasoid.iptvorganizer.utils.streaming.StreamModeHandler;
 
 /**
  * Stream Data Controller
@@ -38,16 +30,10 @@ import org.anasoid.iptvorganizer.utils.streaming.StreamModeHandler;
 @Slf4j
 @Path("")
 @ApplicationScoped
-public class StreamDataController {
+public class StreamDataController extends AbstractDataController {
 
   @Inject XtreamUserService xtreamUserService;
   @Inject ClientService clientService;
-  @Inject ContentFilterService contentFilterService;
-  @Inject CategoryService categoryService;
-  @Inject LiveStreamService liveStreamService;
-  @Inject VodStreamService vodStreamService;
-  @Inject SeriesService seriesService;
-  @Inject StreamModeHandler streamModeHandler;
 
   /**
    * Handle live stream request
@@ -72,7 +58,7 @@ public class StreamDataController {
       @Context UriInfo uriInfo,
       @Context HttpHeaders httpHeaders) {
     return handleStreamRequest(
-        username, password, streamId, ext, "live", uriInfo, httpHeaders, true);
+        username, password, streamId, ext, StreamType.LIVE, uriInfo, httpHeaders, true);
   }
 
   /**
@@ -98,7 +84,7 @@ public class StreamDataController {
       @Context UriInfo uriInfo,
       @Context HttpHeaders httpHeaders) {
     return handleStreamRequest(
-        username, password, streamId, ext, "movie", uriInfo, httpHeaders, true);
+        username, password, streamId, ext, StreamType.VOD, uriInfo, httpHeaders, true);
   }
 
   /**
@@ -124,7 +110,7 @@ public class StreamDataController {
       @Context UriInfo uriInfo,
       @Context HttpHeaders httpHeaders) {
     return handleStreamRequest(
-        username, password, streamId, ext, "series", uriInfo, httpHeaders, false);
+        username, password, streamId, ext, StreamType.SERIES, uriInfo, httpHeaders, true);
   }
 
   /**
@@ -144,7 +130,7 @@ public class StreamDataController {
       String password,
       String streamId,
       String ext,
-      String streamType,
+      StreamType streamType,
       UriInfo uriInfo,
       HttpHeaders httpHeaders,
       boolean checkAccess) {
@@ -164,7 +150,7 @@ public class StreamDataController {
     String streamUrl = buildStreamUrl(source, streamType, streamId, ext);
 
     ConnectXtreamStreamMode streamMode = clientService.resolveConnectXtreamStream(client, source);
-    log.info(
+    log.debug(
         "Stream request - user: {},mode: {}, type: {}, streamId: {}, sourceUrl: {}",
         username,
         streamMode,
@@ -172,24 +158,6 @@ public class StreamDataController {
         streamId,
         streamUrl);
     return getStream(client, source, streamUrl, streamMode, uriInfo, httpHeaders);
-  }
-
-  private Response getStream(
-      Client client,
-      Source source,
-      String streamUrl,
-      ConnectXtreamStreamMode streamMode,
-      UriInfo uriInfo,
-      HttpHeaders httpHeaders) {
-
-    return switch (streamMode) {
-      case REDIRECT -> streamModeHandler.handleRedirectMode(streamUrl);
-      case DIRECT -> streamModeHandler.handleDirectMode(client, source, streamUrl, httpHeaders);
-      case PROXY -> streamModeHandler.handleProxyMode(uriInfo, client, streamUrl);
-      case NO_PROXY -> streamModeHandler.handleDirectMode(client, source, streamUrl, httpHeaders);
-      case DEFAULT -> streamModeHandler.handleProxyMode(uriInfo, client, streamUrl);
-      default -> streamModeHandler.handleUnknownMode(streamMode.toString());
-    };
   }
 
   /**
@@ -201,89 +169,15 @@ public class StreamDataController {
    * @param ext File extension
    * @return Complete stream URL
    */
-  private String buildStreamUrl(Source source, String streamType, String streamId, String ext) {
+  private String buildStreamUrl(Source source, StreamType streamType, String streamId, String ext) {
     String baseUrl = source.getUrl().replaceAll("/$", "");
     return String.format(
         "%s/%s/%s/%s/%s.%s",
-        baseUrl, streamType, source.getUsername(), source.getPassword(), streamId, ext);
-  }
-
-  /**
-   * Check if client has access to specific stream
-   *
-   * @param client The authenticated client
-   * @param source The source
-   * @param streamId Stream ID to check
-   * @param streamType Stream type (live, movie, series)
-   * @return true if stream access is allowed
-   */
-  private boolean hasStreamAccess(
-      Client client, Source source, String streamId, String streamType) {
-    try {
-      // Parse stream ID as integer
-      int streamIdInt;
-      try {
-        streamIdInt = Integer.parseInt(streamId);
-      } catch (NumberFormatException e) {
-        log.warn("Invalid stream ID format: {}", streamId);
-        return false;
-      }
-
-      // Load stream from database
-      BaseStream stream = loadStream(source.getId(), streamIdInt, streamType);
-      if (stream == null) {
-        log.warn(
-            "Stream not found - source: {}, type: {}, id: {}",
-            source.getId(),
-            streamType,
-            streamId);
-        return false; // Stream not found
-      }
-
-      // Load category
-      String streamTypeCategory = getStreamTypeCategory(streamType);
-      Category category =
-          categoryService.findBySourceAndCategoryId(
-              source.getId(), stream.getCategoryId(), streamTypeCategory);
-
-      // Build filtering context and check access
-      FilterContext context = contentFilterService.buildFilterContext(client);
-      return contentFilterService.shouldIncludeStream(context, stream, category);
-    } catch (Exception e) {
-      log.error("Error checking stream access", e);
-      return false; // Deny access on error
-    }
-  }
-
-  /**
-   * Load stream from database by type
-   *
-   * @param sourceId Source ID
-   * @param streamId Stream ID
-   * @param streamType Stream type (live, movie, series)
-   * @return Stream or null if not found
-   */
-  private BaseStream loadStream(Long sourceId, Integer streamId, String streamType) {
-    return switch (streamType.toLowerCase()) {
-      case "live" -> liveStreamService.findBySourceAndStreamId(sourceId, streamId);
-      case "movie", "vod" -> vodStreamService.findBySourceAndStreamId(sourceId, streamId);
-      case "series" -> seriesService.findBySourceAndStreamId(sourceId, streamId);
-      default -> null;
-    };
-  }
-
-  /**
-   * Get category type string from stream type
-   *
-   * @param streamType Stream type (live, movie, series)
-   * @return Category type string
-   */
-  private String getStreamTypeCategory(String streamType) {
-    return switch (streamType.toLowerCase()) {
-      case "live" -> "live";
-      case "movie", "vod" -> "vod";
-      case "series" -> "series";
-      default -> streamType.toLowerCase();
-    };
+        baseUrl,
+        streamType.getStreamPath(),
+        source.getUsername(),
+        source.getPassword(),
+        streamId,
+        ext);
   }
 }
