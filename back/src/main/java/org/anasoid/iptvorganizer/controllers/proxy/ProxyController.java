@@ -15,6 +15,9 @@ import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
@@ -23,7 +26,6 @@ import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
-import org.anasoid.iptvorganizer.services.http.HeaderFilterService;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
 import org.anasoid.iptvorganizer.utils.streaming.StreamProxyHttpClient;
 
@@ -43,11 +45,15 @@ import org.anasoid.iptvorganizer.utils.streaming.StreamProxyHttpClient;
 @ApplicationScoped
 public class ProxyController {
 
-  private static final int BUFFER_SIZE = 8192;
+  /** Buffer size for streaming chunks. 64 KB balances memory and throughput for video streams. */
+  private static final int BUFFER_SIZE = 65536;
+
+  /** Hop-by-hop headers that must not be forwarded to the client. */
+  private static final Set<String> SKIP_RESPONSE_HEADERS =
+      Set.of("transfer-encoding", "connection", "keep-alive", "proxy-connection");
 
   @Inject XtreamUserService xtreamUserService;
   @Inject StreamProxyHttpClient streamProxyHttpClient;
-  @Inject HeaderFilterService headerFilterService;
   @Inject ClientRepository clientRepository;
   @Inject SourceRepository sourceRepository;
 
@@ -145,45 +151,63 @@ public class ProxyController {
         return Response.status(streamResponse.getStatusCode()).build();
       }
 
-      // Build response with streaming output
+      // Build response with streaming output, forwarding upstream status code
       Response.ResponseBuilder responseBuilder =
-          Response.ok(
-              (StreamingOutput)
-                  os -> {
-                    InputStream inputStream = streamResponse.getBody();
-                    try {
-                      byte[] buffer = new byte[BUFFER_SIZE];
-                      int bytesRead;
-                      while ((bytesRead = inputStream.read(buffer)) != -1) {
-                        os.write(buffer, 0, bytesRead);
-                        os.flush();
-                      }
-                    } catch (IOException ex) {
-                      // Handle client disconnection
-                      if (ex.getMessage() != null
-                          && (ex.getMessage().contains("Broken pipe")
-                              || ex.getMessage().contains("Connection reset"))) {
-                        log.info("Client disconnected (normal for IPTV) - {}", upstreamUrl);
-                      } else {
-                        if (!(ex.getCause() instanceof HttpClosedException)) {
-                          // do nothing
-                        } else {
-                          log.warn(
-                              "Error streaming content from {}: {}", upstreamUrl, ex.getMessage());
+          Response.status(streamResponse.getStatusCode())
+              .entity(
+                  (StreamingOutput)
+                      os -> {
+                        InputStream inputStream = streamResponse.getBody();
+                        try {
+                          byte[] buffer = new byte[BUFFER_SIZE];
+                          int bytesRead;
+                          while ((bytesRead = inputStream.read(buffer)) != -1) {
+                            os.write(buffer, 0, bytesRead);
+                            os.flush();
+                          }
+                        } catch (IOException ex) {
+                          // Handle client disconnection
+                          if (ex.getMessage() != null
+                              && (ex.getMessage().contains("Broken pipe")
+                                  || ex.getMessage().contains("Connection reset"))) {
+                            log.info("Client disconnected (normal for IPTV) - {}", upstreamUrl);
+                          } else if (ex.getCause() instanceof HttpClosedException) {
+                            // HTTP connection closed by client - normal for IPTV, do nothing
+                          } else {
+                            log.warn(
+                                "Error streaming content from {}: {}", upstreamUrl, ex.getMessage());
+                          }
+                          throw ex;
+                        } finally {
+                          try {
+                            inputStream.close();
+                          } catch (IOException ex) {
+                            log.warn("Error closing stream: {}", ex.getMessage());
+                          }
                         }
-                      }
-                      throw ex;
-                    } finally {
-                      try {
-                        inputStream.close();
-                      } catch (IOException ex) {
-                        log.warn("Error closing stream: {}", ex.getMessage());
-                      }
-                    }
-                  });
+                      });
 
-      // Apply upstream response headers
-      headerFilterService.applyResponseHeaders(responseBuilder, streamResponse.getHeaders());
+      // Apply upstream response headers (Content-Type, Content-Length, Content-Range, etc.)
+      for (Map.Entry<String, List<String>> header : streamResponse.getHeaders().entrySet()) {
+        String headerName = header.getKey();
+        // Skip hop-by-hop headers
+        if (SKIP_RESPONSE_HEADERS.contains(headerName.toLowerCase())) {
+          continue;
+        }
+        for (String headerValue : header.getValue()) {
+          responseBuilder.header(headerName, headerValue);
+        }
+      }
+
+      // Explicitly set Content-Type from upstream via type() to ensure it overrides
+      // any JAX-RS default content type derived from the StreamingOutput entity
+      String contentType = streamResponse.getHeader("content-type");
+      if (contentType == null) {
+        contentType = streamResponse.getHeader("Content-Type");
+      }
+      if (contentType != null && !contentType.isEmpty()) {
+        responseBuilder.type(contentType);
+      }
 
       return responseBuilder.build();
 
