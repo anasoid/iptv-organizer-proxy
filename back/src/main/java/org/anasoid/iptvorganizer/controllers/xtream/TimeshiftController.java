@@ -12,10 +12,6 @@ import jakarta.ws.rs.core.UriInfo;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
@@ -70,13 +66,13 @@ public class TimeshiftController {
    * @return Stream response or redirect
    */
   @GET
-  @Path("/timeshift/{username}/{password}/{streamId}/{start}/{duration}.{ext}")
+  @Path("/timeshift/{username}/{password}/{duration}/{start}/{streamId}.{ext}")
   public Response handleTimeshiftStream(
       @PathParam("username") String username,
       @PathParam("password") String password,
-      @PathParam("streamId") String streamId,
       @PathParam("start") String start,
       @PathParam("duration") String duration,
+      @PathParam("streamId") String streamId,
       @PathParam("ext") String ext,
       @Context UriInfo uriInfo,
       @Context HttpHeaders httpHeaders) {
@@ -220,6 +216,7 @@ public class TimeshiftController {
 
   /**
    * Build timeshift URL from source (Official Xtream API format)
+   * /timeshift/{username}/{password}/{duration}/{start}/{streamId}.{ext}
    *
    * @param source The source
    * @param streamId Stream ID
@@ -232,30 +229,21 @@ public class TimeshiftController {
       Source source, int streamId, String startStr, String durationStr, String ext) {
     String baseUrl = source.getUrl().replaceAll("/$", "");
 
-    // Parse start timestamp (Unix seconds) and convert to YYYY-MM-DD:HH-MM format
-    long startSeconds = Long.parseLong(startStr);
-    LocalDateTime startDateTime =
-        LocalDateTime.ofInstant(Instant.ofEpochSecond(startSeconds), ZoneId.systemDefault());
-    String formattedStart = startDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd:HH-mm"));
-
     // Convert duration from seconds to minutes
-    long durationSeconds = Long.parseLong(durationStr);
-    long durationMinutes = durationSeconds / 60;
+    long durationMinutes = Long.parseLong(durationStr);
 
     // Build official Xtream API format URL: /streaming/timeshift.php
     String url =
         String.format(
-            "%s/streaming/timeshift.php?username=%s&password=%s&stream=%d&start=%s&duration=%d",
+            "%s/timeshift/%s/%s/%d/%s/%d.%s",
             baseUrl,
             URLEncoder.encode(source.getUsername(), StandardCharsets.UTF_8),
             URLEncoder.encode(source.getPassword(), StandardCharsets.UTF_8),
+            durationMinutes,
+            startStr,
             streamId,
-            formattedStart,
-            durationMinutes);
+            ext);
 
-    log.debug(
-        "Built timeshift URL: {} (redacted credentials)",
-        url.replaceAll("password=[^&]*", "password=***"));
     return url;
   }
 
@@ -294,14 +282,6 @@ public class TimeshiftController {
   private TimeshiftValidationResult validateTimeshiftParameters(
       String startStr, String durationStr, LiveStream stream) {
 
-    // Parse start timestamp
-    long startTime;
-    try {
-      startTime = Long.parseLong(startStr);
-    } catch (NumberFormatException e) {
-      return TimeshiftValidationResult.invalid("Invalid start timestamp format");
-    }
-
     // Parse duration
     long duration;
     try {
@@ -317,12 +297,6 @@ public class TimeshiftController {
 
     if (duration > 86400) { // 24 hours
       return TimeshiftValidationResult.invalid("Duration must not exceed 24 hours");
-    }
-
-    // Validate start time is not in the future
-    long now = Instant.now().getEpochSecond();
-    if (startTime > now) {
-      return TimeshiftValidationResult.invalid("Start time cannot be in the future");
     }
 
     return TimeshiftValidationResult.valid();
