@@ -126,19 +126,19 @@ public class XtreamClient {
     String url = buildApiUrlWithParam(source, "get_simple_data_table", "stream_id", streamId);
 
     log.info(
-            "Fetching simple datatable info (proxy) for stream_id={} from source: {}",
-            streamId,
-            source.getName());
+        "Fetching simple datatable info (proxy) for stream_id={} from source: {}",
+        streamId,
+        source.getName());
 
     try {
       return httpStreamingService.streamHttpWithHeaders(
-              url, createDefaultHttpOptions(), null, source);
+          url, createDefaultHttpOptions(), null, source);
     } catch (Exception ex) {
       log.error(
-              "Failed to fetch simple datatable info for stream_id={} from source {}: {}",
-              streamId,
-              source.getName(),
-              ex.getMessage());
+          "Failed to fetch simple datatable info for stream_id={} from source {}: {}",
+          streamId,
+          source.getName(),
+          ex.getMessage());
       throw ex;
     }
   }

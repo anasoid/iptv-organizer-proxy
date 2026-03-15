@@ -240,8 +240,6 @@ public class XtreamUserService {
     return xtreamClient.getLiveSimpleDataTableRaw(source, streamId);
   }
 
-
-
   /**
    * detailed series info with access control (proxy passthrough).
    *
@@ -272,8 +270,8 @@ public class XtreamUserService {
     Category category = null;
     if (stream.getCategoryId() != null) {
       category =
-              categoryService.findBySourceAndCategoryId(
-                      source.getId(), stream.getCategoryId(), stream.getStreamType().getCategoryType());
+          categoryService.findBySourceAndCategoryId(
+              source.getId(), stream.getCategoryId(), stream.getStreamType().getCategoryType());
     }
 
     // Build filtering context and check access
@@ -285,6 +283,7 @@ public class XtreamUserService {
       throw new ForbiddenException("Access denied to this series");
     }
   }
+
   /**
    * Fetch authentication data from upstream source
    *

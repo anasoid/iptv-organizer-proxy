@@ -75,7 +75,7 @@ public class Cache<V> {
    *
    * <p>No-op when the cache is disabled ({@code maxSize == 0}).
    */
-  public void putNull(String stringKey,  Object value) {
+  public void putNull(String stringKey, Object value) {
     if (!isEnabled()) return;
     manager.put(name, stringKey, -Math.abs(ThreadLocalRandom.current().nextLong()), value, ttl);
   }

@@ -175,7 +175,9 @@ public class ProxyController {
                             // HTTP connection closed by client - normal for IPTV, do nothing
                           } else {
                             log.warn(
-                                "Error streaming content from {}: {}", upstreamUrl, ex.getMessage());
+                                "Error streaming content from {}: {}",
+                                upstreamUrl,
+                                ex.getMessage());
                           }
                           throw ex;
                         } finally {

@@ -86,7 +86,7 @@ public class XtreamController {
     Source source = authResult.getSource();
 
     // Route to appropriate handler
-    return handleAction(action, client, source, categoryId,streamId, seriesId);
+    return handleAction(action, client, source, categoryId, streamId, seriesId);
   }
 
   /**
@@ -118,9 +118,13 @@ public class XtreamController {
    * @return Response
    */
   private Response handleAction(
-      String action, Client client, Source source, Long categoryId,Integer streamId, Integer seriesId) {
+      String action,
+      Client client,
+      Source source,
+      Long categoryId,
+      Integer streamId,
+      Integer seriesId) {
     switch (action) {
-
       case "get_live_categories":
         return streamJsonArray(xtreamUserService.getLiveCategories(client, source));
 
@@ -150,11 +154,11 @@ public class XtreamController {
       case "get_simple_data_table":
         if (streamId == null) {
           return Response.status(Response.Status.BAD_REQUEST)
-                  .entity("{\"error\":\"series_id parameter required\"}")
-                  .header("Content-Type", MediaType.APPLICATION_JSON)
-                  .build();
+              .entity("{\"error\":\"series_id parameter required\"}")
+              .header("Content-Type", MediaType.APPLICATION_JSON)
+              .build();
         }
-        return liveSimpleDataTable(client, source,streamId);
+        return liveSimpleDataTable(client, source, streamId);
       default:
         log.warn("Unknown Xtream API action: {}", action);
         return Response.status(Response.Status.BAD_REQUEST)
@@ -225,39 +229,39 @@ public class XtreamController {
   private Response liveSimpleDataTable(Client client, Source source, Integer streamId) {
     try {
       HttpStreamingResponse streamResponse =
-              xtreamUserService.getLiveSimpleDataTableRaw(client, source, streamId);
+          xtreamUserService.getLiveSimpleDataTableRaw(client, source, streamId);
 
       return Response.ok(
-                      (StreamingOutput)
-                              os -> {
-                                try (InputStream is = streamResponse.getBody()) {
-                                  byte[] buffer = new byte[8192];
-                                  int bytesRead;
-                                  while ((bytesRead = is.read(buffer)) != -1) {
-                                    os.write(buffer, 0, bytesRead);
-                                  }
-                                  os.flush();
-                                } catch (IOException ex) {
-                                  if (ex.getMessage() != null
-                                          && !ex.getMessage().contains("Stream is closed")) {
-                                    log.error("Error streaming series info", ex);
-                                  }
-                                }
-                              })
-              .header("Content-Type", MediaType.APPLICATION_JSON)
-              .build();
+              (StreamingOutput)
+                  os -> {
+                    try (InputStream is = streamResponse.getBody()) {
+                      byte[] buffer = new byte[8192];
+                      int bytesRead;
+                      while ((bytesRead = is.read(buffer)) != -1) {
+                        os.write(buffer, 0, bytesRead);
+                      }
+                      os.flush();
+                    } catch (IOException ex) {
+                      if (ex.getMessage() != null
+                          && !ex.getMessage().contains("Stream is closed")) {
+                        log.error("Error streaming series info", ex);
+                      }
+                    }
+                  })
+          .header("Content-Type", MediaType.APPLICATION_JSON)
+          .build();
 
     } catch (NotFoundException ex) {
       return Response.status(Response.Status.NOT_FOUND)
-              .entity("{\"error\":\"Series not found\"}")
-              .header("Content-Type", MediaType.APPLICATION_JSON)
-              .build();
+          .entity("{\"error\":\"Series not found\"}")
+          .header("Content-Type", MediaType.APPLICATION_JSON)
+          .build();
 
     } catch (ForbiddenException ex) {
       return Response.status(Response.Status.FORBIDDEN)
-              .entity("{\"error\":\"Access denied\"}")
-              .header("Content-Type", MediaType.APPLICATION_JSON)
-              .build();
+          .entity("{\"error\":\"Access denied\"}")
+          .header("Content-Type", MediaType.APPLICATION_JSON)
+          .build();
     }
   }
 
