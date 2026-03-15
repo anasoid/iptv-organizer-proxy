@@ -40,7 +40,7 @@ public class StreamModeHandler {
    * @return Response with redirect or error
    */
   public Response handleDirectMode(
-      String streamUrl, Client client, Source source, HttpHeaders httpHeaders) {
+      Client client, Source source, String streamUrl, HttpHeaders httpHeaders) {
     RedirectCheckResult redirectCheck =
         streamProxyHttpClient.checkForRedirect(streamUrl, client, source, httpHeaders);
 

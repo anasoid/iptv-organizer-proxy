@@ -17,6 +17,7 @@ import org.anasoid.iptvorganizer.services.xtream.ClientAuthenticationResult;
 import org.anasoid.iptvorganizer.services.xtream.ContentFilterService;
 import org.anasoid.iptvorganizer.services.xtream.FilterContext;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
+import org.anasoid.iptvorganizer.utils.streaming.StreamModeHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,7 +37,7 @@ class TimeshiftControllerTest {
   @Mock private ContentFilterService contentFilterService;
   @Mock private CategoryService categoryService;
   @Mock private LiveStreamService liveStreamService;
-
+  @Mock private StreamModeHandler streamModeHandler;
   @InjectMocks private TimeshiftController timeshiftController;
 
   private Client testClient;

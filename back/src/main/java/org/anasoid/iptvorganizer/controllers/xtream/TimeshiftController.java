@@ -9,10 +9,8 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
-import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
@@ -21,14 +19,13 @@ import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.LiveStream;
 import org.anasoid.iptvorganizer.models.enums.ConnectXtreamStreamMode;
-import org.anasoid.iptvorganizer.models.http.RedirectCheckResult;
 import org.anasoid.iptvorganizer.services.ClientService;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
 import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
 import org.anasoid.iptvorganizer.services.xtream.ContentFilterService;
 import org.anasoid.iptvorganizer.services.xtream.FilterContext;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
-import org.anasoid.iptvorganizer.utils.streaming.StreamProxyHttpClient;
+import org.anasoid.iptvorganizer.utils.streaming.StreamModeHandler;
 
 /**
  * Timeshift (Catch-up TV) Controller
@@ -48,7 +45,7 @@ public class TimeshiftController {
   @Inject ContentFilterService contentFilterService;
   @Inject CategoryService categoryService;
   @Inject LiveStreamService liveStreamService;
-  @Inject StreamProxyHttpClient streamProxyHttpClient;
+  @Inject StreamModeHandler streamModeHandler;
 
   /**
    * Handle timeshift stream request
@@ -121,16 +118,16 @@ public class TimeshiftController {
 
       // Build timeshift URL from source
       String timeshiftUrl = buildTimeshiftUrl(source, streamIdInt, start, duration, ext);
+      ConnectXtreamStreamMode streamMode = clientService.resolveConnectXtreamStream(client, source);
 
       log.info(
-          "Timeshift request - user: {}, streamId: {}, start: {}, duration: {}, sourceUrl: {}",
+          "Timeshift request - user: {},mode: {},  , streamId: {}, sourceUrl: {}",
           username,
+          streamMode,
           streamId,
-          start,
-          duration,
           timeshiftUrl);
 
-      return getStream(client, source, timeshiftUrl, uriInfo, httpHeaders);
+      return getStream(client, source, timeshiftUrl, streamMode, uriInfo, httpHeaders);
 
     } catch (UnauthorizedException ex) {
       return Response.status(Response.Status.UNAUTHORIZED).build();
@@ -155,63 +152,26 @@ public class TimeshiftController {
    * @return Response with stream or redirect
    */
   private Response getStream(
-      Client client, Source source, String streamUrl, UriInfo uriInfo, HttpHeaders httpHeaders) {
-    ConnectXtreamStreamMode streamMode = clientService.resolveConnectXtreamStream(client, source);
-
-    switch (streamMode) {
-      case REDIRECT:
-        log.info("Redirect mode - sending 302 redirect to upstream");
-        return Response.seeOther(URI.create(streamUrl)).build();
-
-      case DIRECT:
-        log.info("Direct mode - checking for upstream redirect to hide credentials");
-        RedirectCheckResult redirectCheck =
-            streamProxyHttpClient.checkForRedirect(streamUrl, client, source, httpHeaders);
-        if (redirectCheck.isError()) {
-          return Response.status(Response.Status.BAD_GATEWAY)
-              .entity("Upstream redirect check failed")
-              .build();
-        }
-
-        if (redirectCheck.isRedirect()) {
-          log.info("Returning upstream redirect location: {}", redirectCheck.getLocation());
-          return Response.seeOther(URI.create(redirectCheck.getLocation())).build();
-        } else {
-          log.warn(
-              "Upstream does not redirect, cannot hide credentials. Status: {}",
-              redirectCheck.getStatusCode());
-          return Response.status(Response.Status.BAD_GATEWAY)
-              .entity("Upstream does not provide credential-free redirect")
-              .build();
-        }
-
-      case PROXY:
-        log.info("Proxy mode - encoding URL and redirecting to proxy");
-        String encodedUrl = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
+      Client client,
+      Source source,
+      String streamUrl,
+      ConnectXtreamStreamMode streamMode,
+      UriInfo uriInfo,
+      HttpHeaders httpHeaders) {
+    // Timeshift always issues a redirect - no server-side streaming
+    return switch (streamMode) {
+      case PROXY -> {
+        log.info("Proxy mode - redirecting timeshift via proxy");
+        String encodedUrl = java.util.Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
         String proxyUrl =
             buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrl);
-        return Response.seeOther(URI.create(proxyUrl)).build();
-
-      case NO_PROXY:
-        log.info("Tunnel mode - using application-level tunneling");
-        String encodedUrlTunnel = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
-        String proxyUrlTunnel =
-            buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrlTunnel);
-        return Response.seeOther(URI.create(proxyUrlTunnel)).build();
-
-      case DEFAULT:
-        log.warn("Unexpected DEFAULT mode in getStream");
-        String encodedUrlDefault = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
-        String proxyUrlDefault =
-            buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrlDefault);
-        return Response.seeOther(URI.create(proxyUrlDefault)).build();
-
-      default:
-        log.warn("Unknown stream mode: {}", streamMode);
-        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-            .entity("Unknown stream mode")
-            .build();
-    }
+        yield Response.seeOther(java.net.URI.create(proxyUrl)).build();
+      }
+      default -> {
+        log.info("Redirecting timeshift to upstream URL, mode: {}", streamMode);
+        yield Response.seeOther(java.net.URI.create(streamUrl)).build();
+      }
+    };
   }
 
   /**
