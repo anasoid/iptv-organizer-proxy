@@ -6,21 +6,16 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.StreamingOutput;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
+import jakarta.ws.rs.core.*;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.enums.ConnectXmltvMode;
-import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 import org.anasoid.iptvorganizer.services.ClientService;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
+import org.anasoid.iptvorganizer.utils.streaming.StreamModeHandler;
 import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 
 /**
@@ -38,13 +33,12 @@ import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 @ApplicationScoped
 public class XmltvController {
 
-  private static final int CHUNK_SIZE = 8192;
-
   @Inject XtreamUserService xtreamUserService;
   @Inject ClientService clientService;
   @Inject ClientRepository clientRepository;
   @Inject SourceRepository sourceRepository;
   @Inject XtreamClient xtreamClient;
+  @Inject StreamModeHandler streamModeHandler;
 
   /**
    * Get XMLTV EPG data
@@ -58,7 +52,10 @@ public class XmltvController {
   @GET
   @Produces(MediaType.APPLICATION_XML)
   public Response getXmltv(
-      @QueryParam("username") String username, @QueryParam("password") String password) {
+      @QueryParam("username") String username,
+      @QueryParam("password") String password,
+      @Context UriInfo uriInfo,
+      @Context HttpHeaders httpHeaders) {
 
     // Validate and authenticate client
     var authResult = xtreamUserService.authenticateAndValidateClient(username, password);
@@ -67,106 +64,15 @@ public class XmltvController {
 
     // Resolve XMLTV connection mode
     ConnectXmltvMode xmltvMode = clientService.resolveConnectXmltv(client, source);
-    log.info("XMLTV request from client: {},mode: {}", username, xmltvMode);
-
-    switch (xmltvMode) {
-      case REDIRECT:
-        String xmltvUrl = buildXmltvUrl(source);
-        log.info("REDIRECT mode - returning direct 302 redirect to: {}", xmltvUrl);
-        return Response.seeOther(URI.create(xmltvUrl)).build();
-
-      case PROXY:
-        log.info("PROXY mode - streaming XMLTV data from source");
-        return streamXmltvData(source, client);
-
-      case TUNNEL:
-        log.info("TUNNEL mode - using application-level tunneling for XMLTV");
-        // TODO: Implement tunnel mode for XMLTV
-        // For now, fall back to PROXY mode
-        return streamXmltvData(source, client);
-
-      case DEFAULT:
-        // Should not happen - default should be resolved by service
-        log.warn("Unexpected DEFAULT mode in getXmltv");
-        return streamXmltvData(source, client);
-
-      default:
-        log.warn("Unknown XMLTV mode: {}", xmltvMode);
-        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-            .entity("Unknown XMLTV mode")
-            .build();
-    }
-  }
-
-  /**
-   * Stream XMLTV data from source
-   *
-   * @param source The source
-   * @param client The client (for logging)
-   * @return Response with streaming XMLTV data
-   */
-  private Response streamXmltvData(Source source, Client client) {
-    return Response.ok(
-            (StreamingOutput)
-                os -> {
-                  InputStream inputStream = null;
-                  try {
-                    // Build XMLTV URL with action parameter
-                    String xmltvUrl = buildXmltvUrl(source);
-
-                    log.info(
-                        "Streaming XMLTV from source: {} for client: {}",
-                        source.getName(),
-                        client.getUsername());
-
-                    // Fetch XMLTV data from upstream source
-                    HttpOptions options =
-                        HttpOptions.builder().timeout(60000L).maxRetries(1).build();
-
-                    org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService
-                        httpStreamingService =
-                            (org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService)
-                                getHttpStreamingService();
-
-                    inputStream = httpStreamingService.streamHttp(xmltvUrl, options);
-
-                    // Stream in chunks
-                    byte[] buffer = new byte[CHUNK_SIZE];
-                    int bytesRead;
-
-                    while ((bytesRead = inputStream.read(buffer)) != -1) {
-                      os.write(buffer, 0, bytesRead);
-                      os.flush();
-                    }
-
-                    log.info("XMLTV streaming completed for client: {}", client.getUsername());
-
-                  } catch (IOException ex) {
-                    // Handle client disconnection
-                    if (ex.getMessage() != null && ex.getMessage().contains("Broken pipe")) {
-                      log.info(
-                          "Client {} disconnected during XMLTV streaming", client.getUsername());
-                    } else {
-                      log.warn(
-                          "Error streaming XMLTV for client {}: {}",
-                          client.getUsername(),
-                          ex.getMessage());
-                    }
-                  } catch (Exception ex) {
-                    log.error("Error streaming XMLTV: {}", ex);
-                  } finally {
-                    if (inputStream != null) {
-                      try {
-                        inputStream.close();
-                      } catch (IOException ex) {
-                        log.warn("Error closing XMLTV stream: {}", ex.getMessage());
-                      }
-                    }
-                  }
-                })
-        .header("Content-Type", MediaType.APPLICATION_XML)
-        .header("Content-Disposition", "inline; filename=\"epg.xml\"")
-        .build();
+    log.info("XMLTV request from client: {}, mode: {}", username, xmltvMode);
+    String xmltvUrl = buildXmltvUrl(source);
+    return switch (xmltvMode) {
+      case REDIRECT -> streamModeHandler.handleRedirectMode(xmltvUrl);
+      case PROXY -> streamModeHandler.handleProxyMode(uriInfo, client, xmltvUrl);
+      case TUNNEL -> streamModeHandler.handleStreamXmltvData(client, xmltvUrl);
+      case DEFAULT -> streamModeHandler.handleStreamXmltvData(client, xmltvUrl);
+      default -> streamModeHandler.handleUnknownMode(xmltvMode.toString());
+    };
   }
 
   /**
@@ -180,18 +86,5 @@ public class XmltvController {
     return String.format(
         "%s/xmltv.php?username=%s&password=%s",
         baseUrl, source.getUsername(), source.getPassword());
-  }
-
-  /**
-   * Get HTTP streaming service instance
-   *
-   * <p>This is a workaround for injection - in production, this should be injected properly
-   *
-   * @return HttpStreamingService instance
-   */
-  @Inject org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService httpStreamingService;
-
-  private org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService getHttpStreamingService() {
-    return httpStreamingService;
   }
 }

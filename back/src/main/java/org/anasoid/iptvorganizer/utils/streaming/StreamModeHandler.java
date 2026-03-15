@@ -2,21 +2,25 @@ package org.anasoid.iptvorganizer.utils.streaming;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.core.HttpHeaders;
-import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.UriInfo;
+import jakarta.ws.rs.core.*;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.RedirectCheckResult;
 
 @Slf4j
 @ApplicationScoped
 public class StreamModeHandler {
 
-  @Inject StreamProxyHttpClient streamProxyHttpClient;
+  private static final int CHUNK_SIZE = 8192;
+  private static final long DEFAULT_TIMEOUT_XMLTV = 120000L;
+  @Inject private StreamProxyHttpClient streamProxyHttpClient;
+  @Inject private HttpStreamingService httpStreamingService;
 
   /**
    * Handle REDIRECT mode - send direct 302 redirect to upstream
@@ -64,15 +68,13 @@ public class StreamModeHandler {
    * Handle PROXY mode - encode URL and redirect to proxy endpoint
    *
    * @param uriInfo Request URI info
-   * @param username Client username
-   * @param password Client password
+   * @param client Client
    * @param streamUrl The upstream stream URL
    * @return Response with redirect to proxy
    */
-  public Response handleProxyMode(
-      UriInfo uriInfo, String username, String password, String streamUrl) {
+  public Response handleProxyMode(UriInfo uriInfo, Client client, String streamUrl) {
 
-    String proxyUrl = buildProxyUrl(uriInfo, username, password, streamUrl);
+    String proxyUrl = buildProxyUrl(uriInfo, client, streamUrl);
     return Response.seeOther(URI.create(proxyUrl)).build();
   }
 
@@ -80,18 +82,15 @@ public class StreamModeHandler {
    * Handle TUNNEL mode - using application-level tunneling
    *
    * @param uriInfo Request URI info
-   * @param username Client username
-   * @param password Client password
+   * @param client Client
    * @param streamUrl The upstream stream URL
    * @return Response with redirect to proxy (tunnel mode not yet implemented)
    */
-  public Response handleTunnelMode(
-      UriInfo uriInfo, String username, String password, String streamUrl) {
+  public Response handleTunnelMode(UriInfo uriInfo, Client client, String streamUrl) {
     // TODO: Implement tunnel mode
     // For now, fall back to proxy mode
-    return handleProxyMode(uriInfo, username, password, streamUrl);
+    return handleProxyMode(uriInfo, client, streamUrl);
   }
-
 
   /**
    * Handle unknown stream mode
@@ -107,15 +106,73 @@ public class StreamModeHandler {
   }
 
   /**
+   * Stream XMLTV data from source
+   *
+   * @param client The client (for logging)
+   * @return Response with streaming XMLTV data
+   */
+  public Response handleStreamXmltvData(Client client, String xmltvUrl) {
+    return Response.ok(
+            (StreamingOutput)
+                os -> {
+                  InputStream inputStream = null;
+                  try {
+                    log.info("Streaming XMLTV for client: {}", client.getUsername());
+
+                    // Fetch XMLTV data from upstream source
+                    HttpOptions options =
+                        HttpOptions.builder().timeout(DEFAULT_TIMEOUT_XMLTV).maxRetries(1).build();
+
+                    inputStream = httpStreamingService.streamHttp(xmltvUrl, options);
+
+                    // Stream in chunks
+                    byte[] buffer = new byte[CHUNK_SIZE];
+                    int bytesRead;
+
+                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                      os.write(buffer, 0, bytesRead);
+                      os.flush();
+                    }
+
+                    log.info("XMLTV streaming completed for client: {}", client.getUsername());
+
+                  } catch (IOException ex) {
+                    // Handle client disconnection
+                    if (ex.getMessage() != null && ex.getMessage().contains("Broken pipe")) {
+                      log.info(
+                          "Client {} disconnected during XMLTV streaming", client.getUsername());
+                    } else {
+                      log.warn(
+                          "Error streaming XMLTV for client {}: {}",
+                          client.getUsername(),
+                          ex.getMessage());
+                    }
+                  } catch (Exception ex) {
+                    log.error("Error streaming XMLTV: {}", ex);
+                  } finally {
+                    if (inputStream != null) {
+                      try {
+                        inputStream.close();
+                      } catch (IOException ex) {
+                        log.warn("Error closing XMLTV stream: {}", ex.getMessage());
+                      }
+                    }
+                  }
+                })
+        .header("Content-Type", MediaType.APPLICATION_XML)
+        .header("Content-Disposition", "inline; filename=\"epg.xml\"")
+        .build();
+  }
+
+  /**
    * Build proxy redirect URL
    *
    * @param uriInfo Request URI info
-   * @param username Client username
-   * @param password Client password
+   * @param client Client
    * @param url stream URL
    * @return Proxy URL
    */
-  private String buildProxyUrl(UriInfo uriInfo, String username, String password, String url) {
+  private String buildProxyUrl(UriInfo uriInfo, Client client, String url) {
     String encodedUrl = Base64.getUrlEncoder().encodeToString(url.getBytes());
     var baseUri = uriInfo.getBaseUri();
     String baseUrl =
@@ -127,6 +184,12 @@ public class StreamModeHandler {
                 ? ":" + baseUri.getPort()
                 : "");
 
-    return baseUrl + "/proxy/" + username + "/" + password + "?url=" + encodedUrl;
+    return baseUrl
+        + "/proxy/"
+        + client.getUsername()
+        + "/"
+        + client.getPassword()
+        + "?url="
+        + encodedUrl;
   }
 }
