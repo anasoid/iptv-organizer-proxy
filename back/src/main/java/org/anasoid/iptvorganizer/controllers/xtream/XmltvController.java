@@ -32,7 +32,7 @@ import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 @Path("/xmltv.php")
 @ApplicationScoped
 public class XmltvController {
-
+  private static final long DEFAULT_TIMEOUT_XMLTV = 120000L;
   @Inject XtreamUserService xtreamUserService;
   @Inject ClientService clientService;
   @Inject ClientRepository clientRepository;
@@ -69,8 +69,8 @@ public class XmltvController {
     return switch (xmltvMode) {
       case REDIRECT -> streamModeHandler.handleRedirectMode(xmltvUrl);
       case PROXY -> streamModeHandler.handleProxyMode(uriInfo, client, xmltvUrl);
-      case TUNNEL -> streamModeHandler.handleStreamXmltvData(client, xmltvUrl);
-      case DEFAULT -> streamModeHandler.handleStreamXmltvData(client, xmltvUrl);
+      case TUNNEL -> streamModeHandler.handleTunnelMode(client, xmltvUrl, DEFAULT_TIMEOUT_XMLTV);
+      case DEFAULT -> streamModeHandler.handleTunnelMode(client, xmltvUrl, DEFAULT_TIMEOUT_XMLTV);
       default -> streamModeHandler.handleUnknownMode(xmltvMode.toString());
     };
   }

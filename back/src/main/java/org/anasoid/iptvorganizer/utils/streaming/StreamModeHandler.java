@@ -18,7 +18,6 @@ import org.anasoid.iptvorganizer.models.http.RedirectCheckResult;
 public class StreamModeHandler {
 
   private static final int CHUNK_SIZE = 8192;
-  private static final long DEFAULT_TIMEOUT_XMLTV = 120000L;
   @Inject private StreamProxyHttpClient streamProxyHttpClient;
   @Inject private HttpStreamingService httpStreamingService;
 
@@ -111,7 +110,7 @@ public class StreamModeHandler {
    * @param client The client (for logging)
    * @return Response with streaming XMLTV data
    */
-  public Response handleStreamXmltvData(Client client, String xmltvUrl) {
+  public Response handleTunnelMode(Client client, String url, long timeout) {
     return Response.ok(
             (StreamingOutput)
                 os -> {
@@ -121,10 +120,8 @@ public class StreamModeHandler {
 
                     // Fetch XMLTV data from upstream source
                     HttpOptions options =
-                        HttpOptions.builder().timeout(DEFAULT_TIMEOUT_XMLTV).maxRetries(1).build();
-
-                    inputStream = httpStreamingService.streamHttp(xmltvUrl, options);
-
+                        HttpOptions.builder().timeout(timeout).maxRetries(1).build();
+                    inputStream = httpStreamingService.streamHttp(url, options);
                     // Stream in chunks
                     byte[] buffer = new byte[CHUNK_SIZE];
                     int bytesRead;
@@ -133,34 +130,30 @@ public class StreamModeHandler {
                       os.write(buffer, 0, bytesRead);
                       os.flush();
                     }
-
-                    log.info("XMLTV streaming completed for client: {}", client.getUsername());
+                    log.info("streaming completed for client: {}", client.getUsername());
 
                   } catch (IOException ex) {
                     // Handle client disconnection
                     if (ex.getMessage() != null && ex.getMessage().contains("Broken pipe")) {
-                      log.info(
-                          "Client {} disconnected during XMLTV streaming", client.getUsername());
+                      log.info("Client {} disconnected during streaming", client.getUsername());
                     } else {
                       log.warn(
-                          "Error streaming XMLTV for client {}: {}",
+                          "Error streaming for client {}: {}",
                           client.getUsername(),
                           ex.getMessage());
                     }
                   } catch (Exception ex) {
-                    log.error("Error streaming XMLTV: {}", ex);
+                    log.error("Error streaming : {}", ex.getMessage());
                   } finally {
                     if (inputStream != null) {
                       try {
                         inputStream.close();
                       } catch (IOException ex) {
-                        log.warn("Error closing XMLTV stream: {}", ex.getMessage());
+                        log.warn("Error closing stream: {}", ex.getMessage());
                       }
                     }
                   }
                 })
-        .header("Content-Type", MediaType.APPLICATION_XML)
-        .header("Content-Disposition", "inline; filename=\"epg.xml\"")
         .build();
   }
 
