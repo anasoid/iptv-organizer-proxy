@@ -18,14 +18,14 @@ import lombok.Getter;
  * Optional<MyType> hit = sources.get("src-abc", MyType.class);
  * }</pre>
  */
-public class Cache {
+public class Cache<V> {
 
   /** Logical name of this cache. */
   @Getter private final String name;
 
   private final CacheManager manager;
 
-  /** Maximum number of live entries; 0 means unlimited. */
+  /** Maximum number of live entries; 0 means cache is disabled (all operations are skipped). */
   @Getter private final int maxSize;
 
   /**
@@ -42,14 +42,25 @@ public class Cache {
   }
 
   // -------------------------------------------------------------------------
+  // Enabled check
+  // -------------------------------------------------------------------------
+
+  /** Returns {@code true} if this cache is active. When {@code maxSize == 0} the cache is disabled and all operations are skipped. */
+  public boolean isEnabled() {
+    return maxSize != 0;
+  }
+
+  // -------------------------------------------------------------------------
   // Put
   // -------------------------------------------------------------------------
 
   /**
    * Stores {@code value} under the given keys using the cache's default TTL (permanent if none). At
    * least one of {@code stringKey} / {@code longKey} must be non-null.
+   * <p>No-op when the cache is disabled ({@code maxSize == 0}).
    */
   public void put(String stringKey, Long longKey, Object value) {
+    if (!isEnabled()) return;
     manager.put(name, stringKey, longKey, value, ttl);
   }
 
@@ -57,13 +68,15 @@ public class Cache {
   // Get
   // -------------------------------------------------------------------------
 
-  /** Returns the cached value by string key if present and not expired. */
+  /** Returns the cached value by string key if present and not expired, or {@link Optional#empty()} when disabled. */
   public <V> Optional<V> get(String stringKey, Class<V> type) {
+    if (!isEnabled()) return Optional.empty();
     return manager.get(name, stringKey, type);
   }
 
-  /** Returns the cached value by long key if present and not expired. */
+  /** Returns the cached value by long key if present and not expired, or {@link Optional#empty()} when disabled. */
   public <V> Optional<V> get(Long longKey, Class<V> type) {
+    if (!isEnabled()) return Optional.empty();
     return manager.get(name, longKey, type);
   }
 
@@ -74,8 +87,11 @@ public class Cache {
   /**
    * Returns the cached value if present and not expired, otherwise invokes {@code loader}, stores
    * the result using the cache's default TTL (permanent if none), and returns it.
+   * <p>When the cache is disabled ({@code maxSize == 0}), {@code loader} is always called and the
+   * result is never stored.
    */
   public <V> V getOrLoad(String stringKey, Long longKey, Class<V> type, Supplier<V> loader) {
+    if (!isEnabled()) return loader.get();
     return manager.getOrLoad(name, stringKey, longKey, type, loader, ttl);
   }
 
@@ -83,13 +99,15 @@ public class Cache {
   // Contains
   // -------------------------------------------------------------------------
 
-  /** Returns {@code true} if a non-expired entry exists for the given string key. */
+  /** Returns {@code true} if a non-expired entry exists for the given string key, or {@code false} when disabled. */
   public boolean contains(String stringKey) {
+    if (!isEnabled()) return false;
     return manager.contains(name, stringKey);
   }
 
-  /** Returns {@code true} if a non-expired entry exists for the given long key. */
+  /** Returns {@code true} if a non-expired entry exists for the given long key, or {@code false} when disabled. */
   public boolean contains(Long longKey) {
+    if (!isEnabled()) return false;
     return manager.contains(name, longKey);
   }
 
@@ -100,18 +118,20 @@ public class Cache {
   /**
    * Removes the entry indexed under the given string key, including its long-key index if any.
    *
-   * @return {@code true} if an entry was actually removed
+   * @return {@code true} if an entry was actually removed, always {@code false} when disabled
    */
   public boolean invalidate(String stringKey) {
+    if (!isEnabled()) return false;
     return manager.invalidate(name, stringKey);
   }
 
   /**
    * Removes the entry indexed under the given long key, including its string-key index if any.
    *
-   * @return {@code true} if an entry was actually removed
+   * @return {@code true} if an entry was actually removed, always {@code false} when disabled
    */
   public boolean invalidate(Long longKey) {
+    if (!isEnabled()) return false;
     return manager.invalidate(name, longKey);
   }
 
@@ -119,14 +139,16 @@ public class Cache {
    * Removes the entry matching either key. At least one of {@code stringKey} / {@code longKey} must
    * be non-null.
    *
-   * @return {@code true} if an entry was actually removed
+   * @return {@code true} if an entry was actually removed, always {@code false} when disabled
    */
   public boolean invalidate(String stringKey, Long longKey) {
+    if (!isEnabled()) return false;
     return manager.invalidate(name, stringKey, longKey);
   }
 
-  /** Clears all entries in this cache. */
+  /** Clears all entries in this cache. No-op when the cache is disabled. */
   public void invalidateAll() {
+    if (!isEnabled()) return;
     manager.invalidateAll(name);
   }
 
@@ -136,9 +158,10 @@ public class Cache {
 
   /**
    * Returns the number of unique, non-expired logical entries in this cache. An entry stored under
-   * both a string and a long key counts as one.
+   * both a string and a long key counts as one. Returns {@code 0} when disabled.
    */
   public long size() {
+    if (!isEnabled()) return 0;
     return manager.size(name);
   }
 
@@ -153,7 +176,7 @@ public class Cache {
         + "', size="
         + size()
         + ", maxSize="
-        + (maxSize == 0 ? "unlimited" : maxSize)
+        + (maxSize == 0 ? "disabled" : maxSize)
         + ", ttl="
         + (ttl == null ? "permanent" : ttl)
         + '}';

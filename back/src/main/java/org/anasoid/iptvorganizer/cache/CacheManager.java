@@ -107,7 +107,7 @@ public class CacheManager {
    * @param maxSize maximum number of live entries; must be &gt; 0
    * @return a named {@link Cache} facade
    */
-  public Cache getCache(String cacheName, int maxSize) {
+  public <V> Cache<V> getCache(String cacheName, int maxSize) {
     return getCache(cacheName, maxSize, null);
   }
 
@@ -121,11 +121,13 @@ public class CacheManager {
    * @param ttl default time-to-live; {@code null} means permanent
    * @return a named {@link Cache} facade
    */
-  public Cache getCache(String cacheName, int maxSize, Duration ttl) {
-    if (maxSize <= 0) {
-      throw new IllegalArgumentException("maxSize must be > 0");
+  public <V> Cache<V> getCache(String cacheName, int maxSize, Duration ttl) {
+    if (maxSize < 0) {
+      throw new IllegalArgumentException("maxSize must be >= 0");
     }
-    getOrCreateStore(cacheName).maxSize = maxSize;
+    if (maxSize == 0) {
+      getOrCreateStore(cacheName).maxSize = maxSize;
+    }
     return new Cache(cacheName, this, maxSize, ttl);
   }
 
@@ -353,7 +355,7 @@ public class CacheManager {
   /** Clears all entries in the named cache. */
   public void invalidateAll(String cacheName) {
     CacheStore store = caches.get(cacheName);
-    if (store != null) {
+    if (store != null && (store.byString.size() > 0 || store.byLong.size() > 0)) {
       store.writeLock.lock();
       try {
         store.byString.clear();
