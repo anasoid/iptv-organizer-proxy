@@ -5,8 +5,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,13 +21,13 @@ import lombok.extern.slf4j.Slf4j;
  * Application-scoped, thread-safe cache manager that supports multiple named caches and per-entry
  * TTL (time-to-live).
  *
- * <p>Each cache entry can be indexed by a {@link String} key, a {@link Long} key, or both. At least
- * one key must be provided when storing an entry.
+ * <p>Each cache entry is indexed by a mandatory {@link Long} key and optionally by a {@link String}
+ * key. The dual-index logic is encapsulated in {@link CacheMap}.
  *
- * <p>Each named cache is backed by a {@link LinkedHashMap} guarded by a {@link
- * ReentrantReadWriteLock}. Max-size enforcement is implemented via {@link LinkedHashMap} {@code
- * removeEldestEntry}: the oldest logical entry is evicted automatically and atomically on every
- * {@code put} that would exceed the limit — no separate eviction loop is needed.
+ * <p>Each named cache is backed by a {@link CacheMap} guarded by a {@link ReentrantReadWriteLock}.
+ * Max-size enforcement is implemented inside {@link CacheMap} via {@link java.util.LinkedHashMap}
+ * {@code removeEldestEntry}: the oldest logical entry is evicted automatically and atomically on
+ * every {@code put} that would exceed the limit — no separate eviction loop is needed.
  *
  * <p>Usage examples:
  *
@@ -46,67 +44,39 @@ import lombok.extern.slf4j.Slf4j;
 public class CacheManager {
 
   /**
-   * Per-named-cache store. All map access is serialised by a {@link ReentrantReadWriteLock}:
-   * multiple readers proceed in parallel; writers are exclusive.
+   * Per-named-cache store. All {@link CacheMap} access is serialised by a {@link
+   * ReentrantReadWriteLock}: multiple readers proceed in parallel; writers are exclusive.
    *
-   * <p>Both {@code byString} and {@code byLong} are anonymous {@link LinkedHashMap} subclasses
-   * whose {@code removeEldestEntry} overrides enforce {@code maxSize} independently. When a map
-   * evicts its eldest entry it cross-removes the matching index from its sibling map. Because
-   * {@link CacheEntry} has no {@code equals}/{@code hashCode} override, sibling removals use
-   * identity-safe {@code Map.remove(key, value)}.
+   * <p>Statistics counters are {@link AtomicLong} fields updated without holding the r/w lock.
    */
   private static class CacheStore {
     final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
     final Lock readLock = rwLock.readLock();
     final Lock writeLock = rwLock.writeLock();
 
-    /** 0 = unlimited. Declared first so both anonymous classes below can read it. */
-    volatile int maxSize;
-
     // ---- Statistics counters (thread-safe, updated without holding the r/w lock) ----
     final AtomicLong hitCount = new AtomicLong();
     final AtomicLong missCount = new AtomicLong();
     final AtomicLong putCount = new AtomicLong();
-    /** Index-level entries evicted due to max-size overflow (one dual-keyed entry may count 2×). */
+
+    /** Logical entries evicted due to max-size overflow (counted once per entry). */
     final AtomicLong sizeEvictionCount = new AtomicLong();
-    /** Index-level entries removed during scheduled TTL cleanup. */
+
+    /** Logical entries removed during scheduled TTL cleanup (counted once per entry). */
     final AtomicLong expiredEvictionCount = new AtomicLong();
+
     /** Successful key-based invalidations (one logical entry = one increment). */
     final AtomicLong invalidationCount = new AtomicLong();
+
     /** Number of invalidateAll calls on this cache. */
     final AtomicLong clearCount = new AtomicLong();
 
-    final LinkedHashMap<String, CacheEntry<Object>> byString =
-        new LinkedHashMap<>() {
-          @Override
-          protected boolean removeEldestEntry(Map.Entry<String, CacheEntry<Object>> eldest) {
-            if (CacheStore.this.maxSize > 0 && size() > CacheStore.this.maxSize) {
-              CacheStore.this.sizeEvictionCount.incrementAndGet();
-              Long lk = eldest.getValue().getLongKey();
-              if (lk != null) {
-                CacheStore.this.byLong.remove(lk, eldest.getValue());
-              }
-              return true;
-            }
-            return false;
-          }
-        };
-
-    final LinkedHashMap<Long, CacheEntry<Object>> byLong =
-        new LinkedHashMap<>() {
-          @Override
-          protected boolean removeEldestEntry(Map.Entry<Long, CacheEntry<Object>> eldest) {
-            if (CacheStore.this.maxSize > 0 && size() > CacheStore.this.maxSize) {
-              CacheStore.this.sizeEvictionCount.incrementAndGet();
-              String sk = eldest.getValue().getStringKey();
-              if (sk != null) {
-                CacheStore.this.byString.remove(sk, eldest.getValue());
-              }
-              return true;
-            }
-            return false;
-          }
-        };
+    /**
+     * Dual-index store. {@code sizeEvictionCount} is wired in at construction time so that {@link
+     * CacheMap} can increment it directly on each size-based eviction. Declared after {@code
+     * sizeEvictionCount} so the field initialiser runs in order.
+     */
+    final CacheMap cache = new CacheMap(0, sizeEvictionCount);
   }
 
   /** cacheName -> CacheStore */
@@ -118,11 +88,11 @@ public class CacheManager {
 
   /**
    * Returns a {@link Cache} facade bound to the given name with a maximum number of live entries
-   * and no default TTL. When the limit is exceeded the oldest entry is evicted (FIFO) automatically
-   * via {@link LinkedHashMap} {@code removeEldestEntry}.
+   * and no default TTL. When the limit is exceeded the oldest entry is evicted (FIFO)
+   * automatically.
    *
    * @param cacheName logical name of the cache
-   * @param maxSize maximum number of live entries; must be &gt; 0
+   * @param maxSize maximum number of live entries; must be &gt;= 0 (0 = disabled)
    * @return a named {@link Cache} facade
    */
   public <V> Cache<V> getCache(String cacheName, int maxSize) {
@@ -131,11 +101,10 @@ public class CacheManager {
 
   /**
    * Returns a {@link Cache} facade bound to the given name with a maximum number of live entries
-   * and a default TTL. When the limit is exceeded the oldest entry is evicted (FIFO) automatically
-   * via {@link LinkedHashMap} {@code removeEldestEntry}.
+   * and a default TTL. When the limit is exceeded the oldest entry is evicted (FIFO) automatically.
    *
    * @param cacheName logical name of the cache
-   * @param maxSize maximum number of live entries; must be &gt; 0
+   * @param maxSize maximum number of live entries; must be &gt;= 0 (0 = disabled)
    * @param ttl default time-to-live; {@code null} means permanent
    * @return a named {@link Cache} facade
    */
@@ -143,9 +112,7 @@ public class CacheManager {
     if (maxSize < 0) {
       throw new IllegalArgumentException("maxSize must be >= 0");
     }
-    if (maxSize == 0) {
-      getOrCreateStore(cacheName).maxSize = maxSize;
-    }
+    getOrCreateStore(cacheName).cache.setMaxSize(maxSize);
     return new Cache(cacheName, this, maxSize, ttl);
   }
 
@@ -154,19 +121,17 @@ public class CacheManager {
   // -------------------------------------------------------------------------
 
   /**
-   * Stores {@code value} under the given keys in the named cache with the specified TTL. At least
-   * one of {@code stringKey} / {@code longKey} must be non-null.
+   * Stores {@code value} under the given keys in the named cache with the specified TTL.
    *
    * @param cacheName logical name of the cache
-   * @param stringKey string index key; may be {@code null} if {@code longKey} is provided
-   * @param longKey long index key; may be {@code null} if {@code stringKey} is provided
+   * @param stringKey string index key; may be {@code null}
+   * @param longKey long index key; must be non-null
    * @param value value to cache (must not be {@code null})
    * @param ttl how long the entry lives; {@code null} for no expiry
    */
   protected void put(String cacheName, String stringKey, Long longKey, Object value, Duration ttl) {
     if (longKey == null) {
-      throw new IllegalArgumentException(
-          "longKey must be non-null");
+      throw new IllegalArgumentException("longKey must be non-null");
     }
     Instant expiresAt = ttl != null ? Instant.now().plus(ttl) : null;
     CacheEntry<Object> entry = new CacheEntry<>(value, expiresAt, stringKey, longKey);
@@ -175,28 +140,7 @@ public class CacheManager {
 
     store.writeLock.lock();
     try {
-      if (stringKey != null) {
-        CacheEntry<Object> old = store.byString.put(stringKey, entry);
-        if (old != null) {
-          // Clean up stale cross-index when the long key changed
-          if (old.getLongKey() != null && !old.getLongKey().equals(longKey)) {
-            store.byLong.remove(old.getLongKey());
-          }
-        }
-        // removeEldestEntry fires automatically if byString.size() > maxSize,
-        // cross-removing the eldest entry's long-key index from byLong.
-      }
-      if (longKey != null) {
-        CacheEntry<Object> old = store.byLong.put(longKey, entry);
-        if (old != null) {
-          // Clean up stale cross-index when the string key changed
-          if (old.getStringKey() != null && !old.getStringKey().equals(stringKey)) {
-            store.byString.remove(old.getStringKey());
-          }
-        }
-        // removeEldestEntry fires automatically if byLong.size() > maxSize,
-        // cross-removing the eldest entry's string-key index from byString.
-      }
+      store.cache.put(stringKey, longKey, entry);
     } finally {
       store.writeLock.unlock();
     }
@@ -218,7 +162,7 @@ public class CacheManager {
     }
     store.readLock.lock();
     try {
-      return resolveEntry(cacheName, store, store.byString.get(stringKey));
+      return resolveEntry(cacheName, store, store.cache.getByString(stringKey));
     } finally {
       store.readLock.unlock();
     }
@@ -231,14 +175,14 @@ public class CacheManager {
    * @param longKey long index key
    * @return {@link Optional} containing the value, or empty if absent / expired
    */
-  protected  <V> Optional<V> get(String cacheName, Long longKey) {
+  protected <V> Optional<V> get(String cacheName, Long longKey) {
     CacheStore store = caches.get(cacheName);
     if (store == null) {
       return Optional.empty();
     }
     store.readLock.lock();
     try {
-      return resolveEntry(cacheName, store, store.byLong.get(longKey));
+      return resolveEntry(cacheName, store, store.cache.getByLong(longKey));
     } finally {
       store.readLock.unlock();
     }
@@ -292,7 +236,7 @@ public class CacheManager {
   // -------------------------------------------------------------------------
 
   /**
-   * Removes the entry indexed under the given string key, including its long-key index if any.
+   * Removes the entry indexed under the given string key, including its long-key index.
    *
    * @return {@code true} if an entry was actually removed
    */
@@ -303,12 +247,9 @@ public class CacheManager {
     }
     store.writeLock.lock();
     try {
-      CacheEntry<Object> entry = store.byString.remove(stringKey);
+      CacheEntry<Object> entry = store.cache.removeByString(stringKey);
       if (entry == null) {
         return false;
-      }
-      if (entry.getLongKey() != null) {
-        store.byLong.remove(entry.getLongKey());
       }
       store.invalidationCount.incrementAndGet();
       log.debug("Cache [{}] INVALIDATE stringKey='{}'", cacheName, stringKey);
@@ -319,7 +260,7 @@ public class CacheManager {
   }
 
   /**
-   * Removes the entry indexed under the given long key, including its string-key index if any.
+   * Removes the entry indexed under the given long key, including its string-key index if present.
    *
    * @return {@code true} if an entry was actually removed
    */
@@ -330,12 +271,9 @@ public class CacheManager {
     }
     store.writeLock.lock();
     try {
-      CacheEntry<Object> entry = store.byLong.remove(longKey);
+      CacheEntry<Object> entry = store.cache.removeByLong(longKey);
       if (entry == null) {
         return false;
-      }
-      if (entry.getStringKey() != null) {
-        store.byString.remove(entry.getStringKey());
       }
       store.invalidationCount.incrementAndGet();
       log.debug("Cache [{}] INVALIDATE longKey={}", cacheName, longKey);
@@ -365,11 +303,10 @@ public class CacheManager {
   /** Clears all entries in the named cache. */
   protected void invalidateAll(String cacheName) {
     CacheStore store = caches.get(cacheName);
-    if (store != null && (store.byString.size() > 0 || store.byLong.size() > 0)) {
+    if (store != null && !store.cache.isEmpty()) {
       store.writeLock.lock();
       try {
-        store.byString.clear();
-        store.byLong.clear();
+        store.cache.clear();
         store.clearCount.incrementAndGet();
         log.debug("Cache [{}] CLEAR ALL", cacheName);
       } finally {
@@ -383,8 +320,7 @@ public class CacheManager {
     for (CacheStore store : caches.values()) {
       store.writeLock.lock();
       try {
-        store.byString.clear();
-        store.byLong.clear();
+        store.cache.clear();
         store.clearCount.incrementAndGet();
       } finally {
         store.writeLock.unlock();
@@ -397,10 +333,7 @@ public class CacheManager {
   // Statistics / inspection
   // -------------------------------------------------------------------------
 
-  /**
-   * Returns the number of unique, non-expired logical entries in the named cache. An entry stored
-   * under both a string and a long key counts as one.
-   */
+  /** Returns the number of non-expired logical entries in the named cache. */
   protected long size(String cacheName) {
     CacheStore store = caches.get(cacheName);
     if (store == null) {
@@ -408,11 +341,7 @@ public class CacheManager {
     }
     store.readLock.lock();
     try {
-      // Deduplicate via identity: an entry stored under both keys counts once.
-      Set<CacheEntry<Object>> unique = Collections.newSetFromMap(new IdentityHashMap<>());
-      store.byString.values().stream().filter(e -> !e.isExpired()).forEach(unique::add);
-      store.byLong.values().stream().filter(e -> !e.isExpired()).forEach(unique::add);
-      return unique.size();
+      return store.cache.liveSize();
     } finally {
       store.readLock.unlock();
     }
@@ -428,8 +357,9 @@ public class CacheManager {
   // -------------------------------------------------------------------------
 
   /**
-   * Periodically removes expired entries from all caches. Runs every 5 minutes. A single pass over
-   * {@code insertionOrder} cleans both index maps atomically under the write lock.
+   * Periodically removes expired entries from all caches. Runs every 5 minutes. Delegates to {@link
+   * CacheMap#removeExpired()} which performs a single pass over the primary index, cleaning both
+   * indexes atomically under the write lock and counting each logical entry exactly once.
    */
   @Scheduled(every = "5m", identity = "cache-eviction")
   void evictExpired() {
@@ -439,39 +369,10 @@ public class CacheManager {
       CacheStore store = cacheEntry.getValue();
       store.writeLock.lock();
       try {
-        int before = store.byString.size() + store.byLong.size();
-        // Pass 1 – remove expired from byString and cross-remove from byLong.
-        store
-            .byString
-            .entrySet()
-            .removeIf(
-                e -> {
-                  if (e.getValue().isExpired()) {
-                    Long lk = e.getValue().getLongKey();
-                    if (lk != null) {
-                      store.byLong.remove(lk, e.getValue());
-                    }
-                    store.expiredEvictionCount.incrementAndGet();
-                    return true;
-                  }
-                  return false;
-                });
-        // Pass 2 – remove any remaining expired from byLong
-        // (entries whose stringKey was null, or already removed in pass 1).
-        store
-            .byLong
-            .entrySet()
-            .removeIf(
-                e -> {
-                  if (e.getValue().isExpired()) {
-                    store.expiredEvictionCount.incrementAndGet();
-                    return true;
-                  }
-                  return false;
-                });
-        int evicted = before - (store.byString.size() + store.byLong.size());
+        int evicted = store.cache.removeExpired();
+        store.expiredEvictionCount.addAndGet(evicted);
         if (evicted > 0) {
-          log.debug("Cache [{}] evicted {} expired index entries", cacheName, evicted);
+          log.debug("Cache [{}] evicted {} expired entries", cacheName, evicted);
           total += evicted;
         }
       } finally {
@@ -479,7 +380,7 @@ public class CacheManager {
       }
     }
     if (total > 0) {
-      log.debug("Cache eviction completed – {} index entries removed in total", total);
+      log.debug("Cache eviction completed – {} entries removed in total", total);
     }
   }
 
@@ -523,8 +424,8 @@ public class CacheManager {
   // -------------------------------------------------------------------------
 
   /**
-   * Returns a snapshot of runtime statistics for the named cache, or {@link Optional#empty()} if
-   * no cache with that name has ever been used.
+   * Returns a snapshot of runtime statistics for the named cache, or {@link Optional#empty()} if no
+   * cache with that name has ever been used.
    *
    * @param cacheName logical name of the cache
    * @return optional statistics snapshot
@@ -560,7 +461,7 @@ public class CacheManager {
         .invalidations(store.invalidationCount.get())
         .clears(store.clearCount.get())
         .size(size(cacheName))
-        .maxSize(store.maxSize)
+        .maxSize(store.cache.getMaxSize())
         .build();
   }
 }

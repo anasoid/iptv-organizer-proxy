@@ -5,7 +5,7 @@ import lombok.Getter;
 
 /**
  * Holds a single cached value together with its optional expiry timestamp and the keys under which
- * it is indexed (one String key, one Long key – at least one must be non-null).
+ * it is indexed. {@code longKey} is mandatory; {@code stringKey} is optional.
  *
  * @param <V> type of the cached value
  */
@@ -17,10 +17,10 @@ public class CacheEntry<V> {
   /** Absolute instant at which this entry expires, or {@code null} for no expiry. */
   private final Instant expiresAt;
 
-  /** String index key – may be {@code null} if the entry was stored with a Long key only. */
+  /** String index key – may be {@code null} when the entry has no string alias. */
   private final String stringKey;
 
-  /** Long index key – may be {@code null} if the entry was stored with a String key only. */
+  /** Long index key – always non-null (mandatory). */
   private final Long longKey;
 
   public CacheEntry(V value, Instant expiresAt, String stringKey, Long longKey) {

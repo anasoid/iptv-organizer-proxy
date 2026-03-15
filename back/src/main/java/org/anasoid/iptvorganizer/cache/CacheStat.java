@@ -33,8 +33,8 @@ public class CacheStat {
   private final long puts;
 
   /**
-   * Number of index-level entries evicted because the cache exceeded its {@code maxSize} limit
-   * (LRU / insertion-order eviction). A dual-keyed entry (string + long) may increment this twice.
+   * Number of index-level entries evicted because the cache exceeded its {@code maxSize} limit (LRU
+   * / insertion-order eviction). A dual-keyed entry (string + long) may increment this twice.
    */
   private final long sizeEvictions;
 
@@ -77,4 +77,3 @@ public class CacheStat {
     return sizeEvictions + expiredEvictions;
   }
 }
-
