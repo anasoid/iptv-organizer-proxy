@@ -1,5 +1,6 @@
 package org.anasoid.iptvorganizer.controllers;
 
+import io.vertx.core.http.HttpClosedException;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
@@ -164,8 +165,12 @@ public class ProxyController {
                               || ex.getMessage().contains("Connection reset"))) {
                         log.info("Client disconnected (normal for IPTV) - {}", upstreamUrl);
                       } else {
-                        log.warn(
-                            "Error streaming content from {}: {}", upstreamUrl, ex.getMessage());
+                        if (!(ex.getCause() instanceof HttpClosedException)) {
+                          // do nothing
+                        } else {
+                          log.warn(
+                              "Error streaming content from {}: {}", upstreamUrl, ex.getMessage());
+                        }
                       }
                       throw ex;
                     } finally {

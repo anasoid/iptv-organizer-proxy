@@ -152,7 +152,7 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
       try (ResultSet rs = stmt.executeQuery()) {
         Category result = rs.next() ? mapRow(rs) : null;
         if (result != null) {
-          getCache().put(key, null, result);
+          getCache().putNull(key, result);
         } else {
           getCache().put(key, result.getId(), result);
         }

@@ -1,5 +1,6 @@
 package org.anasoid.iptvorganizer.repositories;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.inject.Inject;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -9,14 +10,19 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import javax.sql.DataSource;
+import lombok.AccessLevel;
+import lombok.Getter;
 import org.anasoid.iptvorganizer.cache.Cache;
 import org.anasoid.iptvorganizer.cache.CacheManager;
 import org.anasoid.iptvorganizer.models.entity.BaseEntity;
 
 public abstract class BaseRepository<T extends BaseEntity> {
 
+  @Getter(AccessLevel.PROTECTED)
   private Cache<T> cache;
+
   @Inject protected DataSource dataSource;
   @Inject protected CacheManager cacheManager;
 
@@ -25,6 +31,10 @@ public abstract class BaseRepository<T extends BaseEntity> {
   protected abstract T mapRow(ResultSet rs) throws SQLException;
 
   public T findById(Long id) {
+    Optional<T> cacheOpt = getCache().get(id);
+    if (cacheOpt.isPresent()) {
+      return cacheOpt.get();
+    }
     String sql = "SELECT * FROM " + getTableName() + " WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -226,11 +236,9 @@ public abstract class BaseRepository<T extends BaseEntity> {
     return Boolean.parseBoolean(value.toString());
   }
 
-  protected Cache<T> getCache() {
-    if (cache == null) {
-      cache = cacheManager.getCache(getTableName(), cacheSize(), cacheDuration());
-    }
-    return cache;
+  @PostConstruct
+  protected void init() {
+    cache = cacheManager.getCache(getTableName(), cacheSize(), cacheDuration());
   }
 
   protected abstract int cacheSize();

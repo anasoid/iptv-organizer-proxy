@@ -3,6 +3,7 @@ package org.anasoid.iptvorganizer.cache;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 import lombok.Getter;
 
@@ -66,6 +67,17 @@ public class Cache<V> {
   public void put(String stringKey, Long longKey, Object value) {
     if (!isEnabled()) return;
     manager.put(name, stringKey, longKey, value, ttl);
+  }
+
+  /**
+   * Stores {@code value} under the given keys using the cache's default TTL (permanent if none). At
+   * least one of {@code stringKey} / {@code longKey} must be non-null.
+   *
+   * <p>No-op when the cache is disabled ({@code maxSize == 0}).
+   */
+  public void putNull(String stringKey,  Object value) {
+    if (!isEnabled()) return;
+    manager.put(name, stringKey, -Math.abs(ThreadLocalRandom.current().nextLong()), value, ttl);
   }
 
   // -------------------------------------------------------------------------
