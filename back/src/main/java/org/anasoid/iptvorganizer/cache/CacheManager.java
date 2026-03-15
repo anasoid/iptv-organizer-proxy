@@ -150,9 +150,6 @@ public class CacheManager {
       throw new IllegalArgumentException(
           "At least one key (stringKey or longKey) must be non-null");
     }
-    if (value == null) {
-      throw new IllegalArgumentException("Cached value must not be null");
-    }
     Instant expiresAt = ttl != null ? Instant.now().plus(ttl) : null;
     CacheEntry<Object> entry = new CacheEntry<>(value, expiresAt, stringKey, longKey);
     CacheStore store = getOrCreateStore(cacheName);
@@ -193,17 +190,16 @@ public class CacheManager {
    *
    * @param cacheName logical name of the cache
    * @param stringKey string index key
-   * @param type expected type of the value
    * @return {@link Optional} containing the value, or empty if absent / expired
    */
-  public <V> Optional<V> get(String cacheName, String stringKey, Class<V> type) {
+  public <V> Optional<V> get(String cacheName, String stringKey) {
     CacheStore store = caches.get(cacheName);
     if (store == null) {
       return Optional.empty();
     }
     store.readLock.lock();
     try {
-      return resolveEntry(cacheName, store.byString.get(stringKey), type);
+      return resolveEntry(cacheName, store.byString.get(stringKey));
     } finally {
       store.readLock.unlock();
     }
@@ -214,17 +210,16 @@ public class CacheManager {
    *
    * @param cacheName logical name of the cache
    * @param longKey long index key
-   * @param type expected type of the value
    * @return {@link Optional} containing the value, or empty if absent / expired
    */
-  public <V> Optional<V> get(String cacheName, Long longKey, Class<V> type) {
+  public <V> Optional<V> get(String cacheName, Long longKey) {
     CacheStore store = caches.get(cacheName);
     if (store == null) {
       return Optional.empty();
     }
     store.readLock.lock();
     try {
-      return resolveEntry(cacheName, store.byLong.get(longKey), type);
+      return resolveEntry(cacheName, store.byLong.get(longKey));
     } finally {
       store.readLock.unlock();
     }
@@ -237,20 +232,15 @@ public class CacheManager {
    * <p>Lookup order: string key first (if non-null), then long key (if non-null).
    */
   public <V> V getOrLoad(
-      String cacheName,
-      String stringKey,
-      Long longKey,
-      Class<V> type,
-      Supplier<V> loader,
-      Duration ttl) {
+      String cacheName, String stringKey, Long longKey, Supplier<V> loader, Duration ttl) {
     if (stringKey != null) {
-      Optional<V> cached = get(cacheName, stringKey, type);
+      Optional<V> cached = get(cacheName, stringKey);
       if (cached.isPresent()) {
         return cached.get();
       }
     }
     if (longKey != null) {
-      Optional<V> cached = get(cacheName, longKey, type);
+      Optional<V> cached = get(cacheName, longKey);
       if (cached.isPresent()) {
         return cached.get();
       }
@@ -264,19 +254,18 @@ public class CacheManager {
   }
 
   /** Returns the cached value if present, otherwise loads and stores it permanently. */
-  public <V> V getOrLoad(
-      String cacheName, String stringKey, Long longKey, Class<V> type, Supplier<V> loader) {
-    return getOrLoad(cacheName, stringKey, longKey, type, loader, null);
+  public <V> V getOrLoad(String cacheName, String stringKey, Long longKey, Supplier<V> loader) {
+    return getOrLoad(cacheName, stringKey, longKey, loader, null);
   }
 
   /** Returns {@code true} if a non-expired entry exists for the given string key. */
   public boolean contains(String cacheName, String stringKey) {
-    return get(cacheName, stringKey, Object.class).isPresent();
+    return get(cacheName, stringKey).isPresent();
   }
 
   /** Returns {@code true} if a non-expired entry exists for the given long key. */
   public boolean contains(String cacheName, Long longKey) {
-    return get(cacheName, longKey, Object.class).isPresent();
+    return get(cacheName, longKey).isPresent();
   }
 
   // -------------------------------------------------------------------------
@@ -468,7 +457,7 @@ public class CacheManager {
    * Resolves a map lookup: returns empty for {@code null} or expired entries. Expiry removal is
    * lazy — actual cleanup is handled by {@link #evictExpired()}.
    */
-  private <V> Optional<V> resolveEntry(String cacheName, CacheEntry<Object> entry, Class<V> type) {
+  private <V> Optional<V> resolveEntry(String cacheName, CacheEntry<Object> entry) {
     if (entry == null || entry.isExpired()) {
       if (entry != null) {
         log.trace(
@@ -484,7 +473,7 @@ public class CacheManager {
         cacheName,
         entry.getStringKey(),
         entry.getLongKey());
-    return Optional.of(type.cast(entry.getValue()));
+    return (Optional<V>) Optional.of(entry.getValue());
   }
 
   private CacheStore getOrCreateStore(String cacheName) {

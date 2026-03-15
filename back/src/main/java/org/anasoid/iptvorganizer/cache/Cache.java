@@ -45,7 +45,10 @@ public class Cache<V> {
   // Enabled check
   // -------------------------------------------------------------------------
 
-  /** Returns {@code true} if this cache is active. When {@code maxSize == 0} the cache is disabled and all operations are skipped. */
+  /**
+   * Returns {@code true} if this cache is active. When {@code maxSize == 0} the cache is disabled
+   * and all operations are skipped.
+   */
   public boolean isEnabled() {
     return maxSize != 0;
   }
@@ -57,6 +60,7 @@ public class Cache<V> {
   /**
    * Stores {@code value} under the given keys using the cache's default TTL (permanent if none). At
    * least one of {@code stringKey} / {@code longKey} must be non-null.
+   *
    * <p>No-op when the cache is disabled ({@code maxSize == 0}).
    */
   public void put(String stringKey, Long longKey, Object value) {
@@ -68,16 +72,22 @@ public class Cache<V> {
   // Get
   // -------------------------------------------------------------------------
 
-  /** Returns the cached value by string key if present and not expired, or {@link Optional#empty()} when disabled. */
-  public <V> Optional<V> get(String stringKey, Class<V> type) {
+  /**
+   * Returns the cached value by string key if present and not expired, or {@link Optional#empty()}
+   * when disabled.
+   */
+  public <V> Optional<V> get(String stringKey) {
     if (!isEnabled()) return Optional.empty();
-    return manager.get(name, stringKey, type);
+    return manager.get(name, stringKey);
   }
 
-  /** Returns the cached value by long key if present and not expired, or {@link Optional#empty()} when disabled. */
-  public <V> Optional<V> get(Long longKey, Class<V> type) {
+  /**
+   * Returns the cached value by long key if present and not expired, or {@link Optional#empty()}
+   * when disabled.
+   */
+  public <V> Optional<V> get(Long longKey) {
     if (!isEnabled()) return Optional.empty();
-    return manager.get(name, longKey, type);
+    return manager.get(name, longKey);
   }
 
   // -------------------------------------------------------------------------
@@ -87,25 +97,32 @@ public class Cache<V> {
   /**
    * Returns the cached value if present and not expired, otherwise invokes {@code loader}, stores
    * the result using the cache's default TTL (permanent if none), and returns it.
+   *
    * <p>When the cache is disabled ({@code maxSize == 0}), {@code loader} is always called and the
    * result is never stored.
    */
-  public <V> V getOrLoad(String stringKey, Long longKey, Class<V> type, Supplier<V> loader) {
+  public <V> V getOrLoad(String stringKey, Long longKey, Supplier<V> loader) {
     if (!isEnabled()) return loader.get();
-    return manager.getOrLoad(name, stringKey, longKey, type, loader, ttl);
+    return manager.getOrLoad(name, stringKey, longKey, loader, ttl);
   }
 
   // -------------------------------------------------------------------------
   // Contains
   // -------------------------------------------------------------------------
 
-  /** Returns {@code true} if a non-expired entry exists for the given string key, or {@code false} when disabled. */
+  /**
+   * Returns {@code true} if a non-expired entry exists for the given string key, or {@code false}
+   * when disabled.
+   */
   public boolean contains(String stringKey) {
     if (!isEnabled()) return false;
     return manager.contains(name, stringKey);
   }
 
-  /** Returns {@code true} if a non-expired entry exists for the given long key, or {@code false} when disabled. */
+  /**
+   * Returns {@code true} if a non-expired entry exists for the given long key, or {@code false}
+   * when disabled.
+   */
   public boolean contains(Long longKey) {
     if (!isEnabled()) return false;
     return manager.contains(name, longKey);
