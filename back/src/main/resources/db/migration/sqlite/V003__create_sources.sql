@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS sources (
     use_redirect INTEGER,
     use_redirect_xmltv INTEGER,
     enable_proxy INTEGER NOT NULL DEFAULT 0 CHECK(enable_proxy IN (0, 1)),
-    enable_tunnel INTEGER NOT NULL DEFAULT 0 CHECK(enable_tunnel IN (0, 1)),
     connect_xtream_api TEXT DEFAULT 'DEFAULT',
     connect_xtream_stream TEXT DEFAULT 'DEFAULT',
     connect_xmltv TEXT DEFAULT 'DEFAULT',

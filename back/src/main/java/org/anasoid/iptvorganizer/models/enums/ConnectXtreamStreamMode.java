@@ -4,8 +4,8 @@ package org.anasoid.iptvorganizer.models.enums;
 public enum ConnectXtreamStreamMode {
   /** Direct connection without any proxy or redirect */
   DIRECT,
-  /** Use tunnel connection (reverse proxy without external proxy) */
-  TUNNEL,
+  /** Use no external proxy connection (reverse proxy without external proxy) */
+  NO_PROXY,
   /** Use external proxy connection */
   PROXY,
   /** Return redirect to client (client fetches directly) */
@@ -21,7 +21,8 @@ public enum ConnectXtreamStreamMode {
    */
   public ConnectXtreamStreamMode resolve(ConnectXtreamApiMode apiMode) {
     if (this == DEFAULT) {
-      return ConnectXtreamStreamMode.valueOf(apiMode.resolve().name());
+      // ConnectXtreamApiMode resolves to NO_PROXY which corresponds to NO_PROXY stream mode
+      return ConnectXtreamStreamMode.NO_PROXY;
     }
     return this;
   }

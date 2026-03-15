@@ -117,9 +117,8 @@ public class ClientsController extends BaseController {
     if (request.getIsActive() != null) client.setIsActive(request.getIsActive());
     if (request.getHideAdultContent() != null)
       client.setHideAdultContent(request.getHideAdultContent());
-    // Always update enableProxy and enableTunnel (they can be null for inheritance)
+    // Always update enableProxy (it can be null for inheritance)
     client.setEnableProxy(request.getEnableProxy());
-    client.setEnableTunnel(request.getEnableTunnel());
     if (request.getConnectXtreamApi() != null)
       client.setConnectXtreamApi(request.getConnectXtreamApi());
     if (request.getConnectXtreamStream() != null)

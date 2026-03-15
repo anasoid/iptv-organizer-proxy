@@ -186,7 +186,7 @@ public class StreamDataController {
       case REDIRECT -> streamModeHandler.handleRedirectMode(streamUrl);
       case DIRECT -> streamModeHandler.handleDirectMode(streamUrl, client, source, httpHeaders);
       case PROXY -> streamModeHandler.handleProxyMode(uriInfo, client, streamUrl);
-      case TUNNEL -> streamModeHandler.handleTunnelMode(uriInfo, client, streamUrl);
+      case NO_PROXY -> streamModeHandler.handleTunnelMode(client, source, streamUrl, httpHeaders);
       case DEFAULT -> streamModeHandler.handleProxyMode(uriInfo, client, streamUrl);
       default -> streamModeHandler.handleUnknownMode(streamMode.toString());
     };

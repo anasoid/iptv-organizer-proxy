@@ -46,7 +46,7 @@ public class SourceRepository extends BaseRepository<Source> {
   @Override
   protected Long internalInsert(Source source) {
     String sql =
-        "INSERT INTO sources (name, url, username, password, sync_interval, is_active, proxy_id, enable_proxy, enable_tunnel, connect_xtream_api, connect_xtream_stream, connect_xmltv, black_list_filter) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO sources (name, url, username, password, sync_interval, is_active, proxy_id, enable_proxy, connect_xtream_api, connect_xtream_stream, connect_xmltv, black_list_filter) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setString(1, source.getName());
@@ -57,18 +57,17 @@ public class SourceRepository extends BaseRepository<Source> {
       stmt.setBoolean(6, source.getIsActive());
       stmt.setObject(7, source.getProxyId());
       stmt.setObject(8, source.getEnableProxy());
-      stmt.setObject(9, source.getEnableTunnel());
       stmt.setString(
-          10,
+          9,
           source.getConnectXtreamApi() != null ? source.getConnectXtreamApi().name() : "DEFAULT");
       stmt.setString(
-          11,
+          10,
           source.getConnectXtreamStream() != null
               ? source.getConnectXtreamStream().name()
               : "DEFAULT");
       stmt.setString(
-          12, source.getConnectXmltv() != null ? source.getConnectXmltv().name() : "DEFAULT");
-      stmt.setString(13, source.getBlackListFilter());
+          11, source.getConnectXmltv() != null ? source.getConnectXmltv().name() : "DEFAULT");
+      stmt.setString(12, source.getBlackListFilter());
       stmt.executeUpdate();
 
       // Get generated key using standard JDBC approach - works with MySQL, H2, SQLite
@@ -88,7 +87,7 @@ public class SourceRepository extends BaseRepository<Source> {
   @Override
   protected void internalUpdate(Source source) {
     String sql =
-        "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, proxy_id = ?, enable_proxy = ?, enable_tunnel = ?, connect_xtream_api = ?, connect_xtream_stream = ?, connect_xmltv = ?, black_list_filter = ? WHERE id = ?";
+        "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, proxy_id = ?, enable_proxy = ?, connect_xtream_api = ?, connect_xtream_stream = ?, connect_xmltv = ?, black_list_filter = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setString(1, source.getName());
@@ -101,19 +100,18 @@ public class SourceRepository extends BaseRepository<Source> {
       stmt.setBoolean(8, source.getIsActive());
       stmt.setObject(9, source.getProxyId());
       stmt.setObject(10, source.getEnableProxy());
-      stmt.setObject(11, source.getEnableTunnel());
       stmt.setString(
-          12,
+          11,
           source.getConnectXtreamApi() != null ? source.getConnectXtreamApi().name() : "DEFAULT");
       stmt.setString(
-          13,
+          12,
           source.getConnectXtreamStream() != null
               ? source.getConnectXtreamStream().name()
               : "DEFAULT");
       stmt.setString(
-          14, source.getConnectXmltv() != null ? source.getConnectXmltv().name() : "DEFAULT");
-      stmt.setString(15, source.getBlackListFilter());
-      stmt.setLong(16, source.getId());
+          13, source.getConnectXmltv() != null ? source.getConnectXmltv().name() : "DEFAULT");
+      stmt.setString(14, source.getBlackListFilter());
+      stmt.setLong(15, source.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update source", e);
@@ -176,7 +174,6 @@ public class SourceRepository extends BaseRepository<Source> {
         .isActive(rs.getBoolean("is_active"))
         .proxyId(proxyId)
         .enableProxy(toBoolean(rs, "enable_proxy"))
-        .enableTunnel(toBoolean(rs, "enable_tunnel"))
         .connectXtreamApi(connectXtreamApi)
         .connectXtreamStream(connectXtreamStream)
         .connectXmltv(connectXmltv)

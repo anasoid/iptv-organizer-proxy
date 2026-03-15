@@ -68,9 +68,15 @@ public class XmltvController {
     String xmltvUrl = buildXmltvUrl(source);
     return switch (xmltvMode) {
       case REDIRECT -> streamModeHandler.handleRedirectMode(xmltvUrl);
-      case PROXY -> streamModeHandler.handleProxyMode(uriInfo, client, xmltvUrl);
-      case TUNNEL -> streamModeHandler.handleTunnelMode(client, xmltvUrl, DEFAULT_TIMEOUT_XMLTV);
-      case DEFAULT -> streamModeHandler.handleTunnelMode(client, xmltvUrl, DEFAULT_TIMEOUT_XMLTV);
+      case NO_PROXY ->
+          streamModeHandler.handleTunnelMode(
+              client, source, xmltvUrl, httpHeaders, DEFAULT_TIMEOUT_XMLTV);
+      case TUNNEL ->
+          streamModeHandler.handleTunnelMode(
+              client, source, xmltvUrl, httpHeaders, DEFAULT_TIMEOUT_XMLTV);
+      case DEFAULT ->
+          streamModeHandler.handleTunnelMode(
+              client, source, xmltvUrl, httpHeaders, DEFAULT_TIMEOUT_XMLTV);
       default -> streamModeHandler.handleUnknownMode(xmltvMode.toString());
     };
   }

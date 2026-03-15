@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.controllers.proxy;
 
-import io.vertx.core.http.HttpClosedException;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
@@ -9,25 +8,16 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.StreamingOutput;
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
-import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
-import org.anasoid.iptvorganizer.repositories.ClientRepository;
-import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
-import org.anasoid.iptvorganizer.utils.streaming.StreamProxyHttpClient;
+import org.anasoid.iptvorganizer.utils.TunnelUtils;
 
 /**
  * Proxy Controller
@@ -45,17 +35,8 @@ import org.anasoid.iptvorganizer.utils.streaming.StreamProxyHttpClient;
 @ApplicationScoped
 public class ProxyController {
 
-  /** Buffer size for streaming chunks. 64 KB balances memory and throughput for video streams. */
-  private static final int BUFFER_SIZE = 65536;
-
-  /** Hop-by-hop headers that must not be forwarded to the client. */
-  private static final Set<String> SKIP_RESPONSE_HEADERS =
-      Set.of("transfer-encoding", "connection", "keep-alive", "proxy-connection");
-
   @Inject XtreamUserService xtreamUserService;
-  @Inject StreamProxyHttpClient streamProxyHttpClient;
-  @Inject ClientRepository clientRepository;
-  @Inject SourceRepository sourceRepository;
+  @Inject TunnelUtils tunnelUtils;
 
   /**
    * Handle proxy stream request
@@ -93,7 +74,12 @@ public class ProxyController {
       log.info("Proxy request - user: {}, decodedUrl: {}", username, decodedUrl);
 
       // Stream content from upstream
-      return streamFromUpstream(decodedUrl, client, source, httpHeaders);
+      return tunnelUtils.streamFromUpstream(
+          decodedUrl,
+          client,
+          source,
+          httpHeaders,
+          tunnelUtils.buildHttpOptions(client, source).followRedirects(true).build());
 
     } catch (UnauthorizedException ex) {
       log.warn("Proxy request unauthorized: {}", ex.getMessage());
@@ -127,95 +113,6 @@ public class ProxyController {
       return new String(decodedBytes, StandardCharsets.UTF_8);
     } catch (IllegalArgumentException ex) {
       throw new IllegalArgumentException("Invalid base64 encoding in URL parameter", ex);
-    }
-  }
-
-  /**
-   * Stream content from upstream URL with header forwarding
-   *
-   * @param upstreamUrl The upstream URL
-   * @param client The authenticated client (for configuration fallback)
-   * @param source The source (for configuration)
-   * @param httpHeaders Client request headers to forward
-   * @return Response with streaming output
-   */
-  private Response streamFromUpstream(
-      String upstreamUrl, Client client, Source source, HttpHeaders httpHeaders) {
-    try {
-      // Load stream from upstream via HTTP proxy client with forced redirect following
-      HttpStreamingResponse streamResponse =
-          streamProxyHttpClient.loadStreamWithProxy(upstreamUrl, client, source, httpHeaders, true);
-
-      // Check for HTTP errors
-      if (streamResponse.getStatusCode() >= 400) {
-        return Response.status(streamResponse.getStatusCode()).build();
-      }
-
-      // Build response with streaming output, forwarding upstream status code
-      Response.ResponseBuilder responseBuilder =
-          Response.status(streamResponse.getStatusCode())
-              .entity(
-                  (StreamingOutput)
-                      os -> {
-                        InputStream inputStream = streamResponse.getBody();
-                        try {
-                          byte[] buffer = new byte[BUFFER_SIZE];
-                          int bytesRead;
-                          while ((bytesRead = inputStream.read(buffer)) != -1) {
-                            os.write(buffer, 0, bytesRead);
-                            os.flush();
-                          }
-                        } catch (IOException ex) {
-                          // Handle client disconnection
-                          if (ex.getMessage() != null
-                              && (ex.getMessage().contains("Broken pipe")
-                                  || ex.getMessage().contains("Connection reset"))) {
-                            log.info("Client disconnected (normal for IPTV) - {}", upstreamUrl);
-                          } else if (ex.getCause() instanceof HttpClosedException) {
-                            // HTTP connection closed by client - normal for IPTV, do nothing
-                          } else {
-                            log.warn(
-                                "Error streaming content from {}: {}",
-                                upstreamUrl,
-                                ex.getMessage());
-                          }
-                          throw ex;
-                        } finally {
-                          try {
-                            inputStream.close();
-                          } catch (IOException ex) {
-                            log.warn("Error closing stream: {}", ex.getMessage());
-                          }
-                        }
-                      });
-
-      // Apply upstream response headers (Content-Type, Content-Length, Content-Range, etc.)
-      for (Map.Entry<String, List<String>> header : streamResponse.getHeaders().entrySet()) {
-        String headerName = header.getKey();
-        // Skip hop-by-hop headers
-        if (SKIP_RESPONSE_HEADERS.contains(headerName.toLowerCase())) {
-          continue;
-        }
-        for (String headerValue : header.getValue()) {
-          responseBuilder.header(headerName, headerValue);
-        }
-      }
-
-      // Explicitly set Content-Type from upstream via type() to ensure it overrides
-      // any JAX-RS default content type derived from the StreamingOutput entity
-      String contentType = streamResponse.getHeader("content-type");
-      if (contentType == null) {
-        contentType = streamResponse.getHeader("Content-Type");
-      }
-      if (contentType != null && !contentType.isEmpty()) {
-        responseBuilder.type(contentType);
-      }
-
-      return responseBuilder.build();
-
-    } catch (Exception ex) {
-      log.error("Error getting stream from upstream: {}", ex.getMessage());
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
   }
 }

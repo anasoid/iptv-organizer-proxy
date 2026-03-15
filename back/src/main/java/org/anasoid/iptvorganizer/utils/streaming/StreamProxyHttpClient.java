@@ -37,32 +37,12 @@ public class StreamProxyHttpClient {
   @Inject ProxyConfigService proxyConfigService;
 
   /**
-   * Load stream from upstream URL via proxy with header forwarding and redirect following
-   *
-   * <p>Handles: - Filtering request headers to forward to upstream - Building HTTP options based on
-   * client/source configuration - Making HTTP request with redirect following if configured -
-   * Checking for HTTP errors
-   *
-   * @param upstreamUrl The upstream URL to fetch from
-   * @param client The authenticated client (for configuration fallback)
-   * @param source The source (for configuration)
-   * @param httpHeaders Client request headers to filter and forward
-   * @return HttpStreamingResponse with status, headers, and body
-   * @throws Exception if streaming fails
-   */
-  public HttpStreamingResponse loadStreamWithProxy(
-      String upstreamUrl, Client client, Source source, HttpHeaders httpHeaders) {
-    return loadStreamWithProxy(upstreamUrl, client, source, httpHeaders, false);
-  }
-
-  /**
    * Load stream from upstream URL via proxy with optional forced redirect following
    *
    * @param upstreamUrl The upstream URL to fetch from
    * @param client The authenticated client (for configuration fallback)
    * @param source The source (for configuration)
    * @param httpHeaders Client request headers to filter and forward
-   * @param forceFollowRedirects Force following redirects regardless of config
    * @return HttpStreamingResponse with status, headers, and body
    * @throws Exception if streaming fails
    */
@@ -71,14 +51,11 @@ public class StreamProxyHttpClient {
       Client client,
       Source source,
       HttpHeaders httpHeaders,
-      boolean forceFollowRedirects) {
+      HttpOptions options) {
     log.info("Loading stream via proxy: {}", upstreamUrl);
 
     // Extract and filter client headers to forward
     Map<String, String> requestHeaders = headerFilterService.filterRequestHeaders(httpHeaders);
-
-    // Build HTTP options with redirect following and proxy config based on client/source config
-    HttpOptions options = buildHttpOptions(client, source, forceFollowRedirects);
 
     // Stream content from upstream with header forwarding
     HttpStreamingResponse streamResponse =
@@ -182,27 +159,13 @@ public class StreamProxyHttpClient {
    *
    * @param client The client
    * @param source The source
-   * @param forceFollowRedirects Force following redirects regardless of config
    * @return Configured HttpOptions
    */
-  private HttpOptions buildHttpOptions(Client client, Source source, boolean forceFollowRedirects) {
-    // Determine followRedirects: force true if forceFollowRedirects is set, else default to true
-    // Note: streamFollowLocation has been removed in favor of enum-based connection modes
-    boolean followRedirects = forceFollowRedirects || true; // Default to true for HTTP redirects
+  public HttpOptions.HttpOptionsBuilder buildHttpOptions(Client client, Source source) {
 
     // Get proxy configuration from source, respecting client enable flags
     Proxy proxy = proxyConfigService.getProxyConfig(client, source);
 
-    log.debug(
-        "HTTP proxy options - followRedirects: {}, proxy configured: {}",
-        followRedirects,
-        proxy != null);
-
-    return HttpOptions.builder()
-        .timeout(300000L)
-        .maxRetries(1)
-        .followRedirects(followRedirects)
-        .proxy(proxy)
-        .build();
+    return HttpOptions.builder().timeout(300000L).maxRetries(1).followRedirects(true).proxy(proxy);
   }
 }

@@ -5,21 +5,19 @@ package org.anasoid.iptvorganizer.models.enums;
  * get streams, etc.
  */
 public enum ConnectXtreamApiMode {
-  /** Default mode - resolves to PROXY */
+  /** Default mode - resolves to NO_PROXY */
   DEFAULT,
-  /** Use tunnel connection (reverse proxy without external proxy) */
-  TUNNEL,
-  /** Use external proxy connection */
-  PROXY;
+  /** Use no external proxy connection (reverse proxy without external proxy) */
+  NO_PROXY;
 
   /**
    * Resolve DEFAULT to actual mode
    *
-   * @return The resolved mode (PROXY for DEFAULT, or self)
+   * @return The resolved mode (NO_PROXY for DEFAULT, or self)
    */
   public ConnectXtreamApiMode resolve() {
     if (this == DEFAULT) {
-      return PROXY;
+      return NO_PROXY;
     }
     return this;
   }

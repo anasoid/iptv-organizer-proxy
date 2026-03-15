@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS sources (
     use_redirect BOOLEAN,
     use_redirect_xmltv BOOLEAN,
     enable_proxy BOOLEAN NOT NULL DEFAULT FALSE,
-    enable_tunnel BOOLEAN NOT NULL DEFAULT FALSE,
     connect_xtream_api VARCHAR(20) NOT NULL DEFAULT 'DEFAULT',
     connect_xtream_stream VARCHAR(20) NOT NULL DEFAULT 'DEFAULT',
     connect_xmltv VARCHAR(20) NOT NULL DEFAULT 'DEFAULT',

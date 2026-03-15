@@ -60,7 +60,6 @@ export default function SourceForm({
       isActive: true,
       proxyId: null,
       enableProxy: false,
-      enableTunnel: false,
       connectXtreamApi: null,
       connectXtreamStream: null,
       connectXmltv: null,
@@ -262,30 +261,6 @@ export default function SourceForm({
                 When enabled, all upstream requests go through the configured HTTP proxy
               </Typography>
             </Box>
-
-            <Box>
-              <Controller
-                name="enableTunnel"
-                control={control}
-                render={({ field }) => (
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={field.value === true}
-                        onChange={(e) => field.onChange(e.target.checked)}
-                      />
-                    }
-                    label="Enable Tunnel"
-                  />
-                )}
-              />
-              <Typography
-                variant="caption"
-                sx={{ display: "block", color: "text.secondary", ml: 4 }}
-              >
-                When enabled, use reverse proxy tunnel for connections
-              </Typography>
-            </Box>
           </Box>
         </Box>
 
@@ -311,8 +286,7 @@ export default function SourceForm({
                     label="Xtream API Mode"
                   >
                     <MenuItem value="DEFAULT">Default</MenuItem>
-                    <MenuItem value="TUNNEL">Tunnel</MenuItem>
-                    <MenuItem value="PROXY">Proxy</MenuItem>
+                    <MenuItem value="NO_PROXY">No Proxy</MenuItem>
                   </Select>
                 </FormControl>
               )}
@@ -333,7 +307,7 @@ export default function SourceForm({
                     label="Xtream Stream Mode"
                   >
                     <MenuItem value="DIRECT">Direct</MenuItem>
-                    <MenuItem value="TUNNEL">Tunnel</MenuItem>
+                    <MenuItem value="NO_PROXY">No Proxy</MenuItem>
                     <MenuItem value="PROXY">Proxy</MenuItem>
                     <MenuItem value="REDIRECT">Redirect</MenuItem>
                     <MenuItem value="DEFAULT">Default</MenuItem>
@@ -358,7 +332,7 @@ export default function SourceForm({
                   >
                     <MenuItem value="REDIRECT">Redirect</MenuItem>
                     <MenuItem value="TUNNEL">Tunnel</MenuItem>
-                    <MenuItem value="PROXY">Proxy</MenuItem>
+                    <MenuItem value="NO_PROXY">No Proxy</MenuItem>
                     <MenuItem value="DEFAULT">Default</MenuItem>
                   </Select>
                 </FormControl>

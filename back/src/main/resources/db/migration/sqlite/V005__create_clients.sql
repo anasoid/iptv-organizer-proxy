@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS clients (
     disablestreamproxy INTEGER,
     stream_follow_location INTEGER,
     enable_proxy INTEGER CHECK(enable_proxy IS NULL OR enable_proxy IN (0, 1)),
-    enable_tunnel INTEGER CHECK(enable_tunnel IS NULL OR enable_tunnel IN (0, 1)),
     connect_xtream_api TEXT DEFAULT 'INHERITED',
     connect_xtream_stream TEXT DEFAULT 'INHERITED',
     connect_xmltv TEXT DEFAULT 'INHERITED',

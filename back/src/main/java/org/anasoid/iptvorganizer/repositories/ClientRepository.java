@@ -27,7 +27,7 @@ public class ClientRepository extends BaseRepository<Client> {
   @Override
   protected Long internalInsert(Client client) {
     String sql =
-        "INSERT INTO clients (source_id, filter_id, username, password, name, email, expiry_date, is_active, hide_adult_content, enable_proxy, enable_tunnel, notes, connect_xtream_api, connect_xtream_stream, connect_xmltv) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO clients (source_id, filter_id, username, password, name, email, expiry_date, is_active, hide_adult_content, enable_proxy, notes, connect_xtream_api, connect_xtream_stream, connect_xmltv) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setLong(1, client.getSourceId());
@@ -40,18 +40,17 @@ public class ClientRepository extends BaseRepository<Client> {
       stmt.setBoolean(8, client.getIsActive());
       stmt.setBoolean(9, client.getHideAdultContent());
       stmt.setObject(10, client.getEnableProxy());
-      stmt.setObject(11, client.getEnableTunnel());
-      stmt.setString(12, client.getNotes());
+      stmt.setString(11, client.getNotes());
       stmt.setString(
-          13,
+          12,
           client.getConnectXtreamApi() != null ? client.getConnectXtreamApi().name() : "INHERITED");
       stmt.setString(
-          14,
+          13,
           client.getConnectXtreamStream() != null
               ? client.getConnectXtreamStream().name()
               : "INHERITED");
       stmt.setString(
-          15, client.getConnectXmltv() != null ? client.getConnectXmltv().name() : "INHERITED");
+          14, client.getConnectXmltv() != null ? client.getConnectXmltv().name() : "INHERITED");
       stmt.executeUpdate();
       return getGeneratedId(stmt);
     } catch (SQLException e) {
@@ -62,7 +61,7 @@ public class ClientRepository extends BaseRepository<Client> {
   @Override
   protected void internalUpdate(Client client) {
     String sql =
-        "UPDATE clients SET source_id = ?, filter_id = ?, username = ?, password = ?, name = ?, email = ?, expiry_date = ?, is_active = ?, hide_adult_content = ?, enable_proxy = ?, enable_tunnel = ?, notes = ?, connect_xtream_api = ?, connect_xtream_stream = ?, connect_xmltv = ? WHERE id = ?";
+        "UPDATE clients SET source_id = ?, filter_id = ?, username = ?, password = ?, name = ?, email = ?, expiry_date = ?, is_active = ?, hide_adult_content = ?, enable_proxy = ?, notes = ?, connect_xtream_api = ?, connect_xtream_stream = ?, connect_xmltv = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setLong(1, client.getSourceId());
@@ -75,19 +74,18 @@ public class ClientRepository extends BaseRepository<Client> {
       stmt.setBoolean(8, client.getIsActive());
       stmt.setBoolean(9, client.getHideAdultContent());
       stmt.setObject(10, client.getEnableProxy());
-      stmt.setObject(11, client.getEnableTunnel());
-      stmt.setString(12, client.getNotes());
+      stmt.setString(11, client.getNotes());
       stmt.setString(
-          13,
+          12,
           client.getConnectXtreamApi() != null ? client.getConnectXtreamApi().name() : "INHERITED");
       stmt.setString(
-          14,
+          13,
           client.getConnectXtreamStream() != null
               ? client.getConnectXtreamStream().name()
               : "INHERITED");
       stmt.setString(
-          15, client.getConnectXmltv() != null ? client.getConnectXmltv().name() : "INHERITED");
-      stmt.setLong(16, client.getId());
+          14, client.getConnectXmltv() != null ? client.getConnectXmltv().name() : "INHERITED");
+      stmt.setLong(15, client.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update client", e);
@@ -139,7 +137,6 @@ public class ClientRepository extends BaseRepository<Client> {
         .isActive(rs.getBoolean("is_active"))
         .hideAdultContent(rs.getBoolean("hide_adult_content"))
         .enableProxy(toBoolean(rs, "enable_proxy"))
-        .enableTunnel(toBoolean(rs, "enable_tunnel"))
         .notes(rs.getString("notes"))
         .connectXtreamApi(connectXtreamApi)
         .connectXtreamStream(connectXtreamStream)

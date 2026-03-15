@@ -12,10 +12,9 @@ export interface Client {
   isActive: boolean;
   hideAdultContent?: boolean;
   enableProxy?: boolean | null;
-  enableTunnel?: boolean | null;
-  connectXtreamApi?: 'INHERITED' | 'DEFAULT' | 'TUNNEL' | 'PROXY' | null;
-  connectXtreamStream?: 'INHERITED' | 'DIRECT' | 'TUNNEL' | 'PROXY' | 'REDIRECT' | 'DEFAULT' | null;
-  connectXmltv?: 'INHERITED' | 'REDIRECT' | 'TUNNEL' | 'PROXY' | 'DEFAULT' | null;
+  connectXtreamApi?: 'INHERITED' | 'DEFAULT' | 'NO_PROXY' | null;
+  connectXtreamStream?: 'INHERITED' | 'DIRECT' | 'NO_PROXY' | 'PROXY' | 'REDIRECT' | 'DEFAULT' | null;
+  connectXmltv?: 'INHERITED' | 'REDIRECT' | 'TUNNEL' | 'NO_PROXY' | 'DEFAULT' | null;
   notes?: string | null;
   createdAt?: string;
   updatedAt?: string;

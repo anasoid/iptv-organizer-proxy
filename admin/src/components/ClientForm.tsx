@@ -51,7 +51,6 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
       isActive: true,
       hideAdultContent: false,
       enableProxy: null,
-      enableTunnel: null,
       connectXtreamApi: null,
       connectXtreamStream: null,
       connectXmltv: null,
@@ -102,7 +101,6 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
         isActive: client.isActive,
         hideAdultContent: client.hideAdultContent || false,
         enableProxy: client.enableProxy ?? null,
-        enableTunnel: client.enableTunnel ?? null,
         connectXtreamApi: client.connectXtreamApi || null,
         connectXtreamStream: client.connectXtreamStream || null,
         connectXmltv: client.connectXmltv || null,
@@ -121,7 +119,6 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
         isActive: true,
         hideAdultContent: false,
         enableProxy: null,
-        enableTunnel: null,
         connectXtreamApi: null,
         connectXtreamStream: null,
         connectXmltv: null,
@@ -137,7 +134,6 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
     const clientData = {
       ...data,
       enableProxy: data.enableProxy === undefined ? null : data.enableProxy,
-      enableTunnel: data.enableTunnel === undefined ? null : data.enableTunnel,
       filterId: !data.filterId ? null : Number(data.filterId),
     };
 
@@ -327,42 +323,6 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
                 Use HTTP proxy for upstream requests
               </Typography>
             </Box>
-
-            <Box>
-              <Controller
-                name="enableTunnel"
-                control={control}
-                shouldUnregister={false}
-                render={({ field }) => (
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={field.value === true}
-                        indeterminate={field.value === null}
-                        onChange={() => {
-                          const currentValue = field.value;
-                          // Three-state cycle: null -> true -> false -> null
-                          let newValue: boolean | null;
-                          if (currentValue === null) {
-                            newValue = true;
-                          } else if (currentValue === true) {
-                            newValue = false;
-                          } else {
-                            newValue = null;
-                          }
-                          field.onChange(newValue);
-                        }}
-                        inputProps={{ 'data-testid': field.name }}
-                      />
-                    }
-                    label="Enable Tunnel"
-                  />
-                )}
-              />
-              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4 }}>
-                Use reverse proxy tunnel
-              </Typography>
-            </Box>
           </Box>
         </Box>
 
@@ -389,8 +349,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
                     <MenuItem value="">Inherit from Source</MenuItem>
                     <MenuItem value="INHERITED">Force Inherit</MenuItem>
                     <MenuItem value="DEFAULT">Default</MenuItem>
-                    <MenuItem value="TUNNEL">Tunnel</MenuItem>
-                    <MenuItem value="PROXY">Proxy</MenuItem>
+                    <MenuItem value="NO_PROXY">No Proxy</MenuItem>
                   </Select>
                 </FormControl>
               )}
@@ -413,7 +372,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
                     <MenuItem value="">Inherit from Source</MenuItem>
                     <MenuItem value="INHERITED">Force Inherit</MenuItem>
                     <MenuItem value="DIRECT">Direct</MenuItem>
-                    <MenuItem value="TUNNEL">Tunnel</MenuItem>
+                    <MenuItem value="NO_PROXY">No Proxy</MenuItem>
                     <MenuItem value="PROXY">Proxy</MenuItem>
                     <MenuItem value="REDIRECT">Redirect</MenuItem>
                     <MenuItem value="DEFAULT">Default</MenuItem>
@@ -440,7 +399,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
                     <MenuItem value="INHERITED">Force Inherit</MenuItem>
                     <MenuItem value="REDIRECT">Redirect</MenuItem>
                     <MenuItem value="TUNNEL">Tunnel</MenuItem>
-                    <MenuItem value="PROXY">Proxy</MenuItem>
+                    <MenuItem value="NO_PROXY">No Proxy</MenuItem>
                     <MenuItem value="DEFAULT">Default</MenuItem>
                   </Select>
                 </FormControl>

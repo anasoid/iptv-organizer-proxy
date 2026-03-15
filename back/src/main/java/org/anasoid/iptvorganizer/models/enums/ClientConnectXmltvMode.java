@@ -11,8 +11,8 @@ public enum ClientConnectXmltvMode {
   REDIRECT,
   /** Use tunnel connection (reverse proxy without external proxy) */
   TUNNEL,
-  /** Use external proxy connection */
-  PROXY,
+  /** Use no external proxy connection (reverse proxy without external proxy) */
+  NO_PROXY,
   /** Default mode - resolves to same as connectXtreamStream */
   DEFAULT;
 
@@ -29,8 +29,8 @@ public enum ClientConnectXmltvMode {
         return ConnectXmltvMode.REDIRECT;
       case TUNNEL:
         return ConnectXmltvMode.TUNNEL;
-      case PROXY:
-        return ConnectXmltvMode.PROXY;
+      case NO_PROXY:
+        return ConnectXmltvMode.NO_PROXY;
       case DEFAULT:
         return ConnectXmltvMode.DEFAULT;
       default:

@@ -3,15 +3,13 @@ package org.anasoid.iptvorganizer.utils.streaming;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.core.*;
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
-import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.RedirectCheckResult;
+import org.anasoid.iptvorganizer.utils.TunnelUtils;
 
 @Slf4j
 @ApplicationScoped
@@ -20,6 +18,7 @@ public class StreamModeHandler {
   private static final int CHUNK_SIZE = 8192;
   @Inject private StreamProxyHttpClient streamProxyHttpClient;
   @Inject private HttpStreamingService httpStreamingService;
+  @Inject TunnelUtils tunnelUtils;
 
   /**
    * Handle REDIRECT mode - send direct 302 redirect to upstream
@@ -80,15 +79,14 @@ public class StreamModeHandler {
   /**
    * Handle TUNNEL mode - using application-level tunneling
    *
-   * @param uriInfo Request URI info
    * @param client Client
    * @param streamUrl The upstream stream URL
    * @return Response with redirect to proxy (tunnel mode not yet implemented)
    */
-  public Response handleTunnelMode(UriInfo uriInfo, Client client, String streamUrl) {
-    // TODO: Implement tunnel mode
-    // For now, fall back to proxy mode
-    return handleProxyMode(uriInfo, client, streamUrl);
+  public Response handleTunnelMode(
+      Client client, Source source, String streamUrl, HttpHeaders httpHeaders) {
+
+    return handleTunnelMode(client, source, streamUrl, httpHeaders, 4 * 3600 * 1000);
   }
 
   /**
@@ -110,51 +108,14 @@ public class StreamModeHandler {
    * @param client The client (for logging)
    * @return Response with streaming XMLTV data
    */
-  public Response handleTunnelMode(Client client, String url, long timeout) {
-    return Response.ok(
-            (StreamingOutput)
-                os -> {
-                  InputStream inputStream = null;
-                  try {
-                    log.info("Streaming XMLTV for client: {}", client.getUsername());
-
-                    // Fetch XMLTV data from upstream source
-                    HttpOptions options =
-                        HttpOptions.builder().timeout(timeout).maxRetries(1).build();
-                    inputStream = httpStreamingService.streamHttp(url, options);
-                    // Stream in chunks
-                    byte[] buffer = new byte[CHUNK_SIZE];
-                    int bytesRead;
-
-                    while ((bytesRead = inputStream.read(buffer)) != -1) {
-                      os.write(buffer, 0, bytesRead);
-                      os.flush();
-                    }
-                    log.info("streaming completed for client: {}", client.getUsername());
-
-                  } catch (IOException ex) {
-                    // Handle client disconnection
-                    if (ex.getMessage() != null && ex.getMessage().contains("Broken pipe")) {
-                      log.info("Client {} disconnected during streaming", client.getUsername());
-                    } else {
-                      log.warn(
-                          "Error streaming for client {}: {}",
-                          client.getUsername(),
-                          ex.getMessage());
-                    }
-                  } catch (Exception ex) {
-                    log.error("Error streaming : {}", ex.getMessage());
-                  } finally {
-                    if (inputStream != null) {
-                      try {
-                        inputStream.close();
-                      } catch (IOException ex) {
-                        log.warn("Error closing stream: {}", ex.getMessage());
-                      }
-                    }
-                  }
-                })
-        .build();
+  public Response handleTunnelMode(
+      Client client, Source source, String url, HttpHeaders httpHeaders, long timeout) {
+    return tunnelUtils.streamFromUpstream(
+        url,
+        client,
+        source,
+        httpHeaders,
+        tunnelUtils.buildHttpOptions(client, source).timeout(timeout).build());
   }
 
   /**

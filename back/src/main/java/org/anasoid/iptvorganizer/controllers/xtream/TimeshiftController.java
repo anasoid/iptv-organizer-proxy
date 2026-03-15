@@ -192,7 +192,7 @@ public class TimeshiftController {
             buildProxyUrl(uriInfo, client.getUsername(), client.getPassword(), encodedUrl);
         return Response.seeOther(URI.create(proxyUrl)).build();
 
-      case TUNNEL:
+      case NO_PROXY:
         log.info("Tunnel mode - using application-level tunneling");
         String encodedUrlTunnel = Base64.getUrlEncoder().encodeToString(streamUrl.getBytes());
         String proxyUrlTunnel =

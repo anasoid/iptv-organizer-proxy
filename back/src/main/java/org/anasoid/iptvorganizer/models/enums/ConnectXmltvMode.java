@@ -6,31 +6,8 @@ public enum ConnectXmltvMode {
   REDIRECT,
   /** Use tunnel connection (reverse proxy without external proxy) */
   TUNNEL,
-  /** Use external proxy connection */
-  PROXY,
+  /** Use no external proxy connection (reverse proxy without external proxy) */
+  NO_PROXY,
   /** Default mode - resolves to same as connectXtreamStream */
   DEFAULT;
-
-  /**
-   * Resolve DEFAULT to actual mode
-   *
-   * @param streamMode The resolved stream mode to inherit from
-   * @return The resolved mode (streamMode for DEFAULT, or self)
-   */
-  public ConnectXmltvMode resolve(ConnectXtreamStreamMode streamMode) {
-    if (this == DEFAULT) {
-      switch (streamMode) {
-        case REDIRECT:
-          return REDIRECT;
-        case TUNNEL:
-          return TUNNEL;
-        case PROXY:
-        case DIRECT: // Direct not applicable for XMLTV, treat as PROXY
-          return PROXY;
-        default:
-          return PROXY;
-      }
-    }
-    return this;
-  }
 }

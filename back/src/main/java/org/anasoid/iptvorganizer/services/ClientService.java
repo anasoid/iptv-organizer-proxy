@@ -116,16 +116,16 @@ public class ClientService extends BaseService<Client, ClientRepository> {
     if (client != null
         && client.getConnectXmltv() != null
         && client.getConnectXmltv() != ClientConnectXmltvMode.INHERITED) {
-      return client.getConnectXmltv().toSourceMode().resolve(resolvedStreamMode);
+      return client.getConnectXmltv().toSourceMode();
     }
 
     // Priority 2: Source-level setting
     if (source != null && source.getConnectXmltv() != null) {
-      return source.getConnectXmltv().resolve(resolvedStreamMode);
+      return source.getConnectXmltv();
     }
 
     // Default: resolve to stream mode
-    return ConnectXmltvMode.DEFAULT.resolve(resolvedStreamMode);
+    return ConnectXmltvMode.DEFAULT;
   }
 
   /**

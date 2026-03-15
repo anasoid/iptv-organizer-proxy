@@ -69,19 +69,18 @@ public class ProxyConfigService {
   }
 
   /**
-   * Check if proxy and tunnel are enabled for a client and source combination.
+   * Check if proxy is enabled for a client and source combination.
    *
    * <p>Resolution logic (inheritance pattern): - If client value is not null: use client value - If
    * client value is null: inherit from source value - Default: false (matches schema default)
    *
    * @param client The client (can be null)
    * @param source The source (can be null)
-   * @return ProxyTunnelStatus object with resolved enableProxy and enableTunnel flags
+   * @return ProxyTunnelStatus object with resolved enableProxy flag
    */
   public ProxyTunnelStatus checkProxyTunnelEnabled(Client client, Source source) {
     boolean enableProxy = resolveEnableProxy(client, source);
-    boolean enableTunnel = resolveEnableTunnel(client, source);
-    return new ProxyTunnelStatus(enableProxy, enableTunnel);
+    return new ProxyTunnelStatus(enableProxy);
   }
 
   /**
@@ -100,28 +99,6 @@ public class ProxyConfigService {
     // Priority 2: Source-level setting
     if (source != null && source.getEnableProxy() != null) {
       return source.getEnableProxy();
-    }
-
-    // Default: false (matches schema default)
-    return false;
-  }
-
-  /**
-   * Resolve enableTunnel setting with priority: client -> source -> default false
-   *
-   * @param client The client (can be null)
-   * @param source The source (can be null)
-   * @return true if tunnel is enabled
-   */
-  public boolean resolveEnableTunnel(Client client, Source source) {
-    // Priority 1: Client-level setting (if not null)
-    if (client != null && client.getEnableTunnel() != null) {
-      return client.getEnableTunnel();
-    }
-
-    // Priority 2: Source-level setting
-    if (source != null && source.getEnableTunnel() != null) {
-      return source.getEnableTunnel();
     }
 
     // Default: false (matches schema default)

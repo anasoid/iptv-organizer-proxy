@@ -9,8 +9,8 @@ public enum ClientConnectXtreamStreamMode {
   INHERITED,
   /** Direct connection without any proxy or redirect */
   DIRECT,
-  /** Use tunnel connection (reverse proxy without external proxy) */
-  TUNNEL,
+  /** Use no external proxy connection (reverse proxy without external proxy) */
+  NO_PROXY,
   /** Use external proxy connection */
   PROXY,
   /** Return redirect to client (client fetches directly) */
@@ -29,8 +29,8 @@ public enum ClientConnectXtreamStreamMode {
         throw new IllegalStateException("Cannot convert INHERITED to source mode");
       case DIRECT:
         return ConnectXtreamStreamMode.DIRECT;
-      case TUNNEL:
-        return ConnectXtreamStreamMode.TUNNEL;
+      case NO_PROXY:
+        return ConnectXtreamStreamMode.NO_PROXY;
       case PROXY:
         return ConnectXtreamStreamMode.PROXY;
       case REDIRECT:
