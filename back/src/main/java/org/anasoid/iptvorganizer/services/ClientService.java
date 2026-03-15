@@ -84,21 +84,18 @@ public class ClientService extends BaseService<Client, ClientRepository> {
   public ConnectXtreamStreamMode resolveConnectXtreamStream(Client client, Source source) {
     // Get resolved API mode for DEFAULT resolution
     ConnectXtreamApiMode resolvedApiMode = resolveConnectXtreamApi(client, source);
-
     // Priority 1: Client-level setting (if not INHERITED)
     if (client != null
         && client.getConnectXtreamStream() != null
         && client.getConnectXtreamStream() != ClientConnectXtreamStreamMode.INHERITED) {
-      return client.getConnectXtreamStream().toSourceMode().resolve(resolvedApiMode);
+      return client.getConnectXtreamStream().toSourceMode();
     }
-
     // Priority 2: Source-level setting
     if (source != null && source.getConnectXtreamStream() != null) {
-      return source.getConnectXtreamStream().resolve(resolvedApiMode);
+      return source.getConnectXtreamStream();
     }
-
     // Default: resolve to API mode
-    return ConnectXtreamStreamMode.DEFAULT.resolve(resolvedApiMode);
+    return ConnectXtreamStreamMode.DEFAULT;
   }
 
   /**
@@ -136,18 +133,18 @@ public class ClientService extends BaseService<Client, ClientRepository> {
    * @return true if client/source is active
    */
   public boolean resolveIsActive(Client client, Source source) {
-    // Priority 1: Client-level setting
+    boolean clientActive = true;
     if (client != null && client.getIsActive() != null) {
-      return client.getIsActive();
+      clientActive = client.getIsActive();
     }
 
-    // Priority 2: Source-level setting
+    boolean sourceActive = true;
     if (source != null && source.getIsActive() != null) {
-      return source.getIsActive();
+      sourceActive = source.getIsActive();
     }
 
     // Default: true
-    return true;
+    return clientActive && sourceActive;
   }
 
   /**
