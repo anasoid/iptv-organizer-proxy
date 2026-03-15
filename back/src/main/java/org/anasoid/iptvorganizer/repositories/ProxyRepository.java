@@ -6,6 +6,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import org.anasoid.iptvorganizer.models.entity.Proxy;
@@ -128,5 +129,15 @@ public class ProxyRepository extends BaseRepository<Proxy> {
       throw new RuntimeException("Failed to check if proxy name exists: " + name, e);
     }
     return false;
+  }
+
+  @Override
+  protected int cacheSize() {
+    return 10;
+  }
+
+  @Override
+  protected Duration cacheDuration() {
+    return Duration.ofHours(1);
   }
 }

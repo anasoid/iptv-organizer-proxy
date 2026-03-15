@@ -6,12 +6,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
@@ -139,6 +136,12 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
 
   /** Find category by source, external_id, and type */
   public Category findBySourceCategoryType(Long sourceId, Integer categoryId, String categoryType) {
+
+    String key = sourceId + "/" + categoryType + "/" + categoryId;
+    Optional<Category> catOpt = getCache().get(key);
+    if (catOpt.isPresent()) {
+      return catOpt.get();
+    }
     String sql =
         "SELECT * FROM categories WHERE source_id = ? AND external_id = ? AND type = ? LIMIT 1";
     try (Connection conn = dataSource.getConnection();
@@ -147,7 +150,13 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
       stmt.setInt(2, categoryId);
       stmt.setString(3, categoryType);
       try (ResultSet rs = stmt.executeQuery()) {
-        return rs.next() ? mapRow(rs) : null;
+        Category result = rs.next() ? mapRow(rs) : null;
+        if (result != null) {
+          getCache().put(key, null, result);
+        } else {
+          getCache().put(key, result.getId(), result);
+        }
+        return result;
       }
     } catch (SQLException e) {
       throw new RuntimeException("Failed to find by source category type", e);
@@ -306,5 +315,15 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
       categoryMap.put(category.getExternalId(), category);
     }
     return categoryMap;
+  }
+
+  @Override
+  protected int cacheSize() {
+    return 10;
+  }
+
+  @Override
+  protected Duration cacheDuration() {
+    return Duration.ofHours(1);
   }
 }

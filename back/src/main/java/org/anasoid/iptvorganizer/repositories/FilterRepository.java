@@ -6,6 +6,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.models.entity.Filter;
 
@@ -65,5 +66,15 @@ public class FilterRepository extends BaseRepository<Filter> {
         .createdAt(rs.getObject("created_at", LocalDateTime.class))
         .updatedAt(rs.getObject("updated_at", LocalDateTime.class))
         .build();
+  }
+
+  @Override
+  protected int cacheSize() {
+    return 0;
+  }
+
+  @Override
+  protected Duration cacheDuration() {
+    return Duration.ofHours(0);
   }
 }

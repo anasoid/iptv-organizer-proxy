@@ -1,6 +1,7 @@
 package org.anasoid.iptvorganizer.repositories.stream;
 
 import jakarta.transaction.Transactional;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -201,5 +202,15 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
       throw new RuntimeException("Failed to count by source ID in " + getTableName(), e);
     }
     return 0;
+  }
+
+  @Override
+  protected int cacheSize() {
+    return 5;
+  }
+
+  @Override
+  protected Duration cacheDuration() {
+    return Duration.ofHours(1);
   }
 }

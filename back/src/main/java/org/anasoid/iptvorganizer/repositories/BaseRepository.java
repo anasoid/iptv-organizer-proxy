@@ -5,15 +5,20 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
+import org.anasoid.iptvorganizer.cache.Cache;
+import org.anasoid.iptvorganizer.cache.CacheManager;
 import org.anasoid.iptvorganizer.models.entity.BaseEntity;
 
 public abstract class BaseRepository<T extends BaseEntity> {
 
+  private Cache<T> cache;
   @Inject protected DataSource dataSource;
+  @Inject protected CacheManager cacheManager;
 
   protected abstract String getTableName();
 
@@ -25,7 +30,9 @@ public abstract class BaseRepository<T extends BaseEntity> {
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setLong(1, id);
       try (ResultSet rs = stmt.executeQuery()) {
-        return rs.next() ? mapRow(rs) : null;
+        T result = rs.next() ? mapRow(rs) : null;
+        getCache().put(null, id, result);
+        return result;
       }
     } catch (SQLException e) {
       throw new RuntimeException("Failed to find by id: " + id, e);
@@ -50,12 +57,15 @@ public abstract class BaseRepository<T extends BaseEntity> {
   public final Long insert(T entity) {
     entity.setUpdatedAt(LocalDateTime.now());
     entity.setCreatedAt(LocalDateTime.now());
-    return internalInsert(entity);
+    Long result = internalInsert(entity);
+    getCache().invalidateAll();
+    return result;
   }
 
   public final void update(T entity) {
     entity.setUpdatedAt(LocalDateTime.now());
     internalUpdate(entity);
+    getCache().invalidateAll();
   }
 
   protected abstract Long internalInsert(T entity);
@@ -68,6 +78,7 @@ public abstract class BaseRepository<T extends BaseEntity> {
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setLong(1, id);
       stmt.executeUpdate();
+      getCache().invalidateAll();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to delete by id: " + id, e);
     }
@@ -214,4 +225,15 @@ public abstract class BaseRepository<T extends BaseEntity> {
     }
     return Boolean.parseBoolean(value.toString());
   }
+
+  protected Cache<T> getCache() {
+    if (cache == null) {
+      cache = cacheManager.getCache(getTableName(), cacheSize(), cacheDuration());
+    }
+    return cache;
+  }
+
+  protected abstract int cacheSize();
+
+  protected abstract Duration cacheDuration();
 }

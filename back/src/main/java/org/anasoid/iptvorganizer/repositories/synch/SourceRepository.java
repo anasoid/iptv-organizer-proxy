@@ -6,6 +6,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -183,5 +184,15 @@ public class SourceRepository extends BaseRepository<Source> {
         .createdAt(rs.getObject("created_at", LocalDateTime.class))
         .updatedAt(rs.getObject("updated_at", LocalDateTime.class))
         .build();
+  }
+
+  @Override
+  protected int cacheSize() {
+    return 10;
+  }
+
+  @Override
+  protected Duration cacheDuration() {
+    return Duration.ofHours(1);
   }
 }

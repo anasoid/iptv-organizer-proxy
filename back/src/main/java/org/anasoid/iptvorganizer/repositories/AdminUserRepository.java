@@ -6,6 +6,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.models.entity.AdminUser;
 
@@ -49,6 +50,16 @@ public class AdminUserRepository extends BaseRepository<AdminUser> {
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update admin user", e);
     }
+  }
+
+  @Override
+  protected int cacheSize() {
+    return 0;
+  }
+
+  @Override
+  protected Duration cacheDuration() {
+    return Duration.ofMillis(0);
   }
 
   @Override

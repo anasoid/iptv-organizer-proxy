@@ -6,6 +6,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -172,5 +173,15 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
       throw new RuntimeException("Failed to find sync logs by status", e);
     }
     return results;
+  }
+
+  @Override
+  protected int cacheSize() {
+    return 0;
+  }
+
+  @Override
+  protected Duration cacheDuration() {
+    return Duration.ofHours(0);
   }
 }

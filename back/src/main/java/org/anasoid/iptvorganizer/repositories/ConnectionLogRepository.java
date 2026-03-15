@@ -6,6 +6,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import org.anasoid.iptvorganizer.models.entity.ConnectionLog;
 
@@ -61,5 +62,15 @@ public class ConnectionLogRepository extends BaseRepository<ConnectionLog> {
         .userAgent(rs.getString("user_agent"))
         .createdAt(rs.getObject("created_at", LocalDateTime.class))
         .build();
+  }
+
+  @Override
+  protected int cacheSize() {
+    return 0;
+  }
+
+  @Override
+  protected Duration cacheDuration() {
+    return Duration.ofHours(0);
   }
 }
