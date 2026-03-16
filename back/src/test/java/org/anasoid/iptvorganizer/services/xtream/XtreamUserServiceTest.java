@@ -5,6 +5,8 @@ import static org.mockito.Mockito.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.anasoid.iptvorganizer.dto.HttpRequestDto;
+import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
@@ -70,7 +72,10 @@ class XtreamUserServiceTest {
 
     // When: Authenticate via proxy
     Map<String, Object> result =
-        xtreamUserService.authenticate("testclient", "clientpass", "http://proxy.local:9000");
+        xtreamUserService.authenticate(
+            "testclient",
+            "clientpass",
+            new HttpRequestDto("http://proxy.local:9000", RequestType.API, null));
 
     // Then: Verify server_info and user_info replaced
     assertThat(result).isNotNull();
@@ -103,7 +108,10 @@ class XtreamUserServiceTest {
 
     // When: Authenticate with HTTPS proxy
     Map<String, Object> result =
-        xtreamUserService.authenticate("testclient", "clientpass", "https://proxy.local:8443");
+        xtreamUserService.authenticate(
+            "testclient",
+            "clientpass",
+            new HttpRequestDto("https://proxy.local:8443", RequestType.API, null));
 
     // Then: Verify HTTPS port mapping
     @SuppressWarnings("unchecked")
@@ -125,7 +133,9 @@ class XtreamUserServiceTest {
     assertThatThrownBy(
             () ->
                 xtreamUserService.authenticate(
-                    "testclient", "clientpass", "http://proxy.local:9000"))
+                    "testclient",
+                    "clientpass",
+                    new HttpRequestDto("http://proxy.local:9000", RequestType.API, null)))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("Source not found for client");
   }
@@ -202,7 +212,9 @@ class XtreamUserServiceTest {
     assertThatThrownBy(
             () ->
                 xtreamUserService.authenticate(
-                    "testclient", "clientpass", "http://proxy.local:9000"))
+                    "testclient",
+                    "clientpass",
+                    new HttpRequestDto("http://proxy.local:9000", RequestType.API, null)))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("Invalid authentication response from upstream");
   }

@@ -3,7 +3,6 @@ package org.anasoid.iptvorganizer.utils;
 import io.vertx.core.http.HttpClosedException;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.StreamingOutput;
 import java.io.IOException;
@@ -12,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.dto.HttpRequestDto;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
@@ -51,23 +51,19 @@ public class TunnelUtils {
   /**
    * Stream content from upstream URL with header forwarding
    *
-   * @param upstreamUrl The upstream URL
+   * @param request The HTTP request DTO containing url, type and headers
    * @param client The authenticated client (for configuration fallback)
    * @param source The source (for configuration)
-   * @param httpHeaders Client request headers to forward
+   * @param options HTTP options
    * @return Response with streaming output
    */
   public Response streamFromUpstream(
-      String upstreamUrl,
-      Client client,
-      Source source,
-      HttpHeaders httpHeaders,
-      HttpOptions options) {
+      HttpRequestDto request, Client client, Source source, HttpOptions options) {
+    String upstreamUrl = request.getUrl();
     try {
       // Load stream from upstream via HTTP proxy client with forced redirect following
       HttpStreamingResponse streamResponse =
-          streamProxyHttpClient.loadStreamWithProxy(
-              upstreamUrl, client, source, httpHeaders, options);
+          streamProxyHttpClient.loadStreamWithProxy(request, client, source, options);
 
       // Check for HTTP errors
       if (streamResponse.getStatusCode() >= 400) {

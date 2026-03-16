@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
+import org.anasoid.iptvorganizer.services.ProxyConfigService;
 import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
 import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class XtreamClientTest {
 
   @Mock private HttpStreamingService httpStreamingService;
+  @Mock private ProxyConfigService proxyConfigService;
 
   @InjectMocks private XtreamClient xtreamClient;
 
@@ -231,7 +233,7 @@ class XtreamClientTest {
         .thenReturn(mockResponse);
 
     // When: Get series info
-    HttpStreamingResponse result = xtreamClient.getSeriesInfoRaw(testSource, 123);
+    HttpStreamingResponse result = xtreamClient.getSeriesInfoRaw(null, testSource, 123);
 
     // Then: Verify correct URL constructed
     ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);

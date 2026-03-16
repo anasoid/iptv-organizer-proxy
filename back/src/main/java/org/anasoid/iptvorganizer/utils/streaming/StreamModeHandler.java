@@ -6,6 +6,7 @@ import jakarta.ws.rs.core.*;
 import java.net.URI;
 import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.dto.HttpRequestDto;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.RedirectCheckResult;
@@ -31,16 +32,14 @@ public class StreamModeHandler {
   /**
    * Handle DIRECT mode - check for upstream redirect to hide credentials
    *
-   * @param streamUrl The upstream stream URL
+   * @param request The HTTP request DTO containing url and headers
    * @param client The authenticated client
    * @param source The source
-   * @param httpHeaders Client request headers
    * @return Response with redirect or error
    */
-  public Response handleDirectMode(
-      Client client, Source source, String streamUrl, HttpHeaders httpHeaders) {
+  public Response handleDirectMode(HttpRequestDto request, Client client, Source source) {
     RedirectCheckResult redirectCheck =
-        streamProxyHttpClient.checkForRedirect(streamUrl, client, source, httpHeaders);
+        streamProxyHttpClient.checkForRedirect(request, client, source);
 
     if (redirectCheck.isError()) {
       return Response.status(Response.Status.BAD_GATEWAY)
@@ -77,14 +76,13 @@ public class StreamModeHandler {
   /**
    * Handle TUNNEL mode - using application-level tunneling
    *
+   * @param request The HTTP request DTO containing url and headers
    * @param client Client
-   * @param streamUrl The upstream stream URL
-   * @return Response with redirect to proxy (tunnel mode not yet implemented)
+   * @param source Source
+   * @return Streaming response
    */
-  public Response handleTunnelMode(
-      Client client, Source source, String streamUrl, HttpHeaders httpHeaders) {
-
-    return handleTunnelMode(client, source, streamUrl, httpHeaders, 4 * 3600 * 1000);
+  public Response handleTunnelMode(HttpRequestDto request, Client client, Source source) {
+    return handleTunnelMode(request, client, source, 4 * 3600 * 1000);
   }
 
   /**
@@ -101,18 +99,20 @@ public class StreamModeHandler {
   }
 
   /**
-   * Stream XMLTV data from source
+   * Handle TUNNEL mode with explicit timeout
    *
-   * @param client The client (for logging)
-   * @return Response with streaming XMLTV data
+   * @param request The HTTP request DTO containing url and headers
+   * @param client Client
+   * @param source Source
+   * @param timeout Timeout in milliseconds
+   * @return Streaming response
    */
   public Response handleTunnelMode(
-      Client client, Source source, String url, HttpHeaders httpHeaders, long timeout) {
+      HttpRequestDto request, Client client, Source source, long timeout) {
     return tunnelUtils.streamFromUpstream(
-        url,
+        request,
         client,
         source,
-        httpHeaders,
         tunnelUtils.buildHttpOptions(client, source).timeout(timeout).build());
   }
 

@@ -13,6 +13,8 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.dto.HttpRequestDto;
+import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
@@ -126,7 +128,12 @@ public class TimeshiftController extends AbstractDataController {
           streamId,
           timeshiftUrl);
 
-      return getStream(client, source, timeshiftUrl, streamMode, uriInfo, httpHeaders);
+      return getStream(
+          client,
+          source,
+          new HttpRequestDto(timeshiftUrl, RequestType.STREAM, httpHeaders),
+          streamMode,
+          uriInfo);
 
     } catch (UnauthorizedException ex) {
       return Response.status(Response.Status.UNAUTHORIZED).build();
@@ -150,12 +157,11 @@ public class TimeshiftController extends AbstractDataController {
   protected Response getStream(
       Client client,
       Source source,
-      String streamUrl,
+      HttpRequestDto request,
       ConnectXtreamStreamMode streamMode,
-      UriInfo uriInfo,
-      HttpHeaders httpHeaders) {
-    log.info("Timeshift redirect, mode: {}, url: {}", streamMode, streamUrl);
-    return Response.seeOther(URI.create(streamUrl)).build();
+      UriInfo uriInfo) {
+    log.info("Timeshift redirect, mode: {}, url: {}", streamMode, request.getUrl());
+    return Response.seeOther(URI.create(request.getUrl())).build();
   }
 
   /**

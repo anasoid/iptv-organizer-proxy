@@ -7,16 +7,14 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
-import jakarta.ws.rs.core.Context;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.StreamingOutput;
-import jakarta.ws.rs.core.UriInfo;
+import jakarta.ws.rs.core.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.dto.HttpRequestDto;
+import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.models.entity.Client;
@@ -73,11 +71,12 @@ public class XtreamController {
       @QueryParam("category_id") Long categoryId,
       @QueryParam("series_id") Integer seriesId,
       @QueryParam("stream_id") Integer streamId,
-      @Context UriInfo uriInfo) {
+      @Context UriInfo uriInfo,
+      @Context HttpHeaders httpHeaders) {
 
     // If no action, treat as authenticate
     if (action == null || action.isEmpty()) {
-      return authenticate(username, password, uriInfo);
+      return authenticate(username, password, uriInfo, httpHeaders);
     }
 
     // Validate and authenticate client
@@ -97,12 +96,15 @@ public class XtreamController {
    * @param uriInfo Request URI info
    * @return JSON response with authentication data
    */
-  private Response authenticate(String username, String password, UriInfo uriInfo) {
+  private Response authenticate(
+      String username, String password, UriInfo uriInfo, HttpHeaders httpHeaders) {
     // Build proxy URL from request
     String proxyUrl = buildProxyUrl(uriInfo);
 
     // Authenticate and get response
-    var authResponse = xtreamUserService.authenticate(username, password, proxyUrl);
+    var authResponse =
+        xtreamUserService.authenticate(
+            username, password, new HttpRequestDto(proxyUrl, RequestType.API, httpHeaders));
 
     return Response.ok(authResponse).header("Content-Type", MediaType.APPLICATION_JSON).build();
   }

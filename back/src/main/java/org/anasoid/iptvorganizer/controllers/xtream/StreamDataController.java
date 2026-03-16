@@ -10,6 +10,8 @@ import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.dto.HttpRequestDto;
+import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
@@ -157,7 +159,12 @@ public class StreamDataController extends AbstractDataController {
         streamType,
         streamId,
         streamUrl);
-    return getStream(client, source, streamUrl, streamMode, uriInfo, httpHeaders);
+    return getStream(
+        client,
+        source,
+        new HttpRequestDto(streamUrl, RequestType.STREAM, httpHeaders),
+        streamMode,
+        uriInfo);
   }
 
   /**

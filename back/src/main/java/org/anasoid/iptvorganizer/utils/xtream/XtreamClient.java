@@ -4,10 +4,14 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.dto.RequestType;
+import org.anasoid.iptvorganizer.models.entity.Client;
+import org.anasoid.iptvorganizer.models.entity.Proxy;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
+import org.anasoid.iptvorganizer.services.ProxyConfigService;
 import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
 import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
 
@@ -26,6 +30,7 @@ public class XtreamClient {
   private static final int DEFAULT_MAX_RETRIES = 1;
 
   @Inject HttpStreamingService httpStreamingService;
+  @Inject ProxyConfigService proxyConfigService;
 
   /**
    * Fetch live categories from Xtream API using lazy Iterator-based streaming.
@@ -94,7 +99,7 @@ public class XtreamClient {
    * @param seriesId The series ID to fetch info for
    * @return HttpStreamingResponse with raw response stream
    */
-  public HttpStreamingResponse getSeriesInfoRaw(Source source, Integer seriesId) {
+  public HttpStreamingResponse getSeriesInfoRaw(Client client, Source source, Integer seriesId) {
     String url = buildApiUrlWithParam(source, "get_series_info", "series_id", seriesId);
 
     log.info(
@@ -104,7 +109,7 @@ public class XtreamClient {
 
     try {
       return httpStreamingService.streamHttpWithHeaders(
-          url, createDefaultHttpOptions(), null, source);
+          url, createDefaultHttpOptions(client, source), null, source);
     } catch (Exception ex) {
       log.error(
           "Failed to fetch series info for series_id={} from source {}: {}",
@@ -122,7 +127,8 @@ public class XtreamClient {
    * @param streamId The series ID to fetch info for
    * @return HttpStreamingResponse with raw response stream
    */
-  public HttpStreamingResponse getLiveSimpleDataTableRaw(Source source, Integer streamId) {
+  public HttpStreamingResponse getLiveSimpleDataTableRaw(
+      Client client, Source source, Integer streamId) {
     String url = buildApiUrlWithParam(source, "get_simple_data_table", "stream_id", streamId);
 
     log.info(
@@ -132,7 +138,7 @@ public class XtreamClient {
 
     try {
       return httpStreamingService.streamHttpWithHeaders(
-          url, createDefaultHttpOptions(), null, source);
+          url, createDefaultHttpOptions(client, source), null, source);
     } catch (Exception ex) {
       log.error(
           "Failed to fetch simple datatable info for stream_id={} from source {}: {}",
@@ -159,7 +165,7 @@ public class XtreamClient {
             "Fetching %s categories for source: %s", type.getStreamTypeName(), source.getName()));
 
     try {
-      return httpStreamingService.streamJsonArray(url, createDefaultHttpOptions(), source);
+      return httpStreamingService.streamJsonArray(url, createDefaultHttpOptions(source), source);
     } catch (Exception ex) {
       log.error(
           String.format(
@@ -184,7 +190,7 @@ public class XtreamClient {
         String.format("Fetching %s for source: %s", type.getStreamTypeName(), source.getName()));
 
     try {
-      return httpStreamingService.streamJsonArray(url, createDefaultHttpOptions(), source);
+      return httpStreamingService.streamJsonArray(url, createDefaultHttpOptions(source), source);
     } catch (Exception ex) {
       log.error(
           String.format(
@@ -235,10 +241,17 @@ public class XtreamClient {
    *
    * @return Configured HttpOptions with sensible defaults
    */
-  private HttpOptions createDefaultHttpOptions() {
+  private HttpOptions createDefaultHttpOptions(Source source) {
+    return createDefaultHttpOptions(null, source);
+  }
+
+  private HttpOptions createDefaultHttpOptions(Client client, Source source) {
+    // Get proxy configuration from source, respecting client enable flags
+    Proxy proxy = proxyConfigService.getProxyConfig(client, source, RequestType.API);
     return HttpOptions.builder()
         .timeout(DEFAULT_TIMEOUT_MS)
         .maxRetries(DEFAULT_MAX_RETRIES)
+        .proxy(proxy)
         .build();
   }
 }

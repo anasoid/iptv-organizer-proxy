@@ -8,6 +8,8 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.*;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.dto.HttpRequestDto;
+import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.enums.ConnectXmltvMode;
@@ -66,17 +68,15 @@ public class XmltvController {
     ConnectXmltvMode xmltvMode = clientService.resolveConnectXmltv(client, source);
     log.info("XMLTV request from client: {}, mode: {}", username, xmltvMode);
     String xmltvUrl = buildXmltvUrl(source);
+    HttpRequestDto request = new HttpRequestDto(xmltvUrl, RequestType.XML_TV, httpHeaders);
     return switch (xmltvMode) {
       case REDIRECT -> streamModeHandler.handleRedirectMode(xmltvUrl);
       case NO_PROXY ->
-          streamModeHandler.handleTunnelMode(
-              client, source, xmltvUrl, httpHeaders, DEFAULT_TIMEOUT_XMLTV);
+          streamModeHandler.handleTunnelMode(request, client, source, DEFAULT_TIMEOUT_XMLTV);
       case TUNNEL ->
-          streamModeHandler.handleTunnelMode(
-              client, source, xmltvUrl, httpHeaders, DEFAULT_TIMEOUT_XMLTV);
+          streamModeHandler.handleTunnelMode(request, client, source, DEFAULT_TIMEOUT_XMLTV);
       case DEFAULT ->
-          streamModeHandler.handleTunnelMode(
-              client, source, xmltvUrl, httpHeaders, DEFAULT_TIMEOUT_XMLTV);
+          streamModeHandler.handleTunnelMode(request, client, source, DEFAULT_TIMEOUT_XMLTV);
       default -> streamModeHandler.handleUnknownMode(xmltvMode.toString());
     };
   }

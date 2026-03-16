@@ -21,7 +21,7 @@ public class HttpStreamingServiceTest {
     // This will attempt to stream from invalid URL, so we expect failure
     assertThrows(
         Exception.class,
-        () -> httpStreamingService.streamHttp("http://invalid-url-12345.test", null));
+        () -> httpStreamingService.streamHttp("http://invalid-url-12345.test", null, null));
   }
 
   @Test
@@ -30,7 +30,7 @@ public class HttpStreamingServiceTest {
 
     assertThrows(
         Exception.class,
-        () -> httpStreamingService.streamHttp("http://invalid-url-12345.test", options));
+        () -> httpStreamingService.streamHttp("http://invalid-url-12345.test", options, null));
   }
 
   @Test

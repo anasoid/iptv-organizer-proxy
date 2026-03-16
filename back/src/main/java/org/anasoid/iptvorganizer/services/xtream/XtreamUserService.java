@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.dto.HttpRequestDto;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
@@ -54,11 +55,11 @@ public class XtreamUserService {
    *
    * @param username Client username
    * @param password Client password
-   * @param proxyUrl Base URL of this proxy server
    * @return Authentication response as Map with server and user info
    * @throws RuntimeException if client not found or authentication fails
    */
-  public Map<String, Object> authenticate(String username, String password, String proxyUrl) {
+  public Map<String, Object> authenticate(
+      String username, String password, HttpRequestDto requestDto) {
 
     // Find client by username
     Client client = clientRepository.findByUsernameAndPassword(username, password);
@@ -71,7 +72,7 @@ public class XtreamUserService {
 
     // Try to fetch from upstream, fallback on error
 
-    Map<String, Object> authData = fetchAuthenticationFromUpstream(source, proxyUrl);
+    Map<String, Object> authData = fetchAuthenticationFromUpstream(source, requestDto);
 
     // Replace user credentials with client credentials
     replaceUserInfo(authData, client);
@@ -237,7 +238,7 @@ public class XtreamUserService {
     }
     checkStreamAccess(stream, client, source);
     // Fetch raw response from upstream (proxy passthrough)
-    return xtreamClient.getLiveSimpleDataTableRaw(source, streamId);
+    return xtreamClient.getLiveSimpleDataTableRaw(client, source, streamId);
   }
 
   /**
@@ -261,7 +262,7 @@ public class XtreamUserService {
 
     checkStreamAccess(stream, client, source);
     // Fetch raw response from upstream (proxy passthrough)
-    return xtreamClient.getSeriesInfoRaw(source, seriesId);
+    return xtreamClient.getSeriesInfoRaw(client, source, seriesId);
   }
 
   private void checkStreamAccess(BaseStream stream, Client client, Source source) {
@@ -288,10 +289,10 @@ public class XtreamUserService {
    * Fetch authentication data from upstream source
    *
    * @param source The source with credentials
-   * @param proxyUrl The proxy URL for replacing server info
    * @return Authentication data as Map with user_info and server_info
    */
-  private Map<String, Object> fetchAuthenticationFromUpstream(Source source, String proxyUrl) {
+  private Map<String, Object> fetchAuthenticationFromUpstream(
+      Source source, HttpRequestDto request) {
     // Build upstream URL with source credentials
     String upstreamUrl =
         String.format(
@@ -310,7 +311,7 @@ public class XtreamUserService {
     }
 
     // Replace server_info with proxy details
-    replaceServerInfo(authData, proxyUrl);
+    replaceServerInfo(authData, request.getUrl());
 
     return authData;
   }

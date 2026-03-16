@@ -2,7 +2,8 @@ package org.anasoid.iptvorganizer.services;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.util.logging.Logger;
+import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.models.ProxyTunnelStatus;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Proxy;
@@ -19,9 +20,8 @@ import org.anasoid.iptvorganizer.repositories.ProxyRepository;
  * attribute)
  */
 @ApplicationScoped
+@Slf4j
 public class ProxyConfigService {
-
-  private static final Logger logger = Logger.getLogger(ProxyConfigService.class.getName());
 
   @Inject ProxyRepository proxyRepository;
   @Inject ClientService clientService;
@@ -43,7 +43,7 @@ public class ProxyConfigService {
         return proxy;
       }
       // Log warning if proxy ID references non-existent proxy
-      logger.warning("Proxy ID " + source.getProxyId() + " not found in database");
+      log.warn("Proxy ID " + source.getProxyId() + " not found in database");
     }
 
     // Fall back to environment variables
@@ -61,10 +61,13 @@ public class ProxyConfigService {
    * @param source The source entity to resolve proxy for
    * @return Proxy object if enabled and configured, null otherwise
    */
-  public Proxy getProxyConfig(Client client, Source source) {
+  public Proxy getProxyConfig(Client client, Source source, RequestType requestType) {
     // Check if proxy is enabled
-    if (!resolveEnableProxy(client, source)) {
-      logger.fine("Proxy is disabled for client/source - returning null");
+    if (!resolveEnableProxy(client, source)
+        || (requestType == RequestType.API && !resolveEnableProxyApi(client, source))
+        || (requestType == RequestType.XML_TV && !resolveEnableProxyXmltv(client, source))
+        || (requestType == RequestType.STREAM && !resolveEnableProxyStream(client, source))) {
+      log.trace("proxy is disabled for client/source - returning null");
       return null;
     }
 
@@ -104,7 +107,7 @@ public class ProxyConfigService {
     return false;
   }
 
-  public boolean resolveEnableProxyApi(Client client, Source source) {
+  private boolean resolveEnableProxyApi(Client client, Source source) {
     boolean enable = resolveEnableProxy(client, source);
     if (!enable) {
       return false;
@@ -117,7 +120,7 @@ public class ProxyConfigService {
     return true;
   }
 
-  public boolean resolveEnableProxyStream(Client client, Source source) {
+  private boolean resolveEnableProxyStream(Client client, Source source) {
     boolean enable = resolveEnableProxy(client, source);
     if (!enable) {
       return false;
@@ -130,7 +133,7 @@ public class ProxyConfigService {
     return true;
   }
 
-  public boolean resolveEnableProxyXmltv(Client client, Source source) {
+  private boolean resolveEnableProxyXmltv(Client client, Source source) {
     boolean enable = resolveEnableProxy(client, source);
     if (!enable) {
       return false;

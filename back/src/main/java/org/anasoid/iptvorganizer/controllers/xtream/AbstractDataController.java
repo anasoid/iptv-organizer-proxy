@@ -1,12 +1,12 @@
 package org.anasoid.iptvorganizer.controllers.xtream;
 
 import jakarta.inject.Inject;
-import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.dto.HttpRequestDto;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
@@ -68,17 +68,16 @@ public abstract class AbstractDataController {
   protected Response getStream(
       Client client,
       Source source,
-      String streamUrl,
+      HttpRequestDto request,
       ConnectXtreamStreamMode streamMode,
-      UriInfo uriInfo,
-      HttpHeaders httpHeaders) {
+      UriInfo uriInfo) {
 
     return switch (streamMode) {
-      case REDIRECT -> streamModeHandler.handleRedirectMode(streamUrl);
-      case DIRECT -> streamModeHandler.handleDirectMode(client, source, streamUrl, httpHeaders);
-      case PROXY -> streamModeHandler.handleProxyMode(uriInfo, client, streamUrl);
-      case NO_PROXY -> streamModeHandler.handleDirectMode(client, source, streamUrl, httpHeaders);
-      case DEFAULT -> streamModeHandler.handleProxyMode(uriInfo, client, streamUrl);
+      case REDIRECT -> streamModeHandler.handleRedirectMode(request.getUrl());
+      case DIRECT -> streamModeHandler.handleDirectMode(request, client, source);
+      case PROXY -> streamModeHandler.handleProxyMode(uriInfo, client, request.getUrl());
+      case NO_PROXY -> streamModeHandler.handleDirectMode(request, client, source);
+      case DEFAULT -> streamModeHandler.handleProxyMode(uriInfo, client, request.getUrl());
       default -> streamModeHandler.handleUnknownMode(streamMode.toString());
     };
   }

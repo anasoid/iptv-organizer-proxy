@@ -31,11 +31,6 @@ public class HttpStreamingService {
 
   @Inject HttpClientFactory httpClientFactory;
 
-  /** Stream HTTP response as InputStream (backward compatible - no proxy support) */
-  public InputStream streamHttp(String url, HttpOptions options) {
-    return streamHttp(url, options, null);
-  }
-
   /** Stream HTTP response as InputStream with optional proxy support */
   public InputStream streamHttp(String url, HttpOptions options, Source source) {
     if (options == null) {
@@ -286,17 +281,6 @@ public class HttpStreamingService {
   }
 
   /**
-   * Stream HTTP response as JSON objects with automatic parsing (memory efficient true streaming).
-   *
-   * @param url The URL to stream from
-   * @param options HTTP options (timeout, retries, headers)
-   * @return JsonStreamResult with lazy Iterator for streaming items
-   */
-  public JsonStreamResult<Map<?, ?>> streamJsonArray(String url, HttpOptions options) {
-    return streamJsonArray(url, options, null);
-  }
-
-  /**
    * Stream HTTP response as JSON objects with automatic parsing and optional proxy support.
    *
    * @param url The URL to stream from
@@ -328,18 +312,6 @@ public class HttpStreamingService {
       log.error("Failed to parse JSON stream from: {}, error: {}", url, e.getMessage());
       throw new StreamingException("Failed to parse JSON stream", e);
     }
-  }
-
-  /**
-   * Fetch single JSON object from HTTP endpoint.
-   *
-   * @param url The URL to fetch from
-   * @param options HTTP options (timeout, retries, headers)
-   * @return Map containing the JSON object
-   * @throws Exception if fetch or parsing fails
-   */
-  public Map<String, Object> fetchJsonObject(String url, HttpOptions options) {
-    return fetchJsonObject(url, options, null);
   }
 
   /**

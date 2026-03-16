@@ -12,6 +12,8 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.dto.HttpRequestDto;
+import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
@@ -75,10 +77,9 @@ public class ProxyController {
 
       // Stream content from upstream
       return tunnelUtils.streamFromUpstream(
-          decodedUrl,
+          new HttpRequestDto(decodedUrl, RequestType.STREAM, httpHeaders),
           client,
           source,
-          httpHeaders,
           tunnelUtils.buildHttpOptions(client, source).followRedirects(true).build());
 
     } catch (UnauthorizedException ex) {

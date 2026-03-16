@@ -2,10 +2,11 @@ package org.anasoid.iptvorganizer.utils.streaming;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.core.HttpHeaders;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.anasoid.iptvorganizer.dto.HttpRequestDto;
+import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Proxy;
 import org.anasoid.iptvorganizer.models.entity.Source;
@@ -37,23 +38,20 @@ public class StreamProxyHttpClient {
   /**
    * Load stream from upstream URL via proxy with optional forced redirect following
    *
-   * @param upstreamUrl The upstream URL to fetch from
+   * @param request The HTTP request DTO containing url and headers
    * @param client The authenticated client (for configuration fallback)
    * @param source The source (for configuration)
-   * @param httpHeaders Client request headers to filter and forward
    * @return HttpStreamingResponse with status, headers, and body
    * @throws Exception if streaming fails
    */
   public HttpStreamingResponse loadStreamWithProxy(
-      String upstreamUrl,
-      Client client,
-      Source source,
-      HttpHeaders httpHeaders,
-      HttpOptions options) {
+      HttpRequestDto request, Client client, Source source, HttpOptions options) {
+    String upstreamUrl = request.getUrl();
     log.info("Loading stream via proxy: {}", upstreamUrl);
 
     // Extract and filter client headers to forward
-    Map<String, String> requestHeaders = headerFilterService.filterRequestHeaders(httpHeaders);
+    Map<String, String> requestHeaders =
+        headerFilterService.filterRequestHeaders(request.getHttpHeaders());
 
     // Stream content from upstream with header forwarding
     HttpStreamingResponse streamResponse =
@@ -75,19 +73,20 @@ public class StreamProxyHttpClient {
    * credentials to the client. Used when disableStreamProxy=true AND useRedirect=false to return
    * the redirect location instead of the URL containing source credentials.
    *
-   * @param upstreamUrl The upstream URL to check (contains source credentials)
+   * @param request The HTTP request DTO containing url and headers
    * @param client The client (for configuration)
    * @param source The source (for configuration)
-   * @param httpHeaders Client headers to forward
    * @return RedirectCheckResult with redirect status and location
    */
   public RedirectCheckResult checkForRedirect(
-      String upstreamUrl, Client client, Source source, HttpHeaders httpHeaders) {
+      HttpRequestDto request, Client client, Source source) {
 
+    String upstreamUrl = request.getUrl();
     log.debug("Checking upstream for redirect to hide credentials: {}", upstreamUrl);
 
     // Extract and filter client headers
-    Map<String, String> requestHeaders = headerFilterService.filterRequestHeaders(httpHeaders);
+    Map<String, String> requestHeaders =
+        headerFilterService.filterRequestHeaders(request.getHttpHeaders());
 
     // Build HTTP options with followRedirects=false
     HttpOptions options =
@@ -162,7 +161,7 @@ public class StreamProxyHttpClient {
   public HttpOptions.HttpOptionsBuilder buildHttpOptions(Client client, Source source) {
 
     // Get proxy configuration from source, respecting client enable flags
-    Proxy proxy = proxyConfigService.getProxyConfig(client, source);
+    Proxy proxy = proxyConfigService.getProxyConfig(client, source, RequestType.STREAM);
 
     return HttpOptions.builder().timeout(300000L).maxRetries(1).followRedirects(true).proxy(proxy);
   }
