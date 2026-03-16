@@ -26,7 +26,6 @@ import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
 import org.anasoid.iptvorganizer.services.xtream.ContentFilterService;
 import org.anasoid.iptvorganizer.services.xtream.FilterContext;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
-import org.anasoid.iptvorganizer.utils.streaming.StreamModeHandler;
 
 /**
  * Timeshift (Catch-up TV) Controller
@@ -46,7 +45,6 @@ public class TimeshiftController extends AbstractDataController {
   @Inject ContentFilterService contentFilterService;
   @Inject CategoryService categoryService;
   @Inject LiveStreamService liveStreamService;
-  @Inject StreamModeHandler streamModeHandler;
 
   /**
    * Handle timeshift stream request
