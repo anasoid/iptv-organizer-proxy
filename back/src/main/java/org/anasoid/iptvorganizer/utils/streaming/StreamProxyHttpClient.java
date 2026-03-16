@@ -12,7 +12,6 @@ import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
 import org.anasoid.iptvorganizer.models.http.RedirectCheckResult;
-import org.anasoid.iptvorganizer.services.ClientService;
 import org.anasoid.iptvorganizer.services.ProxyConfigService;
 import org.anasoid.iptvorganizer.services.http.HeaderFilterService;
 
@@ -33,7 +32,6 @@ public class StreamProxyHttpClient {
 
   @Inject HttpStreamingService httpStreamingService;
   @Inject HeaderFilterService headerFilterService;
-  @Inject ClientService clientService;
   @Inject ProxyConfigService proxyConfigService;
 
   /**
