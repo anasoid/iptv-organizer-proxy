@@ -15,9 +15,7 @@ import org.anasoid.iptvorganizer.utils.TunnelUtils;
 @ApplicationScoped
 public class StreamModeHandler {
 
-  private static final int CHUNK_SIZE = 8192;
   @Inject private StreamProxyHttpClient streamProxyHttpClient;
-  @Inject private HttpStreamingService httpStreamingService;
   @Inject TunnelUtils tunnelUtils;
 
   /**
