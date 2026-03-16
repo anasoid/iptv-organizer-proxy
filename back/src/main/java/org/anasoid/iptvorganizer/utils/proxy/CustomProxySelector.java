@@ -14,8 +14,12 @@ import org.anasoid.iptvorganizer.models.entity.ProxyType;
 /**
  * Custom ProxySelector that configures proxy routing for HttpClient.
  *
- * <p>Converts Proxy entity configuration to Java ProxySelector by mapping ProxyType enum to
- * java.net.Proxy.Type and creating InetSocketAddress for the proxy endpoint.
+ * <p>Resolves proxy connection details in priority order:
+ *
+ * <ol>
+ *   <li>Component fields: {@code proxyHost} + {@code proxyPort} (+ optional {@code proxyType})
+ *   <li>URL field: {@code proxyUrl} parsed to extract scheme, host and port
+ * </ol>
  *
  * <p>Thread-safe immutable design.
  */
@@ -25,43 +29,67 @@ public class CustomProxySelector extends ProxySelector {
   private final Proxy proxyEntity;
   private final java.net.Proxy javaProxy;
 
+  /** Internal holder for values parsed from a proxy URL. */
+  private record ParsedProxy(String host, int port, ProxyType type) {}
+
   /**
    * Create a CustomProxySelector from a Proxy entity.
    *
+   * <p>Uses component fields ({@code proxyHost}/{@code proxyPort}/{@code proxyType}) when
+   * available; otherwise parses {@code proxyUrl}.
+   *
    * @param proxyEntity The proxy configuration
-   * @throws IllegalArgumentException if proxy host or port is null or invalid
+   * @throws IllegalArgumentException if neither component fields nor proxyUrl supply enough info
    */
   public CustomProxySelector(Proxy proxyEntity) {
     if (proxyEntity == null) {
       throw new IllegalArgumentException("Proxy entity cannot be null");
     }
 
-    if (proxyEntity.getProxyHost() == null || proxyEntity.getProxyPort() == null) {
-      throw new IllegalArgumentException(
-          "Proxy host and port are required. Got host="
-              + proxyEntity.getProxyHost()
-              + ", port="
-              + proxyEntity.getProxyPort());
-    }
-
     this.proxyEntity = proxyEntity;
 
-    // Convert ProxyType to java.net.Proxy.Type
-    java.net.Proxy.Type javaProxyType = convertProxyType(proxyEntity.getProxyType());
+    // Resolve proxy connection details: component fields take precedence over URL
+    final String resolvedHost;
+    final int resolvedPort;
+    final ProxyType resolvedType;
 
-    // Create socket address for proxy endpoint
-    SocketAddress addr =
-        new InetSocketAddress(proxyEntity.getProxyHost(), proxyEntity.getProxyPort());
+    if (proxyEntity.getProxyHost() != null && proxyEntity.getProxyPort() != null) {
+      // --- Component-based configuration ---
+      resolvedHost = proxyEntity.getProxyHost();
+      resolvedPort = proxyEntity.getProxyPort();
+      // Default to HTTP when proxyType is not explicitly set
+      resolvedType =
+          proxyEntity.getProxyType() != null ? proxyEntity.getProxyType() : ProxyType.HTTP;
 
-    // Create Java Proxy instance
+    } else if (proxyEntity.getProxyUrl() != null && !proxyEntity.getProxyUrl().isBlank()) {
+      // --- URL-based configuration ---
+      ParsedProxy parsed = parseProxyUrl(proxyEntity.getProxyUrl());
+      resolvedHost = parsed.host();
+      resolvedPort = parsed.port();
+      resolvedType = parsed.type();
+
+    } else {
+      throw new IllegalArgumentException(
+          "Proxy requires either (proxyHost + proxyPort) or a non-empty proxyUrl. "
+              + "Got host="
+              + proxyEntity.getProxyHost()
+              + ", port="
+              + proxyEntity.getProxyPort()
+              + ", url="
+              + proxyEntity.getProxyUrl());
+    }
+
+    // Convert ProxyType to java.net.Proxy.Type and build the proxy instance
+    java.net.Proxy.Type javaProxyType = convertProxyType(resolvedType);
+    SocketAddress addr = new InetSocketAddress(resolvedHost, resolvedPort);
     this.javaProxy = new java.net.Proxy(javaProxyType, addr);
 
     log.debug(
         "Created CustomProxySelector for {}://{}: {}:{}",
-        proxyEntity.getProxyType(),
+        resolvedType,
         javaProxyType,
-        proxyEntity.getProxyHost(),
-        proxyEntity.getProxyPort());
+        resolvedHost,
+        resolvedPort);
   }
 
   /**
@@ -95,6 +123,58 @@ public class CustomProxySelector extends ProxySelector {
         uri,
         ioe.getMessage(),
         ioe);
+  }
+
+  /**
+   * Parse a proxy URL into its constituent parts.
+   *
+   * <p>Supported schemes and their mapped {@link ProxyType}:
+   *
+   * <ul>
+   *   <li>{@code http} → {@link ProxyType#HTTP} (default port 8080)
+   *   <li>{@code https} → {@link ProxyType#HTTPS} (default port 443)
+   *   <li>{@code socks} / {@code socks5} → {@link ProxyType#SOCKS5} (default port 1080)
+   * </ul>
+   *
+   * @param proxyUrl Raw URL string, e.g. {@code http://user:pass@proxy.example.com:8080}
+   * @return Parsed host, port, and proxy type
+   * @throws IllegalArgumentException if the URL cannot be parsed or the host is missing
+   */
+  private ParsedProxy parseProxyUrl(String proxyUrl) {
+    try {
+      URI uri = URI.create(proxyUrl);
+      String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase() : "http";
+      String host = uri.getHost();
+      int port = uri.getPort(); // -1 when absent
+
+      if (host == null || host.isBlank()) {
+        throw new IllegalArgumentException("Cannot parse host from proxyUrl: " + proxyUrl);
+      }
+
+      final ProxyType type;
+      final int defaultPort;
+      if (scheme.startsWith("socks")) {
+        type = ProxyType.SOCKS5;
+        defaultPort = 1080;
+      } else if ("https".equals(scheme)) {
+        type = ProxyType.HTTPS;
+        defaultPort = 443;
+      } else {
+        type = ProxyType.HTTP;
+        defaultPort = 8080;
+      }
+
+      if (port < 0) {
+        port = defaultPort;
+      }
+
+      return new ParsedProxy(host, port, type);
+
+    } catch (IllegalArgumentException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Invalid proxyUrl: " + proxyUrl, e);
+    }
   }
 
   /**

@@ -3,6 +3,7 @@ package org.anasoid.iptvorganizer.services.xtream;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.Map;
 import org.anasoid.iptvorganizer.dto.HttpRequestDto;
@@ -12,11 +13,13 @@ import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
+import org.anasoid.iptvorganizer.services.ProxyConfigService;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
 import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
 import org.anasoid.iptvorganizer.services.stream.SeriesService;
 import org.anasoid.iptvorganizer.services.stream.VodStreamService;
 import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
+import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +39,9 @@ class XtreamUserServiceTest {
   @Mock private VodStreamService vodStreamService;
   @Mock private SeriesService seriesService;
   @Mock private ContentFilterService contentFilterService;
+  @Mock private ProxyConfigService proxyConfigService;
+  @Mock private XtreamClient xtreamClient;
+  @Mock private ObjectMapper objectMapper;
 
   @InjectMocks private XtreamUserService xtreamUserService;
 

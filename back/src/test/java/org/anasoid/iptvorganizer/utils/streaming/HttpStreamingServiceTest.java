@@ -72,6 +72,9 @@ public class HttpStreamingServiceTest {
 
     assertEquals(1, options1.getMaxRetries());
     assertEquals(5, options2.getMaxRetries());
-    assertNull(options3.getMaxRetries());
+    assertEquals(
+        1,
+        options3
+            .getMaxRetries()); // @Builder.Default applies to @NoArgsConstructor in Lombok 1.18.30+
   }
 }

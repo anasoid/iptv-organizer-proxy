@@ -12,10 +12,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.dto.HttpRequestDto;
+import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
+import org.anasoid.iptvorganizer.models.entity.Proxy;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
@@ -26,6 +28,7 @@ import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
+import org.anasoid.iptvorganizer.services.ProxyConfigService;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
 import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
 import org.anasoid.iptvorganizer.services.stream.SeriesService;
@@ -49,6 +52,7 @@ public class XtreamUserService {
   @Inject ObjectMapper objectMapper;
   @Inject HttpStreamingService httpStreamingService;
   @Inject XtreamClient xtreamClient;
+  @Inject ProxyConfigService proxyConfigService;
 
   /**
    * Authenticate client and return server/user info as JSON Map
@@ -72,7 +76,7 @@ public class XtreamUserService {
 
     // Try to fetch from upstream, fallback on error
 
-    Map<String, Object> authData = fetchAuthenticationFromUpstream(source, requestDto);
+    Map<String, Object> authData = fetchAuthenticationFromUpstream(client, source, requestDto);
 
     // Replace user credentials with client credentials
     replaceUserInfo(authData, client);
@@ -292,15 +296,17 @@ public class XtreamUserService {
    * @return Authentication data as Map with user_info and server_info
    */
   private Map<String, Object> fetchAuthenticationFromUpstream(
-      Source source, HttpRequestDto request) {
+      Client client, Source source, HttpRequestDto request) {
     // Build upstream URL with source credentials
     String upstreamUrl =
         String.format(
             "%s/player_api.php?username=%s&password=%s",
             source.getUrl().replaceAll("/$", ""), source.getUsername(), source.getPassword());
 
+    // Get proxy configuration from source, respecting client enable flags
+    Proxy proxy = proxyConfigService.getProxyConfig(client, source, RequestType.STREAM);
     // Fetch from upstream
-    HttpOptions options = HttpOptions.builder().timeout(30000L).maxRetries(1).build();
+    HttpOptions options = HttpOptions.builder().timeout(30000L).proxy(proxy).build();
 
     Map<String, Object> authData =
         httpStreamingService.fetchJsonObject(upstreamUrl, options, source);

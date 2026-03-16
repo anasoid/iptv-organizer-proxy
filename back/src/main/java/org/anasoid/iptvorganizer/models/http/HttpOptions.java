@@ -15,6 +15,6 @@ public class HttpOptions {
   private Boolean followRedirects;
   private Long timeout;
   private Map<String, String> headers;
-  private Integer maxRetries;
+  @Builder.Default private Integer maxRetries = 1;
   private Proxy proxy;
 }
