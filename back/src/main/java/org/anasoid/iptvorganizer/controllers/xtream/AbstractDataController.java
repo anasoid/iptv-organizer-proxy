@@ -3,6 +3,7 @@ package org.anasoid.iptvorganizer.controllers.xtream;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
+import java.util.Optional;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -83,7 +84,56 @@ public abstract class AbstractDataController {
   }
 
   /**
-   * Check if client has access to specific stream
+   * Loads the stream and checks whether the client is allowed to access it.
+   *
+   * <p>Returns an {@link Optional} containing the stream if access is granted, or {@link
+   * Optional#empty()} if the stream was not found, the client is not allowed, or any error occurs.
+   * Callers can use the returned stream to extract metadata (e.g. name) without a second DB query.
+   *
+   * @param client The authenticated client
+   * @param source The source
+   * @param streamId Stream ID to check (as a URL path segment string)
+   * @param streamType Stream type (live, movie, series)
+   * @return {@code Optional.of(stream)} if allowed; {@code Optional.empty()} otherwise
+   */
+  protected Optional<BaseStream> loadAccessibleStream(
+      Client client, Source source, String streamId, StreamType streamType) {
+    try {
+      int streamIdInt;
+      try {
+        streamIdInt = Integer.parseInt(streamId);
+      } catch (NumberFormatException e) {
+        log.warn("Invalid stream ID format: {}", streamId);
+        return Optional.empty();
+      }
+
+      BaseStream stream = loadStream(source.getId(), streamIdInt, streamType);
+      if (stream == null) {
+        log.warn(
+            "Stream not found - source: {}, type: {}, id: {}",
+            source.getId(),
+            streamType,
+            streamId);
+        return Optional.empty();
+      }
+
+      Category category =
+          categoryService.findBySourceAndCategoryId(
+              source.getId(), stream.getCategoryId(), streamType.getCategoryType());
+
+      FilterContext context = contentFilterService.buildFilterContext(client);
+      if (contentFilterService.shouldIncludeStream(context, stream, category)) {
+        return Optional.of(stream);
+      }
+      return Optional.empty();
+    } catch (Exception e) {
+      log.error("Error checking stream access", e);
+      return Optional.empty();
+    }
+  }
+
+  /**
+   * Check if client has access to specific stream.
    *
    * @param client The authenticated client
    * @param source The source
@@ -93,39 +143,7 @@ public abstract class AbstractDataController {
    */
   protected boolean hasStreamAccess(
       Client client, Source source, String streamId, StreamType streamType) {
-    try {
-      // Parse stream ID as integer
-      int streamIdInt;
-      try {
-        streamIdInt = Integer.parseInt(streamId);
-      } catch (NumberFormatException e) {
-        log.warn("Invalid stream ID format: {}", streamId);
-        return false;
-      }
-
-      // Load stream from database
-      BaseStream stream = loadStream(source.getId(), streamIdInt, streamType);
-      if (stream == null) {
-        log.warn(
-            "Stream not found - source: {}, type: {}, id: {}",
-            source.getId(),
-            streamType,
-            streamId);
-        return false; // Stream not found
-      }
-
-      // Load category
-      Category category =
-          categoryService.findBySourceAndCategoryId(
-              source.getId(), stream.getCategoryId(), streamType.getCategoryType());
-
-      // Build filtering context and check access
-      FilterContext context = contentFilterService.buildFilterContext(client);
-      return contentFilterService.shouldIncludeStream(context, stream, category);
-    } catch (Exception e) {
-      log.error("Error checking stream access", e);
-      return false; // Deny access on error
-    }
+    return loadAccessibleStream(client, source, streamId, streamType).isPresent();
   }
 
   /**

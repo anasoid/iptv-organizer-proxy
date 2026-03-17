@@ -9,15 +9,18 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.dto.HttpRequestDto;
 import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.models.enums.ConnectXtreamStreamMode;
 import org.anasoid.iptvorganizer.services.ClientService;
+import org.anasoid.iptvorganizer.services.history.ClientHistoryService;
 import org.anasoid.iptvorganizer.services.xtream.XtreamUserService;
 
 /**
@@ -36,6 +39,7 @@ public class StreamDataController extends AbstractDataController {
 
   @Inject XtreamUserService xtreamUserService;
   @Inject ClientService clientService;
+  @Inject ClientHistoryService clientHistoryService;
 
   /**
    * Handle live stream request
@@ -142,11 +146,18 @@ public class StreamDataController extends AbstractDataController {
     Client client = authResult.getClient();
     Source source = authResult.getSource();
 
-    // Validate stream access
-    if (checkAccess && !hasStreamAccess(client, source, streamId, streamType)) {
-      log.warn("Client {} attempted to access blocked stream: {}", username, streamId);
-      throw new ForbiddenException("Access to stream " + streamId + " is blocked");
+    // Validate stream access (single DB lookup via loadAccessibleStream)
+    if (checkAccess) {
+      Optional<BaseStream> accessibleStream =
+          loadAccessibleStream(client, source, streamId, streamType);
+      if (accessibleStream.isEmpty()) {
+        log.warn("Client {} attempted to access blocked stream: {}", username, streamId);
+        throw new ForbiddenException("Access to stream " + streamId + " is blocked");
+      }
     }
+
+    // Record the stream access in the client's in-memory history
+    clientHistoryService.recordStreamAccess(client.getId(), streamId, streamType);
 
     // Build stream URL from source
     String streamUrl = buildStreamUrl(source, streamType, streamId, ext);

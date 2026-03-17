@@ -29,11 +29,14 @@ import {
   MenuItem,
   Stack,
   Pagination,
+  Tooltip,
+  IconButton,
 } from '@mui/material';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { ArrowBack, Download as DownloadIcon, Block as BlockIcon, OpenInNew as OpenInNewIcon, Visibility as ViewIcon } from '@mui/icons-material';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ArrowBack, Download as DownloadIcon, Block as BlockIcon, OpenInNew as OpenInNewIcon, Visibility as ViewIcon, Delete as DeleteIcon, Refresh as RefreshIcon, History as HistoryIcon } from '@mui/icons-material';
 import clientsApi from '../services/clientsApi';
 import sourcesApi from '../services/sourcesApi';
+import clientHistoryApi, { type StreamHistoryEntry } from '../services/clientHistoryApi';
 import { useAuthStore } from '../stores/authStore';
 
 // Type definitions for category and stream data
@@ -88,6 +91,7 @@ export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
+  const queryClient = useQueryClient();
   const [exportingType, setExportingType] = useState<string | null>(null);
   const [exportMessage, setExportMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [blockedModalOpen, setBlockedModalOpen] = useState(false);
@@ -100,6 +104,9 @@ export default function ClientDetail() {
   const [allowedSearch, setAllowedSearch] = useState('');
   const [allowedPageSize, setAllowedPageSize] = useState(20);
   const [allowedPage, setAllowedPage] = useState(1);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(20);
 
   const { data: clientResponse, isLoading: clientLoading, error: clientError } = useQuery({
     queryKey: ['client', id],
@@ -235,6 +242,26 @@ export default function ClientDetail() {
   const source = sourceResponse?.data;
   const blockedData = blockedResponse?.data; // Extract just the data array from response
   const allowedData = allowedResponse?.data; // Extract just the data array from response
+
+  // Watch history
+  const {
+    data: historyResponse,
+    isLoading: historyLoading,
+    refetch: refetchHistory,
+  } = useQuery({
+    queryKey: ['client-history', id],
+    queryFn: () => clientHistoryApi.getHistory(Number(id)),
+    enabled: isAuthenticated && !!id,
+    // Do not cache aggressively – history changes on every stream access
+    staleTime: 0,
+  });
+
+  const clearHistoryMutation = useMutation({
+    mutationFn: () => clientHistoryApi.clearHistory(Number(id)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['client-history', id] });
+    },
+  });
 
   const exportMutation = useMutation({
     mutationFn: ({ exportType }: { exportType: string }) => {
@@ -613,6 +640,51 @@ export default function ClientDetail() {
             </Grid>
           ))}
         </Grid>
+      </Box>
+
+      {/* Watch History Section */}
+      <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid #e0e0e0' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <HistoryIcon color="action" />
+            <Typography variant="h6">Watch History</Typography>
+            {historyResponse?.data?.total !== undefined && (
+              <Chip label={`${historyResponse.data.total} entries`} size="small" variant="outlined" />
+            )}
+          </Box>
+          <Stack direction="row" spacing={1}>
+            <Tooltip title="Refresh history">
+              <IconButton size="small" onClick={() => refetchHistory()} disabled={historyLoading}>
+                <RefreshIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Button
+              size="small"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={() => clearHistoryMutation.mutate()}
+              disabled={clearHistoryMutation.isPending || !historyResponse?.data?.total}
+            >
+              Clear
+            </Button>
+          </Stack>
+        </Box>
+
+        {historyLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <WatchHistoryTable
+            entries={historyResponse?.data?.data ?? []}
+            searchTerm={historySearch}
+            onSearchChange={(v) => { setHistorySearch(v); setHistoryPage(1); }}
+            pageSize={historyPageSize}
+            currentPage={historyPage}
+            onPageChange={setHistoryPage}
+            onPageSizeChange={(v) => { setHistoryPageSize(v); setHistoryPage(1); }}
+          />
+        )}
       </Box>
 
       {/* Blocked Items Details Modal */}
@@ -1096,6 +1168,152 @@ function AllowedStreamsTable({
       {searchTerm && (
         <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
           Showing {displayedItems.length} of {filtered.length} items
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
+// --------------------------------------------------------------------------
+// WatchHistoryTable – renders the in-memory per-client stream watch history
+// --------------------------------------------------------------------------
+
+const STREAM_TYPE_COLOR: Record<string, 'primary' | 'secondary' | 'info'> = {
+  LIVE: 'primary',
+  VOD: 'secondary',
+  SERIES: 'info',
+};
+
+function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString();
+}
+
+function formatDuration(start: string, end: string | null): string {
+  if (!end) return '—';
+  const ms = new Date(end).getTime() - new Date(start).getTime();
+  if (ms < 0) return '—';
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function WatchHistoryTable({
+  entries,
+  searchTerm = '',
+  onSearchChange,
+  pageSize = 20,
+  currentPage = 1,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  entries: StreamHistoryEntry[];
+  searchTerm?: string;
+  onSearchChange?: (v: string) => void;
+  pageSize?: number;
+  currentPage?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
+}) {
+  const filtered = entries.filter(
+    (e) =>
+      (e.streamName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      (e.categoryName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      e.streamId.includes(searchTerm) ||
+      e.streamType.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+
+  const totalPages = pageSize === 0 ? 1 : Math.ceil(filtered.length / pageSize);
+  const displayed =
+    pageSize === 0
+      ? filtered
+      : filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  return (
+    <Box>
+      <Stack direction="row" spacing={2} sx={{ mb: 2 }} alignItems="center">
+        <TextField
+          placeholder="Search by name, ID or type…"
+          size="small"
+          value={searchTerm}
+          onChange={(e) => onSearchChange?.(e.target.value)}
+          sx={{ flex: 1 }}
+        />
+        <FormControl size="small" sx={{ minWidth: 130 }}>
+          <Select
+            value={pageSize}
+            onChange={(e) => onPageSizeChange?.(e.target.value as number)}
+          >
+            <MenuItem value={20}>20 per page</MenuItem>
+            <MenuItem value={50}>50 per page</MenuItem>
+            <MenuItem value={100}>100 per page</MenuItem>
+            <MenuItem value={0}>All</MenuItem>
+          </Select>
+        </FormControl>
+      </Stack>
+
+      <TableContainer>
+        <Table size="small">
+          <TableHead>
+            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+              <TableCell>Stream Name</TableCell>
+              <TableCell>Stream ID</TableCell>
+              <TableCell>Type</TableCell>
+              <TableCell>Start</TableCell>
+              <TableCell>End</TableCell>
+              <TableCell>Duration</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {displayed.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ color: 'text.secondary', py: 4 }}>
+                  {searchTerm ? 'No entries match your search' : 'No watch history recorded yet'}
+                </TableCell>
+              </TableRow>
+            ) : (
+              displayed.map((entry, idx) => (
+                <TableRow key={`${entry.streamId}-${entry.start}-${idx}`} hover>
+                  <TableCell>{entry.streamName ?? <em style={{ color: '#9e9e9e' }}>unknown</em>}</TableCell>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{entry.streamId}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={entry.streamType}
+                      size="small"
+                      color={STREAM_TYPE_COLOR[entry.streamType] ?? 'default'}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                    {formatDateTime(entry.start)}
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                    {entry.end ? formatDateTime(entry.end) : <Chip label="active" size="small" color="success" variant="outlined" />}
+                  </TableCell>
+                  <TableCell sx={{ fontSize: '0.8rem' }}>{formatDuration(entry.start, entry.end)}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {pageSize !== 0 && totalPages > 1 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, mb: 2 }}>
+          <Pagination
+            count={totalPages}
+            page={currentPage}
+            onChange={(_, page) => onPageChange?.(page)}
+          />
+        </Box>
+      )}
+
+      {searchTerm && (
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+          Showing {displayed.length} of {filtered.length} entries
         </Typography>
       )}
     </Box>
