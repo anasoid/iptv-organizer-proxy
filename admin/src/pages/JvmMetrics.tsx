@@ -309,21 +309,7 @@ export default function JvmMetrics() {
               yFormatter={mb}
             />
           </Grid>
-          {/* 3 – Process memory */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <MetricChart
-              title="Process Memory (MB)"
-              data={chartData}
-              lines={[
-                { key: 'rss', name: 'RSS (actual, matches top/ps)', color: '#f44336' },
-                { key: 'memAvailable', name: 'Available RAM (incl. cache)', color: '#4caf50' },
-                { key: 'freePhysical', name: 'MemFree (excl. cache)', color: '#bdbdbd' },
-                { key: 'virtualMem', name: 'VSZ (virtual)', color: '#e0e0e0' },
-              ]}
-              yFormatter={mb}
-            />
-          </Grid>
-          {/* 4 – CPU */}
+          {/* 3 – CPU */}
           <Grid size={{ xs: 12, md: 6 }}>
             <MetricChart
               title="CPU Load (%)"
@@ -335,7 +321,31 @@ export default function JvmMetrics() {
               yFormatter={fmtPct}
             />
           </Grid>
-          {/* 5 – Threads */}
+          {/* 4 – Process RSS / VSZ */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <MetricChart
+              title="Process Memory (MB)"
+              data={chartData}
+              lines={[
+                { key: 'rss', name: 'RSS (actual, matches top/ps)', color: '#f44336' },
+                { key: 'virtualMem', name: 'VSZ (virtual)', color: '#bdbdbd' },
+              ]}
+              yFormatter={mb}
+            />
+          </Grid>
+          {/* 5 – Host memory */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <MetricChart
+              title="Host Memory (MB)"
+              data={chartData}
+              lines={[
+                { key: 'memAvailable', name: 'Available (incl. cache)', color: '#4caf50' },
+                { key: 'freePhysical', name: 'MemFree (excl. cache)', color: '#bdbdbd' },
+              ]}
+              yFormatter={mb}
+            />
+          </Grid>
+          {/* 6 – Threads */}
           <Grid size={{ xs: 12, md: 6 }}>
             <MetricChart
               title="Threads"
@@ -347,7 +357,7 @@ export default function JvmMetrics() {
               ]}
             />
           </Grid>
-          {/* 6 – GC */}
+          {/* 7 – GC */}
           <Grid size={{ xs: 12, md: 6 }}>
             <MetricChart
               title="GC Activity (per minute)"
@@ -358,7 +368,7 @@ export default function JvmMetrics() {
               ]}
             />
           </Grid>
-          {/* 7 – Database size */}
+          {/* 8 – Database size */}
           <Grid size={{ xs: 12, md: 6 }}>
             <MetricChart
               title="Database Size (MB)"
