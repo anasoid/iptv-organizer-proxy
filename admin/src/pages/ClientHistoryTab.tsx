@@ -322,6 +322,19 @@ function CustomTooltip({
   const total = bucket.total;
   if (total === 0) return null;
 
+  // Group entries by streamId → distinct streams with individual play counts
+  const streamMap = new Map<string, { entry: StreamHistoryEntry; count: number }>();
+  for (const e of bucket.entries) {
+    const existing = streamMap.get(e.streamId);
+    if (existing) {
+      existing.count++;
+    } else {
+      streamMap.set(e.streamId, { entry: e, count: 1 });
+    }
+  }
+  const distinctStreams = Array.from(streamMap.values());
+  const distinctCount = distinctStreams.length;
+
   // Build a compact type-count summary, e.g. "3 Live · 1 VOD"
   const typeSummary = (
     [
@@ -336,18 +349,20 @@ function CustomTooltip({
   return (
     <Paper
       elevation={4}
-      sx={{ p: 1.5, maxWidth: 320, maxHeight: 260, overflow: 'auto', pointerEvents: 'none' }}
+      sx={{ p: 1.5, maxWidth: 320, maxHeight: 280, overflow: 'auto', pointerEvents: 'none' }}
     >
       <Typography variant="subtitle2" fontWeight="bold">
         {bucket.label}
       </Typography>
       <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-        {total} stream{total !== 1 ? 's' : ''} — {typeSummary}
+        {distinctCount} distinct stream{distinctCount !== 1 ? 's' : ''}
+        {total !== distinctCount && ` · ${total} play${total !== 1 ? 's' : ''}`}
+        {' '}— {typeSummary}
       </Typography>
       <Divider sx={{ mb: 1 }} />
       <Stack spacing={0.5}>
-        {bucket.entries.slice(0, 15).map((entry, i) => (
-          <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75 }}>
+        {distinctStreams.slice(0, 15).map(({ entry, count }) => (
+          <Box key={entry.streamId} sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75 }}>
             {/* colour dot for stream type */}
             <Box
               sx={{
@@ -359,23 +374,34 @@ function CustomTooltip({
                 backgroundColor: TYPE_COLOR[entry.streamType] ?? '#777',
               }}
             />
-            <Typography variant="caption" sx={{ lineHeight: 1.4 }}>
+            <Typography variant="caption" sx={{ lineHeight: 1.4, flex: 1 }}>
               {entry.streamName ?? <em>unknown</em>}
               {entry.categoryName && (
-                <Typography
-                  component="span"
-                  variant="caption"
-                  color="text.secondary"
-                >
+                <Typography component="span" variant="caption" color="text.secondary">
                   {' '}({entry.categoryName})
                 </Typography>
               )}
             </Typography>
+            {count > 1 && (
+              <Typography
+                variant="caption"
+                sx={{
+                  ml: 0.5,
+                  px: 0.5,
+                  borderRadius: 0.5,
+                  bgcolor: 'action.hover',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                ×{count}
+              </Typography>
+            )}
           </Box>
         ))}
-        {bucket.entries.length > 15 && (
+        {distinctStreams.length > 15 && (
           <Typography variant="caption" color="text.secondary">
-            +{bucket.entries.length - 15} more…
+            +{distinctStreams.length - 15} more…
           </Typography>
         )}
       </Stack>
