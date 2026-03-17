@@ -150,10 +150,17 @@ function formatBucketLabel(slotStart: Date, bucketMinutes: number, granularity: 
   if (bucketMinutes >= 1440) {
     return slotStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
-  const wd = slotStart.toLocaleDateString('en-US', { weekday: 'short' });
   const h  = String(slotStart.getHours()).padStart(2, '0');
   const mi = String(slotStart.getMinutes()).padStart(2, '0');
-  return bucketMinutes < 60 ? `${wd} ${h}:${mi}` : `${wd} ${h}:00`;
+  const timeStr = bucketMinutes < 60 ? `${h}:${mi}` : `${h}:00`;
+  if (granularity === 'month') {
+    // Show day-of-month so adjacent days are distinguishable ("17 08:00")
+    const d = String(slotStart.getDate()).padStart(2, '0');
+    return `${d} ${timeStr}`;
+  }
+  // Week: show short weekday name ("Mon 08:00")
+  const wd = slotStart.toLocaleDateString('en-US', { weekday: 'short' });
+  return `${wd} ${timeStr}`;
 }
 
 /**
@@ -240,20 +247,28 @@ function makeBarLabelRenderer(chartData: ChartBucket[]) {
     const { x = 0, y = 0, width = 0, index } = props;
     if (index === undefined) return null;
     const bucket = chartData[index];
-    // Only show the count label when there are MULTIPLE streams in the bucket
-    if (!bucket || bucket.total <= 1) return null;
+    // Show count for every non-empty bar
+    if (!bucket || bucket.total === 0) return null;
 
     const cx     = x + width / 2;
     const barTop = y;
 
-    // Count above bar (always shown)
+    // Count INSIDE the bar, near the top
     const countLabel = (
-      <text key="count" x={cx} y={barTop - 3} textAnchor="middle" fontSize={9} fill="#555">
+      <text
+        key="count"
+        x={cx}
+        y={barTop + 12}
+        textAnchor="middle"
+        fontSize={9}
+        fontWeight="bold"
+        fill="rgba(255,255,255,0.9)"
+      >
         {bucket.total}
       </text>
     );
 
-    // Names inside bar as vertical text (only when bars are wide enough)
+    // Stream names as rotated text (only when bars are wide enough)
     const showNames = width >= 12 && chartData.length <= 72;
     if (!showNames) return <g>{countLabel}</g>;
 
@@ -265,14 +280,13 @@ function makeBarLabelRenderer(chartData: ChartBucket[]) {
         {countLabel}
         {names.map((name, i) => {
           const truncated = name.length > 18 ? name.slice(0, 17) + '…' : name;
-          // Spread names horizontally within the bar width
           const xOff = cx + (i - (n - 1) / 2) * Math.min(10, (width - 2) / Math.max(n, 1));
           return (
             <text
               key={`n${i}`}
               x={xOff}
-              y={barTop + 4}
-              transform={`rotate(90, ${xOff}, ${barTop + 4})`}
+              y={barTop + 22}
+              transform={`rotate(90, ${xOff}, ${barTop + 22})`}
               textAnchor="start"
               fontSize={8}
               fill="rgba(255,255,255,0.9)"
@@ -620,7 +634,7 @@ export default function ClientHistoryTab({ clientId }: Props) {
         </Box>
 
         <ResponsiveContainer width="100%" height={340}>
-          <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
+          <BarChart data={chartData} margin={{ top: 20, right: 90, left: 80, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={true} horizontal={true} />
             <XAxis dataKey="label" interval={xAxisInterval} tick={{ fontSize: 11 }} />
             {/* Y-axis is fixed 0→1; actual counts are shown above each bar and in the tooltip */}
@@ -666,10 +680,11 @@ export default function ClientHistoryTab({ clientId }: Props) {
                 <Cell key={i} fill={TYPE_COLOR.SERIES} opacity={isActive(i) ? 1 : 0.3} />
               ))}
             </Bar>
-            {/* Brush for interval selection — controlled: null brushIndices resets to full range */}
+            {/* Brush for interval selection — controlled: null brushIndices resets to full range.
+                tickFormatter suppressed: range is already shown in the table header selectionLabel. */}
             <Brush
               dataKey="label"
-              height={20}
+              height={30}
               stroke="#8884d8"
               onChange={handleBrushChange}
               travellerWidth={8}
