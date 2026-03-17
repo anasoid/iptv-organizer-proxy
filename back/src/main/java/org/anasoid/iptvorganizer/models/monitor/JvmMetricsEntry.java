@@ -109,32 +109,8 @@ public class JvmMetricsEntry {
   /** Total wall-clock time spent in GC pauses since JVM start (milliseconds). */
   private final long gcCollectionTimeMs;
 
-  // ── Class loading ─────────────────────────────────────────────────────────
-
-  /**
-   * Number of classes currently loaded. A steady increase over time is a sign of a class-loader
-   * leak.
-   */
-  private final int loadedClassCount;
-
   // ── JVM runtime ──────────────────────────────────────────────────────────
 
   /** Seconds elapsed since JVM start. Useful for detecting unexpected restarts. */
   private final long jvmUptimeSeconds;
-
-  // ── File descriptors (Unix / Linux only) ─────────────────────────────────
-
-  /**
-   * Number of file descriptors currently open by the process. Each proxied stream holds at least
-   * one socket FD; exhausting the limit ({@link #maxFileDescriptors}) causes new connections to
-   * fail immediately. {@code -1} on Windows or when {@code UnixOperatingSystemMXBean} is not
-   * available.
-   */
-  private final long openFileDescriptors;
-
-  /**
-   * Maximum number of open file descriptors allowed for this process (ulimit). {@code -1} when
-   * unavailable.
-   */
-  private final long maxFileDescriptors;
 }

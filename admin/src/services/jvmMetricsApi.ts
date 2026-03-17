@@ -42,15 +42,8 @@ export interface JvmMetricsEntry {
   gcCollectionCount: number;
   gcCollectionTimeMs: number;
 
-  // Class loading
-  loadedClassCount: number;
-
   // JVM uptime
   jvmUptimeSeconds: number;
-
-  // File descriptors (Unix only; -1 otherwise)
-  openFileDescriptors: number;
-  maxFileDescriptors: number;
 }
 
 /**

@@ -3,7 +3,6 @@ package org.anasoid.iptvorganizer.services.monitor;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.lang.management.BufferPoolMXBean;
-import java.lang.management.ClassLoadingMXBean;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
@@ -121,17 +120,11 @@ public class JvmMonitorService {
     long freePhysicalMb = -1L;
     double processCpuLoad = -1.0;
     double systemCpuLoad = -1.0;
-    long openFds = -1L;
-    long maxFds = -1L;
     if (osBean instanceof com.sun.management.OperatingSystemMXBean sunOs) {
       virtualMemoryMb = toMb(sunOs.getCommittedVirtualMemorySize());
       freePhysicalMb = toMb(sunOs.getFreeMemorySize());
       processCpuLoad = sunOs.getProcessCpuLoad();
       systemCpuLoad = sunOs.getCpuLoad();
-    }
-    if (osBean instanceof com.sun.management.UnixOperatingSystemMXBean unixOs) {
-      openFds = unixOs.getOpenFileDescriptorCount();
-      maxFds = unixOs.getMaxFileDescriptorCount();
     }
     // -- Threads --
     ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
@@ -154,8 +147,6 @@ public class JvmMonitorService {
         break;
       }
     }
-    // -- Class loading --
-    ClassLoadingMXBean classBean = ManagementFactory.getClassLoadingMXBean();
     // -- Runtime uptime --
     RuntimeMXBean runtimeBean = ManagementFactory.getRuntimeMXBean();
     return JvmMetricsEntry.builder()
@@ -176,10 +167,7 @@ public class JvmMonitorService {
         .gcCollectionTimeMs(gcTime)
         .directBufferUsedMb(directUsedMb)
         .directBufferCount(directCount)
-        .loadedClassCount(classBean.getLoadedClassCount())
         .jvmUptimeSeconds(runtimeBean.getUptime() / 1000L)
-        .openFileDescriptors(openFds)
-        .maxFileDescriptors(maxFds)
         .build();
   }
 

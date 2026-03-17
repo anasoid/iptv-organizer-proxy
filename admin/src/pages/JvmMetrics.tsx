@@ -169,11 +169,6 @@ export default function JvmMetrics() {
     // GC
     gcTime: avail(m.gcCollectionTimeMs),
     gcCount: avail(m.gcCollectionCount),
-    // Classes
-    classes: avail(m.loadedClassCount),
-    // FDs
-    openFds: avail(m.openFileDescriptors),
-    maxFds: avail(m.maxFileDescriptors),
   }));
   const latest = entries.length > 0 ? entries[entries.length - 1] : null;
   const pct = (v: number) =>
@@ -259,21 +254,6 @@ export default function JvmMetrics() {
             size="small"
           />
           <Chip
-            label={`Open FDs: ${latest.openFileDescriptors >= 0 ? latest.openFileDescriptors : 'N/A'}`}
-            variant="outlined"
-            size="small"
-          />
-          <Chip
-            label={`Virtual Mem: ${latest.processVirtualMemoryMb >= 0 ? latest.processVirtualMemoryMb + ' MB' : 'N/A'}`}
-            variant="outlined"
-            size="small"
-          />
-          <Chip
-            label={`Classes: ${latest.loadedClassCount}`}
-            variant="outlined"
-            size="small"
-          />
-          <Chip
             label={`Uptime: ${fmtUptime(latest.jvmUptimeSeconds)}`}
             variant="outlined"
             size="small"
@@ -354,25 +334,6 @@ export default function JvmMetrics() {
                 { key: 'gcTime', name: 'GC Time (ms)', color: '#ff5722' },
                 { key: 'gcCount', name: 'GC Collections', color: '#795548' },
               ]}
-            />
-          </Grid>
-          {/* 7 – File descriptors */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <MetricChart
-              title="File Descriptors (Unix)"
-              data={chartData}
-              lines={[
-                { key: 'openFds', name: 'Open FDs', color: '#607d8b' },
-                { key: 'maxFds', name: 'Max FDs', color: '#bdbdbd' },
-              ]}
-            />
-          </Grid>
-          {/* 8 – Loaded classes */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <MetricChart
-              title="Loaded Classes"
-              data={chartData}
-              lines={[{ key: 'classes', name: 'Loaded classes', color: '#8bc34a' }]}
             />
           </Grid>
         </Grid>
