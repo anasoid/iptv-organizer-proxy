@@ -222,8 +222,11 @@ public class JvmMonitorService {
     long dbSizeMb = queryDbSizeMb();
     // -- RSS (actual physical RAM used by this process, from /proc/self/status) --
     long rssMb = readRssMb();
-    // -- MemAvailable (reclaimable buff/cache included, matches free -m "available") --
-    long memAvailableMb = readMemAvailableMb();
+    // -- MemAvailable + MemFree from /proc/meminfo (single read, preferred over JMX) --
+    long[] meminfo = readProcMeminfo();
+    long memAvailableMb = meminfo[0];
+    // Prefer /proc/meminfo MemFree; fall back to JMX getFreeMemorySize() for non-Linux.
+    long freePhysicalFinal = meminfo[1] >= 0 ? meminfo[1] : freePhysicalMb;
     return JvmMetricsEntry.builder()
         .timestamp(LocalDateTime.now())
         .heapUsedMb(toMb(heap.getUsed()))
@@ -233,7 +236,7 @@ public class JvmMonitorService {
         .metaspaceMb(metaspaceMb)
         .processRssMb(rssMb)
         .processVirtualMemoryMb(virtualMemoryMb)
-        .freePhysicalMemoryMb(freePhysicalMb)
+        .freePhysicalMemoryMb(freePhysicalFinal)
         .memAvailableMb(memAvailableMb)
         .processCpuLoad(processCpuLoad)
         .systemCpuLoad(systemCpuLoad)
@@ -276,29 +279,32 @@ public class JvmMonitorService {
   }
 
   /**
-   * Reads {@code MemAvailable} from {@code /proc/meminfo} — the memory available for new
-   * allocations without swapping, including reclaimable page cache and buffers.
+   * Reads {@code MemAvailable} and {@code MemFree} from {@code /proc/meminfo} in a single pass.
    *
-   * <p>This matches what {@code free -m} shows in the "available" column and is a far better
-   * indicator of memory pressure than {@code MemFree} (which excludes buff/cache).
+   * <p>Returns a two-element array: {@code [memAvailableMb, memFreeMb]}. Either value is {@code -1}
+   * if the corresponding line is missing or the file cannot be read (non-Linux).
    *
-   * @return available memory in MB, or {@code -1} on non-Linux or parse errors.
+   * <p>Reading from {@code /proc/meminfo} is always preferred over JMX {@code getFreeMemorySize()}
+   * because the JMX value requires {@code com.sun.management .OperatingSystemMXBean}, which is
+   * absent on GraalVM native and some minimal JDK builds.
    */
-  private long readMemAvailableMb() {
+  private long[] readProcMeminfo() {
+    long[] result = {-1L, -1L}; // [MemAvailable, MemFree]
     try {
       for (String line : Files.readAllLines(Path.of("/proc/meminfo"))) {
         if (line.startsWith("MemAvailable:")) {
-          // Format: "MemAvailable:   1234567 kB"
           String[] parts = line.trim().split("\\s+");
-          if (parts.length >= 2) {
-            return Long.parseLong(parts[1]) / 1024L; // kB → MB
-          }
+          if (parts.length >= 2) result[0] = Long.parseLong(parts[1]) / 1024L; // kB → MB
+        } else if (line.startsWith("MemFree:")) {
+          String[] parts = line.trim().split("\\s+");
+          if (parts.length >= 2) result[1] = Long.parseLong(parts[1]) / 1024L; // kB → MB
         }
+        if (result[0] >= 0 && result[1] >= 0) break; // both found, stop early
       }
     } catch (Exception e) {
-      log.debug("Could not read MemAvailable from /proc/meminfo: {}", e.getMessage());
+      log.debug("Could not read /proc/meminfo: {}", e.getMessage());
     }
-    return -1L;
+    return result;
   }
 
   /**
