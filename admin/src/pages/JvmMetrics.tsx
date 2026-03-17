@@ -157,7 +157,9 @@ export default function JvmMetrics() {
     metaspace: avail(m.metaspaceMb),
     directBuffer: avail(m.directBufferUsedMb),
     // Process memory
+    rss: avail(m.processRssMb),
     virtualMem: avail(m.processVirtualMemoryMb),
+    memAvailable: avail(m.memAvailableMb),
     freePhysical: avail(m.freePhysicalMemoryMb),
     // CPU (convert 0-1 to %)
     processCpu: m.processCpuLoad >= 0 ? +((m.processCpuLoad * 100).toFixed(1)) : null,
@@ -244,6 +246,14 @@ export default function JvmMetrics() {
             variant="outlined"
             size="small"
           />
+          {latest.processRssMb >= 0 && (
+            <Chip
+              label={`RSS: ${latest.processRssMb} MB`}
+              color="warning"
+              variant="outlined"
+              size="small"
+            />
+          )}
           <Chip
             label={`CPU: ${pct(latest.processCpuLoad)}`}
             color="secondary"
@@ -305,8 +315,10 @@ export default function JvmMetrics() {
               title="Process Memory (MB)"
               data={chartData}
               lines={[
-                { key: 'virtualMem', name: 'Virtual (committed)', color: '#3f51b5' },
-                { key: 'freePhysical', name: 'Free Physical RAM', color: '#4caf50' },
+                { key: 'rss', name: 'RSS (actual, matches top/ps)', color: '#f44336' },
+                { key: 'memAvailable', name: 'Available RAM (incl. cache)', color: '#4caf50' },
+                { key: 'freePhysical', name: 'MemFree (excl. cache)', color: '#bdbdbd' },
+                { key: 'virtualMem', name: 'VSZ (virtual)', color: '#e0e0e0' },
               ]}
               yFormatter={mb}
             />

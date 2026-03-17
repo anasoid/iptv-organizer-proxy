@@ -220,6 +220,10 @@ public class JvmMonitorService {
     RuntimeMXBean runtimeBean = ManagementFactory.getRuntimeMXBean();
     // -- Database size --
     long dbSizeMb = queryDbSizeMb();
+    // -- RSS (actual physical RAM used by this process, from /proc/self/status) --
+    long rssMb = readRssMb();
+    // -- MemAvailable (reclaimable buff/cache included, matches free -m "available") --
+    long memAvailableMb = readMemAvailableMb();
     return JvmMetricsEntry.builder()
         .timestamp(LocalDateTime.now())
         .heapUsedMb(toMb(heap.getUsed()))
@@ -227,8 +231,10 @@ public class JvmMonitorService {
         .heapCommittedMb(toMb(heap.getCommitted()))
         .nonHeapUsedMb(toMb(nonHeap.getUsed()))
         .metaspaceMb(metaspaceMb)
+        .processRssMb(rssMb)
         .processVirtualMemoryMb(virtualMemoryMb)
         .freePhysicalMemoryMb(freePhysicalMb)
+        .memAvailableMb(memAvailableMb)
         .processCpuLoad(processCpuLoad)
         .systemCpuLoad(systemCpuLoad)
         .threadCount(threadBean.getThreadCount())
@@ -241,6 +247,58 @@ public class JvmMonitorService {
         .jvmUptimeSeconds(runtimeBean.getUptime() / 1000L)
         .dbSizeMb(dbSizeMb)
         .build();
+  }
+
+  /**
+   * Reads the process RSS (Resident Set Size) from {@code /proc/self/status} on Linux.
+   *
+   * <p>Parses the {@code VmRSS} line, e.g. {@code VmRSS: 189440 kB}, and converts kB → MB. This
+   * matches exactly what {@code top} and {@code ps} report as the process memory, unlike {@code
+   * getCommittedVirtualMemorySize()} which returns VSZ and can be 10-20× larger.
+   *
+   * @return RSS in MB, or {@code -1} on non-Linux platforms or parse errors.
+   */
+  private long readRssMb() {
+    try {
+      for (String line : Files.readAllLines(Path.of("/proc/self/status"))) {
+        if (line.startsWith("VmRSS:")) {
+          // Format: "VmRSS:    189440 kB"
+          String[] parts = line.trim().split("\\s+");
+          if (parts.length >= 2) {
+            return Long.parseLong(parts[1]) / 1024L; // kB → MB
+          }
+        }
+      }
+    } catch (Exception e) {
+      log.debug("Could not read RSS from /proc/self/status: {}", e.getMessage());
+    }
+    return -1L;
+  }
+
+  /**
+   * Reads {@code MemAvailable} from {@code /proc/meminfo} — the memory available for new
+   * allocations without swapping, including reclaimable page cache and buffers.
+   *
+   * <p>This matches what {@code free -m} shows in the "available" column and is a far better
+   * indicator of memory pressure than {@code MemFree} (which excludes buff/cache).
+   *
+   * @return available memory in MB, or {@code -1} on non-Linux or parse errors.
+   */
+  private long readMemAvailableMb() {
+    try {
+      for (String line : Files.readAllLines(Path.of("/proc/meminfo"))) {
+        if (line.startsWith("MemAvailable:")) {
+          // Format: "MemAvailable:   1234567 kB"
+          String[] parts = line.trim().split("\\s+");
+          if (parts.length >= 2) {
+            return Long.parseLong(parts[1]) / 1024L; // kB → MB
+          }
+        }
+      }
+    } catch (Exception e) {
+      log.debug("Could not read MemAvailable from /proc/meminfo: {}", e.getMessage());
+    }
+    return -1L;
   }
 
   /**

@@ -26,8 +26,14 @@ export interface JvmMetricsEntry {
   directBufferCount: number; // -1 if unavailable
 
   // Process / OS memory (MB)
+  /** RSS — actual physical RAM used by this process (what top/ps show). -1 on non-Linux. */
+  processRssMb: number;
+  /** VSZ — virtual address space size; always much larger than RSS, not what top shows. -1 if com.sun.management unavailable */
   processVirtualMemoryMb: number; // -1 if com.sun.management unavailable
+  /** MemFree — truly free pages only, excludes buff/cache (lower than what free -m shows). -1 if unavailable */
   freePhysicalMemoryMb: number; // -1 if unavailable
+  /** MemAvailable — free + reclaimable cache/buffers; matches free -m "available" column. -1 on non-Linux. */
+  memAvailableMb: number;
 
   // CPU (0.0–1.0; -1 if unavailable)
   processCpuLoad: number;

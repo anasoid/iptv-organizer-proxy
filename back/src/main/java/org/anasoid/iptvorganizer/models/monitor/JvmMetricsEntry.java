@@ -63,17 +63,35 @@ public class JvmMetricsEntry {
   // ── Process / OS memory (MB) ─────────────────────────────────────────────
 
   /**
-   * Virtual memory committed (reserved) for the process by the OS. Includes heap + non-heap + JIT
-   * code cache + thread stacks + native libraries. A growing trend here hints at native memory
-   * leaks. {@code -1} if {@code com.sun.management.OperatingSystemMXBean} is not available.
+   * Process RSS (Resident Set Size) in megabytes — the actual physical RAM pages held by this
+   * process at sample time. Read from {@code /proc/self/status} (VmRSS line) on Linux. This is what
+   * {@code top} / {@code ps} display as the process memory. {@code -1} on non-Linux or if the file
+   * cannot be parsed.
+   */
+  private final long processRssMb;
+
+  /**
+   * VSZ (Virtual Size) — virtual address space committed for the process by the OS. Includes heap +
+   * non-heap + JIT code cache + thread stacks + shared libraries + memory-mapped files. Always much
+   * larger than RSS; a growing trend hints at native memory leaks. {@code -1} if {@code
+   * com.sun.management.OperatingSystemMXBean} is not available.
    */
   private final long processVirtualMemoryMb;
 
   /**
-   * Free physical RAM on the host at sample time. Useful for detecting host memory pressure that
-   * would force the OS to swap. {@code -1} if unavailable.
+   * Free physical RAM on the host at sample time — maps to {@code MemFree} in {@code
+   * /proc/meminfo}. This excludes buffers and page cache. Usually much lower than what {@code free
+   * -m} shows as "available". {@code -1} if unavailable.
    */
   private final long freePhysicalMemoryMb;
+
+  /**
+   * Memory available for new allocations without swapping — maps to {@code MemAvailable} in {@code
+   * /proc/meminfo}. Includes reclaimable page cache and buffers. This is what {@code free -m} shows
+   * in the "available" column and is the correct metric for monitoring memory pressure. {@code -1}
+   * on non-Linux or if the file cannot be parsed.
+   */
+  private final long memAvailableMb;
 
   // ── CPU (0.0–1.0; -1 if unavailable) ────────────────────────────────────
 
