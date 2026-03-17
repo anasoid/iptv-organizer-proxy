@@ -169,6 +169,8 @@ export default function JvmMetrics() {
     // GC
     gcTime: avail(m.gcCollectionTimeMs),
     gcCount: avail(m.gcCollectionCount),
+    // DB size
+    dbSize: avail(m.dbSizeMb),
   }));
   const latest = entries.length > 0 ? entries[entries.length - 1] : null;
   const pct = (v: number) =>
@@ -258,6 +260,14 @@ export default function JvmMetrics() {
             variant="outlined"
             size="small"
           />
+          {latest.dbSizeMb >= 0 && (
+            <Chip
+              label={`DB: ${latest.dbSizeMb} MB`}
+              color="success"
+              variant="outlined"
+              size="small"
+            />
+          )}
         </Box>
       )}
       {/* ── Charts grid ─────────────────────────────────────────────────── */}
@@ -334,6 +344,17 @@ export default function JvmMetrics() {
                 { key: 'gcTime', name: 'GC pause time/min (ms)', color: '#ff5722' },
                 { key: 'gcCount', name: 'GC collections/min', color: '#795548' },
               ]}
+            />
+          </Grid>
+          {/* 7 – Database size */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <MetricChart
+              title="Database Size (MB)"
+              data={chartData}
+              lines={[
+                { key: 'dbSize', name: 'DB Size', color: '#43a047' },
+              ]}
+              yFormatter={mb}
             />
           </Grid>
         </Grid>

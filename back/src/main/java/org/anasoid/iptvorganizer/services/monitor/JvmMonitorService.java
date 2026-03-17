@@ -2,6 +2,7 @@ package org.anasoid.iptvorganizer.services.monitor;
 
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import java.lang.management.BufferPoolMXBean;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
@@ -10,6 +11,11 @@ import java.lang.management.MemoryUsage;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
 import java.lang.management.ThreadMXBean;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayDeque;
@@ -18,6 +24,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
+import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.monitor.JvmMetricsEntry;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -43,6 +50,14 @@ public class JvmMonitorService {
 
   @ConfigProperty(name = "jvm.metrics.max.age.hours", defaultValue = "24")
   int maxAgeHours;
+
+  @ConfigProperty(name = "app.datasource.dialect", defaultValue = "sqlite")
+  String dialect;
+
+  @ConfigProperty(name = "quarkus.datasource.jdbc.url", defaultValue = "")
+  String jdbcUrl;
+
+  @Inject DataSource dataSource;
 
   private final ArrayDeque<JvmMetricsEntry> metrics = new ArrayDeque<>();
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
@@ -203,6 +218,8 @@ public class JvmMonitorService {
     }
     // -- Runtime uptime --
     RuntimeMXBean runtimeBean = ManagementFactory.getRuntimeMXBean();
+    // -- Database size --
+    long dbSizeMb = queryDbSizeMb();
     return JvmMetricsEntry.builder()
         .timestamp(LocalDateTime.now())
         .heapUsedMb(toMb(heap.getUsed()))
@@ -222,7 +239,45 @@ public class JvmMonitorService {
         .directBufferUsedMb(directUsedMb)
         .directBufferCount(directCount)
         .jvmUptimeSeconds(runtimeBean.getUptime() / 1000L)
+        .dbSizeMb(dbSizeMb)
         .build();
+  }
+
+  /**
+   * Returns the total database size in megabytes, using the cheapest method per dialect.
+   *
+   * <ul>
+   *   <li><b>SQLite</b>: {@link Files#size(Path)} — a single OS {@code stat()} syscall on the
+   *       database file. Zero SQL, zero connection-pool usage; safe on low-resource hardware such
+   *       as OpenWrt routers. The file path is extracted from {@code quarkus.datasource.jdbc.url}
+   *       by stripping the {@code jdbc:sqlite:} prefix.
+   *   <li><b>MySQL</b>: {@code information_schema.tables} — sums {@code data_length + index_length}
+   *       for the current schema.
+   * </ul>
+   *
+   * Returns {@code -1} on any error or unsupported dialect (e.g. H2 in tests) so the chart simply
+   * gaps that data point.
+   */
+  private long queryDbSizeMb() {
+    try {
+      if ("sqlite".equalsIgnoreCase(dialect)) {
+        // Strip "jdbc:sqlite:" prefix to obtain the raw file path.
+        String filePath = jdbcUrl.substring("jdbc:sqlite:".length());
+        return toMb(Files.size(Path.of(filePath)));
+      } else if ("mysql".equalsIgnoreCase(dialect)) {
+        String sql =
+            "SELECT COALESCE(SUM(data_length + index_length), 0)"
+                + " FROM information_schema.tables WHERE table_schema = DATABASE()";
+        try (Connection conn = dataSource.getConnection();
+            Statement st = conn.createStatement();
+            ResultSet rs = st.executeQuery(sql)) {
+          if (rs.next()) return toMb(rs.getLong(1));
+        }
+      }
+    } catch (Exception e) {
+      log.debug("Could not measure DB size (dialect={}): {}", dialect, e.getMessage());
+    }
+    return -1L;
   }
 
   private static long toMb(long bytes) {

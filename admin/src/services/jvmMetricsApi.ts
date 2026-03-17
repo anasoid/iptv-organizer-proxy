@@ -44,6 +44,10 @@ export interface JvmMetricsEntry {
 
   // JVM uptime
   jvmUptimeSeconds: number;
+
+  // Database
+  /** Total DB size in MB. -1 if unavailable (H2 tests, query error). */
+  dbSizeMb: number;
 }
 
 /**

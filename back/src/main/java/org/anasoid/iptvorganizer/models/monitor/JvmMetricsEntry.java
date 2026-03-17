@@ -113,4 +113,13 @@ public class JvmMetricsEntry {
 
   /** Seconds elapsed since JVM start. Useful for detecting unexpected restarts. */
   private final long jvmUptimeSeconds;
+
+  // ── Database ──────────────────────────────────────────────────────────────
+
+  /**
+   * Total database size in megabytes at sample time. Computed via {@code PRAGMA page_count} ×
+   * {@code page_size} for SQLite, or {@code information_schema} for MySQL. {@code -1} if the query
+   * fails or the dialect is unsupported (e.g. H2 in tests).
+   */
+  private final long dbSizeMb;
 }
