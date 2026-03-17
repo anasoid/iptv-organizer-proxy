@@ -36,6 +36,7 @@ import {
   CartesianGrid,
   Tooltip as ChartTooltip,
   Legend,
+  ReferenceLine,
   ResponsiveContainer,
 } from 'recharts';
 import clientHistoryApi, { type StreamHistoryEntry } from '../services/clientHistoryApi';
@@ -477,6 +478,23 @@ export default function ClientHistoryTab({ clientId }: Props) {
   const xAxisInterval = computeXAxisInterval(chartData.length);
   const barLabel     = makeBarLabelRenderer(chartData);
 
+  /** Label of the bucket that contains the current moment — used for the "now" reference line. */
+  const nowBucketLabel = useMemo(() => {
+    const now = new Date();
+    let windowStart: Date;
+    if (granularity === 'day') {
+      windowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    } else {
+      const daysBack = granularity === 'week' ? 6 : 29;
+      const d = new Date(now);
+      d.setDate(d.getDate() - daysBack);
+      windowStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+    }
+    const bucketMs = currentBucket * 60 * 1000;
+    const idx = Math.floor((now.getTime() - windowStart.getTime()) / bucketMs);
+    return idx >= 0 && idx < chartData.length ? chartData[idx].label : null;
+  }, [granularity, currentBucket, chartData]);
+
   // ── Selection helpers ──────────────────────────────────────────────────
   const hasSelection = brushIndices !== null || selectedBuckets.size > 0;
   const isActive = (i: number): boolean => {
@@ -680,6 +698,16 @@ export default function ClientHistoryTab({ clientId }: Props) {
                 <Cell key={i} fill={TYPE_COLOR.SERIES} opacity={isActive(i) ? 1 : 0.3} />
               ))}
             </Bar>
+            {/* Vertical line marking the current time */}
+            {nowBucketLabel !== null && (
+              <ReferenceLine
+                x={nowBucketLabel}
+                stroke="#f44336"
+                strokeWidth={2}
+                strokeDasharray="4 3"
+                label={{ value: 'now', position: 'insideTopRight', fontSize: 9, fill: '#f44336' }}
+              />
+            )}
             {/* Brush for interval selection — controlled: null brushIndices resets to full range.
                 tickFormatter suppressed: range is already shown in the table header selectionLabel. */}
             <Brush
