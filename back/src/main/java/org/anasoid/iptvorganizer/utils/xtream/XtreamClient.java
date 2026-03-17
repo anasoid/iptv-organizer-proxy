@@ -6,11 +6,11 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.models.entity.Client;
-import org.anasoid.iptvorganizer.models.entity.Proxy;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
+import org.anasoid.iptvorganizer.models.http.ProxyOptions;
 import org.anasoid.iptvorganizer.services.ProxyConfigService;
 import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
 import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
@@ -109,7 +109,11 @@ public class XtreamClient {
 
     try {
       return httpStreamingService.streamHttpWithHeaders(
-          url, createDefaultHttpOptions(client, source), null, source);
+          url,
+          createDefaultHttpOptions(client, source),
+          createDefaultProxyOptions(client, source),
+          null,
+          source);
     } catch (Exception ex) {
       log.error(
           "Failed to fetch series info for series_id={} from source {}: {}",
@@ -138,7 +142,11 @@ public class XtreamClient {
 
     try {
       return httpStreamingService.streamHttpWithHeaders(
-          url, createDefaultHttpOptions(client, source), null, source);
+          url,
+          createDefaultHttpOptions(client, source),
+          createDefaultProxyOptions(client, source),
+          null,
+          source);
     } catch (Exception ex) {
       log.error(
           "Failed to fetch simple datatable info for stream_id={} from source {}: {}",
@@ -165,7 +173,8 @@ public class XtreamClient {
             "Fetching %s categories for source: %s", type.getStreamTypeName(), source.getName()));
 
     try {
-      return httpStreamingService.streamJsonArray(url, createDefaultHttpOptions(source), source);
+      return httpStreamingService.streamJsonArray(
+          url, createDefaultHttpOptions(source), createDefaultProxyOptions(source), source);
     } catch (Exception ex) {
       log.error(
           String.format(
@@ -190,7 +199,8 @@ public class XtreamClient {
         String.format("Fetching %s for source: %s", type.getStreamTypeName(), source.getName()));
 
     try {
-      return httpStreamingService.streamJsonArray(url, createDefaultHttpOptions(source), source);
+      return httpStreamingService.streamJsonArray(
+          url, createDefaultHttpOptions(source), createDefaultProxyOptions(source), source);
     } catch (Exception ex) {
       log.error(
           String.format(
@@ -246,12 +256,18 @@ public class XtreamClient {
   }
 
   private HttpOptions createDefaultHttpOptions(Client client, Source source) {
-    // Get proxy configuration from source, respecting client enable flags
-    Proxy proxy = proxyConfigService.getProxyConfig(client, source, RequestType.API);
     return HttpOptions.builder()
         .timeout(DEFAULT_TIMEOUT_MS)
         .maxRetries(DEFAULT_MAX_RETRIES)
-        .proxy(proxy)
         .build();
+  }
+
+  private ProxyOptions createDefaultProxyOptions(Source source) {
+    return createDefaultProxyOptions(null, source);
+  }
+
+  private ProxyOptions createDefaultProxyOptions(Client client, Source source) {
+
+    return proxyConfigService.getProxyOption(client, source, RequestType.API);
   }
 }

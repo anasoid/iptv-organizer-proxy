@@ -11,6 +11,7 @@ import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
+import org.anasoid.iptvorganizer.models.http.ProxyOptions;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 import org.anasoid.iptvorganizer.services.ProxyConfigService;
@@ -61,6 +62,11 @@ class XtreamUserServiceTest {
     testSource.setUrl("http://upstream.example.com");
     testSource.setUsername("upstream_user");
     testSource.setPassword("upstream_pass");
+
+    // Ensure proxyConfigService never returns null ProxyOptions (lenient: not all tests invoke it)
+    lenient()
+        .when(proxyConfigService.getProxyOption(any(), any(), any(RequestType.class)))
+        .thenReturn(new ProxyOptions());
   }
 
   @Test
@@ -73,7 +79,10 @@ class XtreamUserServiceTest {
     // Mock upstream authentication response
     Map<String, Object> upstreamAuth = createUpstreamAuthResponse();
     when(httpStreamingService.fetchJsonObject(
-            contains("upstream_user"), any(HttpOptions.class), eq(testSource)))
+            contains("upstream_user"),
+            any(HttpOptions.class),
+            any(ProxyOptions.class),
+            eq(testSource)))
         .thenReturn(upstreamAuth);
 
     // When: Authenticate via proxy
@@ -109,7 +118,8 @@ class XtreamUserServiceTest {
     when(sourceRepository.findById(1L)).thenReturn(testSource);
 
     Map<String, Object> upstreamAuth = createUpstreamAuthResponse();
-    when(httpStreamingService.fetchJsonObject(anyString(), any(HttpOptions.class), eq(testSource)))
+    when(httpStreamingService.fetchJsonObject(
+            anyString(), any(HttpOptions.class), any(ProxyOptions.class), eq(testSource)))
         .thenReturn(upstreamAuth);
 
     // When: Authenticate with HTTPS proxy
@@ -211,7 +221,8 @@ class XtreamUserServiceTest {
 
     Map<String, Object> invalidResponse = new HashMap<>();
     invalidResponse.put("invalid_field", "value");
-    when(httpStreamingService.fetchJsonObject(anyString(), any(HttpOptions.class), eq(testSource)))
+    when(httpStreamingService.fetchJsonObject(
+            anyString(), any(HttpOptions.class), any(ProxyOptions.class), eq(testSource)))
         .thenReturn(invalidResponse);
 
     // When/Then: Should throw exception

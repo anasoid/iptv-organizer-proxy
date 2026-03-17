@@ -3,6 +3,7 @@ package org.anasoid.iptvorganizer.utils.streaming;
 import static org.junit.jupiter.api.Assertions.*;
 
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
+import org.anasoid.iptvorganizer.models.http.ProxyOptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -17,11 +18,41 @@ public class HttpStreamingServiceTest {
 
   @Test
   void testStreamHttpNullOptions() {
-    // Test that null options are handled gracefully
+    // Test that null HttpOptions are handled gracefully (ProxyOptions is provided)
     // This will attempt to stream from invalid URL, so we expect failure
     assertThrows(
         Exception.class,
-        () -> httpStreamingService.streamHttp("http://invalid-url-12345.test", null, null));
+        () ->
+            httpStreamingService.streamHttp(
+                "http://invalid-url-12345.test", null, new ProxyOptions(), null));
+  }
+
+  @Test
+  void testStreamHttp_NullProxyOptions_ThrowsNullPointerException() {
+    assertThrows(
+        NullPointerException.class,
+        () -> httpStreamingService.streamHttp("http://example.com", null, null, null));
+  }
+
+  @Test
+  void testStreamHttpWithHeaders_NullProxyOptions_ThrowsNullPointerException() {
+    assertThrows(
+        NullPointerException.class,
+        () -> httpStreamingService.streamHttpWithHeaders("http://example.com", null, null, null));
+  }
+
+  @Test
+  void testStreamJsonArray_NullProxyOptions_ThrowsNullPointerException() {
+    assertThrows(
+        NullPointerException.class,
+        () -> httpStreamingService.streamJsonArray("http://example.com", null, null, null));
+  }
+
+  @Test
+  void testFetchJsonObject_NullProxyOptions_ThrowsNullPointerException() {
+    assertThrows(
+        NullPointerException.class,
+        () -> httpStreamingService.fetchJsonObject("http://example.com", null, null, null));
   }
 
   @Test
@@ -30,7 +61,9 @@ public class HttpStreamingServiceTest {
 
     assertThrows(
         Exception.class,
-        () -> httpStreamingService.streamHttp("http://invalid-url-12345.test", options, null));
+        () ->
+            httpStreamingService.streamHttp(
+                "http://invalid-url-12345.test", options, new ProxyOptions(), null));
   }
 
   @Test

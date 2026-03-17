@@ -113,7 +113,8 @@ public class StreamModeHandler {
         request,
         client,
         source,
-        tunnelUtils.buildHttpOptions(client, source).timeout(timeout).build());
+        tunnelUtils.buildHttpOptions(client, source).timeout(timeout).build(),
+        tunnelUtils.buildProxyOptions(client, source));
   }
 
   /**

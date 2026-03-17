@@ -12,6 +12,7 @@ import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.enums.ConnectXmltvMode;
 import org.anasoid.iptvorganizer.models.enums.ConnectXtreamApiMode;
 import org.anasoid.iptvorganizer.models.enums.ConnectXtreamStreamMode;
+import org.anasoid.iptvorganizer.models.http.ProxyOptions;
 import org.anasoid.iptvorganizer.repositories.ProxyRepository;
 
 /**
@@ -73,6 +74,21 @@ public class ProxyConfigService {
 
     // Proxy is enabled - delegate to existing logic
     return getProxyConfig(source);
+  }
+
+  /**
+   * Get proxy configuration for a given client and source, respecting enable flags.
+   *
+   * <p>Resolution logic: 1. Check if proxy is enabled (via client→source inheritance) 2. If
+   * disabled, return null immediately 3. If enabled, load proxy configuration (database →
+   * environment → null)
+   *
+   * @param client The client (can be null)
+   * @param source The source entity to resolve proxy for
+   * @return Proxy object if enabled and configured, null otherwise
+   */
+  public ProxyOptions getProxyOption(Client client, Source source, RequestType requestType) {
+    return new ProxyOptions(getProxyConfig(client, source, requestType));
   }
 
   /**

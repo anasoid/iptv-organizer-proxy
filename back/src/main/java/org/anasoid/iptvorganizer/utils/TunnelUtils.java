@@ -16,6 +16,7 @@ import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
+import org.anasoid.iptvorganizer.models.http.ProxyOptions;
 import org.anasoid.iptvorganizer.utils.streaming.StreamProxyHttpClient;
 
 /*
@@ -55,15 +56,20 @@ public class TunnelUtils {
    * @param client The authenticated client (for configuration fallback)
    * @param source The source (for configuration)
    * @param options HTTP options
+   * @param proxyOptions Proxy options
    * @return Response with streaming output
    */
   public Response streamFromUpstream(
-      HttpRequestDto request, Client client, Source source, HttpOptions options) {
+      HttpRequestDto request,
+      Client client,
+      Source source,
+      HttpOptions options,
+      ProxyOptions proxyOptions) {
     String upstreamUrl = request.getUrl();
     try {
       // Load stream from upstream via HTTP proxy client with forced redirect following
       HttpStreamingResponse streamResponse =
-          streamProxyHttpClient.loadStreamWithProxy(request, client, source, options);
+          streamProxyHttpClient.loadStreamWithProxy(request, client, source, options, proxyOptions);
 
       // Check for HTTP errors
       if (streamResponse.getStatusCode() >= 400) {
@@ -150,5 +156,16 @@ public class TunnelUtils {
   public HttpOptions.HttpOptionsBuilder buildHttpOptions(Client client, Source source) {
 
     return streamProxyHttpClient.buildHttpOptions(client, source);
+  }
+
+  /**
+   * Build ProxyOptions from client/source configuration
+   *
+   * @param client The client
+   * @param source The source
+   * @return Configured ProxyOptions
+   */
+  public ProxyOptions buildProxyOptions(Client client, Source source) {
+    return streamProxyHttpClient.buildProxyOptions(client, source);
   }
 }

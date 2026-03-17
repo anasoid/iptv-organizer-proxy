@@ -17,7 +17,6 @@ import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
-import org.anasoid.iptvorganizer.models.entity.Proxy;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
@@ -26,6 +25,7 @@ import org.anasoid.iptvorganizer.models.entity.stream.Series;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
+import org.anasoid.iptvorganizer.models.http.ProxyOptions;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 import org.anasoid.iptvorganizer.services.ProxyConfigService;
@@ -304,12 +304,13 @@ public class XtreamUserService {
             source.getUrl().replaceAll("/$", ""), source.getUsername(), source.getPassword());
 
     // Get proxy configuration from source, respecting client enable flags
-    Proxy proxy = proxyConfigService.getProxyConfig(client, source, RequestType.STREAM);
+    ProxyOptions proxyOptions =
+        proxyConfigService.getProxyOption(client, source, RequestType.STREAM);
     // Fetch from upstream
-    HttpOptions options = HttpOptions.builder().timeout(30000L).proxy(proxy).build();
+    HttpOptions options = HttpOptions.builder().timeout(30000L).build();
 
     Map<String, Object> authData =
-        httpStreamingService.fetchJsonObject(upstreamUrl, options, source);
+        httpStreamingService.fetchJsonObject(upstreamUrl, options, proxyOptions, source);
 
     // Validate structure
     if (!authData.containsKey("user_info") || !authData.containsKey("server_info")) {

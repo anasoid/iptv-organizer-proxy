@@ -8,10 +8,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.dto.HttpRequestDto;
 import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.models.entity.Client;
-import org.anasoid.iptvorganizer.models.entity.Proxy;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
+import org.anasoid.iptvorganizer.models.http.ProxyOptions;
 import org.anasoid.iptvorganizer.models.http.RedirectCheckResult;
 import org.anasoid.iptvorganizer.services.ProxyConfigService;
 import org.anasoid.iptvorganizer.services.http.HeaderFilterService;
@@ -45,7 +45,11 @@ public class StreamProxyHttpClient {
    * @throws Exception if streaming fails
    */
   public HttpStreamingResponse loadStreamWithProxy(
-      HttpRequestDto request, Client client, Source source, HttpOptions options) {
+      HttpRequestDto request,
+      Client client,
+      Source source,
+      HttpOptions options,
+      ProxyOptions proxyOptions) {
     String upstreamUrl = request.getUrl();
     log.info("Loading stream via proxy: {}", upstreamUrl);
 
@@ -55,7 +59,8 @@ public class StreamProxyHttpClient {
 
     // Stream content from upstream with header forwarding
     HttpStreamingResponse streamResponse =
-        httpStreamingService.streamHttpWithHeaders(upstreamUrl, options, requestHeaders);
+        httpStreamingService.streamHttpWithHeaders(
+            upstreamUrl, options, proxyOptions, requestHeaders);
 
     // Check for HTTP errors
     if (streamResponse.getStatusCode() >= 400) {
@@ -89,17 +94,19 @@ public class StreamProxyHttpClient {
         headerFilterService.filterRequestHeaders(request.getHttpHeaders());
 
     // Build HTTP options with followRedirects=false
+    ProxyOptions proxyOptions =
+        proxyConfigService.getProxyOption(client, source, RequestType.STREAM);
     HttpOptions options =
         HttpOptions.builder()
             .timeout(10000L) // Short timeout for redirect check
-            .maxRetries(0) // No retries for redirect check
-            .followRedirects(false) // CRITICAL: don't follow redirects
+            .followRedirects(false)
             .build();
 
     try {
       // Make GET request without following redirects
       HttpStreamingResponse response =
-          httpStreamingService.streamHttpWithHeaders(upstreamUrl, options, requestHeaders);
+          httpStreamingService.streamHttpWithHeaders(
+              upstreamUrl, options, proxyOptions, requestHeaders);
 
       int statusCode = response.getStatusCode();
 
@@ -159,10 +166,18 @@ public class StreamProxyHttpClient {
    * @return Configured HttpOptions
    */
   public HttpOptions.HttpOptionsBuilder buildHttpOptions(Client client, Source source) {
+    return HttpOptions.builder().timeout(300000L).maxRetries(1).followRedirects(true);
+  }
 
-    // Get proxy configuration from source, respecting client enable flags
-    Proxy proxy = proxyConfigService.getProxyConfig(client, source, RequestType.STREAM);
+  /**
+   * Build ProxyOptions from client/source configuration
+   *
+   * @param client The client
+   * @param source The source
+   * @return Configured ProxyOptions
+   */
+  public ProxyOptions buildProxyOptions(Client client, Source source) {
 
-    return HttpOptions.builder().timeout(300000L).maxRetries(1).followRedirects(true).proxy(proxy);
+    return proxyConfigService.getProxyOption(client, source, RequestType.STREAM);
   }
 }

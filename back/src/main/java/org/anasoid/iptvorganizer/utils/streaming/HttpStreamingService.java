@@ -13,12 +13,14 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.exceptions.ProxyException;
 import org.anasoid.iptvorganizer.exceptions.StreamingException;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
+import org.anasoid.iptvorganizer.models.http.ProxyOptions;
 import org.anasoid.iptvorganizer.utils.proxy.HttpClientFactory;
 
 @Slf4j
@@ -32,7 +34,9 @@ public class HttpStreamingService {
   @Inject HttpClientFactory httpClientFactory;
 
   /** Stream HTTP response as InputStream with optional proxy support */
-  public InputStream streamHttp(String url, HttpOptions options, Source source) {
+  public InputStream streamHttp(
+      String url, HttpOptions options, ProxyOptions proxyOptions, Source source) {
+    Objects.requireNonNull(proxyOptions, "proxyOptions must not be null");
     if (options == null) {
       options = new HttpOptions();
     }
@@ -46,7 +50,7 @@ public class HttpStreamingService {
     Exception lastException = null;
     for (int attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        return performHttpRequest(url, finalOptions, source);
+        return performHttpRequest(url, finalOptions, proxyOptions, source);
       } catch (Exception e) {
         lastException = e;
         if (attempt < maxRetries) {
@@ -61,23 +65,26 @@ public class HttpStreamingService {
   }
 
   /** Perform actual HTTP request and return response body as InputStream */
-  private InputStream performHttpRequest(String url, HttpOptions options) {
-    return performHttpRequest(url, options, null);
+  private InputStream performHttpRequest(
+      String url, HttpOptions options, ProxyOptions proxyOptions) {
+    return performHttpRequest(url, options, proxyOptions, null);
   }
 
   /** Perform actual HTTP request with optional proxy support */
-  private InputStream performHttpRequest(String url, HttpOptions options, Source source) {
+  private InputStream performHttpRequest(
+      String url, HttpOptions options, ProxyOptions proxyOptions, Source source) {
     try {
       // Determine redirect policy
       boolean followRedirects =
           options.getFollowRedirects() == null || options.getFollowRedirects();
 
-      // Get HttpClient with proxy configuration if proxy is configured in options
+      // Get HttpClient with proxy configuration if proxy is configured in proxyOptions
       HttpClient clientToUse;
-      if (options.getProxy() != null) {
-        clientToUse = httpClientFactory.createClientWithProxy(options.getProxy(), followRedirects);
+      if (proxyOptions.getProxy() != null) {
+        clientToUse =
+            httpClientFactory.createClientWithProxy(proxyOptions.getProxy(), followRedirects);
       } else {
-        // Backward compatibility: use default client behavior
+        // No proxy configured: use default client behavior
         clientToUse =
             followRedirects
                 ? HttpClient.newBuilder()
@@ -135,8 +142,12 @@ public class HttpStreamingService {
    * @return HttpStreamingResponse with status, headers, and body
    */
   public HttpStreamingResponse streamHttpWithHeaders(
-      String url, HttpOptions options, Map<String, String> requestHeaders) {
-    return streamHttpWithHeaders(url, options, requestHeaders, null);
+      String url,
+      HttpOptions options,
+      ProxyOptions proxyOptions,
+      Map<String, String> requestHeaders) {
+    Objects.requireNonNull(proxyOptions, "proxyOptions must not be null");
+    return streamHttpWithHeaders(url, options, proxyOptions, requestHeaders, null);
   }
 
   /**
@@ -150,7 +161,12 @@ public class HttpStreamingService {
    * @return HttpStreamingResponse with status, headers, and body
    */
   public HttpStreamingResponse streamHttpWithHeaders(
-      String url, HttpOptions options, Map<String, String> requestHeaders, Source source) {
+      String url,
+      HttpOptions options,
+      ProxyOptions proxyOptions,
+      Map<String, String> requestHeaders,
+      Source source) {
+    Objects.requireNonNull(proxyOptions, "proxyOptions must not be null");
     if (options == null) {
       options = createHttpOptions();
     }
@@ -164,7 +180,8 @@ public class HttpStreamingService {
     Exception lastException = null;
     for (int attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        return performHttpRequestWithHeaders(url, finalOptions, requestHeaders, source);
+        return performHttpRequestWithHeaders(
+            url, finalOptions, proxyOptions, requestHeaders, source);
       } catch (Exception e) {
         lastException = e;
         if (attempt < maxRetries) {
@@ -187,8 +204,11 @@ public class HttpStreamingService {
    * @return HttpStreamingResponse with status, headers, and body
    */
   private HttpStreamingResponse performHttpRequestWithHeaders(
-      String url, HttpOptions options, Map<String, String> requestHeaders) {
-    return performHttpRequestWithHeaders(url, options, requestHeaders, null);
+      String url,
+      HttpOptions options,
+      ProxyOptions proxyOptions,
+      Map<String, String> requestHeaders) {
+    return performHttpRequestWithHeaders(url, options, proxyOptions, requestHeaders, null);
   }
 
   /**
@@ -201,18 +221,23 @@ public class HttpStreamingService {
    * @return HttpStreamingResponse with status, headers, and body
    */
   private HttpStreamingResponse performHttpRequestWithHeaders(
-      String url, HttpOptions options, Map<String, String> requestHeaders, Source source) {
+      String url,
+      HttpOptions options,
+      ProxyOptions proxyOptions,
+      Map<String, String> requestHeaders,
+      Source source) {
     try {
       // Determine redirect policy
       boolean followRedirects =
           options.getFollowRedirects() == null || options.getFollowRedirects();
 
-      // Get HttpClient with proxy configuration if proxy is configured in options
+      // Get HttpClient with proxy configuration if proxy is configured in proxyOptions
       HttpClient clientToUse;
-      if (options.getProxy() != null) {
-        clientToUse = httpClientFactory.createClientWithProxy(options.getProxy(), followRedirects);
+      if (proxyOptions.getProxy() != null) {
+        clientToUse =
+            httpClientFactory.createClientWithProxy(proxyOptions.getProxy(), followRedirects);
       } else {
-        // Backward compatibility: use default client behavior
+        // No proxy configured: use default client behavior
         clientToUse =
             followRedirects
                 ? HttpClient.newBuilder()
@@ -289,7 +314,8 @@ public class HttpStreamingService {
    * @return JsonStreamResult with lazy Iterator for streaming items
    */
   public JsonStreamResult<Map<?, ?>> streamJsonArray(
-      String url, HttpOptions options, Source source) {
+      String url, HttpOptions options, ProxyOptions proxyOptions, Source source) {
+    Objects.requireNonNull(proxyOptions, "proxyOptions must not be null");
     if (options == null) {
       options = createHttpOptions();
     }
@@ -298,7 +324,7 @@ public class HttpStreamingService {
 
     try {
       // Fetch HTTP response as InputStream
-      InputStream is = streamHttp(url, options, source);
+      InputStream is = streamHttp(url, options, proxyOptions, source);
 
       // Parse JSON array from InputStream using Iterator-based streaming
       @SuppressWarnings("unchecked")
@@ -323,14 +349,16 @@ public class HttpStreamingService {
    * @return Map containing the JSON object
    * @throws Exception if fetch or parsing fails
    */
-  public Map<String, Object> fetchJsonObject(String url, HttpOptions options, Source source) {
+  public Map<String, Object> fetchJsonObject(
+      String url, HttpOptions options, ProxyOptions proxyOptions, Source source) {
+    Objects.requireNonNull(proxyOptions, "proxyOptions must not be null");
     if (options == null) {
       options = createHttpOptions();
     }
 
     log.info("Fetching JSON object from URL: {}", url);
 
-    InputStream is = performHttpRequest(url, options, source);
+    InputStream is = performHttpRequest(url, options, proxyOptions, source);
     try {
       Map<String, Object> result = objectMapper.readValue(is, new TypeReference<>() {});
       log.info("Successfully fetched JSON object from: {}", url);

@@ -6,9 +6,11 @@ import static org.mockito.Mockito.*;
 import java.io.ByteArrayInputStream;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
+import org.anasoid.iptvorganizer.models.http.ProxyOptions;
 import org.anasoid.iptvorganizer.services.ProxyConfigService;
 import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
 import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
@@ -39,6 +41,11 @@ class XtreamClientTest {
     testSource.setUsername("upstream_user");
     testSource.setPassword("upstream_pass");
     testSource.setName("Test Source");
+
+    // Ensure proxyConfigService never returns null ProxyOptions (lenient: not all tests invoke it)
+    lenient()
+        .when(proxyConfigService.getProxyOption(any(), any(), any(RequestType.class)))
+        .thenReturn(new ProxyOptions());
   }
 
   @Test
@@ -46,7 +53,8 @@ class XtreamClientTest {
     // Given: Mock streaming service
     JsonStreamResult<Map<?, ?>> mockResult =
         new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
-    when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
+    when(httpStreamingService.streamJsonArray(
+            anyString(), any(HttpOptions.class), any(ProxyOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
     // When: Get live categories
@@ -54,7 +62,7 @@ class XtreamClientTest {
 
     // Then: Verify correct URL constructed
     ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
-    verify(httpStreamingService).streamJsonArray(urlCaptor.capture(), any(), eq(testSource));
+    verify(httpStreamingService).streamJsonArray(urlCaptor.capture(), any(), any(), eq(testSource));
 
     String capturedUrl = urlCaptor.getValue();
     assertThat(capturedUrl)
@@ -69,7 +77,8 @@ class XtreamClientTest {
     // Given: Mock streaming service
     JsonStreamResult<Map<?, ?>> mockResult =
         new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
-    when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
+    when(httpStreamingService.streamJsonArray(
+            anyString(), any(HttpOptions.class), any(ProxyOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
     // When: Get VOD categories
@@ -77,7 +86,7 @@ class XtreamClientTest {
 
     // Then: Verify correct URL with VOD action
     ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
-    verify(httpStreamingService).streamJsonArray(urlCaptor.capture(), any(), eq(testSource));
+    verify(httpStreamingService).streamJsonArray(urlCaptor.capture(), any(), any(), eq(testSource));
 
     String capturedUrl = urlCaptor.getValue();
     assertThat(capturedUrl).contains("action=get_vod_categories");
@@ -88,7 +97,8 @@ class XtreamClientTest {
     // Given: Mock streaming service
     JsonStreamResult<Map<?, ?>> mockResult =
         new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
-    when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
+    when(httpStreamingService.streamJsonArray(
+            anyString(), any(HttpOptions.class), any(ProxyOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
     // When: Get series categories
@@ -96,7 +106,7 @@ class XtreamClientTest {
 
     // Then: Verify correct URL with series action
     ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
-    verify(httpStreamingService).streamJsonArray(urlCaptor.capture(), any(), eq(testSource));
+    verify(httpStreamingService).streamJsonArray(urlCaptor.capture(), any(), any(), eq(testSource));
 
     String capturedUrl = urlCaptor.getValue();
     assertThat(capturedUrl).contains("action=get_series_categories");
@@ -107,7 +117,8 @@ class XtreamClientTest {
     // Given: Mock streaming service
     JsonStreamResult<Map<?, ?>> mockResult =
         new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
-    when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
+    when(httpStreamingService.streamJsonArray(
+            anyString(), any(HttpOptions.class), any(ProxyOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
     // When: Get live streams
@@ -115,7 +126,7 @@ class XtreamClientTest {
 
     // Then: Verify correct URL with stream action
     ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
-    verify(httpStreamingService).streamJsonArray(urlCaptor.capture(), any(), eq(testSource));
+    verify(httpStreamingService).streamJsonArray(urlCaptor.capture(), any(), any(), eq(testSource));
 
     String capturedUrl = urlCaptor.getValue();
     assertThat(capturedUrl).contains("action=get_live_streams");
@@ -126,7 +137,8 @@ class XtreamClientTest {
     // Given: Mock streaming service
     JsonStreamResult<Map<?, ?>> mockResult =
         new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
-    when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
+    when(httpStreamingService.streamJsonArray(
+            anyString(), any(HttpOptions.class), any(ProxyOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
     // When: Get VOD streams
@@ -134,7 +146,7 @@ class XtreamClientTest {
 
     // Then: Verify correct URL with VOD stream action
     ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
-    verify(httpStreamingService).streamJsonArray(urlCaptor.capture(), any(), eq(testSource));
+    verify(httpStreamingService).streamJsonArray(urlCaptor.capture(), any(), any(), eq(testSource));
 
     String capturedUrl = urlCaptor.getValue();
     assertThat(capturedUrl).contains("action=get_vod_streams");
@@ -145,7 +157,8 @@ class XtreamClientTest {
     // Given: Mock streaming service
     JsonStreamResult<Map<?, ?>> mockResult =
         new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
-    when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
+    when(httpStreamingService.streamJsonArray(
+            anyString(), any(HttpOptions.class), any(ProxyOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
     // When: Get series
@@ -153,7 +166,7 @@ class XtreamClientTest {
 
     // Then: Verify correct URL with series action
     ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
-    verify(httpStreamingService).streamJsonArray(urlCaptor.capture(), any(), eq(testSource));
+    verify(httpStreamingService).streamJsonArray(urlCaptor.capture(), any(), any(), eq(testSource));
 
     String capturedUrl = urlCaptor.getValue();
     assertThat(capturedUrl).contains("action=get_series");
@@ -166,7 +179,8 @@ class XtreamClientTest {
 
     JsonStreamResult<Map<?, ?>> mockResult =
         new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
-    when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
+    when(httpStreamingService.streamJsonArray(
+            anyString(), any(HttpOptions.class), any(ProxyOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
     // When: Get categories
@@ -174,7 +188,7 @@ class XtreamClientTest {
 
     // Then: Verify URL doesn't have double slashes
     ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
-    verify(httpStreamingService).streamJsonArray(urlCaptor.capture(), any(), eq(testSource));
+    verify(httpStreamingService).streamJsonArray(urlCaptor.capture(), any(), any(), eq(testSource));
 
     String capturedUrl = urlCaptor.getValue();
     assertThat(capturedUrl)
@@ -187,7 +201,8 @@ class XtreamClientTest {
     // Given: Mock streaming service
     JsonStreamResult<Map<?, ?>> mockResult =
         new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
-    when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
+    when(httpStreamingService.streamJsonArray(
+            anyString(), any(HttpOptions.class), any(ProxyOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
     // When: Get categories
@@ -196,7 +211,8 @@ class XtreamClientTest {
     // Then: Verify default timeout is set
     ArgumentCaptor<HttpOptions> optionsCaptor = ArgumentCaptor.forClass(HttpOptions.class);
     verify(httpStreamingService)
-        .streamJsonArray(anyString(), optionsCaptor.capture(), eq(testSource));
+        .streamJsonArray(
+            anyString(), optionsCaptor.capture(), any(ProxyOptions.class), eq(testSource));
 
     HttpOptions capturedOptions = optionsCaptor.getValue();
     assertThat(capturedOptions).isNotNull();
@@ -209,7 +225,8 @@ class XtreamClientTest {
     // Given: Mock streaming service with test data
     JsonStreamResult<Map<?, ?>> mockResult =
         new JsonStreamResult<>(java.util.Collections.emptyIterator(), new AtomicLong(0), () -> {});
-    when(httpStreamingService.streamJsonArray(anyString(), any(HttpOptions.class), eq(testSource)))
+    when(httpStreamingService.streamJsonArray(
+            anyString(), any(HttpOptions.class), any(ProxyOptions.class), eq(testSource)))
         .thenReturn(mockResult);
 
     // When: Get live categories
@@ -229,7 +246,7 @@ class XtreamClientTest {
             .body(new ByteArrayInputStream("{}".getBytes()))
             .build();
     when(httpStreamingService.streamHttpWithHeaders(
-            anyString(), any(HttpOptions.class), isNull(), eq(testSource)))
+            anyString(), any(HttpOptions.class), any(ProxyOptions.class), isNull(), eq(testSource)))
         .thenReturn(mockResponse);
 
     // When: Get series info
@@ -238,7 +255,8 @@ class XtreamClientTest {
     // Then: Verify correct URL constructed
     ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
     verify(httpStreamingService)
-        .streamHttpWithHeaders(urlCaptor.capture(), any(), isNull(), eq(testSource));
+        .streamHttpWithHeaders(
+            urlCaptor.capture(), any(), any(ProxyOptions.class), isNull(), eq(testSource));
 
     String capturedUrl = urlCaptor.getValue();
     assertThat(capturedUrl)
