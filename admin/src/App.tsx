@@ -23,6 +23,7 @@ import SeriesStreams from './pages/SeriesStreams';
 import SyncLogs from './pages/SyncLogs';
 import Proxies from './pages/Proxies';
 import CacheStats from './pages/CacheStats';
+import JvmMetrics from './pages/JvmMetrics';
 import NotFound from './pages/NotFound';
 
 // Create React Query client
@@ -92,6 +93,7 @@ function App() {
                 <Route path="/sync-logs" element={<SyncLogs />} />
                 <Route path="/proxies" element={<Proxies />} />
                 <Route path="/cache-stats" element={<CacheStats />} />
+                <Route path="/jvm-metrics" element={<JvmMetrics />} />
               </Route>
 
               {/* 404 */}
