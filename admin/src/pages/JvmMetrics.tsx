@@ -1,5 +1,4 @@
-import { useState, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useCallback } from 'react';import { useQuery } from '@tanstack/react-query';
 import {
   Box,
   Paper,
@@ -77,6 +76,18 @@ interface MetricChartProps {
 }
 function MetricChart({ title, data, lines, yFormatter, height = 220 }: MetricChartProps) {
   const fmt = yFormatter ?? ((v: number) => String(v));
+  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
+
+  const handleLegendClick = (entry: { dataKey?: unknown }) => {
+    const key = entry.dataKey as string;
+    if (!key) return;
+    setHiddenKeys((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
   return (
     <Paper sx={{ p: 2, height: '100%' }}>
       <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
@@ -108,7 +119,22 @@ function MetricChart({ title, data, lines, yFormatter, height = 220 }: MetricCha
                 name,
               ]}
             />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Legend
+              wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
+              onClick={handleLegendClick}
+              formatter={(value, entry) => (
+                <span
+                  style={{
+                    color: hiddenKeys.has(entry.dataKey as string) ? '#aaa' : 'inherit',
+                    textDecoration: hiddenKeys.has(entry.dataKey as string)
+                      ? 'line-through'
+                      : 'none',
+                  }}
+                >
+                  {value}
+                </span>
+              )}
+            />
             {lines.map((l) => (
               <Line
                 key={l.key}
@@ -119,6 +145,7 @@ function MetricChart({ title, data, lines, yFormatter, height = 220 }: MetricCha
                 dot={false}
                 strokeWidth={1.5}
                 connectNulls={false}
+                hide={hiddenKeys.has(l.key)}
               />
             ))}
           </LineChart>
