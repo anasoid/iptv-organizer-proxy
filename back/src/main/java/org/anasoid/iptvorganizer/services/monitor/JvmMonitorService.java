@@ -10,8 +10,10 @@ import java.lang.management.MemoryUsage;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
 import java.lang.management.ThreadMXBean;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -70,24 +72,76 @@ public class JvmMonitorService {
   }
 
   /**
-   * Returns entries filtered by date range, sorted oldest-first.
+   * Returns entries in the requested date range, ordered oldest-first.
    *
-   * @param start inclusive lower bound; null means no lower bound
-   * @param end inclusive upper bound; null means no upper bound
+   * <p>Raw {@code gcCollectionCount} / {@code gcCollectionTimeMs} in the deque are cumulative JVM
+   * totals. This method converts them to <strong>per-minute rates</strong> before returning:
+   *
+   * <ul>
+   *   <li>For each in-range entry the delta against the immediately preceding entry (which may lie
+   *       outside the requested range) is divided by the actual elapsed minutes between the two
+   *       samples, keeping the rate accurate even when samples are slightly late or a gap exists.
+   *   <li>The very first entry — when no predecessor exists in the deque — gets a delta of {@code
+   *       0}.
+   *   <li>Negative deltas (counter reset after JVM restart) are clamped to {@code 0}.
+   * </ul>
+   *
+   * @param start inclusive lower bound; {@code null} means no lower bound
+   * @param end inclusive upper bound; {@code null} means no upper bound
    */
   public List<JvmMetricsEntry> getMetrics(LocalDateTime start, LocalDateTime end) {
+    List<JvmMetricsEntry> all;
     rwLock.readLock().lock();
     try {
-      return metrics.stream()
-          .filter(
-              e ->
-                  (start == null || !e.getTimestamp().isBefore(start))
-                      && (end == null || !e.getTimestamp().isAfter(end)))
-          .sorted(Comparator.comparing(JvmMetricsEntry::getTimestamp))
-          .collect(Collectors.toList());
+      all =
+          metrics.stream()
+              .sorted(Comparator.comparing(JvmMetricsEntry::getTimestamp))
+              .collect(Collectors.toList());
     } finally {
       rwLock.readLock().unlock();
     }
+    return applyGcDeltas(all, start, end);
+  }
+
+  /**
+   * Iterates <em>all</em> stored entries in chronological order. Out-of-range entries are not added
+   * to the result but still advance {@code prev}, so the first in-range entry always has a valid
+   * predecessor for delta computation.
+   */
+  private List<JvmMetricsEntry> applyGcDeltas(
+      List<JvmMetricsEntry> all, LocalDateTime start, LocalDateTime end) {
+
+    List<JvmMetricsEntry> result = new ArrayList<>();
+    JvmMetricsEntry prev = null;
+
+    for (JvmMetricsEntry current : all) {
+      boolean inRange =
+          (start == null || !current.getTimestamp().isBefore(start))
+              && (end == null || !current.getTimestamp().isAfter(end));
+
+      if (inRange) {
+        if (prev == null) {
+          // No predecessor available — emit zero rather than a misleading value.
+          result.add(current.toBuilder().gcCollectionCount(0L).gcCollectionTimeMs(0L).build());
+        } else {
+          long seconds = Duration.between(prev.getTimestamp(), current.getTimestamp()).getSeconds();
+          double minutes = seconds > 0 ? seconds / 60.0 : 1.0;
+          long deltaCount =
+              Math.max(0L, current.getGcCollectionCount() - prev.getGcCollectionCount());
+          long deltaTime =
+              Math.max(0L, current.getGcCollectionTimeMs() - prev.getGcCollectionTimeMs());
+          result.add(
+              current.toBuilder()
+                  .gcCollectionCount(Math.round(deltaCount / minutes))
+                  .gcCollectionTimeMs(Math.round(deltaTime / minutes))
+                  .build());
+        }
+      }
+      // Always advance prev — even for out-of-range entries — so the first in-range entry
+      // can be properly diffed against its true predecessor.
+      prev = current;
+    }
+    return result;
   }
 
   /** Returns the number of retained entries (for diagnostics). */

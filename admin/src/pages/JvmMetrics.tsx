@@ -328,11 +328,11 @@ export default function JvmMetrics() {
           {/* 6 – GC */}
           <Grid size={{ xs: 12, md: 6 }}>
             <MetricChart
-              title="GC Activity (cumulative)"
+              title="GC Activity (per minute)"
               data={chartData}
               lines={[
-                { key: 'gcTime', name: 'GC Time (ms)', color: '#ff5722' },
-                { key: 'gcCount', name: 'GC Collections', color: '#795548' },
+                { key: 'gcTime', name: 'GC pause time/min (ms)', color: '#ff5722' },
+                { key: 'gcCount', name: 'GC collections/min', color: '#795548' },
               ]}
             />
           </Grid>

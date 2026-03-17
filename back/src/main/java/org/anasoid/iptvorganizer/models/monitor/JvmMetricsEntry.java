@@ -15,7 +15,7 @@ import lombok.Getter;
  * <p>All memory values are in megabytes (MB) to keep numbers human-readable.
  */
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class JvmMetricsEntry {
 
   // ── Timing ───────────────────────────────────────────────────────────────
