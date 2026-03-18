@@ -17,10 +17,24 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
-
 jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
+  # ──────────────────────────────────────────────────────────────────────────
+  # Build native binary and arch-specific image on each platform's own runner.
+  # Each job compiles the Quarkus native binary natively (no cross-compilation,
+  # no QEMU for the compile step) and pushes a platform-tagged image.
+  # ──────────────────────────────────────────────────────────────────────────
+  build-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux/amd64
+            arch: amd64
+          - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
+            platform: linux/arm64
+            arch: arm64
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       packages: write
@@ -30,7 +44,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 1.5. Setup Node.js for Admin UI build
+      # 2. Build admin UI (platform-independent JS build)
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
@@ -38,20 +52,14 @@ jobs:
           cache: 'npm'
           cache-dependency-path: admin/package-lock.json
 
-      # 1.6. Build admin UI
+      # build:java compiles TS, runs vite build, and copies dist → back/src/main/resources/META-INF/resources/admin/
       - name: Build admin UI
         working-directory: admin
         run: |
           npm ci
           npm run build:java
 
-      # 1.7. Copy admin UI to Quarkus resources
-      - name: Copy admin UI to Quarkus resources
-        run: |
-          mkdir -p back/src/main/resources/META-INF/resources/admin
-          cp -r admin/dist/* back/src/main/resources/META-INF/resources/admin/
-
-      # 2. Setup JDK 21 with Gradle cache
+      # 3. Setup JDK 21 with Gradle cache
       - name: Setup JDK 21
         uses: actions/setup-java@v4
         with:
@@ -59,11 +67,10 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
-      # 3. Grant execute permission for gradlew
       - name: Grant execute permission for gradlew
         run: chmod +x back/gradlew
 
-      # 4. Setup Docker Buildx (for multi-platform)
+      # 4. Docker Buildx (single-platform per job — no cross-compilation needed)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -87,12 +94,14 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/heads/* ]]; then
             TAG="${GITHUB_REF#refs/heads/}"
           else
-            TAG="pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            TAG="pr-${{ github.event.pull_request.number }}"
           fi
-          echo "tag-> ${TAG}" 
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
-      # 7. Build and push container image with Quarkus native (optimized for embedded/OpenWrt)
-      - name: Build and push container image (native)
+
+      # 7. Build and push arch-specific image (push builds only)
+      #    Each job produces its own native binary on native hardware, so the
+      #    binary arch always matches the image target platform.
+      - name: Build and push native image (${{ matrix.arch }})
         if: github.event_name != 'pull_request'
         run: |
           export GRADLE_OPTS="-Xmx2g"
@@ -103,37 +112,20 @@ jobs:
             -Dquarkus.package.jar.enabled=false \
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.compression.level=9 \
-            -Dquarkus.native.container-runtime-options=--memory=3g \
+            "-Dquarkus.native.container-runtime-options=--memory=3g" \
             -Dquarkus.container-image.build=true \
             -Dquarkus.container-image.push=true \
             -Dquarkus.container-image.registry=${{ env.REGISTRY }} \
             -Dquarkus.container-image.group=${{ github.repository_owner }} \
             -Dquarkus.container-image.name=iptv-organizer-proxy \
-            -Dquarkus.container-image.tag=${{ steps.tag.outputs.tag }} \
-            -Dquarkus.docker.buildx.platform=linux/amd64,linux/arm64 \
+            "-Dquarkus.container-image.tag=${{ steps.tag.outputs.tag }}-${{ matrix.arch }}" \
+            "-Dquarkus.docker.buildx.platform=${{ matrix.platform }}" \
             --no-daemon
         working-directory: back
-        env:
-          DOCKER_USERNAME: ${{ github.actor }}
-          DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
-      # 7.5. Build and push VFS image (single-layer overlay for VFS-based systems)
-      - name: Build and push VFS image
-        if: github.event_name != 'pull_request'
-        run: |
-          BASE_IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy:${{ steps.tag.outputs.tag }}"
-          VFS_TAG="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy:${{ steps.tag.outputs.tag }}-vfs"
-          docker buildx build \
-            --file ./docker/Dockerfile.vfs \
-            --platform linux/amd64,linux/arm64 \
-            --build-arg BASE_IMAGE=$BASE_IMAGE \
-            --push \
-            --tag $VFS_TAG \
-            .
-
-      # 8. Build only (for PRs, don't push)
-      - name: Build container image (PR - native)
-        if: github.event_name == 'pull_request'
+      # 8. PR: build only (no push), amd64 only to keep CI fast
+      - name: Build native image (PR / amd64 verification only)
+        if: github.event_name == 'pull_request' && matrix.arch == 'amd64'
         run: |
           export GRADLE_OPTS="-Xmx2g"
           export DOCKER_BUILDKIT=1
@@ -143,20 +135,73 @@ jobs:
             -Dquarkus.package.jar.enabled=false \
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.compression.level=9 \
-            -Dquarkus.native.container-runtime-options=--memory=3g \
+            "-Dquarkus.native.container-runtime-options=--memory=3g" \
             -Dquarkus.container-image.build=true \
             -Dquarkus.container-image.push=false \
+            "-Dquarkus.docker.buildx.platform=${{ matrix.platform }}" \
             --no-daemon
         working-directory: back
 
-      # 9. Generate build summary
-      - name: Generate build summary
-        if: github.event_name != 'pull_request'
+  # ──────────────────────────────────────────────────────────────────────────
+  # After all arch-specific images are pushed, merge them into a single
+  # multi-arch manifest and build the VFS variant.
+  # ──────────────────────────────────────────────────────────────────────────
+  merge-manifest:
+    needs: build-native
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine image tag
+        id: tag
         run: |
-          echo "## Docker Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** ${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy:${{ steps.tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "**VFS Image:** ${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy:${{ steps.tag.outputs.tag }}-vfs" >> $GITHUB_STEP_SUMMARY
-          echo "**Platforms:** linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
-          echo "**Registry:** ${{ env.REGISTRY }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Built with:** Quarkus Native + Mandrel" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
+            TAG="latest"
+          elif [[ "${{ github.ref }}" == refs/heads/* ]]; then
+            TAG="${GITHUB_REF#refs/heads/}"
+          else
+            TAG="pr-${{ github.event.pull_request.number }}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # Combine arch-specific images into a single multi-arch manifest
+      - name: Create and push multi-arch manifest
+        run: |
+          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
+          TAG="${{ steps.tag.outputs.tag }}"
+          docker buildx imagetools create \
+            -t "${BASE}:${TAG}" \
+            "${BASE}:${TAG}-amd64" \
+            "${BASE}:${TAG}-arm64"
+
+      # Build single-layer VFS variant on top of the merged manifest
+      - name: Build and push VFS image
+        run: |
+          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
+          TAG="${{ steps.tag.outputs.tag }}"
+          VFS_TAG="${BASE}:${TAG}-vfs"
+          docker buildx build \
+            --file ./docker/Dockerfile.vfs \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg BASE_IMAGE="${BASE}:${TAG}" \
+            --push \
+            --tag "${VFS_TAG}" \
+            .
