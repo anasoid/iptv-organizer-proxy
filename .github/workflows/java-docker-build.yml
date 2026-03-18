@@ -99,6 +99,7 @@ jobs:
           ./gradlew build \
             -PbuildingNativeImage \
             -Dquarkus.native.enabled=true \
+            -Dquarkus.package.jar.enabled=false \
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.compression.level=9 \
             -Dquarkus.native.container-runtime-options=--memory=3g \
@@ -138,6 +139,7 @@ jobs:
           ./gradlew build \
             -PbuildingNativeImage \
             -Dquarkus.native.enabled=true \
+            -Dquarkus.package.jar.enabled=false \
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.compression.level=9 \
             -Dquarkus.native.container-runtime-options=--memory=3g \
