@@ -11,19 +11,27 @@
 ###
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.3
 WORKDIR /work/
+
+# Install openssl — required by the entrypoint to generate a unique JWT RSA key pair on first boot
+RUN microdnf install -y openssl && microdnf clean all
+
 RUN chown 1001 /work \
     && chmod "g+rwX" /work \
     && chown 1001:root /work \
-    && mkdir -p /app/data \
-    && chown -R 1001:root /app  \
-    && chmod -R "g+rwX" /app
+    && mkdir -p /app/data /logs \
+    && chown -R 1001:root /app /logs \
+    && chmod -R "g+rwX" /app /logs
+
 COPY --chown=1001:root *-runner /work/application
 
-# Persistent volumes: SQLite database and application logs
+# Entrypoint: generates a unique JWT RSA key pair on first boot, then starts the native binary
+COPY --chown=1001:root src/main/docker/docker-entrypoint-native.sh /work/docker-entrypoint.sh
+RUN chmod +x /work/docker-entrypoint.sh
+
+# Persistent volumes: SQLite database (+ JWT keys on first boot) and application logs
 VOLUME ["/app/data"]
 
 EXPOSE 8080
 USER 1001
 
-CMD ["./application", "-Dquarkus.http.host=0.0.0.0"]
-
+ENTRYPOINT ["/work/docker-entrypoint.sh"]
