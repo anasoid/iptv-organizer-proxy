@@ -20,13 +20,3 @@ CREATE TABLE IF NOT EXISTS series (
 
 CREATE INDEX IF NOT EXISTS idx_series_source_category_num ON series(source_id, category_id, num);
 CREATE INDEX IF NOT EXISTS idx_series_source_num ON series(source_id, num);
-CREATE INDEX IF NOT EXISTS idx_series_allow_deny ON series(allow_deny);
-CREATE INDEX IF NOT EXISTS idx_series_added_date ON series(added_date);
-CREATE INDEX IF NOT EXISTS idx_series_release_date ON series(release_date);
-
-CREATE TRIGGER IF NOT EXISTS update_series_updated_at
-AFTER UPDATE ON series
-FOR EACH ROW
-BEGIN
-    UPDATE series SET updated_at = datetime('now') WHERE id = NEW.id;
-END;

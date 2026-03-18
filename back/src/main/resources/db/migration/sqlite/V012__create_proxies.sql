@@ -17,9 +17,3 @@ CREATE TABLE IF NOT EXISTS proxies (
 CREATE INDEX IF NOT EXISTS idx_proxy_name ON proxies(name);
 CREATE INDEX IF NOT EXISTS idx_proxy_type ON proxies(proxy_type);
 
-CREATE TRIGGER IF NOT EXISTS update_proxies_updated_at
-AFTER UPDATE ON proxies
-FOR EACH ROW
-BEGIN
-    UPDATE proxies SET updated_at = datetime('now') WHERE id = NEW.id;
-END;

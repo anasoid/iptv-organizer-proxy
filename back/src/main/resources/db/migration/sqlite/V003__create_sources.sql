@@ -27,9 +27,3 @@ CREATE INDEX IF NOT EXISTS idx_source_is_active ON sources(is_active);
 CREATE INDEX IF NOT EXISTS idx_source_next_sync ON sources(next_sync);
 CREATE INDEX IF NOT EXISTS idx_source_proxy_id ON sources(proxy_id);
 
-CREATE TRIGGER IF NOT EXISTS update_sources_updated_at
-AFTER UPDATE ON sources
-FOR EACH ROW
-BEGIN
-    UPDATE sources SET updated_at = datetime('now') WHERE id = NEW.id;
-END;

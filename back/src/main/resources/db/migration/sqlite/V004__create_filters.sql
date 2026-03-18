@@ -11,9 +11,3 @@ CREATE TABLE IF NOT EXISTS filters (
 
 CREATE INDEX IF NOT EXISTS idx_filter_name ON filters(name);
 
-CREATE TRIGGER IF NOT EXISTS update_filters_updated_at
-AFTER UPDATE ON filters
-FOR EACH ROW
-BEGIN
-    UPDATE filters SET updated_at = datetime('now') WHERE id = NEW.id;
-END;

@@ -20,13 +20,3 @@ CREATE TABLE IF NOT EXISTS live_streams (
 
 CREATE INDEX IF NOT EXISTS idx_live_source_category_num ON live_streams(source_id, category_id, num);
 CREATE INDEX IF NOT EXISTS idx_live_source_num ON live_streams(source_id, num);
-CREATE INDEX IF NOT EXISTS idx_live_allow_deny ON live_streams(allow_deny);
-CREATE INDEX IF NOT EXISTS idx_live_added_date ON live_streams(added_date);
-CREATE INDEX IF NOT EXISTS idx_live_release_date ON live_streams(release_date);
-
-CREATE TRIGGER IF NOT EXISTS update_live_streams_updated_at
-AFTER UPDATE ON live_streams
-FOR EACH ROW
-BEGIN
-    UPDATE live_streams SET updated_at = datetime('now') WHERE id = NEW.id;
-END;

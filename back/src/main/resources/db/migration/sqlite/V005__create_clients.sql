@@ -31,9 +31,3 @@ CREATE INDEX IF NOT EXISTS idx_client_source_is_active ON clients(source_id, is_
 CREATE INDEX IF NOT EXISTS idx_client_filter_id ON clients(filter_id);
 CREATE INDEX IF NOT EXISTS idx_client_expiry_date ON clients(expiry_date);
 
-CREATE TRIGGER IF NOT EXISTS update_clients_updated_at
-AFTER UPDATE ON clients
-FOR EACH ROW
-BEGIN
-    UPDATE clients SET updated_at = datetime('now') WHERE id = NEW.id;
-END;

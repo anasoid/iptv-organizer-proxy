@@ -11,12 +11,6 @@ CREATE TABLE IF NOT EXISTS admin_users (
 
 CREATE INDEX IF NOT EXISTS idx_admin_is_active ON admin_users(is_active);
 
-CREATE TRIGGER IF NOT EXISTS update_admin_users_updated_at
-AFTER UPDATE ON admin_users
-FOR EACH ROW
-BEGIN
-    UPDATE admin_users SET updated_at = datetime('now') WHERE id = NEW.id;
-END;
 
 -- Insert default admin user
 -- Username: admin

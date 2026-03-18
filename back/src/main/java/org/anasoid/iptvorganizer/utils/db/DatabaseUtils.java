@@ -16,7 +16,6 @@ import lombok.extern.slf4j.Slf4j;
  *   <li><b>MySQL</b>: setFetchSize(Integer.MIN_VALUE) enables row-by-row streaming
  *   <li><b>PostgreSQL</b>: Requires positive fetch size + autoCommit=false for streaming
  *   <li><b>SQLite</b>: Doesn't buffer results, ignores fetch size - no special config needed
- *   <li><b>H2</b>: Test database with small datasets - uses sensible defaults
  * </ul>
  *
  * <p>The detected vendor is cached after first detection to avoid repeated DatabaseMetaData calls.
@@ -65,12 +64,6 @@ public class DatabaseUtils {
         log.debug("SQLite doesn't require special streaming configuration");
         break;
 
-      case H2:
-        // H2: Test database with small datasets, uses sensible defaults
-        // No special configuration needed
-        log.debug("H2 database configured with default streaming behavior");
-        break;
-
       case UNKNOWN:
         // Conservative default: Use small positive fetch size
         // This prevents memory issues on unknown databases while staying compatible
@@ -109,8 +102,6 @@ public class DatabaseUtils {
         vendor = DatabaseVendor.POSTGRESQL;
       } else if (productName.contains("sqlite")) {
         vendor = DatabaseVendor.SQLITE;
-      } else if (productName.contains("h2")) {
-        vendor = DatabaseVendor.H2;
       } else {
         vendor = DatabaseVendor.UNKNOWN;
       }

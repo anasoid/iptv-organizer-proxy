@@ -16,9 +16,6 @@ public enum DatabaseVendor {
   /** SQLite - doesn't buffer results, ignores fetch size */
   SQLITE,
 
-  /** H2 - test database, uses sensible defaults */
-  H2,
-
   /** Unknown/unsupported vendor - uses conservative defaults */
   UNKNOWN
 }

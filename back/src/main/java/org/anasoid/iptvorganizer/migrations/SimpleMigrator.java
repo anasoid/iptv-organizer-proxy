@@ -94,18 +94,6 @@ public class SimpleMigrator {
               applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           )
           """;
-    } else if ("h2".equalsIgnoreCase(dbKind)) {
-      // H2 database
-      createTableSql =
-          """
-          CREATE TABLE IF NOT EXISTS schema_version (
-              id BIGINT AUTO_INCREMENT PRIMARY KEY,
-              version VARCHAR(255) NOT NULL UNIQUE,
-              description VARCHAR(500),
-              checksum VARCHAR(32) NOT NULL,
-              applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          )
-          """;
     } else {
       // MySQL
       createTableSql =

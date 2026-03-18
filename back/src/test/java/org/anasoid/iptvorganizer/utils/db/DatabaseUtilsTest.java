@@ -55,18 +55,6 @@ public class DatabaseUtilsTest {
   }
 
   @Test
-  void testDetectH2Vendor() throws SQLException {
-    Connection mockConnection = mock(Connection.class);
-    DatabaseMetaData mockMetadata = mock(DatabaseMetaData.class);
-    when(mockConnection.getMetaData()).thenReturn(mockMetadata);
-    when(mockMetadata.getDatabaseProductName()).thenReturn("H2");
-
-    DatabaseVendor vendor = DatabaseUtils.detectVendor(mockConnection);
-
-    assertEquals(DatabaseVendor.H2, vendor);
-  }
-
-  @Test
   void testDetectUnknownVendor() throws SQLException {
     Connection mockConnection = mock(Connection.class);
     DatabaseMetaData mockMetadata = mock(DatabaseMetaData.class);
@@ -175,22 +163,6 @@ public class DatabaseUtilsTest {
     DatabaseUtils.configureStreamingStatement(mockStatement, mockConnection);
 
     // SQLite should have no special configuration
-    verify(mockStatement, never()).setFetchSize(anyInt());
-    verify(mockConnection, never()).setAutoCommit(anyBoolean());
-  }
-
-  @Test
-  void testConfigureStreamingStatementH2() throws SQLException {
-    Connection mockConnection = mock(Connection.class);
-    PreparedStatement mockStatement = mock(PreparedStatement.class);
-    DatabaseMetaData mockMetadata = mock(DatabaseMetaData.class);
-
-    when(mockConnection.getMetaData()).thenReturn(mockMetadata);
-    when(mockMetadata.getDatabaseProductName()).thenReturn("H2");
-
-    DatabaseUtils.configureStreamingStatement(mockStatement, mockConnection);
-
-    // H2 should have no special configuration
     verify(mockStatement, never()).setFetchSize(anyInt());
     verify(mockConnection, never()).setAutoCommit(anyBoolean());
   }
