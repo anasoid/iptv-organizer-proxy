@@ -117,6 +117,15 @@ docker-compose -f docker/docker-compose.yml up --build
 
 ---
 
+## CI / Workflow Rules
+
+- **Frontend changes** (`admin/**`): after any edit to `admin/` source files or `package.json`, verify that `.github/workflows/frontend-ci.yml` still contains all five required npm steps (`npm ci`, `npm run lint`, `npm run type-check`, `npm test`, `npm run build`) with `working-directory: admin`.  
+  See [frontend_ci.instructions.md](.github/instructions/frontend_ci.instructions.md) for the full checklist.
+- Always use `npm run build` (not `build:java`) in CI — `build:java` copies files into the backend and must not run in GitHub Actions.
+- If a script in `package.json` is renamed or removed, update the matching `run:` line in the workflow in the same change.
+
+---
+
 ## Project-Specific Conventions
 
 - No JPA/Hibernate — all SQL is hand-written in repositories via `PreparedStatement`
