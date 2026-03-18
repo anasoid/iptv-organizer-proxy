@@ -68,13 +68,16 @@ jobs:
       - name: Determine image tag
         id: tag
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/java-v* ]]; then
-            TAG="${GITHUB_REF#refs/tags/java-v}"
-            echo "tag=java-${TAG}" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == refs/heads/java ]]; then
-            echo "tag=java-latest" >> $GITHUB_OUTPUT
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/heads/* ]]; then
+            TAG="${GITHUB_REF#refs/heads/}"
+            echo "tag=${TAG}" >> $GITHUB_OUTPUT
           else
-            echo "tag=java-pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            echo "tag=pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
           fi
 
       # 7. Build and push container image with Quarkus native (optimized for embedded/OpenWrt)
