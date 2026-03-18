@@ -1,18 +1,20 @@
 ####
 # This Dockerfile is used in order to build a container that runs the Quarkus application in native (no JVM) mode.
-# Before building the container image run:
+# The Quarkus Gradle plugin sets the Docker build context to back/build/, so only files produced
+# by the build (e.g. *-runner) are accessible via COPY. External files (src/main/docker/*.sh)
+# are NOT in that context — the entrypoint is therefore written inline via RUN.
+#
+# Build via Quarkus Gradle plugin (recommended):
+#   ./gradlew build -Dquarkus.native.enabled=true -Dquarkus.container-image.build=true
+#
+# Or manually (build context must be back/build/):
 #   ./gradlew build -Dquarkus.native.enabled=true
-#
-# Then, build the image with:
-#   docker build -f src/main/docker/Dockerfile.native -t quarkus/iptv-organizer-proxy .
-#
-# Then run the container using:
-#   docker run -i --rm -p 8080:8080 quarkus/iptv-organizer-proxy
+#   docker build -f src/main/docker/Dockerfile.native -t quarkus/iptv-organizer-proxy build/
 ###
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.3
 WORKDIR /work/
 
-# Install openssl — required by the entrypoint to generate a unique JWT RSA key pair on first boot
+# openssl is required to generate a unique JWT RSA key pair on first boot
 RUN microdnf install -y openssl && microdnf clean all
 
 RUN chown 1001 /work \
@@ -22,13 +24,37 @@ RUN chown 1001 /work \
     && chown -R 1001:root /app /logs \
     && chmod -R "g+rwX" /app /logs
 
+# Native runner produced by Quarkus Gradle native build (lives at the root of back/build/)
 COPY --chown=1001:root *-runner /work/application
 
-# Entrypoint: generates a unique JWT RSA key pair on first boot, then starts the native binary
-COPY --chown=1001:root src/main/docker/docker-entrypoint-native.sh /work/docker-entrypoint.sh
-RUN chmod +x /work/docker-entrypoint.sh
+# Write the entrypoint inline — avoids any dependency on files outside the Docker build context.
+# The script generates a unique JWT RSA key pair on first boot, then starts the native binary.
+RUN { \
+    echo '#!/bin/bash'; \
+    echo 'set -e'; \
+    echo 'echo "Starting IPTV Organizer Proxy - Quarkus Native"'; \
+    echo 'mkdir -p /app/data /logs'; \
+    echo 'if [ ! -f /app/data/privateKey.pem ] || [ ! -f /app/data/publicKey.pem ]; then'; \
+    echo '    echo "Generating JWT RSA-2048 key pair (first boot)..."'; \
+    echo '    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /app/data/privateKey.pem 2>/dev/null'; \
+    echo '    openssl pkey -in /app/data/privateKey.pem -pubout -out /app/data/publicKey.pem 2>/dev/null'; \
+    echo '    chmod 600 /app/data/privateKey.pem'; \
+    echo '    chmod 644 /app/data/publicKey.pem'; \
+    echo '    echo "JWT keys generated and stored in /app/data/"'; \
+    echo 'else'; \
+    echo '    echo "Using existing JWT keys from /app/data/"'; \
+    echo 'fi'; \
+    echo 'export SMALLRYE_JWT_SIGN_KEY_LOCATION=file:/app/data/privateKey.pem'; \
+    echo 'export MP_JWT_VERIFY_PUBLICKEY_LOCATION=file:/app/data/publicKey.pem'; \
+    echo 'export QUARKUS_HTTP_PORT=${QUARKUS_HTTP_PORT:-8080}'; \
+    echo 'export QUARKUS_DATASOURCE_DB_KIND=${QUARKUS_DATASOURCE_DB_KIND:-sqlite}'; \
+    echo 'export QUARKUS_DATASOURCE_JDBC_URL=${QUARKUS_DATASOURCE_JDBC_URL:-jdbc:sqlite:/app/data/app.sqlite}'; \
+    echo 'echo "Starting native application on port $QUARKUS_HTTP_PORT..."'; \
+    echo '# Note: JAVA_OPTS does not apply — no JVM in native mode.'; \
+    echo 'exec /work/application -Dquarkus.http.host=0.0.0.0'; \
+} > /work/docker-entrypoint.sh && chmod +x /work/docker-entrypoint.sh
 
-# Persistent volumes: SQLite database (+ JWT keys on first boot) and application logs
+# Persistent volumes: SQLite database + JWT keys (generated on first boot) and logs
 VOLUME ["/app/data"]
 
 EXPOSE 8080
