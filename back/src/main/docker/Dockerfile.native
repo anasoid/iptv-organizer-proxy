@@ -1,7 +1,7 @@
 ####
 # This Dockerfile is used in order to build a container that runs the Quarkus application in native (no JVM) mode.
 # Before building the container image run:
-#   ./gradlew build -Dquarkus.package.type=native
+#   ./gradlew build -Dquarkus.native.enabled=true
 #
 # Then, build the image with:
 #   docker build -f src/main/docker/Dockerfile.native -t quarkus/iptv-organizer-proxy .

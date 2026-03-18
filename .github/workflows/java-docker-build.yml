@@ -87,7 +87,7 @@ jobs:
           export DOCKER_BUILDKIT=1
           ./gradlew build \
             -PbuildingNativeImage \
-            -Dquarkus.package.type=native \
+            -Dquarkus.native.enabled=true \
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.compression.level=9 \
             -Dquarkus.native.container-runtime-options=--memory=3g \
@@ -112,7 +112,7 @@ jobs:
           export DOCKER_BUILDKIT=1
           ./gradlew build \
             -PbuildingNativeImage \
-            -Dquarkus.package.type=native \
+            -Dquarkus.native.enabled=true \
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.compression.level=9 \
             -Dquarkus.native.container-runtime-options=--memory=3g \
