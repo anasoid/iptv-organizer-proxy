@@ -1,18 +1,24 @@
-# Use already built image from Dockerfile as base
+# Use already built native image as base
 ARG BASE_IMAGE=iptv-organizer-proxy:latest
 
 # Stage 1: Define base image using ARG
 FROM ${BASE_IMAGE} AS base
 
 # Stage 2: VFS Single Layer - copy entire filesystem to scratch for true single layer
+# COPY must come first; WORKDIR is set after so CMD resolves ./application correctly
 FROM scratch
 
 COPY --from=base / /
 
+WORKDIR /work/
+
 VOLUME ["/app/data"]
-EXPOSE 9090
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost:9090/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+USER 1001
+
+CMD ["./application", "-Dquarkus.http.host=0.0.0.0"]
+
