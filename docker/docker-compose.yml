@@ -36,14 +36,23 @@ services:
       QUARKUS_LOG_LEVEL: "${QUARKUS_LOG_LEVEL:-INFO}"
       QUARKUS_LOG_CONSOLE_FORMAT: "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{2.}] (%t) %s%e%n"
 
-      # Memory and Performance — override JVM flags via JAVA_OPTS (e.g. export JAVA_OPTS="-Xms64m -Xmx512m -XX:+UseG1GC")
-      JAVA_OPTS: "- Xms16m -Xmx64m -XX:+UseG1GC "
+      # JVM heap — primary memory knob for the JVM image.
+      # Override: JAVA_OPTS="-Xms64m -Xmx512m -XX:+UseG1GC" docker-compose up
+      JAVA_OPTS: "${JAVA_OPTS:--Xms16m -Xmx64m -XX:+UseG1GC}"
+
+    # Container memory cap — acts as a hard ceiling above the JVM heap.
+    # Set MEM_LIMIT >= Xmx + ~80 MB (metaspace, threads, off-heap).
+    # Override: MEM_LIMIT=512M docker-compose up
+    deploy:
+      resources:
+        limits:
+          memory: ${MEM_LIMIT:-256M}
+        reservations:
+          memory: ${MEM_RESERVATION:-32M}
 
     volumes:
       # Persistent SQLite database + JWT key pair (generated on first boot)
       - app-data:/app/data
-      # Application logs
-      - app-logs:/logs
 
     restart: unless-stopped
 
@@ -57,6 +66,4 @@ services:
 
 volumes:
   app-data:
-    driver: local
-  app-logs:
     driver: local

@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Docker Compose for IPTV Organizer Proxy
 # Full stack: Quarkus Java backend + React admin panel + SQLite database
 # Usage: docker-compose up --build
@@ -7,7 +5,7 @@ version: '3.8'
 services:
   app:
     # Build from Dockerfile using the new Quarkus Java backend
-    image: ghcr.io/anasoid/iptv-organizer-proxy:develop-vfs
+    image: ghcr.io/anasoid/iptv-organizer-proxy:develop
     container_name: iptv-organizer-proxy
 
     ports:
@@ -30,9 +28,12 @@ services:
       QUARKUS_LOG_LEVEL: "${QUARKUS_LOG_LEVEL:-INFO}"
       QUARKUS_LOG_CONSOLE_FORMAT: "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{2.}] (%t) %s%e%n"
 
-      # Memory and Performance
-      # Memory and Performance — override JVM flags via JAVA_OPTS (e.g. export JAVA_OPTS="-Xms64m -Xmx512m -XX:+UseG1GC")
-      JAVA_OPTS: "-Xms16m -Xmx64m -XX:+UseG1GC"
+    deploy:
+      resources:
+        limits:
+          memory: ${MEM_LIMIT:-96M}
+        reservations:
+          memory: ${MEM_RESERVATION:-32M}
 
     volumes:
       # Persistent SQLite database
