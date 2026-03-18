@@ -83,7 +83,7 @@ function MetricChart({ title, data, lines, yFormatter, height = 220 }: MetricCha
     if (!key) return;
     setHiddenKeys((prev) => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) { next.delete(key); } else { next.add(key); }
       return next;
     });
   };

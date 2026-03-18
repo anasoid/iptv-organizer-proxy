@@ -109,16 +109,6 @@ const EMPTY_ENTRIES: StreamHistoryEntry[] = [];
 // Chart helpers  (only the label renderer changes)
 // ---------------------------------------------------------------------------
 
-/**
- * Returns a local "YYYY-MM-DD" string — avoids UTC-shift that
- * `toISOString().slice(0,10)` would introduce.
- */
-function localDateStr(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
 
 /**
  * Fills the `total` and `*_pct` fields on every bucket so that bars with at

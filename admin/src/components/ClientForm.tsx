@@ -16,7 +16,7 @@ import {
   InputLabel,
   Select,
 } from '@mui/material';
-import { useForm, Controller, useWatch } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import type { Client } from '../services/clientsApi';
 import clientsApi from '../services/clientsApi';
@@ -38,7 +38,6 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
     reset,
     control,
     watch,
-    setValue,
   } = useForm<Client>({
     defaultValues: {
       username: '',
@@ -59,7 +58,6 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
   });
 
   const sourceId = watch('sourceId');
-  const filterId = watch('filterId');
 
   // Fetch sources for dropdown
   const { data: sourcesData } = useQuery({

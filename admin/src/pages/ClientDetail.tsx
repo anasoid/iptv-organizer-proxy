@@ -32,7 +32,7 @@ import {
   Tab,
   Tabs,
 } from '@mui/material';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { ArrowBack, Download as DownloadIcon, Block as BlockIcon, OpenInNew as OpenInNewIcon, Visibility as ViewIcon } from '@mui/icons-material';
 import clientsApi from '../services/clientsApi';
 import sourcesApi from '../services/sourcesApi';
@@ -91,7 +91,6 @@ export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
-  const queryClient = useQueryClient();
   const [exportingType, setExportingType] = useState<string | null>(null);
   const [exportMessage, setExportMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [blockedModalOpen, setBlockedModalOpen] = useState(false);
