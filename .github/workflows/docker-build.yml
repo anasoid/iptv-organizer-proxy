@@ -4,14 +4,14 @@ on:
   push:
     branches:
       - main
-      - devlop
+      - develop
       - release/*
     tags:
       - '*'
   pull_request:
     branches:
       - main
-      - devlop
+      - develop
 
 env:
   REGISTRY: ghcr.io
