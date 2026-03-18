@@ -32,9 +32,11 @@ LABEL description="IPTV Organizer Proxy - Quarkus Java Backend"
 WORKDIR /app
 
 # Install minimal dependencies
+# openssl is required by the entrypoint to generate a unique JWT RSA key pair on first boot
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
+    openssl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
