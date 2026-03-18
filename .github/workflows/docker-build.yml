@@ -5,12 +5,14 @@ on:
     branches:
       - main
       - devlop
+      - php
     tags:
       - 'v*'
   pull_request:
     branches:
       - main
       - devlop
+      - php
 
 env:
   REGISTRY: ghcr.io
