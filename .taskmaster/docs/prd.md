@@ -1,1516 +1,774 @@
-# IPTV Organizer Proxy - Product Requirements Document
+# PRD: IPTV Organizer Proxy - Java/Quarkus for OpenWrt
 
-<context>
-## Overview
-The IPTV Organizer Proxy is a middleware service that synchronizes data from Xtream Codes API sources, stores it in a local database, and provides filtered access through the standard Xtream Codes API protocol. It enables personal users to organize, filter, and customize IPTV content for themselves and family members with granular access control. Each user/device can be assigned to a source with custom filters applied.
+## Project Overview
 
-**Target Users:**
-- Personal IPTV users managing their own content
-- Self-hosters running personal IPTV proxy services
-- Home users organizing IPTV for family members
-- Individual users wanting to filter and customize their IPTV content
+Build new Java/Quarkus implementation of IPTV Organizer Proxy with GraalVM native compilation for OpenWrt deployment with 64MB memory constraint.
 
-**Value Proposition:**
-- Simple one-source-per-client architecture
-- Granular content filtering per client
-- Automatic daily synchronization with sources
-- Standard Xtream Codes API compatibility with all clients
-- Local caching reduces load on source servers
-- Docker deployment for easy installation
-- Configurable database (MySQL or SQLite)
+**Deployment Model**: Standalone Quarkus native application
+**Target State**: Independent Java service with 64MB heap running on OpenWrt via Docker
+**No Migration**: Fresh implementation, old PHP application remains unchanged
 
-## Core Features
+---
 
-### 1. Xtream Codes Source Synchronization
-**What it does:** Connects to Xtream Codes servers, fetches all content data (live channels, VOD movies, series), and stores locally.
+## Scope & Deliverables (8 Phases)
 
-**Why it's important:** Foundation for the entire system; enables offline operation and fast response times.
+### Phase 1: Project Setup & Infrastructure
+**Goal**: Establish Quarkus project structure and build configuration
+- Create Quarkus Gradle project with GraalVM native compilation
+- Setup Gradle with Quarkus BOM 3.6.4+ and dependencies
+- Configure project structure: controllers, services, models, migrations
+- Setup version control and CI/CD pipeline (GitHub Actions for build, test, and Docker image generation)
+
+### Phase 2: Database Layer
+**Goal**: Build database schema and ORM layer with custom migration system
+- Implement custom SimpleMigrator (saves 3-4MB vs Flyway)
+- Design and implement 11 MySQL schema files (adapting from PHP structure)
+- Create Panache reactive entities for all tables
+- Configure connection pooling (2 connections max)
+- Test MySQL and SQLite support
+
+### Phase 3: Core Streaming Components
+**Goal**: Implement memory-efficient streaming and JSON parsing
+- **StreamingJsonParser**: Jackson Streaming API (128KB chunks, GC every 1000 items)
+- **HttpStreamingService**: Vert.x WebClient with zero-copy streaming
+- **FilterService**: SnakeYAML parsing with regex-based pattern matching
+- **SyncService**: Quarkus Scheduler with batch processing (100 items/batch)
+- **LabelExtractor**: Implement label extraction from stream metadata
+
+### Phase 4: Admin REST API & UI Integration
+**Goal**: Build complete Admin REST API for React UI management
+- **Auth Endpoints**: Login/logout, JWT token management
+- **Sources CRUD**: Create, read, update, delete upstream IPTV sources
+- **Clients CRUD**: Manage client credentials, expiry dates, access control
+- **Filters CRUD**: Manage YAML filter configurations per source
+- **Categories API**: Browse live/VOD/series categories
+- **Streams API**: Browse live streams, VOD, series content
+- **Sync Management API**: View sync status, logs, trigger manual sync
+- **Connection Logs API**: View client connection history and activity
+- **Dashboard API**: Statistics, source status, sync info
+- **UI Testing**: Validate all endpoints with React admin UI
+
+### Phase 5: Xtream Codes API & Proxy System
+**Goal**: Implement full Xtream Codes API with dual proxy architecture
+- **Xtream API** (`/player_api.php`): All client endpoints and actions
+- **Stream Proxy Endpoints**: `/live/{user}/{pass}/{id}.{ext}`, `/movie/...`, `/series/...`
+- **Client-Facing Proxy**: Application acts as proxy between IPTV clients and upstream servers
+  - Handle 302 redirects from upstream servers
+  - Base64-encoded proxy endpoint `/proxy/{user}/{pass}?url={encoded_url}`
+  - Per-source configuration: `disablestreamproxy`, `stream_follow_location`
+- **Upstream Proxy Support**: Route requests to upstream via HTTP/HTTPS/SOCKS5 proxy
+  - Global and per-source proxy configuration
+  - Support authentication (username/password)
+  - ProxyConfigService for centralized configuration
+- **Client Authentication**: Username/password validation per request
+- **EPG Support**: Electronic Program Guide data
+- **Test**: VLC, Kodi, TiviMate, GSE IPTV, other Xtream-compatible players
+
+### Phase 6: Configuration & Deployment
+**Goal**: Configure for OpenWrt deployment
+- Convert `.env` to `application.yaml`
+- Setup database connection properties
+- Configure memory limits and GC settings
+- Create Docker build configuration (multi-stage)
+- Setup docker-compose for OpenWrt
+
+### Phase 7: Testing & Optimization
+**Goal**: Validate memory usage and performance
+- Memory profiling: idle <45MB, load <60MB
+- Load testing: 50 concurrent streams, 4 hours
+- Functional testing: all endpoints
+- OpenWrt hardware validation
+- Performance benchmarking and tuning
+
+### Phase 8: Documentation & Release
+**Goal**: Finalize deliverables
+- Deployment instructions
+- Configuration reference
+- Memory tuning guide
+- API documentation (Xtream + Admin REST)
+- Release notes
+
+---
+
+## Technical Requirements
+
+### Why Reactive Stack is Critical for 64MB
+
+**Problem**: Blocking I/O requires thread pools (each thread = 1-2MB memory)
+- Traditional Java: 50 concurrent streams = 50 threads × 2MB = 100MB+ memory
+- **64MB constraint**: Cannot support concurrent streams with blocking I/O
+
+**Solution**: Reactive (Mutiny/Vert.x) uses event loops, not threads
+- Single event loop handles 1000+ concurrent connections
+- One thread per core (typical: 1-4 cores on OpenWrt)
+- Memory: ~8MB for event loop + buffer, regardless of concurrent streams
+
+**Result**: 50 concurrent streams = 2 threads × 4MB = 8MB overhead
+**Savings**: 92MB less memory than blocking approach
+
+### Technology Stack
+- **Build Tool**: Gradle 8.5+
+- **Framework**: Quarkus 3.6+ with GraalVM native image
+- **Runtime**: Java 17+
+- **Architecture**: Reactive (Mutiny/Vert.x) - **required for 64MB constraint**
+- **GC**: Serial GC (minimal footprint)
+
+### Memory Budget (64MB Heap)
+```
+Target breakdown:
+- Idle baseline: ~24MB
+- Streaming buffers (3 concurrent): ~12MB
+- Database pools: ~8MB
+- GC overhead: ~16MB
+- Safety margin: ~4MB
+Total: ~64MB
+```
+
+### Dependencies
+- RESTEasy Reactive (REST framework)
+- Hibernate Reactive Panache (ORM)
+- Vert.x WebClient (HTTP client)
+- Jackson Streaming API (JSON parsing)
+- SnakeYAML Engine (YAML parsing)
+- SmallRye JWT (authentication)
+- Custom SimpleMigrator (database migrations)
+
+---
+
+## Functional Components to Implement
+
+| Component | Reference (PHP) | Java Implementation | Details |
+|-----------|-----------------|---------------------|---------|
+| Video Streaming | HttpClient.php (547) | Vert.x WebClient, Multi<Buffer> | Zero-copy, 8-16KB chunks |
+| JSON Parser | StreamingJsonParser.php (262) | Jackson Streaming API | 128KB chunks, GC every 1000 items |
+| Sync Service | SyncService.php (923) | Quarkus Scheduler | Batch 100 items, explicit GC |
+| Filter Engine | FilterService.php (789) | SnakeYAML + regex | Pattern matching, caching |
+| Stream Proxy | StreamDataController.php (372) | Reactive REST endpoint | Route video streams |
+| Client API | XtreamController.php | Implement /player_api.php endpoints | Full Xtream compatibility |
+| Admin API | Admin/* (11 controllers) | RESTEasy Reactive | CRUD for all entities |
+| Data Models | Models/* (11 tables) | Panache entities | Reactive ORM |
+| Database | migrations/mysql/*.sql | Custom SimpleMigrator | Version tracking, checksums |
+
+---
+
+## Proxy Architecture
+
+### Dual Proxy System
+
+The application implements **two levels of proxying**:
+
+#### 1. Client-Facing Proxy (Application ↔ IPTV Clients)
+The application acts as an intermediary between IPTV clients (VLC, Kodi) and upstream IPTV servers.
 
 **How it works:**
-- Connect to Xtream Codes API using credentials (username, password, URL)
-- **Synchronization is separated by categories and stream types:**
-  - **Live Sync Tasks:**
-    1. Sync live categories (`get_live_categories`)
-    2. Sync live streams (`get_live_streams`)
-  - **VOD Sync Tasks:**
-    1. Sync VOD categories (`get_vod_categories`)
-    2. Sync VOD streams (`get_vod_streams`)
-  - **Series Sync Tasks:**
-    1. Sync series categories (`get_series_categories`)
-    2. Sync series (`get_series`)
-- Each task is separate and can be tracked independently
-- Store all metadata in local database (MySQL or SQLite)
-- **Extract labels** from channel names and category names:
-  - Split by `-` (dash) delimiter and trim whitespace
-  - Split by `|` (pipe) delimiter and trim whitespace
-  - Extract text between `[]` (square brackets) as separate labels
-  - Remove `[]` brackets from the main text to get clean labels
-  - Add `stream_type` as a label (e.g., "live", "movie", "series")
-  - Example: "ESPN [HD] | Sports - USA" (live stream) → labels: "ESPN", "HD", "Sports", "USA", "live"
-  - Example: "FR: TF1 [FHD]" (live stream) → labels: "FR", "TF1", "FHD", "live"
-  - Example: "Movies - Action | English" (VOD) → labels: "Movies", "Action", "English", "movie"
-  - Store labels in database for advanced filtering, grouping, and search
-- Scheduled synchronization (daily, configurable interval)
-- Track sync status and last update time per source
-- Handle API errors with logging
-
-### 2. Client Access via Xtream Codes API
-**What it does:** Provides standard Xtream Codes API endpoints for clients to access filtered content from their assigned source.
-
-**Why it's important:** Ensures compatibility with all existing Xtream Codes-compatible IPTV players (TiviMate, IPTV Smarters, etc.).
-
-**How it works:**
-- Implement Xtream Codes API endpoints:
-  - `player_api.php?username=X&password=Y` (authentication)
-  - `player_api.php?username=X&password=Y&action=get_live_categories`
-  - `player_api.php?username=X&password=Y&action=get_live_streams` (all streams)
-  - `player_api.php?username=X&password=Y&action=get_live_streams&category_id=X` (filtered by category)
-  - `player_api.php?username=X&password=Y&action=get_vod_categories`
-  - `player_api.php?username=X&password=Y&action=get_vod_streams` (all VOD)
-  - `player_api.php?username=X&password=Y&action=get_vod_streams&category_id=X` (filtered by category)
-  - `player_api.php?username=X&password=Y&action=get_series_categories`
-  - `player_api.php?username=X&password=Y&action=get_series` (all series)
-  - `player_api.php?username=X&password=Y&action=get_series&category_id=X` (filtered by category)
-  - `player_api.php?username=X&password=Y&action=get_simple_data_table&stream_id=X` (EPG - proxied without filtering)
-  - `player_api.php?username=X&password=Y&action=get_short_epg&stream_id=X&limit=X` (short EPG - proxied without filtering)
-  - `xmltv.php?username=X&password=Y` (full XMLTV - proxied and filtered on-the-fly)
-  - `xmltv.php?username=X&password=Y&stream_id=X` (single stream XMLTV - proxied without filtering)
-  - Stream URLs: `/live/{username}/{password}/{stream_id}.{ext}` (any extension)
-  - VOD URLs: `/movie/{username}/{password}/{stream_id}.{ext}` (any extension)
-  - Series URLs: `/series/{username}/{password}/{stream_id}.{ext}` (any extension)
-  - Extensions can be: m3u8, ts, mp4, mkv, avi, flv, or any other format from source
-- **Stream URL Proxying:**
-  - Client requests: `http://proxy-server/live/client_user/client_pass/12345.m3u8`
-  - Proxy authenticates client and verifies access to stream
-  - Proxy replaces domain and credentials with source: `http://source-server/live/source_user/source_pass/12345.m3u8`
-  - Proxy redirects or reverse-proxies to the source URL
-  - Same logic applies for /movie/ and /series/ URLs
-- **Channels, categories, VOD, series**: Filtered from local SQL database cache
-- **EPG data**: NOT stored in database - proxied on-the-fly from source
-  - EPG with stream_id: proxy directly without filtering
-  - Full XMLTV (no stream_id): proxy and filter on-the-fly to client's accessible streams
-- Return filtered data in standard Xtream format
-
-### 3. Filter Management System
-**What it does:** Allows administrators to create and assign filters that control what content each client can access from their assigned source.
-
-**Why it's important:** Core business logic for content distribution and access control.
-
-**How it works:**
-- **Filter Structure (YAML):**
-  - Filter has two separate sections:
-    1. **rules**: list of include/exclude rules
-    2. **favoris**: list of favoris rules (separate field)
-
-  - **Each include/exclude rule has:**
-    - **name**: descriptive name for the rule
-    - **type**: include or exclude
-    - **match**: criteria for matching content
-      - **categories**: match by category name or labels
-      - **channels**: match by channel name or labels
-
-  - **Each favoris rule has:**
-    - **name**: descriptive name for the favoris
-    - **target_group**: name of the favorite group/category (virtual category)
-    - **match**: criteria for matching content
-      - **categories**: match by category name or labels
-      - **channels**: match by channel name or labels
-
-- **Rule Types:**
-  - **include**: whitelist matching categories/channels
-  - **exclude**: blacklist matching categories/channels
-  - **favoris** (separate field): add matching categories/channels to a favorite group (virtual category)
-
-- **Matching Criteria:**
-  - Match by **name**: exact or partial category/channel name matching
-  - Match by **labels**: match extracted labels (HD, FHD, 4K, country codes, etc.)
-  - Can match on categories, channels, or both
-
-- **Favorite Groups (Virtual Categories):**
-  - Create virtual categories from favoris section (separate from rules)
-  - Channels/categories appear in their target group
-  - Groups appear as categories in client API
-  - **Favoris ID Generation:**
-    - Favoris category IDs start from 100000
-    - Order respects the order of favoris in the favoris section
-    - First favoris → category_id: 100000
-    - Second favoris → category_id: 100001
-    - Third favoris → category_id: 100002, etc.
-  - **Favoris Calculation by Content Type:**
-    - Process separately for each type: live, movies, series
-    - For `get_live_categories`: check all favoris, create virtual categories for live streams, **favoris appear first**
-    - For `get_vod_categories`: check all favoris, create virtual categories for movies, **favoris appear first**
-    - For `get_series_categories`: check all favoris, create virtual categories for series, **favoris appear first**
-    - **Category Order:** Favoris categories (100000+) are listed first, then regular categories
-
-- Include/exclude rules are applied in order within the rules section
-- Favoris are processed separately from the favoris section
-- Each client has ONE filter assigned
-- Each filter contains YAML with two sections: rules (include/exclude) and favoris
-- Preview filter results before applying
-- Template filters for common configurations
-
-### 4. Admin Authentication & Authorization
-**What it does:** Provides secure authentication system for accessing the administration panel.
-
-**Why it's important:** Protects the system from unauthorized access and ensures only authenticated administrators can manage sources, clients, and filters.
-
-**How it works:**
-- **Simple Authentication System:**
-  - Username and password-based login
-
-- **Admin User Management:**
-  - Create/edit/delete admin users
-
-
-### 5. React-based Administration Web Interface
-**What it does:** Provides a modern, responsive web-based dashboard for managing sources, clients, and filters.
-
-**Why it's important:** Essential for day-to-day operations and configuration with excellent user experience.
-
-**How it works:**
-- **Authentication:**
-  - Login page with username/password
-  - Session/token management
-  - Logout functionality
-  - Protected routes (redirect to login if not authenticated)
-
-- **Source Management:**
-  - Add/edit/delete Xtream Codes sources
-  - Configure source credentials (URL, username, password)
-  - Set sync interval per source
-  - View sync status and last update
-  - Manual sync trigger
-  - Test source connection
-
-- **Client Management:**
-  - Add/edit/delete clients
-  - Generate client credentials (username/password)
-  - Assign source to client (one source per client)
-  - Assign filter to client (one filter per client, optional)
-  - Hide adult content toggle (automatically filters out adult streams/VOD/series)
-  - Set expiration dates
-  - Enable/disable clients
-  - View client connection logs
-
-- **Filter Management:**
-  - Create/edit/delete filters
-  - Configure filters in YAML format with two sections:
-    - **rules**: include/exclude rules
-    - **favoris**: favoris rules (separate)
-  - YAML editor with syntax highlighting
-  - Preview filtered content
-  - Clone filters
-  - Import/export filter configurations (YAML files)
-
-- **Admin User Management:**
-  - List all admin users
-  - Add/edit/delete admin accounts
-  - Change passwords (own and others)
-  - Enable/disable admin users
-
-- **Dashboard:**
-  - System overview (total sources, clients, streams)
-  - Recent activity logs
-  - Sync status for all sources
-  - Quick actions
-
-### 6. Automatic Data Refresh
-**What it does:** Scheduled background jobs that synchronize data from sources at configurable intervals without requiring cron.
-
-**Why it's important:** Keeps local database up-to-date with source changes without manual intervention.
-
-**How it works (multiple options for servers without cron):**
-
-**Option 1: PHP Daemon Worker (Recommended)**
-- Long-running PHP process in Docker container
-- Continuous loop with sleep intervals
-- Checks each source's next_sync timestamp
-- Automatically restarts on failure (Docker restart policy)
-- No external dependencies
-
-**Option 2: External Webhook Trigger**
-- Expose HTTP endpoint for triggering sync (authenticated)
-- Use free external services to call webhook:
-  - cron-job.org (free, reliable)
-  - EasyCron (free tier available)
-  - GitHub Actions scheduled workflows
-  - UptimeRobot (monitoring + cron alternative)
-
-**Option 3: On-Demand Sync with TTL**
-- Check data freshness on each API request
-- Trigger async sync if data is stale (TTL expired)
-- Background sync doesn't block client requests
-- Lazy loading approach
-
-**Sync Features (all options):**
-- Configurable refresh interval per source (default: 24 hours)
-- **Separate sync tasks by type:**
-  - Live categories sync
-  - Live streams sync
-  - VOD categories sync
-  - VOD streams sync
-  - Series categories sync
-  - Series sync
-- Each task tracked independently in sync_logs
-- Incremental updates when possible
-- Full resync option per task type
-- Conflict resolution (handle deleted/updated content)
-- Notification on sync failures
-- Sync logs and history per task type
-- Lock mechanism to prevent duplicate syncs per task type
-
-### 7. Docker Deployment
-**What it does:** Provides containerized deployment with Docker for easy installation and portability.
-
-
-### 8. CI/CD with GitHub Actions
-**What it does:** Automated build, test, and deployment pipeline using GitHub Actions.
-
-**Why it's important:** Ensures code quality, automates releases, publishes Docker images automatically.
-
-
-</context>
-
-<PRD>
-## Technical Architecture
-
-### System Components
-
-**1. PHP Backend API**
-- RESTful API server (using Slim Framework or similar)
-- Xtream Codes API implementation
-- Client authentication and authorization
-- Source synchronization logic
-- Filter application engine
-- Stream URL proxying
-- EPG proxy with on-the-fly filtering
-
-**Data Architecture:**
-- **Stored in database**: Channels, categories, VOD, series metadata
-- **Proxied on-the-fly**: EPG data, stream URLs,series info
-- Filters applied to database queries for cached content
-- Filters applied in real-time for proxied EPG data
-
-**2. React Frontend (Admin Panel)**
-- React with TypeScript
-- State management (Redux Toolkit or Zustand)
-- UI component library (Material-UI or Ant Design)
-- React Router for navigation
-- Axios for API calls
-- Form handling (React Hook Form)
-- Real-time updates (SWR or React Query)
-- Build with Vite or Create React App
-
-**3. Database (Configurable)**
-- **MySQL** (for production, multi-user deployments)
-- **SQLite** (for development, single-user, embedded deployments)
-- Single configuration option determines which to use
-- Same schema supports both databases
-- Migration scripts for both database types
-
-**4. Background Sync Worker**
-- PHP CLI script or daemon
-- Cron-triggered or continuous loop
-- Queue-based processing
-- Handles all source synchronization
-- Error handling and logging
-- Logging to database and files
-
-
-**7. CI/CD Pipeline (GitHub Actions)**
-- Automated testing (PHPUnit, Jest)
-- Multi-platform support (linux/amd64, linux/arm64)
-
-### Data Models
-
-**admin_users**
-```sql
-- id (PRIMARY KEY)
-- username (VARCHAR, UNIQUE) - admin username
-- password_hash (VARCHAR) - bcrypt hashed password
-- email (VARCHAR)
-- is_active (BOOLEAN) - admin account enabled/disabled
-- created_at (DATETIME)
-- updated_at (DATETIME)
-- last_login (DATETIME)
-```
-
-**sources**
-```sql
-- id (PRIMARY KEY)
-- name (VARCHAR)
-- url (VARCHAR) - base URL of Xtream server
-- username (VARCHAR) - source credentials
-- password (VARCHAR) - source credentials
-- sync_interval (INT) - hours between syncs
-- last_sync (DATETIME)
-- next_sync (DATETIME)
-- sync_status (ENUM: idle, syncing, error)
-- is_active (BOOLEAN)
-- created_at (DATETIME)
-- updated_at (DATETIME)
-```
-
-**clients**
-```sql
-- id (PRIMARY KEY)
-- source_id (FOREIGN KEY) - assigned source (required)
-- filter_id (FOREIGN KEY) - assigned filter (optional, one filter per client)
-- username (VARCHAR, UNIQUE) - client credential
-- password (VARCHAR) - client credential
-- name (VARCHAR) - friendly name
-- email (VARCHAR)
-- expiry_date (DATETIME)
-- is_active (BOOLEAN)
-- hide_adult_content (BOOLEAN, DEFAULT true) - automatically exclude adult content for this client
-- max_connections (INT)
-- created_at (DATETIME)
-- last_login (DATETIME)
-- notes (TEXT)
-```
-
-**Note:** When `hide_adult_content` is true, all streams/VOD/series with `is_adult=1` are automatically excluded from the client's API responses, regardless of filter rules.
-
-**filters**
-```sql
-- id (PRIMARY KEY)
-- name (VARCHAR)
-- description (TEXT)
-- filter_config (TEXT) - YAML format with two sections: "rules" (include/exclude) and "favoris" (separate)
-- created_at (DATETIME)
-- updated_at (DATETIME)
-```
-
-**live_streams**
-```sql
--- Essential fields (indexed/filterable)
-- id (PRIMARY KEY)
-- source_id (FOREIGN KEY) - references sources.id
-- stream_id (INT) - original stream ID from source (needed for stream URL construction)
-- name (VARCHAR) - stream name (needed for filter matching by name)
-- category_id (INT) - primary category (functional ID from API, with source_id references categories)
-- category_ids (TEXT) - JSON array of all category functional IDs: [1363,1364]
-- FOREIGN KEY (source_id, category_id) REFERENCES categories(source_id, category_id)
-- is_adult (BOOLEAN) - adult content flag (needed for adult content filtering)
-- labels (TEXT) - extracted labels (comma-separated: "ESPN,HD,Sports,USA,live") (needed for filter matching)
-- is_active (BOOLEAN)
-- created_at (DATETIME)
-- updated_at (DATETIME)
-
--- All other fields stored as JSON
-- data (JSON) - complete stream data from API including:
-  {
-    "num": 1,
-    "stream_type": "live",
-    "stream_icon": "http://...",
-    "epg_channel_id": "",
-    "added": 1675464765,
-    "custom_sid": null,
-    "tv_archive": 0,
-    "tv_archive_duration": 0,
-    "direct_source": "",
-    ... (any other fields from API)
-  }
-```
-
-**Note:** The `data` JSON field stores the complete API response, allowing the proxy to return all original fields without needing schema changes when the API adds new fields.
-
-**vod_streams**
-```sql
--- Essential fields (indexed/filterable)
-- id (PRIMARY KEY)
-- source_id (FOREIGN KEY) - references sources.id
-- stream_id (INT) - original stream ID from source (needed for stream URL construction)
-- name (VARCHAR) - movie/VOD name (needed for filter matching by name)
-- category_id (INT) - primary category (functional ID from API, with source_id references categories)
-- category_ids (TEXT) - JSON array of all category functional IDs
-- FOREIGN KEY (source_id, category_id) REFERENCES categories(source_id, category_id)
-- is_adult (BOOLEAN) - adult content flag (needed for adult content filtering)
-- labels (TEXT) - extracted labels (comma-separated: "Action,English,movie") (needed for filter matching)
-- is_active (BOOLEAN)
-- created_at (DATETIME)
-- updated_at (DATETIME)
-
--- All other fields stored as JSON
-- data (JSON) - complete VOD data from API including:
-  {
-    "num": 1,
-    "stream_type": "movie",
-    "stream_icon": "https://...",
-    "added": 1764452400,
-    "container_extension": "mp4",
-    "custom_sid": null,
-    "direct_source": "",
-    "plot": "...",
-    "cast": "...",
-    "director": "...",
-    "genre": "...",
-    "release_date": "...",
-    "rating": 5.857,
-    "rating_5based": 2.9,
-    "tmdb": "1211776",
-    "trailer": "...",
-    "year": 2025,
-    "duration_secs": 5400,
-    "duration": "1:30:00",
-    "video": {...},
-    "audio": {...},
-    "bitrate": 8000,
-    ... (any other fields from API)
-  }
-```
-
-**series**
-```sql
--- Essential fields (indexed/filterable)
-- id (PRIMARY KEY)
-- source_id (FOREIGN KEY) - references sources.id
-- series_id (INT) - original series ID from source (needed for API lookups)
-- name (VARCHAR) - series name (needed for filter matching by name)
-- category_id (INT) - primary category (functional ID from API, with source_id references categories)
-- category_ids (TEXT) - JSON array of all category functional IDs
-- FOREIGN KEY (source_id, category_id) REFERENCES categories(source_id, category_id)
-- labels (TEXT) - extracted labels (comma-separated: "Drama,2024,series") (needed for filter matching)
-- is_active (BOOLEAN)
-- created_at (DATETIME)
-- updated_at (DATETIME)
-
--- All other fields stored as JSON
-- data (JSON) - complete series data from API including:
-  {
-    "num": 1,
-    "cover": "https://...",
-    "plot": "...",
-    "cast": "...",
-    "director": "...",
-    "genre": "...",
-    "release_date": "...",
-    "last_modified": 1234567890,
-    "rating": 8.5,
-    "rating_5based": 4.25,
-    "tmdb": "246680",
-    "backdrop_path": ["https://...", ...],
-    "youtube_trailer": "LSPzvzgZ9JE",
-    "episode_run_time": 45,
-    "seasons": [...],
-    "episodes": {...},
-    ... (any other fields from API)
-  }
-```
-
-**Note:** Series data is particularly large due to seasons/episodes information. The `is_adult` flag is not typically present in series API responses, but can be added to labels for filtering if needed.
-
-**categories**
-```sql
--- Essential fields (indexed/filterable)
-- id (PRIMARY KEY) - technical ID for internal use only
-- source_id (FOREIGN KEY) - references sources.id
-- category_id (INT) - functional ID from Xtream API
-- UNIQUE KEY (source_id, category_id) - composite functional identifier
-- category_name (VARCHAR) - category name (needed for filter matching by name)
-- category_type (ENUM: live, vod, series)
-- parent_id (INT) - references category_id within same source (not technical id)
-- labels (TEXT) - extracted labels (comma-separated: "Sports,HD,live") (needed for filter matching)
-- created_at (DATETIME)
-```
-
-**Note:**
-- Stream-to-category relationships use the functional ID (source_id, category_id) instead of technical ID
-- Categories have minimal extra data from the API, so no JSON field is needed
-- This ensures proper foreign key relationships across sources with potentially overlapping category IDs
-
-**sync_logs**
-```sql
-- id (PRIMARY KEY)
-- source_id (FOREIGN KEY)
-- sync_type (ENUM: live_categories, live_streams, vod_categories, vod_streams, series_categories, series)
-- started_at (DATETIME)
-- completed_at (DATETIME)
-- status (ENUM: success, failed, partial)
-- items_added (INT)
-- items_updated (INT)
-- items_deleted (INT)
-- error_message (TEXT)
-```
-
-**connection_logs**
-```sql
-- id (PRIMARY KEY)
-- client_id (FOREIGN KEY)
-- action (VARCHAR) - API action called
-- ip_address (VARCHAR)
-- user_agent (VARCHAR)
-- created_at (DATETIME)
-```
-
-### APIs and Integrations
-
-**Upstream Xtream Codes API (consumed):**
-```
-GET /player_api.php?username=X&password=Y
-GET /player_api.php?username=X&password=Y&action=get_live_categories
-GET /player_api.php?username=X&password=Y&action=get_live_streams
-GET /player_api.php?username=X&password=Y&action=get_live_streams&category_id=X
-GET /player_api.php?username=X&password=Y&action=get_vod_categories
-GET /player_api.php?username=X&password=Y&action=get_vod_streams
-GET /player_api.php?username=X&password=Y&action=get_vod_streams&category_id=X
-GET /player_api.php?username=X&password=Y&action=get_series_categories
-GET /player_api.php?username=X&password=Y&action=get_series
-GET /player_api.php?username=X&password=Y&action=get_series&category_id=X
-GET /player_api.php?username=X&password=Y&action=get_series_info&series=X
-GET /player_api.php?username=X&password=Y&action=get_simple_data_table&stream_id=X
-GET /player_api.php?username=X&password=Y&action=get_short_epg&stream_id=X&limit=X
-GET /xmltv.php?username=X&password=Y
-```
-
-**Xtream Codes API (provided to clients):**
-```
-GET /player_api.php?username=X&password=Y
-GET /player_api.php?username=X&password=Y&action=get_live_categories
-GET /player_api.php?username=X&password=Y&action=get_live_streams
-GET /player_api.php?username=X&password=Y&action=get_live_streams&category_id=X
-GET /player_api.php?username=X&password=Y&action=get_vod_categories
-GET /player_api.php?username=X&password=Y&action=get_vod_streams
-GET /player_api.php?username=X&password=Y&action=get_vod_streams&category_id=X
-GET /player_api.php?username=X&password=Y&action=get_series_categories
-GET /player_api.php?username=X&password=Y&action=get_series
-GET /player_api.php?username=X&password=Y&action=get_series&category_id=X
-GET /player_api.php?username=X&password=Y&action=get_series_info&series=X
-GET /player_api.php?username=X&password=Y&action=get_simple_data_table&stream_id=X (proxied - no filtering)
-GET /player_api.php?username=X&password=Y&action=get_short_epg&stream_id=X&limit=X (proxied - no filtering)
-GET /xmltv.php?username=X&password=Y (proxied - filtered on-the-fly to client's streams)
-GET /xmltv.php?username=X&password=Y&stream_id=X (proxied - no filtering)
-GET /live/{username}/{password}/{stream_id}.{ext} (any extension: m3u8, ts, etc.)
-GET /movie/{username}/{password}/{stream_id}.{ext} (any extension: mp4, mkv, avi, etc.)
-GET /series/{username}/{password}/{stream_id}.{ext} (any extension: mp4, mkv, avi, etc.)
-```
-
-**Admin REST API (for React frontend):**
-```
-POST /api/auth/login - Admin authentication (returns token/session)
-POST /api/auth/logout - Admin logout
-GET /api/auth/me - Get current authenticated admin
-POST /api/auth/change-password - Change admin password
-
-GET /api/admin-users - List admin users (protected)
-POST /api/admin-users - Create admin user (protected)
-GET /api/admin-users/{id} - Get admin user details (protected)
-PUT /api/admin-users/{id} - Update admin user (protected)
-DELETE /api/admin-users/{id} - Delete admin user (protected)
-
-GET /api/sources - List all sources (protected)
-POST /api/sources - Add source (protected)
-GET /api/sources/{id} - Get source details (protected)
-PUT /api/sources/{id} - Update source (protected)
-DELETE /api/sources/{id} - Delete source (protected)
-POST /api/sources/{id}/sync - Trigger manual sync (protected)
-POST /api/sources/{id}/test - Test source connection (protected)
-
-GET /api/clients - List clients (protected, pagination, filters)
-POST /api/clients - Add client (protected)
-GET /api/clients/{id} - Get client details (protected)
-PUT /api/clients/{id} - Update client (protected)
-DELETE /api/clients/{id} - Delete client (protected)
-GET /api/clients/{id}/logs - Get client connection logs (protected)
-
-GET /api/filters - List filters (protected)
-POST /api/filters - Create filter (protected)
-GET /api/filters/{id} - Get filter details (protected)
-PUT /api/filters/{id} - Update filter (protected)
-DELETE /api/filters/{id} - Delete filter (protected)
-POST /api/filters/{id}/preview - Preview filter results (protected)
-
-GET /api/dashboard/activity - Recent activity (protected)
-GET /api/sync/status - All sources sync status (protected)
-GET /api/sync/logs - Sync history (protected)
-```
-
-### Technology Stack Summary
-
-**Backend:**
-- PHP
-- Slim Framework or vanilla PHP with routing
-- PDO for database abstraction
-- Guzzle for HTTP client
-- Monolog for logging
-
-**Frontend:**
-- React
-- TypeScript
-- Material-UI or Ant Design
-- Redux Toolkit or Zustand
-- React Router
-- Axios
-- React Hook Form
-
-**Database:**
-- MySQL OR SQLite (configurable)
-- Migration system (Phinx or custom)
-
-**DevOps:**
-- Docker & Docker Compose
-- Nginx
-- GitHub Actions
-- Multi-stage Dockerfile
-- Docker Hub / GitHub Container Registry
-
-**Development:**
-- Composer (PHP dependencies)
-- NPM/Yarn (React dependencies)
-- PHPUnit (PHP testing)
-- Jest (React testing)
-- ESLint + Prettier (code formatting)
-- PHPStan (static analysis)
-
-## Development Roadmap
-
-### Phase 1: Core Backend & Database Foundation
-**Scope:** Database schema, basic data synchronization, core data models
-
-**Features:**
-- Database abstraction layer supporting MySQL and SQLite
-- Configuration system for database selection
-- Database migration scripts for both DB types (including labels column)
-- Source model and storage
-- Xtream Codes API client (PHP)
-- Basic authentication for sources
-- **Separate sync tasks:**
-  - Sync live categories task
-  - Sync live streams task
-- **Label extraction engine** (parse channel/category names by `-`, `|`, `[]`, add stream_type)
-- Store live categories and streams in database with extracted labels
-- Sync logging per task type (sync_type field in sync_logs)
-- Command-line sync script (PHP CLI) with task separation
-- Environment configuration (.env)
-
-**Deliverables:**
-- Database schema for both MySQL and SQLite
-- PHP classes for data models
-- API client library for Xtream Codes
-- CLI sync tool
-- Configuration system
-- Docker setup for backend
-
-**Success Criteria:**
-- Can connect to Xtream source
-- Can fetch and store live categories (separate task)
-- Can fetch and store live streams (separate task)
-- Each task is logged independently in sync_logs with sync_type
-- Data persists in chosen database
-- Can switch between MySQL and SQLite via config
-- Works in Docker container
-
-### Phase 2: Xtream API Implementation for Clients
-**Scope:** Implement Xtream Codes API endpoints for client access
-
-**Features:**
-- `player_api.php` endpoint handler
-- Client authentication (username/password validation)
-- Client-to-source assignment (one source per client)
-- `get_live_categories` implementation (from database)
-- `get_live_streams` implementation with optional category_id (from database)
-- EPG endpoints (get_simple_data_table, get_short_epg) - direct proxy to source
-- XMLTV endpoint with on-the-fly filtering
-- Basic filter application (show all from client's source)
-- Stream URL proxying/redirect to client's source
-- JSON response formatting (Xtream format)
-- Nginx configuration for URL rewriting
-
-**Deliverables:**
-- Working Xtream API endpoints
-- Client authentication system
-- Stream proxy functionality
-- Client table with source assignment
-- Nginx configuration
-- Docker container for backend
-
-**Success Criteria:**
-- IPTV player can connect and authenticate
-- IPTV player can list channels from client's assigned source
-- IPTV player can play streams
-- Streams work through proxy
-
-### Phase 3: React Admin Panel - Foundation & Authentication
-**Scope:** React application setup, authentication, layout
-
-**Features:**
-- React project setup with TypeScript and Vite
-- Material-UI or Ant Design integration
-- Admin authentication UI (login page)
-- JWT or session-based auth
-- Protected routes
-- Main layout with sidebar navigation
-- Dashboard skeleton
-- Logout functionality
-- Responsive design
-- Dark/light theme toggle
-
-**Deliverables:**
-- React application structure
-- Authentication flow
-- Admin login API endpoint
-- Layout components
-- Docker container for frontend
-- Nginx configuration for React SPA
-
-**Success Criteria:**
-- Admin can log in via React UI
-- Protected routes redirect to login
-- Clean, professional UI layout
-- Works in Docker container
-- Responsive on mobile/tablet
-
-### Phase 4: React Admin Panel - Source Management
-**Scope:** Complete source management interface
-
-**Features:**
-- Sources list page with data table
-- Add source form/modal
-- Edit source form/modal
-- Delete source with confirmation
-- Test source connection button (real-time feedback)
-- Manual sync trigger button (trigger all tasks or individual task types)
-- View sync status and progress per task type
-- Sync logs display per task type (live_categories, live_streams, vod_categories, vod_streams, series_categories, series)
-- Form validation
-- Error handling and toast notifications
-- Loading states
-
-**Deliverables:**
-- Source CRUD components
-- Source API endpoints (backend)
-- Test connection functionality
-- Manual sync trigger
-- Real-time sync status updates
-
-**Success Criteria:**
-- Can add/edit/delete sources via React UI
-- Can test connection with instant feedback
-- Can trigger sync (all tasks or individual task types) and see progress
-- Sync status shows progress per task type (live_categories, live_streams, etc.)
-- Clean, intuitive UI with proper feedback
-
-### Phase 5: React Admin Panel - Client Management
-**Scope:** Complete client management interface
-
-**Features:**
-- Clients list page with data table
-- Add client form/modal
-- Edit client form/modal
-- Delete client with confirmation
-- Source assignment dropdown (required field)
-- Filter assignment dropdown (optional field, one filter per client)
-- Hide adult content toggle (checkbox, default: enabled)
-- Generate random credentials button
-- Enable/disable client toggle
-- Expiry date picker
-- View client connection logs
-- Copy credentials to clipboard
-- Display client connection URL
-- Pagination and search
-
-**Deliverables:**
-- Client CRUD components
-- Client API endpoints (backend)
-- Connection logging display
-- Credential generation
-
-**Success Criteria:**
-- Can create clients via React UI
-- Must assign source to each client (required)
-- Can optionally assign one filter to each client
-- Can toggle adult content filtering per client (default: enabled)
-- Can disable/enable clients
-- Client credentials work with IPTV players
-- Can view client activity
-- Adult content is automatically hidden when client has hide_adult_content enabled
-
-### Phase 6: Filter System Implementation
-**Scope:** Filter creation, management, and application
-
-**Features:**
-- Filter definition storage (database - YAML in TEXT field)
-- Filter CRUD interface in React
-- **Filter structure with two sections:**
-  - **rules section:** include/exclude rules
-    - Each rule has: name, type (include/exclude), match criteria
-    - Match by categories: by_name or by_labels
-    - Match by channels: by_name or by_labels
-  - **favoris section:** favoris rules (separate field)
-    - Each favoris has: name, target_group, match criteria
-    - Match by categories: by_name or by_labels
-    - Match by channels: by_name or by_labels
-- Filter rule editor UI (YAML format with syntax highlighting and validation)
-- Filter assignment to clients (one filter per client)
-- Filter application logic in API responses:
-  - **Stream Filtering Algorithm (for each stream):**
-    1. **Adult Content Check (First Priority):**
-       - If client has `hide_adult_content=true` AND stream has `is_adult=1`: reject stream immediately
-       - This check happens before any filter rules are evaluated
-    2. Iterate through all rules in the **rules section** (include/exclude only)
-    3. For each rule, check if stream matches (by name or labels, for categories or channels)
-    4. **If rule type is "include" and matches:** accept stream
-    5. **If rule type is "exclude" and matches:** reject stream (skip to next stream)
-    6. Continue checking remaining rules for the stream
-    7. After processing all include/exclude rules, check **favoris section separately**
-    8. For each favoris, check if stream matches
-    9. **If favoris matches:** add stream to that favoris category (with calculated ID)
-    10. Note: A stream can appear in both its original category AND in multiple favoris categories
-
-  - **Generate virtual categories from favoris section:**
-    - Iterate through all favoris in the **favoris section** (in order)
-    - Assign category_id starting from 100000, incrementing for each favoris
-    - Create virtual category for each favoris with target_group as category_name
-    - Process separately for live/movies/series based on API endpoint
-    - When client requests `get_live_categories`, return favoris virtual categories (100000+) **first**, then regular categories
-    - When client requests `get_vod_categories`, return favoris virtual categories **first**, then regular categories
-    - When client requests `get_series_categories`, return favoris virtual categories **first**, then regular categories
-    - When client requests streams by favoris category_id (e.g., 100000), return all streams that matched that favoris
-
-  - Match on name (partial string matching) or labels (exact match)
-- Filter preview functionality (show what client will see with virtual categories)
-- Filter templates/presets (YAML files)
-- Import/export filters (YAML format)
-
-
-### Phase 7: VOD & Series Support
-**Scope:** Extend functionality to VOD movies and series
-
-**Features:**
-- **Separate VOD sync tasks:**
-  - Sync VOD categories task
-  - Sync VOD streams task
-- **Separate series sync tasks:**
-  - Sync series categories task
-  - Sync series task (with episodes)
-- `get_vod_categories` API endpoint
-- `get_vod_streams` API endpoint
-- `get_series_categories` API endpoint
-- `get_series` API endpoint
-- `get_series_info` API endpoint
-- VOD stream URL proxying
-- Series episode URL proxying
-- Filters for VOD and series
-- VOD/series display in React admin
-- Enhanced sync worker to handle all 6 sync task types (live_categories, live_streams, vod_categories, vod_streams, series_categories, series)
-
-
-
-### Phase 8: Automated Sync & Background Workers
-**Scope:** Background workers and scheduled synchronization (no cron required)
-
-**Features:**
-- **PHP Daemon Worker** (primary method):
-  - Long-running PHP process in Docker container
-  - Continuous loop checking next_sync timestamps
-  - **Processes 6 separate sync tasks per source:**
-    1. Live categories sync
-    2. Live streams sync
-    3. VOD categories sync
-    4. VOD streams sync
-    5. Series categories sync
-    6. Series sync
-  - Sleep between iterations (configurable, default 5 minutes)
-  - Docker restart policy for reliability
-
-- **Webhook API Endpoint** (alternative method):
-  - Authenticated HTTP endpoint to trigger sync
-  - Can trigger all tasks or specific task type
-  - Can be called by external cron services (cron-job.org, etc.)
-  - Can be triggered manually from admin panel
-
-- **On-Demand Sync with TTL** (fallback method):
-  - Check data age on API requests per task type
-  - Trigger background sync if stale
-  - Non-blocking for client requests
-
-- Configurable sync interval per source
-- **Task-level sync management:**
-  - Each of the 6 task types tracked separately in sync_logs
-  - Sync lock per task type (prevent duplicate syncs)
-- Incremental sync (detect changes)
-- Sync queue system (handle multiple sources and task types)
-- Error handling and logging per task
-- Email/webhook notifications on sync failure
-- Sync history and detailed logs per task type
-- Sync progress tracking (real-time in UI) per task
-- Manual vs automatic sync tracking
-- Sync worker Docker container with restart policy
-
-**Deliverables:**
-- PHP daemon worker script
-- Webhook API endpoint for external triggers
-- On-demand sync middleware
-- Sync scheduling system
-- Notification system
-- Detailed logging
-- Background worker container
-- Real-time sync progress in React UI
-- Documentation for external cron service setup
-
-**Success Criteria:**
-- Sources sync automatically at configured intervals without cron
-- Can configure custom intervals per source
-- Worker automatically restarts on failure
-- Receives notifications on failures
-- Sync completes without manual intervention
-- React UI shows real-time sync progress
-- Multiple sync methods available for different environments
-
-### Phase 9: Docker & Deployment
-**Scope:** Production-ready Docker setup and deployment
-
-**Features:**
-- Multi-stage Dockerfile for backend (optimized size)
-- Multi-stage Dockerfile for frontend (optimized build)
-- Docker Compose for full stack
-- Separate compose file for MySQL vs SQLite
-- Environment variable configuration
-- Volume mounts for persistent data
-- Health checks for all containers
-- Container networking and security
-- docker-compose.yml with all services
-- .env.example for configuration
-- README with deployment instructions
-- Database initialization scripts
-
-**Deliverables:**
-- Production Dockerfiles
-- Docker Compose configurations
-- Volume management
-- Environment templates
-- Deployment documentation
-
-
-### Phase 10: CI/CD with GitHub Actions
-**Scope:** Automated build, test, and deployment pipeline
-
-**Features:**
-- GitHub Actions workflow for CI
-- Automated testing (PHPUnit + Jest)
-- Code quality checks (PHPStan, ESLint, Prettier)
-- Docker image build workflow
-- Multi-platform builds (linux/amd64, linux/arm64)
-- Semantic versioning and git tagging
-- Push to Docker Hub
-- Push to GitHub Container Registry
-- Automated changelog generation
-- Release artifact creation
-- Build on pull request (test only)
-- Deploy on merge to main (build + push)
-
-**Deliverables:**
-- `.github/workflows/ci.yml` - Test and lint
-- `.github/workflows/build.yml` - Docker build and push
-- `.github/workflows/release.yml` - Release management
-- Version tagging automation
-- Docker Hub integration
-- Documentation for CI/CD
-
-**Success Criteria:**
-- Tests run automatically on PRs
-- Docker images build on commits to main
-- Images pushed to Docker Hub and GHCR
-- Multi-platform images available
-- Semantic versioning applied automatically
-- Releases created with changelogs
-
-## Logical Dependency Chain
-
-**Foundation Layer (Must build first):**
-1. Database abstraction layer (MySQL/SQLite support)
-2. Database schema and migrations
-3. Configuration management (environment variables)
-4. Basic PHP project structure
-5. Docker backend container setup
-
-**Data Sync Layer (Core data pipeline):**
-6. Xtream API client library (HTTP requests)
-7. Sync task separation system (6 task types)
-8. Live categories fetch and parse (task 1)
-9. Live streams fetch and parse (task 2)
-10. Live categories and streams database storage
-11. Sync logging with sync_type tracking
-12. Source model and CRUD operations
-13. Basic sync script (CLI) with task separation
-
-**Client API Layer (External interface):**
-14. Client model with source assignment (one-to-one)
-15. Client authentication system
-16. `player_api.php` routing and handler
-17. `get_live_streams` endpoint with source-based filtering
-18. `get_live_categories` endpoint
-19. Stream URL proxy/redirect to client's source
-20. JSON response formatter
-21. Nginx configuration for Xtream URLs
-
-**React Foundation (Admin interface base):**
-22. React project setup (TypeScript, Vite)
-23. UI library integration (Material-UI/Ant Design)
-24. React Router setup
-25. Admin authentication UI (login page)
-26. Backend auth API (JWT/session)
-27. Protected routes
-28. Main layout with navigation
-29. Frontend Docker container
-30. Docker Compose for backend + frontend
-
-**Source Management (First admin feature):**
-31. Sources API endpoints (backend)
-32. Sources list component
-33. Add/edit source forms
-34. Source test connection
-35. Manual sync trigger from React UI (per task type)
-36. Sync status display per task type
-
-**Client Management (Second admin feature):**
-37. Clients API endpoints (backend)
-38. Clients list component
-39. Add/edit client forms with source dropdown
-40. Client enable/disable toggle
-41. Connection logging
-42. Credential generation and display
-
-**Filter System (Core business logic):**
-43. Filter database schema
-44. Filter model and storage
-45. Filter API endpoints (backend)
-46. Filter CRUD components (React)
-47. Filter rule builder UI (rules and favoris sections)
-48. Filter application logic (backend)
-49. Client-filter assignment
-50. Filter preview functionality
-
-**Content Expansion (All content types with task separation):**
-51. VOD database schema
-52. VOD categories sync task implementation
-53. VOD streams sync task implementation
-54. VOD API endpoints
-55. Series database schema
-56. Series categories sync task implementation
-57. Series sync task implementation
-58. Series API endpoints
-
-**Automation & Background Jobs (no cron required):**
-59. PHP daemon worker (long-running process)
-60. Task separation logic for 6 sync types
-61. Webhook API endpoint for external triggers (per task type)
-62. On-demand sync middleware with TTL per task
-63. Sync lock mechanism per task type
-64. Scheduled sync system (loop-based) handling all task types
-65. Error notification system per task
-66. Sync logging and history per task type
-67. Real-time sync progress in UI per task
-68. Docker restart policy for worker
-
-**Deployment & CI/CD:**
-69. Production Docker Compose
-70. Environment configuration templates
-71. GitHub Actions for testing
-72. GitHub Actions for Docker builds
-73. Multi-platform build support
-74. Docker Hub/GHCR publishing
-75. Release automation
-76. Per-task sync status dashboard
-
-## Appendix
-
-### Technical Specifications
-
-**Xtream Codes API Format Examples:**
-
-**Authentication Response:**
-```json
-{
-  "user_info": {
-    "username": "client123",
-    "password": "pass123",
-    "status": "Active",
-    "exp_date": "1735689600",
-    "is_trial": "0",
-    "max_connections": "1"
-  },
-  "server_info": {
-    "url": "http://your-proxy.com",
-    "port": "80",
-    "https_port": "443"
-  }
-}
-```
-
-**Live Streams Response Example:**
-```json
-[
-  {
-    "num": 1,
-    "name": "##### GENERAL #####",
-    "stream_type": "live",
-    "stream_id": 845453,
-    "stream_icon": "http://51.158.145.100/picons/logos/france/845453.png",
-    "epg_channel_id": "",
-    "added": "1675464765",
-    "is_adult": 0,
-    "category_id": "1363",
-    "category_ids": [1363],
-    "custom_sid": null,
-    "tv_archive": 0,
-    "direct_source": "",
-    "tv_archive_duration": 0
-  }
-]
-```
-
-**Note:** All fields from Xtream API are stored in database. The `stream_url` field is constructed by the proxy during sync.
-
-**VOD Streams Response Example:**
-```json
-[
-  {
-    "num": 1,
-    "name": "AR - Violent Ends (2025)",
-    "stream_type": "movie",
-    "stream_id": 1328644,
-    "stream_icon": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/9BrXyyrd5amNmpbZNc4gSblt6kQ.jpg",
-    "rating": "5.857",
-    "rating_5based": 2.9,
-    "tmdb": "1211776",
-    "trailer": "",
-    "added": "1764452400",
-    "is_adult": 0,
-    "category_id": "1487",
-    "category_ids": [1487],
-    "container_extension": "mp4",
-    "custom_sid": null,
-    "direct_source": ""
-  }
-]
-```
-
-**Note:** Additional VOD metadata (plot, cast, director, genre, year, duration, video/audio codecs) may be available from `get_vod_info` API call.
-
-**Series Response Example:**
-```json
-[
-  {
-    "num": 1,
-    "name": "AR - Davey & Jonesie's Locker (2024)",
-    "series_id": 25703,
-    "cover": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/ezbU23Ayb3FVkfXCAvqpB2sfGKE.jpg",
-    "plot": "Best friends Davey and Jonesie escape their bland high school lives through their locker, which is actually a portal to other universes.",
-    "cast": "Veronika Slowikowska, Jaelynn Thora Brooks, Sydney Topliffe",
-    "director": "",
-    "genre": "Comedy / Family",
-    "releaseDate": "2024-03-22",
-    "release_date": "2024-03-22",
-    "last_modified": "1721497059",
-    "rating": "4",
-    "rating_5based": "2",
-    "backdrop_path": [
-      "https://image.tmdb.org/t/p/w1280/ohjylMcBzzPYIq16tMAga3kBvF1.jpg",
-      "https://image.tmdb.org/t/p/w1280/ftExofLUyY4SDPfGNEJGuJWLH1w.jpg"
-    ],
-    "youtube_trailer": "LSPzvzgZ9JE",
-    "tmdb": "246680",
-    "episode_run_time": "0",
-    "category_id": "956",
-    "category_ids": [956]
-  }
-]
-```
-
-**Note:** The series list from `get_series` doesn't include `seasons` and `episodes` data. To get full episode information, use `get_series_info` with the `series_id`.
-
-**Filter YAML Format Example:**
-```yaml
-# Filter configuration in YAML format
-# Two separate sections: rules (include/exclude) and favoris
-
-# Include/Exclude Rules Section
-rules:
-  # Rule 1: Exclude adult content
-  - name: "Block Adult Content"
-    type: exclude
-    match:
-      categories:
-        by_name: ["Adult", "XXX", "18+"]
-        by_labels: ["Adult", "18+"]
-      channels:
-        by_name: ["Playboy TV", "Adult Channel"]
-        by_labels: ["Adult", "XXX"]
-
-  # Rule 2: Include only sports channels
-  - name: "Include Sports"
-    type: include
-    match:
-      categories:
-        by_name: ["Sports", "Football", "Basketball"]
-        by_labels: ["Sports", "ESPN"]
-      channels:
-        by_labels: ["Sports", "HD"]
-
-  # Rule 3: Exclude news channels
-  - name: "Block News"
-    type: exclude
-    match:
-      categories:
-        by_name: ["News", "Politics"]
-      channels:
-        by_labels: ["News"]
-
-# Favoris Section (separate from rules)
-favoris:
-  # Favoris 1: Kids channels (will get category_id: 100000)
-  - name: "Kids Favorites"
-    target_group: "Kids Corner"
-    match:
-      categories:
-        by_name: ["Cartoons", "Kids", "Children"]
-        by_labels: ["Kids", "Cartoon"]
-      channels:
-        by_name: ["Disney", "Nickelodeon", "Cartoon Network"]
-        by_labels: ["Kids", "Family"]
-
-  # Favoris 2: HD sports (will get category_id: 100001)
-  - name: "HD Sports Favorites"
-    target_group: "My Sports HD"
-    match:
-      channels:
-        by_labels: ["Sports", "HD", "FHD"]
-
-  # Favoris 3: Movies (will get category_id: 100002)
-  - name: "My Movies"
-    target_group: "Favorite Movies"
-    match:
-      categories:
-        by_name: ["Action", "Comedy"]
-```
-
-### Environment Configuration
-
-**Backend .env:**
-```bash
-# Database Configuration
-DB_TYPE=mysql # or sqlite
-DB_HOST=mysql
-DB_PORT=3306
-DB_NAME=iptv_proxy
-DB_USER=iptv_user
-DB_PASS=secure_password
-DB_SQLITE_PATH=/app/data/database.sqlite
-
-# Application
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=http://localhost
-
-# Admin Credentials
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=changeme123
-JWT_SECRET=random_secret_key_here  # For JWT token signing (if using JWT)
-SESSION_SECRET=random_session_secret  # For session encryption (if using sessions)
-
-# Sync Configuration (no cron required)
-SYNC_ENABLED=true
-DEFAULT_SYNC_INTERVAL=24  # Hours between syncs per source
-SYNC_CHECK_INTERVAL=300  # Seconds between daemon checks (5 min)
-SYNC_METHOD=daemon  # Options: daemon, webhook, ondemand
-SYNC_WEBHOOK_TOKEN=your_secret_token_here  # For webhook authentication
-
-# Logging
-LOG_LEVEL=info
-```
-
-**Docker Compose:**
-```yaml
-services:
-  backend:
-    image: ghcr.io/yourorg/iptv-proxy-backend:latest
-    environment:
-      - DB_TYPE=mysql
-      - DB_HOST=mysql
-    volumes:
-      - ./data:/app/data
-    ports:
-      - "8080:80"
-
-  frontend:
-    image: ghcr.io/yourorg/iptv-proxy-frontend:latest
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
-
-  mysql:
-    image: mysql:8.0
-    environment:
-      - MYSQL_ROOT_PASSWORD=rootpass
-      - MYSQL_DATABASE=iptv_proxy
-      - MYSQL_USER=iptv_user
-      - MYSQL_PASSWORD=secure_password
-    volumes:
-      - mysql_data:/var/lib/mysql
-
-  sync-worker:
-    image: ghcr.io/yourorg/iptv-proxy-backend:latest
-    command: php /app/bin/sync-daemon.php  # Long-running daemon (no cron needed)
-    restart: always  # Auto-restart on failure
-    environment:
-      - DB_TYPE=mysql
-      - DB_HOST=mysql
-      - SYNC_CHECK_INTERVAL=300  # Check every 5 minutes
-    depends_on:
-      - backend
-      - mysql
-
-volumes:
-  mysql_data:
-```
-
-### GitHub Actions Workflow Examples
-
-**CI Workflow (.github/workflows/ci.yml):**
-```yaml
-name: CI
-
-on: [pull_request]
-
-jobs:
-  test-backend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.1'
-      - name: Install dependencies
-        run: composer install
-      - name: Run tests
-        run: vendor/bin/phpunit
-
-  test-frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      - name: Install dependencies
-        run: npm ci
-      - name: Run tests
-        run: npm test
-```
-
-**Docker Build Workflow (.github/workflows/docker.yml):**
-```yaml
-name: Docker Build
-
-on:
-  push:
-    branches: [main]
-    tags: ['v*']
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build and push
-        uses: docker/build-push-action@v4
-        with:
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            yourorg/iptv-proxy:latest
-            yourorg/iptv-proxy:${{ github.sha }}
-```
-
-### Database Indexes for Performance
-```sql
--- Admin users
-CREATE UNIQUE INDEX idx_admin_username ON admin_users(username);
-
--- Composite index for category lookups (functional ID relationship)
-CREATE INDEX idx_live_source_category ON live_streams(source_id, category_id);
-CREATE INDEX idx_vod_source_category ON vod_streams(source_id, category_id);
-CREATE INDEX idx_series_source_category ON series(source_id, category_id);
-
--- Other performance indexes
-CREATE INDEX idx_live_source ON live_streams(source_id);
-CREATE INDEX idx_live_active ON live_streams(is_active);
-CREATE INDEX idx_live_adult ON live_streams(is_adult);
-CREATE INDEX idx_vod_adult ON vod_streams(is_adult);
-CREATE INDEX idx_client_username ON clients(username);
-CREATE INDEX idx_client_source ON clients(source_id);
-CREATE INDEX idx_client_active ON clients(is_active);
-CREATE INDEX idx_client_adult_filter ON clients(hide_adult_content);
-CREATE INDEX idx_filter_client ON client_filters(client_id);
-
--- Unique constraint on categories to ensure functional ID integrity
-CREATE UNIQUE INDEX idx_category_functional ON categories(source_id, category_id, category_type);
-
--- Note: For label filtering, use LIKE queries with comma delimiters
--- Example: WHERE labels LIKE '%,HD,%' OR labels LIKE 'HD,%' OR labels LIKE '%,HD'
--- Or use FIND_IN_SET for MySQL: WHERE FIND_IN_SET('HD', labels)
--- Consider full-text search indexes for larger deployments if needed
-```
-
-### External Webhook Setup (Alternative to Daemon)
-
-If using webhook-based sync instead of PHP daemon:
-
-**Setup with cron-job.org (Free):**
-1. Register at https://cron-job.org
-2. Create new cron job pointing to: `https://your-proxy.com/api/sync/webhook`
-3. Add header: `Authorization: Bearer YOUR_SYNC_WEBHOOK_TOKEN`
-4. Set schedule (e.g., every 24 hours)
-
-**Setup with GitHub Actions:**
-```yaml
-name: Trigger IPTV Sync
-on:
-  schedule:
-    - cron: '0 0 * * *'  # Daily at midnight
-jobs:
-  sync:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger sync
-        run: |
-          curl -X POST https://your-proxy.com/api/sync/webhook \
-            -H "Authorization: Bearer ${{ secrets.SYNC_WEBHOOK_TOKEN }}"
-```
-
-**Setup with UptimeRobot (Free):**
-1. Create HTTP monitor
-2. URL: `https://your-proxy.com/api/sync/webhook`
-3. Custom HTTP headers: `Authorization: Bearer TOKEN`
-4. Interval: Every 24 hours (requires paid plan, or use 5-min checks)
-
-### Technology Requirements
-
-**Backend:**
-- PHP (latest stable version recommended)
-- Extensions: pdo, pdo_mysql, pdo_sqlite, curl, json, mbstring, openssl
-- Composer (latest version)
-
-**Frontend:**
-- Node.js (LTS version recommended)
-- NPM or Yarn
-- Modern browser support (ES6+)
-
-**Infrastructure:**
-- Docker (latest stable version)
-- Docker Compose
-</PRD>
+1. Client requests: `/live/{username}/{password}/{stream_id}.ts`
+2. StreamDataController builds upstream URL and checks for 302 redirects
+3. **Case A - No redirect**: Stream directly from upstream to client (pass-through)
+4. **Case B - 302 redirect detected**:
+   - If `disablestreamproxy=true`: Return 302 redirect directly to client (client connects to final URL)
+   - If `disablestreamproxy=false` (default): Encode redirect URL in base64 and return 302 to `/proxy/{user}/{pass}?url={base64}`
+5. ProxyController decodes URL, handles further redirects, and streams final data
+
+**Benefit**: Handles complex redirect chains transparently to clients
+
+#### 2. Upstream Proxy (Application ↔ Upstream Servers)
+Route upstream API and stream requests through an optional HTTP/HTTPS/SOCKS5 proxy.
+
+**Configuration:**
+- **Global settings**: Environment variables (`PROXY_ENABLED`, `PROXY_URL`, `PROXY_TYPE`, `PROXY_HOST`, `PROXY_PORT`, `PROXY_USERNAME`, `PROXY_PASSWORD`)
+- **Per-source override**: Source model field `enableproxy` (true/false)
+  - `null/true`: Use global proxy if enabled
+  - `false`: Bypass upstream proxy for this source
+
+**Behavior:**
+- ProxyConfigService loads configuration at startup
+- ProxyConfigService.getCurlOptions() provides cURL configuration
+- HttpClient applies proxy settings to all upstream requests
+- Supports authentication (username/password)
+
+#### 3. Source Configuration Flags
+Each upstream source has three proxy-related settings:
+
+| Flag | Purpose | Values |
+|------|---------|--------|
+| `enableproxy` | Use upstream proxy for this source | true/false/null |
+| `disablestreamproxy` | Skip client-facing proxy for redirects | true/false |
+| `stream_follow_location` | Follow HTTP redirects in streams | true/false |
+
+---
+
+## Admin REST API Specification
+
+### Authentication
+- **POST /api/auth/login** - Login with username/password, returns JWT token
+- **POST /api/auth/logout** - Logout (invalidate token)
+- All other endpoints require JWT token in Authorization header
+
+### Sources Management (with Proxy Configuration)
+- **GET /api/sources** - List all upstream IPTV sources
+- **GET /api/sources/{id}** - Get source details
+- **POST /api/sources** - Create new source
+  - Fields: `name`, `url`, `username`, `password`, `sync_interval`
+  - Proxy fields: `enableproxy` (null/true/false), `disablestreamproxy`, `stream_follow_location`
+- **PUT /api/sources/{id}** - Update source (including proxy settings)
+- **DELETE /api/sources/{id}** - Delete source
+- **GET /api/sources/{id}/sync-status** - Get sync status for source
+- **POST /api/sources/{id}/test-connection** - Test upstream connection
+
+### Clients Management
+- **GET /api/clients** - List all IPTV clients
+- **GET /api/clients/{id}** - Get client details
+- **POST /api/clients** - Create new client
+- **PUT /api/clients/{id}** - Update client
+- **DELETE /api/clients/{id}** - Delete client
+- **GET /api/clients/{id}/history** - View client connection history
+
+### Filters Management
+- **GET /api/filters** - List all filters
+- **GET /api/filters/{id}** - Get filter details
+- **POST /api/filters** - Create new filter
+- **PUT /api/filters/{id}** - Update filter
+- **DELETE /api/filters/{id}** - Delete filter
+- **POST /api/filters/{id}/validate** - Validate filter YAML syntax
+
+### Content Discovery
+- **GET /api/categories** - List categories by type (live/vod/series)
+- **GET /api/categories/{id}/streams** - Get streams in category
+- **GET /api/streams** - List all streams (paginated)
+- **GET /api/streams/{id}** - Get stream details
+
+### Synchronization
+- **GET /api/sync/logs** - View sync operation logs
+- **GET /api/sync/logs/{id}** - Get sync log details
+- **POST /api/sync/trigger** - Trigger manual sync for source
+- **GET /api/sync/status** - Get current sync status
+
+### Monitoring
+- **GET /api/connection-logs** - View client connection activity
+- **GET /api/connection-logs?client={id}** - Filter by client
+- **GET /api/dashboard** - Dashboard statistics and overview
+  - Total sources, clients, streams
+  - Last sync time, next sync time
+  - Current active connections
+  - System memory usage
+
+---
+
+## Xtream Codes API Endpoints (IPTV Client-Facing)
+
+### Main Xtream API
+- **GET /player_api.php** - Server info and authentication
+- **GET /player_api.php?action=get_live_categories** - List live TV categories
+- **GET /player_api.php?action=get_vod_categories** - List VOD categories
+- **GET /player_api.php?action=get_series_categories** - List series categories
+- **GET /player_api.php?action=get_live_streams** - List live streams with pagination
+- **GET /player_api.php?action=get_vod_streams** - List VOD content
+- **GET /player_api.php?action=get_series** - List series
+- **GET /live/xmltv.php** - EPG data (XMLTV format)
+
+### Stream Proxy Endpoints (with Dual Proxy Support)
+- **GET /live/{username}/{password}/{stream_id}.ts** - Live TV stream
+- **GET /movie/{username}/{password}/{stream_id}.mp4** - VOD stream
+- **GET /series/{username}/{password}/{stream_id}.mp4** - Series stream
+
+**Proxy behavior per source configuration:**
+1. **Direct streaming** (no redirect): Proxy data directly from upstream
+2. **With 302 redirect and disablestreamproxy=false**:
+   - Application receives redirect from upstream
+   - Returns 302 to `/proxy/{username}/{password}?url={base64_encoded_redirect_url}`
+   - Client receives redirect and follows to proxy endpoint
+   - ProxyController streams final data
+3. **With 302 redirect and disablestreamproxy=true**:
+   - Application returns 302 directly to client with upstream URL
+   - Client connects directly to upstream (bypasses proxy)
+
+### Internal Proxy Endpoint (Redirect Handling)
+- **GET /proxy/{username}/{password}?url={base64_encoded_url}** - Internal redirect handler
+  - Decodes base64 URL
+  - Follows any additional redirects
+  - Streams final data to client
+  - Subject to upstream proxy if enabled
+
+---
+
+## CI/CD Pipeline - GitHub Actions
+
+### Overview
+Separate, dedicated workflows for Java and PHP builds to enable independent testing and deployment.
+
+**Java Workflows** (java branch):
+1. **java-build-test.yml** - Build and test Java code with Gradle
+2. **java-docker-build.yml** - Build and push Quarkus native Docker images
+
+**PHP Workflows** (main, develop branches):
+1. **backend-ci.yml** - PHP linting and validation
+2. **docker-build.yml** - Build and push PHP Docker images
+
+---
+
+### Java Workflows
+
+#### Workflow: Java Build & Test (java-build-test.yml)
+
+**Trigger**: Push and pull requests on `java` branch only
+
+**Steps**:
+1. Checkout repository (v4)
+2. Setup JDK 17 (Temurin distribution)
+   - Enable Gradle build cache
+3. Build with Gradle
+   - Command: `cd java && ./gradlew build -Dquarkus.package.type=native`
+   - Compile Java sources
+   - Run linting/analysis
+4. Run tests
+   - Command: `cd java && ./gradlew test`
+   - Execute all unit and integration tests
+5. Upload test results (if available)
+   - Artifact: `java/build/test-results/test/`
+6. Upload code coverage (if available)
+   - Artifact: `java/build/reports/jacoco/test/jacocoTestReport.xml`
+   - Sends to codecov for tracking
+
+**Success Criteria**:
+- Gradle build completes without errors
+- All tests pass
+- No compiler warnings
+- Native image compilation succeeds
+
+#### Workflow: Java Docker Build & Push (java-docker-build.yml)
+
+**Trigger**:
+- Push to `java` branch (excluding branches `main`, `develop`)
+- Version tags matching `java-v*` pattern
+- Pull requests to `java` branch
+
+**Steps**:
+1. Checkout repository
+2. Setup JDK 17 (Temurin distribution)
+   - Enable Gradle build cache
+3. Build Java with Gradle native compilation
+   - Command: `cd java && ./gradlew build -Dquarkus.package.type=native --no-daemon`
+   - Produces GraalVM native executable (`*-runner`)
+4. Setup Docker Buildx for multi-platform builds
+5. Login to GHCR (GitHub Container Registry)
+   - Skip on pull requests
+   - Uses GitHub Actions token
+6. Extract metadata and generate tags
+   - Branch tag: `ghcr.io/anasoid/iptv-organizer-proxy:java`
+   - Semantic version tags: `v1.2.3`, `1.2` (from `java-v*` tags)
+   - Latest tag: `java-latest` for java branch
+7. Build and push Docker image
+   - Docker Buildx with GitHub Actions cache
+   - Multi-platforms: `linux/amd64`, `linux/arm/v7`, `linux/arm64`
+   - Push only on successful builds to main branches (skip on PRs)
+8. Generate build summary
+   - Posts to GitHub workflow summary with tags and platforms
+
+**Docker Image Details (Java)**:
+
+| Aspect | Value |
+|--------|-------|
+| Base Image | `alpine:3.18` (runtime) |
+| Builder Image | `ghcr.io/graalvm/native-image:22` |
+| Executable | GraalVM native binary |
+| Memory Target | 64MB heap (-Xmx64m -Xms32m) |
+| Startup Time | < 2 seconds |
+| Image Size Target | < 80MB |
+| Health Check | `/health` endpoint, 30s interval |
+| Port | 9090 |
+| Volumes | `/app/data`, `/logs/iptv` |
+| Non-root User | `app` (UID 1000) |
+
+**Platforms Supported (Java)**:
+- `linux/amd64` - x86-64 servers, desktops
+- `linux/arm/v7` - ARMv7 OpenWrt routers (primary target)
+- `linux/arm64` - ARM64 modern routers, Raspberry Pi 4+
+
+**Registry**: GitHub Container Registry (GHCR)
+- URL: `ghcr.io/anasoid/iptv-organizer-proxy` with `java` tag prefix
+- Authentication: GitHub Actions token (automatic)
+- Image naming: `ghcr.io/anasoid/iptv-organizer-proxy:java`, `ghcr.io/anasoid/iptv-organizer-proxy:java-v1.2.3`
+
+**Caching**:
+- GitHub Actions cache layer for faster rebuilds
+- BuildKit cache optimization
+
+---
+
+### PHP Workflows
+
+#### Workflow: Backend CI (backend-ci.yml)
+
+**Trigger**: Push and pull requests on `main`, `develop` branches
+
+**Purpose**: PHP linting, composer validation, security scanning
+
+#### Workflow: Docker Build & Push (docker-build.yml)
+
+**Trigger**:
+- Push to `main`, `develop` branches
+- Version tags matching `v*` pattern (without `java-` prefix)
+- Pull requests to `main`, `develop` branches
+
+**Configuration**:
+- Uses: `./docker/Dockerfile` (PHP multi-stage build)
+- Platforms: `linux/amd64`, `linux/arm64`
+- Build command: Composer + PHP-FPM with Alpine
+- Tags: Branch-based (`main`, `develop`), semantic versions (`v1.2.3`)
+
+---
+
+## Workflow Separation Summary
+
+| Aspect | Java (java branch) | PHP (main/develop) |
+|--------|-------------------|-------------------|
+| **Build Workflow** | `java-build-test.yml` | `backend-ci.yml` |
+| **Docker Workflow** | `java-docker-build.yml` | `docker-build.yml` |
+| **Build Tool** | Gradle 8.5+ | Composer |
+| **Compilation** | GraalVM native | PHP-FPM runtime |
+| **Platforms** | amd64, arm/v7, arm64 | amd64, arm64 |
+| **Image Base** | Alpine 3.18 + native binary | Alpine 3.18 + PHP-FPM |
+| **Tag Prefix** | `java` | none (main is latest) |
+| **Registry** | GHCR | GHCR |
+| **Testing** | JUnit + Gradle test | PHP linter + composer validate |
+
+---
+
+## Success Metrics
+
+### Memory
+- [ ] Idle state: < 45MB RSS
+- [ ] Load (3 concurrent streams): < 60MB RSS
+- [ ] Background sync: < 58MB RSS
+- [ ] No OOM errors under sustained load
+
+### Performance
+- [ ] Startup time: < 2 seconds
+- [ ] Video stream latency (first byte): < 200ms
+- [ ] JSON parsing (10K items): < 3 seconds
+- [ ] API response time (p99): < 100ms
+- [ ] Throughput matches/exceeds PHP version
+
+### Functionality
+- [ ] All Xtream API endpoints working
+- [ ] YAML filtering system operational
+- [ ] Background sync daemon functional
+- [ ] Admin REST API complete
+- [ ] IPTV client compatibility (VLC, Kodi, TiviMate)
+
+### Deployment
+- [ ] Docker image < 80MB
+- [ ] Successful build for ARM (armv7/armv8)
+- [ ] Runs on OpenWrt with Docker
+- [ ] Health check endpoint responsive
+- [ ] React admin panel compatible
+
+---
+
+## Key Decisions
+
+### 1. Custom SimpleMigrator vs Flyway
+**Decision**: Implement custom migration system
+**Rationale**: Saves 3-4MB memory (Flyway uses 4-6MB at runtime)
+**Trade-off**: No rollback support (acceptable for embedded deployment)
+
+### 2. Gradle vs Maven
+**Decision**: Use Gradle 8.5+
+**Rationale**: Faster builds, better caching, simpler native image configuration
+**Implementation**: Configure via `quarkus.native` block in `build.gradle`
+
+### 3. Reactive Architecture
+**Decision**: Mutiny/Vert.x reactive stack
+**Rationale**: Non-blocking I/O for video streaming, lower thread overhead
+**Benefit**: Better concurrency with same memory footprint
+
+### 4. Connection Pooling
+**Decision**: Minimal pools (2 DB, 3 HTTP)
+**Rationale**: Fits within 64MB memory constraint
+**Impact**: Sequential connection reuse, acceptable latency
+
+---
+
+## Risks & Mitigation
+
+| Risk | Impact | Likelihood | Mitigation |
+|------|--------|------------|-----------|
+| Memory overflow during sync | Critical | Medium | Batch tuning (100 items), explicit GC calls |
+| GraalVM reflection issues | High | Medium | Comprehensive reflection config, early testing |
+| Native image size > 80MB | High | Low | Dependency optimization, tree-shaking |
+| Stream buffer exhaustion | High | Low | Connection limits, backpressure handling |
+| Database connection leaks | Medium | Low | Pool monitoring, timeout enforcement |
+| YAML filter incompatibility | Medium | Medium | Unit tests with existing PHP configs |
+| OpenWrt hardware compatibility | High | Medium | Test on real device early, ARM cross-compile |
+
+---
+
+## Timeline & Milestones
+
+### Milestone 1: Infrastructure & Database (Weeks 1-2)
+- Quarkus project setup with Gradle
+- Database layer with custom SimpleMigrator
+- Connection pooling configured
+- Panache entities for all 11 tables
+- **Deliverable**: Working database, migration system, ORM models
+
+### Milestone 2: Core Services (Weeks 2-4)
+- Streaming components (JSON parser, HTTP client, filters)
+- Background sync daemon with Quarkus Scheduler
+- Label extraction service
+- All services tested for memory efficiency
+- **Deliverable**: <60MB memory under load
+
+### Milestone 3: Admin REST API for UI (Week 4-5)
+- Complete Admin REST API with 9 controllers
+- Auth, sources, clients, filters, categories, streams, sync, logs, dashboard
+- JWT authentication
+- Full integration with React admin UI
+- **Deliverable**: Fully functional admin panel backend
+
+### Milestone 4: Xtream Codes API (Week 5)
+- Xtream API implementation (/player_api.php endpoints)
+- Stream proxy with video streaming
+- EPG support
+- Full client compatibility testing
+- **Deliverable**: IPTV client integration (VLC, Kodi, etc.)
+
+### Milestone 5: Deployment & Optimization (Weeks 6-7)
+- Docker configuration with multi-stage builds
+- Native image compilation for OpenWrt
+- Configuration management (application.yaml)
+- Memory profiling and optimization
+- OpenWrt hardware validation
+- **Deliverable**: Production-ready <80MB Docker image, <2s startup
+
+---
+
+## Implementation Steps
+
+### Phase 1: Project Setup & Infrastructure
+- [ ] Create Quarkus Gradle project (build.gradle)
+- [ ] Add Quarkus platform BOM 3.6.4+
+- [ ] Add reactive extensions: resteasy-reactive, hibernate-reactive-panache, reactive-mysql-client
+- [ ] Add dependencies: Vert.x WebClient, Jackson, SnakeYAML, SmallRye JWT
+- [ ] Configure native build: -Xmx64m, --gc=serial, -march=armv7-a
+- [ ] Setup package structure: controllers, services, models, migrations
+- [ ] Create separate GitHub Actions workflows for Java:
+  - [ ] `.github/workflows/java-build-test.yml` - Build Java with Gradle + run tests (java branch only)
+  - [ ] `.github/workflows/java-docker-build.yml` - Build and push Quarkus native Docker images
+- [ ] Keep existing PHP workflows unchanged:
+  - [ ] `.github/workflows/backend-ci.yml` - PHP linting (main, develop)
+  - [ ] `.github/workflows/docker-build.yml` - PHP Docker builds (main, develop)
+- [ ] Configure GHCR authentication and image tagging strategy (java-prefixed tags for Java images)
+
+### Phase 2: Database Layer
+- [ ] Create custom migration system (SimpleMigrator pattern)
+- [ ] Design and implement 11 SQL schema files in /resources/db/migration/
+- [ ] Implement version tracking table (schema_version)
+- [ ] Add checksum validation
+- [ ] Create Panache entities for 11 tables: AdminUser, Source, Filter, Client, Category, LiveStream, VodStream, Series, SyncLog, ConnectionLog
+- [ ] Configure reactive pool: max-size=2, idle-timeout=30s
+- [ ] Test MySQL and SQLite support
+
+### Phase 3: Core Services
+- [ ] **StreamingJsonParser**: Jackson Streaming API, 128KB chunks, GC every 1000 items
+- [ ] **HttpStreamingService**: Vert.x WebClient, Multi<Buffer>, 8-16KB chunks, backpressure
+- [ ] **FilterService**: SnakeYAML parsing, regex matching, filter caching
+- [ ] **SyncService**: Quarkus Scheduler, batch 100 items, explicit GC, transaction safety
+- [ ] **LabelExtractor**: Implement label extraction from stream metadata
+
+### Phase 4: Admin REST API & UI Integration
+- [ ] **AuthController**: POST /api/auth/login, POST /api/auth/logout, JWT token generation
+- [ ] **SourceController**: GET/POST/PUT/DELETE /api/sources, list and manage upstream sources
+- [ ] **ClientController**: GET/POST/PUT/DELETE /api/clients, manage IPTV clients and credentials
+- [ ] **FilterController**: GET/POST/PUT/DELETE /api/filters, manage YAML filter configurations
+- [ ] **CategoriesController**: GET /api/categories, browse available categories
+- [ ] **StreamsController**: GET /api/streams, browse live streams, VOD, series content
+- [ ] **SyncController**: GET /api/sync/logs, POST /api/sync/trigger, manage background sync
+- [ ] **ConnectionLogsController**: GET /api/connection-logs, view client activity
+- [ ] **DashboardController**: GET /api/dashboard, statistics and overview data
+- [ ] Test all endpoints with React admin UI
+
+### Phase 5: Xtream Codes API & Proxy System
+- [ ] **XtreamController**: GET /player_api.php with all actions (get_live_categories, get_live_streams, etc.)
+- [ ] **StreamDataController**:
+  - Implement `/live/{user}/{pass}/{id}.{ext}`, `/movie/...`, `/series/...` endpoints
+  - Handle upstream 302 redirects (redirect directly or via proxy)
+  - Support per-source configuration: `disablestreamproxy`, `stream_follow_location`
+  - Direct streaming when no redirect, proxy when redirect detected
+- [ ] **ProxyController**:
+  - Implement `/proxy/{user}/{pass}?url={base64_encoded}` endpoint
+  - Decode base64 URLs and stream data
+  - Support redirect following based on source configuration
+- [ ] **ProxyConfigService**:
+  - Manage upstream proxy configuration (HTTP/HTTPS/SOCKS5)
+  - Support global (PROXY_ENABLED, PROXY_URL) and per-source proxy settings
+  - Handle proxy authentication (username/password)
+  - Provide configuration for cURL requests
+- [ ] **ClientAuthMiddleware**: Validate client credentials per request
+- [ ] **EPG Support**: GET /live/xmltv.php or similar EPG endpoints
+- [ ] **Response Formatting**: JSON compliance with Xtream API specification
+- [ ] Test with VLC, Kodi, TiviMate, GSE IPTV, other compatible players
+- [ ] Test proxy scenarios: direct, 302 redirects, upstream proxy, SOCKS5
+
+### Phase 6: Configuration & Deployment
+- [ ] Convert .env to application.yaml
+- [ ] Database connection properties
+- [ ] Sync scheduler intervals (DEFAULT_SYNC_INTERVAL, SYNC_CHECK_INTERVAL)
+- [ ] Memory and pool limits
+- [ ] JWT secret configuration
+- [ ] CORS and security settings
+
+### Phase 7: Docker & Testing
+- [ ] Create Dockerfile for Quarkus native build
+  - [ ] Multi-stage: GraalVM builder + Alpine 3.18 runtime
+  - [ ] Configure native image compilation with aggressive optimization
+  - [ ] ARM architecture optimization (armv7-a, armv8-a)
+  - [ ] Target image size: < 80MB
+- [ ] Setup Java-specific GitHub Actions workflows
+  - [ ] Create `java-docker-build.yml` for automated GHCR pushes
+  - [ ] Configure multi-architecture builds (amd64, arm/v7, arm64)
+  - [ ] Setup java-prefixed semantic versioning and branch tagging (java, java-v1.2.3, java-latest)
+  - [ ] Keep PHP workflows independent (docker-build.yml remains unchanged)
+- [ ] Implement health check endpoint (/health for liveness checks)
+- [ ] Create docker-compose.yml for OpenWrt deployment
+- [ ] Test image on target platforms (OpenWrt ARMv7/ARMv8)
+
+### Phase 8: Validation & Optimization
+- [ ] Memory profiling: idle <45MB, load <60MB, sync <58MB
+- [ ] Load testing: 50 concurrent streams, 4 hours
+- [ ] Functional testing: all Admin API endpoints with React UI
+- [ ] Functional testing: all Xtream API endpoints with IPTV clients
+- [ ] OpenWrt hardware deployment validation
+- [ ] Startup time <2s verification
+
+---
+
+## Dependencies & Resources
+
+### External Systems
+- MySQL 8.0+ or MariaDB 10.5+
+- OpenWrt 22.03+ with Docker support
+- GraalVM CE 22.3+ for native compilation
+
+### Build Infrastructure
+- Gradle 8.5+
+- Java 17+
+- Docker for multi-stage builds
+- **CI/CD Pipeline**: GitHub Actions with separate Java and PHP workflows
+  - **Java Workflows** (java branch):
+    - `.github/workflows/java-build-test.yml` - Gradle build and test
+    - `.github/workflows/java-docker-build.yml` - Quarkus native Docker builds
+  - **PHP Workflows** (main, develop branches):
+    - `.github/workflows/backend-ci.yml` - PHP linting and validation
+    - `.github/workflows/docker-build.yml` - PHP Docker builds
+  - Multi-architecture builds (Java: amd64, arm/v7, arm64; PHP: amd64, arm64)
+  - Automated pushes to GitHub Container Registry (GHCR)
+  - Separate image tags (java-prefixed for Java, plain for PHP)
+
+### Testing Infrastructure
+- JFR (Java Flight Recorder) for memory profiling
+- JMeter or custom load testing
+- IPTV clients (VLC, Kodi, TiviMate)
+- OpenWrt device or emulator
+
+---
+
+## Acceptance Criteria
+
+### Code Quality
+- [ ] Memory usage validated on target hardware
+- [ ] All unit tests passing
+- [ ] Integration tests for critical paths
+- [ ] Code follows Java conventions
+- [ ] No compiler warnings
+
+### Performance
+- [ ] Startup time < 2s on target device
+- [ ] Video streaming latency < 200ms
+- [ ] API response times < 100ms (p99)
+- [ ] Handles 50 concurrent streams
+
+### Admin API Endpoints
+- [ ] POST /api/auth/login - User authentication
+- [ ] POST /api/auth/logout - User logout
+- [ ] GET /api/sources - List upstream sources
+- [ ] POST/PUT/DELETE /api/sources - CRUD sources
+- [ ] GET /api/clients - List IPTV clients
+- [ ] POST/PUT/DELETE /api/clients - CRUD clients
+- [ ] GET /api/filters - List filters
+- [ ] POST/PUT/DELETE /api/filters - CRUD filters
+- [ ] GET /api/categories - Browse categories
+- [ ] GET /api/streams - Browse streams
+- [ ] GET /api/sync/logs - View sync logs
+- [ ] POST /api/sync/trigger - Manual sync trigger
+- [ ] GET /api/connection-logs - View client activity
+- [ ] GET /api/dashboard - Dashboard statistics
+
+### Xtream API Compatibility
+- [ ] Xtream API 100% compatible (/player_api.php)
+- [ ] Works with VLC, Kodi, TiviMate, GSE IPTV
+- [ ] Stream proxy functional (/live/..., /movie/..., /series/...)
+- [ ] EPG support (XMLTV format)
+- [ ] MySQL and SQLite databases work
+- [ ] Runs on OpenWrt ARMv7/ARMv8
+
+### Operations & Deployment
+- [ ] Docker image < 80MB
+- [ ] Automated Docker builds (GitHub Actions) on java branch push
+- [ ] Multi-architecture Docker image (amd64, arm/v7, arm64)
+- [ ] Images published to GHCR with version tags
+- [ ] Health check endpoint (`/health`)
+- [ ] Startup < 2 seconds
+- [ ] No memory leaks (4-hour test)
+- [ ] Graceful shutdown
+- [ ] Configuration via environment variables
+- [ ] GitHub Actions workflows functional and passing
+
+---
+
+## Critical Implementation Notes
+
+### Proxy System (Phase 5 Priority)
+- **Dual proxy architecture** is core to application functionality
+- **Client-facing proxy** handles redirect chains transparently (base64 encoding/decoding)
+- **Upstream proxy** allows routing through HTTP/HTTPS/SOCKS5 with authentication
+- Per-source proxy configuration is essential for flexibility
+- ProxyConfigService must support both unified URL and component-based environment variables
+
+### Database Schema
+All 11 tables include these fields:
+- Timestamps: `created_at`, `updated_at`
+- Primary key: `id` (auto-increment)
+- Source table includes: `enableproxy`, `disablestreamproxy`, `stream_follow_location`
+- Client table linked to Source via `source_id`
+- Filter table linked to Source via `source_id`
+
+### General Notes
+- **No Migration Required**: Old PHP application remains separate; this is new Java implementation
+- React admin panel can remain unchanged (separate TypeScript/React service)
+- OpenWrt deployment uses Docker (standalone container)
+- Custom migration system chosen for 3-4MB memory savings vs Flyway
+- Gradle chosen for build efficiency and native image configuration
+- Reactive architecture critical for 64MB heap constraint
+- Fresh implementation focused on memory efficiency and OpenWrt compatibility
+
+---
+
+**Document Version**: 1.3 (Separate Java and PHP GitHub Actions Workflows)
+**Created**: 2026-01-02
+**Last Updated**: 2026-01-02
+**Status**: Approved for New Development
+
+**Latest Updates (v1.3)**:
+- Separated Java and PHP GitHub Actions workflows completely
+- Java Workflows: `java-build-test.yml`, `java-docker-build.yml` (java branch only)
+- PHP Workflows: `backend-ci.yml`, `docker-build.yml` (main/develop branches)
+- Added workflow separation table for clarity
+- Configured java-prefixed image tags in GHCR (java, java-v1.2.3, java-latest)
+- Java builds support 3 platforms (amd64, arm/v7, arm64) for full OpenWrt compatibility
+
+**Previous Updates (v1.2)**:
+- Added comprehensive GitHub Actions CI/CD section
+- Created multi-stage Dockerfile for Quarkus native build
+- Configured multi-architecture Docker builds (amd64, arm/v7, arm64)
+- Integrated GHCR publishing with semantic versioning

@@ -94,7 +94,7 @@ export default function Filters() {
       const cloneData = {
         name: `${filter.name} (Copy)`,
         description: filter.description,
-        filter_config: filter.filter_config,
+        filterConfig: filter.filterConfig,
       };
       await filtersApi.createFilter(cloneData);
       queryClient.invalidateQueries({ queryKey: ['filters'] });
@@ -118,14 +118,14 @@ export default function Filters() {
     { field: 'name', headerName: 'Name', width: 200, flex: 1 },
     { field: 'description', headerName: 'Description', width: 250, flex: 1 },
     {
-      field: 'use_source_filter',
+      field: 'useSourceFilter',
       headerName: 'Source Filter',
       width: 140,
       sortable: false,
       filterable: false,
       renderCell: (params) => {
         const filter = params.row as Filter;
-        const isEnabled = filter.use_source_filter ? true : false;
+        const isEnabled = filter.useSourceFilter ? true : false;
         const isLoading = updateUseSourceFilterMutation.isPending;
 
         return (

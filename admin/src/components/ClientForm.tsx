@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
   DialogTitle,
   DialogContent,
@@ -11,10 +11,13 @@ import {
   FormControlLabel,
   Checkbox,
   MenuItem,
+  Typography,
+  FormControl,
+  InputLabel,
+  Select,
 } from '@mui/material';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ContentCopy as CopyIcon } from '@mui/icons-material';
 import type { Client } from '../services/clientsApi';
 import clientsApi from '../services/clientsApi';
 import sourcesApi from '../services/sourcesApi';
@@ -27,32 +30,34 @@ interface ClientFormProps {
 }
 
 export default function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
-  const [showPassword, setShowPassword] = useState(false);
-  const [credentials, setCredentials] = useState<{ username: string; password: string } | null>(
-    null
-  );
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
+    control,
     watch,
-    setValue,
   } = useForm<Client>({
-    defaultValues: client || {
+    defaultValues: {
       username: '',
       password: '',
-      source_id: undefined,
-      filter_id: null,
+      name: '',
+      sourceId: undefined,
+      filterId: null,
       email: '',
-      is_active: 1,
-      hide_adult_content: 0,
+      expiryDate: undefined,
+      isActive: true,
+      hideAdultContent: false,
+      enableProxy: null,
+      connectXtreamApi: null,
+      connectXtreamStream: null,
+      connectXmltv: null,
+      notes: '',
     },
   });
 
-  const sourceId = watch('source_id');
-  const filterId = watch('filter_id');
+  const sourceId = watch('sourceId');
 
   // Fetch sources for dropdown
   const { data: sourcesData } = useQuery({
@@ -82,39 +87,66 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
 
   useEffect(() => {
     if (client) {
-      reset(client);
+      // Reset form with client data, preserving null values
+      reset({
+        username: client.username,
+        password: client.password,
+        name: client.name || '',
+        sourceId: client.sourceId,
+        filterId: client.filterId || null,
+        email: client.email || '',
+        expiryDate: client.expiryDate || undefined,
+        isActive: client.isActive,
+        hideAdultContent: client.hideAdultContent || false,
+        enableProxy: client.enableProxy ?? null,
+        connectXtreamApi: client.connectXtreamApi || null,
+        connectXtreamStream: client.connectXtreamStream || null,
+        connectXmltv: client.connectXmltv || null,
+        notes: client.notes || '',
+      });
+    } else {
+      // Reset to default values for new client
+      reset({
+        username: '',
+        password: '',
+        name: '',
+        sourceId: undefined,
+        filterId: null,
+        email: '',
+        expiryDate: undefined,
+        isActive: true,
+        hideAdultContent: false,
+        enableProxy: null,
+        connectXtreamApi: null,
+        connectXtreamStream: null,
+        connectXmltv: null,
+        notes: '',
+      });
     }
   }, [client, reset]);
 
   const onSubmit = (data: Client) => {
+    console.log('Form data before processing:', data);
+    
+    // Ensure null values are preserved in the submission
+    const clientData = {
+      ...data,
+      enableProxy: data.enableProxy === undefined ? null : data.enableProxy,
+      filterId: !data.filterId ? null : Number(data.filterId),
+    };
+
+    console.log('Submitting client data:', clientData);
+
     if (client?.id) {
       updateMutation.mutate({
         id: client.id,
-        client: data,
+        client: clientData,
       });
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(clientData);
     }
   };
 
-  const generateCredentials = () => {
-    const newUsername = `client_${Date.now()}`;
-    const newPassword = Math.random().toString(36).substring(2, 15) +
-      Math.random().toString(36).substring(2, 15);
-
-    setCredentials({ username: newUsername, password: newPassword });
-    setValue('username', newUsername);
-    setValue('password', newPassword);
-  };
-
-  const copyToClipboard = () => {
-    if (sourceId && credentials) {
-      const connectionUrl = `http://proxy-url/player_api.php?username=${credentials.username}&password=${credentials.password}&source=${sourceId}`;
-      navigator.clipboard.writeText(connectionUrl).then(() => {
-        alert('Credentials copied to clipboard!');
-      });
-    }
-  };
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
   const error = createMutation.error || updateMutation.error;
@@ -122,9 +154,9 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
   return (
     <>
       <DialogTitle>{client ? 'Edit Client' : 'Add Client'}</DialogTitle>
-      <DialogContent sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <DialogContent sx={{ pt: 2, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
         {error && (
-          <Alert severity="error">
+          <Alert severity="error" sx={{ gridColumn: '1 / -1' }}>
             {error instanceof Error ? error.message : 'An error occurred'}
           </Alert>
         )}
@@ -134,9 +166,9 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           label="Source"
           fullWidth
           value={sourceId || ''}
-          {...register('source_id', { required: 'Source is required' })}
-          error={!!errors.source_id}
-          helperText={errors.source_id?.message}
+          {...register('sourceId', { required: 'Source is required' })}
+          error={!!errors.sourceId}
+          helperText={errors.sourceId?.message}
         >
           <MenuItem value="">Select a source</MenuItem>
           {sourcesData?.data?.map(
@@ -148,23 +180,37 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           )}
         </TextField>
 
-        <TextField
-          select
-          label="Filter (Optional)"
-          fullWidth
-          value={filterId || ''}
-          {...register('filter_id')}
-        >
-          <MenuItem value="">None</MenuItem>
-          {Array.isArray(filtersData?.data) &&
-            filtersData.data.map(
-              (filter: { id: number; name: string }) => (
-                <MenuItem key={filter.id} value={filter.id}>
-                  {filter.name}
-                </MenuItem>
-              )
-            )}
-        </TextField>
+        <Controller
+          name="filterId"
+          control={control}
+          render={({ field }) => (
+            <TextField
+              select
+              label="Filter (Optional)"
+              fullWidth
+              value={field.value ?? ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                console.log('Filter changed to:', val, 'type:', typeof val);
+                if (val === '' || val === 'None') {
+                  field.onChange(null);
+                } else {
+                  field.onChange(Number(val));
+                }
+              }}
+            >
+              <MenuItem value="">None</MenuItem>
+              {Array.isArray(filtersData?.data) &&
+                filtersData.data.map(
+                  (filter: { id: number; name: string }) => (
+                    <MenuItem key={filter.id} value={filter.id}>
+                      {filter.name}
+                    </MenuItem>
+                  )
+                )}
+            </TextField>
+          )}
+        />
 
         <TextField
           label="Username"
@@ -177,20 +223,11 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
         <TextField
           label="Password"
           fullWidth
-          type={showPassword ? 'text' : 'password'}
+          type="text"
           {...register('password', { required: 'Password is required' })}
           error={!!errors.password}
           helperText={errors.password?.message}
         />
-
-        <FormControlLabel
-          control={<Checkbox checked={showPassword} onChange={(e) => setShowPassword(e.target.checked)} />}
-          label="Show password"
-        />
-
-        <Button onClick={generateCredentials} variant="outlined" fullWidth>
-          Generate Random Credentials
-        </Button>
 
         <TextField
           label="Email"
@@ -206,11 +243,25 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           helperText={errors.email?.message}
         />
 
+        <TextField
+          label="Display Name (Optional)"
+          fullWidth
+          {...register('name')}
+        />
+
+        <TextField
+          label="Expiry Date (Optional)"
+          fullWidth
+          type="date"
+          slotProps={{ input: { max: '2099-12-31' } }}
+          {...register('expiryDate')}
+        />
+
         <FormControlLabel
           control={
             <Checkbox
-              {...register('is_active')}
-              defaultChecked={!client || client.is_active === 1}
+              {...register('isActive')}
+              defaultChecked={!client || client.isActive === true}
             />
           }
           label="Active"
@@ -219,34 +270,152 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
         <FormControlLabel
           control={
             <Checkbox
-              {...register('hide_adult_content')}
-              defaultChecked={client?.hide_adult_content === 1}
+              {...register('hideAdultContent')}
+              defaultChecked={client?.hideAdultContent === true}
             />
           }
           label="Hide Adult Content"
         />
 
-        {credentials && sourceId && (
-          <Box sx={{ p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
-            <Alert severity="info">
-              Connection URL:
-              <br />
-              <code style={{ wordBreak: 'break-all' }}>
-                http://proxy-url/player_api.php?username={credentials.username}&password=
-                {credentials.password}
-              </code>
-            </Alert>
-            <Button
-              startIcon={<CopyIcon />}
-              onClick={copyToClipboard}
-              variant="outlined"
-              size="small"
-              sx={{ mt: 1 }}
-            >
-              Copy URL
-            </Button>
+        <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2, gridColumn: '1 / -1' }}>
+          <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+            Proxy Settings (Optional)
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mb: 2 }}>
+            Indeterminate (unchecked) = inherit from source, Checked = enable, Unchecked = disable
+          </Typography>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            <Box>
+              <Controller
+                name="enableProxy"
+                control={control}
+                shouldUnregister={false}
+                render={({ field }) => (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={field.value === true}
+                        indeterminate={field.value === null}
+                        onChange={() => {
+                          const currentValue = field.value;
+                          // Three-state cycle: null -> true -> false -> null
+                          let newValue: boolean | null;
+                          if (currentValue === null) {
+                            newValue = true;
+                          } else if (currentValue === true) {
+                            newValue = false;
+                          } else {
+                            newValue = null;
+                          }
+                          field.onChange(newValue);
+                        }}
+                        inputProps={{ 'data-testid': field.name }}
+                      />
+                    }
+                    label="Enable HTTP Proxy"
+                  />
+                )}
+              />
+              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 4 }}>
+                Use HTTP proxy for upstream requests
+              </Typography>
+            </Box>
           </Box>
-        )}
+        </Box>
+
+        <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2, gridColumn: '1 / -1' }}>
+          <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+            Connection Mode Settings (Optional - leave empty to inherit from source)
+          </Typography>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
+            <Controller
+              name="connectXtreamApi"
+              control={control}
+              render={({ field }) => (
+                <FormControl fullWidth>
+                  <InputLabel>Xtream API Mode</InputLabel>
+                  <Select
+                    value={field.value ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      field.onChange(val === '' ? null : val);
+                    }}
+                    label="Xtream API Mode"
+                  >
+                    <MenuItem value="">Inherit from Source</MenuItem>
+                    <MenuItem value="INHERITED">Force Inherit</MenuItem>
+                    <MenuItem value="DEFAULT">Default</MenuItem>
+                    <MenuItem value="NO_PROXY">No Proxy</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+            />
+
+            <Controller
+              name="connectXtreamStream"
+              control={control}
+              render={({ field }) => (
+                <FormControl fullWidth>
+                  <InputLabel>Xtream Stream Mode</InputLabel>
+                  <Select
+                    value={field.value ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      field.onChange(val === '' ? null : val);
+                    }}
+                    label="Xtream Stream Mode"
+                  >
+                    <MenuItem value="">Inherit from Source</MenuItem>
+                    <MenuItem value="INHERITED">Force Inherit</MenuItem>
+                    <MenuItem value="DIRECT">Direct</MenuItem>
+                    <MenuItem value="NO_PROXY">No Proxy</MenuItem>
+                    <MenuItem value="PROXY">Proxy</MenuItem>
+                    <MenuItem value="REDIRECT">Redirect</MenuItem>
+                    <MenuItem value="DEFAULT">Default</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+            />
+
+            <Controller
+              name="connectXmltv"
+              control={control}
+              render={({ field }) => (
+                <FormControl fullWidth>
+                  <InputLabel>XMLTV Mode</InputLabel>
+                  <Select
+                    value={field.value ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      field.onChange(val === '' ? null : val);
+                    }}
+                    label="XMLTV Mode"
+                  >
+                    <MenuItem value="">Inherit from Source</MenuItem>
+                    <MenuItem value="INHERITED">Force Inherit</MenuItem>
+                    <MenuItem value="REDIRECT">Redirect</MenuItem>
+                    <MenuItem value="TUNNEL">Tunnel</MenuItem>
+                    <MenuItem value="NO_PROXY">No Proxy</MenuItem>
+                    <MenuItem value="DEFAULT">Default</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+            />
+          </Box>
+        </Box>
+
+        <TextField
+          label="Notes (Optional)"
+          fullWidth
+          multiline
+          rows={3}
+          {...register('notes')}
+          sx={{ gridColumn: '1 / -1' }}
+        />
+
+
       </DialogContent>
       <DialogActions>
         <Button onClick={onCancel}>Cancel</Button>

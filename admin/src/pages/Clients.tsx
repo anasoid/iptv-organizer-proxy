@@ -117,27 +117,27 @@ export default function Clients() {
     { field: 'id', headerName: 'ID', width: 60 },
     { field: 'username', headerName: 'Username', flex: 1, minWidth: 120 },
     {
-      field: 'source_id',
+      field: 'sourceId',
       headerName: 'Source',
       flex: 1,
       minWidth: 120,
       renderCell: (params) => <>{sourcesMap.get(params.value) || '-'}</>,
     },
     {
-      field: 'filter_id',
+      field: 'filterId',
       headerName: 'Filter',
       flex: 1,
       minWidth: 120,
       renderCell: (params) => <>{params.value ? filtersMap.get(params.value) || '-' : '-'}</>,
     },
     {
-      field: 'is_active',
+      field: 'isActive',
       headerName: 'Active',
       width: 100,
       renderCell: (params) => (
         <Chip
-          label={params.value === 1 ? 'Active' : 'Inactive'}
-          color={params.value === 1 ? 'success' : 'default'}
+          label={params.value ? 'Active' : 'Inactive'}
+          color={params.value ? 'success' : 'default'}
           size="small"
         />
       ),
@@ -214,7 +214,7 @@ export default function Clients() {
       </Box>
 
       {/* Client Form Modal */}
-      <Dialog open={open} onClose={handleCloseForm} maxWidth="sm" fullWidth>
+      <Dialog open={open} onClose={handleCloseForm} maxWidth="md" fullWidth>
         <ClientForm
           client={editingClient}
           onSuccess={handleFormSuccess}

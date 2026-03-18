@@ -23,12 +23,21 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
+  FormControl,
+  Select,
+  MenuItem,
+  Stack,
+  Pagination,
+  Tab,
+  Tabs,
 } from '@mui/material';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { ArrowBack, Download as DownloadIcon, Block as BlockIcon, OpenInNew as OpenInNewIcon, Visibility as ViewIcon } from '@mui/icons-material';
 import clientsApi from '../services/clientsApi';
 import sourcesApi from '../services/sourcesApi';
 import { useAuthStore } from '../stores/authStore';
+import ClientHistoryTab from './ClientHistoryTab';
 
 // Type definitions for category and stream data
 interface Category {
@@ -42,6 +51,7 @@ interface Stream {
   name: string;
   num?: string | number | null;
   category_id: string | number;
+  category_name?: string;
 }
 
 type AllowedItem = Category | Stream;
@@ -87,6 +97,13 @@ export default function ClientDetail() {
   const [selectedBlockedType, setSelectedBlockedType] = useState<string | null>(null);
   const [allowedModalOpen, setAllowedModalOpen] = useState(false);
   const [selectedAllowedType, setSelectedAllowedType] = useState<string | null>(null);
+  const [blockedSearch, setBlockedSearch] = useState('');
+  const [blockedPageSize, setBlockedPageSize] = useState(20);
+  const [blockedPage, setBlockedPage] = useState(1);
+  const [allowedSearch, setAllowedSearch] = useState('');
+  const [allowedPageSize, setAllowedPageSize] = useState(20);
+  const [allowedPage, setAllowedPage] = useState(1);
+  const [activeTab, setActiveTab] = useState(0);
 
   const { data: clientResponse, isLoading: clientLoading, error: clientError } = useQuery({
     queryKey: ['client', id],
@@ -97,10 +114,91 @@ export default function ClientDetail() {
   const client = clientResponse?.data;
 
   const { data: sourceResponse } = useQuery({
-    queryKey: ['source', client?.source_id],
-    queryFn: () => sourcesApi.getSource(Number(client?.source_id)),
-    enabled: isAuthenticated && !!client?.source_id,
+    queryKey: ['source', client?.sourceId],
+    queryFn: () => sourcesApi.getSource(Number(client?.sourceId)),
+    enabled: isAuthenticated && !!client?.sourceId,
   });
+
+  // Fetch all categories (both allowed and blocked) to map category_id to category_name
+  const { data: liveCategoriesResponse } = useQuery({
+    queryKey: ['all-live-categories', id],
+    queryFn: () => clientsApi.exportLiveCategories(Number(id)),
+    enabled: isAuthenticated && !!id,
+  });
+
+  const { data: vodCategoriesResponse } = useQuery({
+    queryKey: ['all-vod-categories', id],
+    queryFn: () => clientsApi.exportVodCategories(Number(id)),
+    enabled: isAuthenticated && !!id,
+  });
+
+  const { data: seriesCategoriesResponse } = useQuery({
+    queryKey: ['all-series-categories', id],
+    queryFn: () => clientsApi.exportSeriesCategories(Number(id)),
+    enabled: isAuthenticated && !!id,
+  });
+
+  const { data: blockedLiveCategoriesResponse } = useQuery({
+    queryKey: ['blocked-live-categories', id],
+    queryFn: () => clientsApi.exportBlockedLiveCategories(Number(id)),
+    enabled: isAuthenticated && !!id && !!client?.filterId,
+  });
+
+  const { data: blockedVodCategoriesResponse } = useQuery({
+    queryKey: ['blocked-vod-categories', id],
+    queryFn: () => clientsApi.exportBlockedVodCategories(Number(id)),
+    enabled: isAuthenticated && !!id && !!client?.filterId,
+  });
+
+  const { data: blockedSeriesCategoriesResponse } = useQuery({
+    queryKey: ['blocked-series-categories', id],
+    queryFn: () => clientsApi.exportBlockedSeriesCategories(Number(id)),
+    enabled: isAuthenticated && !!id && !!client?.filterId,
+  });
+
+  // Create mapping of category_id -> category_name for all types (allowed + blocked)
+  const categoryNameMap: Record<string, string> = {};
+  if (liveCategoriesResponse?.data) {
+    (liveCategoriesResponse.data as Category[]).forEach((cat) => {
+      categoryNameMap[`live-${cat.category_id}`] = cat.category_name;
+    });
+  }
+  if (blockedLiveCategoriesResponse?.data) {
+    (blockedLiveCategoriesResponse.data as Category[]).forEach((cat) => {
+      categoryNameMap[`live-${cat.category_id}`] = cat.category_name;
+    });
+  }
+  if (vodCategoriesResponse?.data) {
+    (vodCategoriesResponse.data as Category[]).forEach((cat) => {
+      categoryNameMap[`vod-${cat.category_id}`] = cat.category_name;
+    });
+  }
+  if (blockedVodCategoriesResponse?.data) {
+    (blockedVodCategoriesResponse.data as Category[]).forEach((cat) => {
+      categoryNameMap[`vod-${cat.category_id}`] = cat.category_name;
+    });
+  }
+  if (seriesCategoriesResponse?.data) {
+    (seriesCategoriesResponse.data as Category[]).forEach((cat) => {
+      categoryNameMap[`series-${cat.category_id}`] = cat.category_name;
+    });
+  }
+  if (blockedSeriesCategoriesResponse?.data) {
+    (blockedSeriesCategoriesResponse.data as Category[]).forEach((cat) => {
+      categoryNameMap[`series-${cat.category_id}`] = cat.category_name;
+    });
+  }
+
+  // Helper function to enrich streams with category names
+  const enrichStreamsWithCategoryNames = (
+    streams: Stream[],
+    type: string
+  ): Stream[] => {
+    return streams.map((stream) => ({
+      ...stream,
+      category_name: categoryNameMap[`${type}-${stream.category_id}`] || `Category ${stream.category_id}`,
+    }));
+  };
 
   const { data: allowedResponse, isLoading: allowedLoading } = useQuery({
     queryKey: ['allowed-items', id, selectedAllowedType],
@@ -139,8 +237,8 @@ export default function ClientDetail() {
   });
 
   const source = sourceResponse?.data;
-  const blockedData = blockedResponse?.data; // Extract just the data array from response
-  const allowedData = allowedResponse?.data; // Extract just the data array from response
+  const blockedData = blockedResponse?.data;
+  const allowedData = allowedResponse?.data;
 
   const exportMutation = useMutation({
     mutationFn: ({ exportType }: { exportType: string }) => {
@@ -343,15 +441,28 @@ export default function ClientDetail() {
         </Button>
         <Typography variant="h5">{client.username}</Typography>
         <Chip
-          label={client.is_active ? 'Active' : 'Inactive'}
-          color={client.is_active ? 'success' : 'default'}
+          label={client.isActive ? 'Active' : 'Inactive'}
+          color={client.isActive ? 'success' : 'default'}
           size="small"
         />
       </Box>
 
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Client Information
+      <Tabs
+        value={activeTab}
+        onChange={(_, v) => setActiveTab(v as number)}
+        sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+      >
+        <Tab label="Details" />
+        <Tab label="Watch History" />
+      </Tabs>
+
+      {activeTab === 1 && <ClientHistoryTab clientId={Number(id)} />}
+
+      {activeTab === 0 && (
+        <>
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Client Information
         </Typography>
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
@@ -371,12 +482,12 @@ export default function ClientDetail() {
           </Grid>
           <Grid item xs={12} md={6}>
             <Typography>
-              <strong>Filter:</strong> {client.filter_id ? `Filter #${client.filter_id}` : 'None'}
+              <strong>Filter:</strong> {client.filterId ? `Filter #${client.filterId}` : 'None'}
             </Typography>
           </Grid>
           <Grid item xs={12} md={6}>
             <Typography>
-              <strong>Created:</strong> {client.created_at ? new Date(client.created_at).toLocaleString() : 'Unknown'}
+              <strong>Created:</strong> {client.createdAt ? new Date(client.createdAt).toLocaleString() : 'Unknown'}
             </Typography>
           </Grid>
           <Grid item xs={12} md={6}>
@@ -520,11 +631,18 @@ export default function ClientDetail() {
           ))}
         </Grid>
       </Box>
+        </> /* end details tab */
+      )} {/* end activeTab === 0 */}
 
       {/* Blocked Items Details Modal */}
       <Dialog
         open={blockedModalOpen}
-        onClose={() => setBlockedModalOpen(false)}
+        onClose={() => {
+          setBlockedModalOpen(false);
+          setBlockedSearch('');
+          setBlockedPage(1);
+          setBlockedPageSize(20);
+        }}
         maxWidth="lg"
         fullWidth
       >
@@ -532,7 +650,7 @@ export default function ClientDetail() {
           {BLOCKED_TYPES.find((b) => b.type === selectedBlockedType)?.label || 'Blocked Items'}
         </DialogTitle>
         <DialogContent>
-          {!client?.filter_id ? (
+          {!client?.filterId ? (
             <Alert severity="info" sx={{ mt: 2 }}>
               No filter assigned to this client. All items are accessible.
             </Alert>
@@ -544,10 +662,51 @@ export default function ClientDetail() {
             <Box sx={{ mt: 2 }}>
               {selectedBlockedType && (
                 <>
+                  <Stack direction="row" spacing={2} sx={{ mb: 2 }} alignItems="center">
+                    <TextField
+                      placeholder="Search items..."
+                      size="small"
+                      value={blockedSearch}
+                      onChange={(e) => {
+                        setBlockedSearch(e.target.value);
+                        setBlockedPage(1);
+                      }}
+                      sx={{ flex: 1 }}
+                    />
+                    <FormControl size="small" sx={{ minWidth: 120 }}>
+                      <Select
+                        value={blockedPageSize}
+                        onChange={(e) => {
+                          setBlockedPageSize(e.target.value as number);
+                          setBlockedPage(1);
+                        }}
+                      >
+                        <MenuItem value={20}>20 per page</MenuItem>
+                        <MenuItem value={50}>50 per page</MenuItem>
+                        <MenuItem value={100}>100 per page</MenuItem>
+                        <MenuItem value={0}>All</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Stack>
                   {selectedBlockedType.includes('categories') ? (
-                    <BlockedCategoriesTable items={(blockedData as Category[]) || []} />
+                    <BlockedCategoriesTable
+                      items={(blockedData as Category[]) || []}
+                      searchTerm={blockedSearch}
+                      pageSize={blockedPageSize}
+                      currentPage={blockedPage}
+                      onPageChange={setBlockedPage}
+                    />
                   ) : (
-                    <BlockedStreamsTable items={(blockedData as Stream[]) || []} />
+                    <BlockedStreamsTable
+                      items={enrichStreamsWithCategoryNames(
+                        (blockedData as Stream[]) || [],
+                        selectedBlockedType.replace('_streams', '').replace('blocked_', '')
+                      )}
+                      searchTerm={blockedSearch}
+                      pageSize={blockedPageSize}
+                      currentPage={blockedPage}
+                      onPageChange={setBlockedPage}
+                    />
                   )}
                 </>
               )}
@@ -555,14 +714,24 @@ export default function ClientDetail() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setBlockedModalOpen(false)}>Close</Button>
+          <Button onClick={() => {
+            setBlockedModalOpen(false);
+            setBlockedSearch('');
+            setBlockedPage(1);
+            setBlockedPageSize(20);
+          }}>Close</Button>
         </DialogActions>
       </Dialog>
 
       {/* Allowed Items Details Modal */}
       <Dialog
         open={allowedModalOpen}
-        onClose={() => setAllowedModalOpen(false)}
+        onClose={() => {
+          setAllowedModalOpen(false);
+          setAllowedSearch('');
+          setAllowedPage(1);
+          setAllowedPageSize(20);
+        }}
         maxWidth="lg"
         fullWidth
       >
@@ -576,16 +745,66 @@ export default function ClientDetail() {
             </Box>
           ) : allowedData ? (
             <Box sx={{ mt: 2 }}>
-              {selectedAllowedType && selectedAllowedType.includes('categories') ? (
-                <AllowedCategoriesTable items={(allowedData as Category[]) || []} />
-              ) : (
-                <AllowedStreamsTable items={(allowedData as Stream[]) || []} />
+              {selectedAllowedType && (
+                <>
+                  <Stack direction="row" spacing={2} sx={{ mb: 2 }} alignItems="center">
+                    <TextField
+                      placeholder="Search items..."
+                      size="small"
+                      value={allowedSearch}
+                      onChange={(e) => {
+                        setAllowedSearch(e.target.value);
+                        setAllowedPage(1);
+                      }}
+                      sx={{ flex: 1 }}
+                    />
+                    <FormControl size="small" sx={{ minWidth: 120 }}>
+                      <Select
+                        value={allowedPageSize}
+                        onChange={(e) => {
+                          setAllowedPageSize(e.target.value as number);
+                          setAllowedPage(1);
+                        }}
+                      >
+                        <MenuItem value={20}>20 per page</MenuItem>
+                        <MenuItem value={50}>50 per page</MenuItem>
+                        <MenuItem value={100}>100 per page</MenuItem>
+                        <MenuItem value={0}>All</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Stack>
+                  {selectedAllowedType.includes('categories') ? (
+                    <AllowedCategoriesTable
+                      items={(allowedData as Category[]) || []}
+                      searchTerm={allowedSearch}
+                      pageSize={allowedPageSize}
+                      currentPage={allowedPage}
+                      onPageChange={setAllowedPage}
+                    />
+                  ) : (
+                    <AllowedStreamsTable
+                      items={enrichStreamsWithCategoryNames(
+                        (allowedData as Stream[]) || [],
+                        selectedAllowedType.replace('_streams', '').replace('_series', '')
+                      )}
+                      searchTerm={allowedSearch}
+                      pageSize={allowedPageSize}
+                      currentPage={allowedPage}
+                      onPageChange={setAllowedPage}
+                    />
+                  )}
+                </>
               )}
             </Box>
           ) : null}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAllowedModalOpen(false)}>Close</Button>
+          <Button onClick={() => {
+            setAllowedModalOpen(false);
+            setAllowedSearch('');
+            setAllowedPage(1);
+            setAllowedPageSize(20);
+          }}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>
@@ -603,136 +822,301 @@ interface BlockedStream {
   name: string;
   num?: number;
   category_id: number;
+  category_name?: string;
 }
 
-function BlockedCategoriesTable({ items }: { items: BlockedCategory[] }) {
+function BlockedCategoriesTable({
+  items,
+  searchTerm = '',
+  pageSize = 20,
+  currentPage = 1,
+  onPageChange,
+}: {
+  items: BlockedCategory[];
+  searchTerm?: string;
+  pageSize?: number;
+  currentPage?: number;
+  onPageChange?: (page: number) => void;
+}) {
+  const filtered = items.filter((item) =>
+    item.category_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(item.category_id).includes(searchTerm)
+  );
+
+  const totalPages = pageSize === 0 ? 1 : Math.ceil(filtered.length / pageSize);
+  const displayedItems =
+    pageSize === 0
+      ? filtered
+      : filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
-    <TableContainer>
-      <Table size="small" sx={{ mt: 2 }}>
-        <TableHead>
-          <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-            <TableCell>Category ID</TableCell>
-            <TableCell>Category Name</TableCell>
-            <TableCell>Parent ID</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {items.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={3} align="center">
-                No blocked categories
-              </TableCell>
+    <Box>
+      <TableContainer>
+        <Table size="small" sx={{ mt: 2 }}>
+          <TableHead>
+            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+              <TableCell>Category ID</TableCell>
+              <TableCell>Category Name</TableCell>
+              <TableCell>Parent ID</TableCell>
             </TableRow>
-          ) : (
-            items.map((item, idx) => (
-              <TableRow key={idx}>
-                <TableCell>{item.category_id}</TableCell>
-                <TableCell>{item.category_name}</TableCell>
-                <TableCell>{item.parent_id || '-'}</TableCell>
+          </TableHead>
+          <TableBody>
+            {displayedItems.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} align="center">
+                  {searchTerm ? 'No categories match your search' : 'No blocked categories'}
+                </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </TableContainer>
+            ) : (
+              displayedItems.map((item, idx) => (
+                <TableRow key={idx}>
+                  <TableCell>{item.category_id}</TableCell>
+                  <TableCell>{item.category_name}</TableCell>
+                  <TableCell>{item.parent_id || '-'}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      {pageSize !== 0 && totalPages > 1 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, mb: 2 }}>
+          <Pagination
+            count={totalPages}
+            page={currentPage}
+            onChange={(_, page) => onPageChange?.(page)}
+          />
+        </Box>
+      )}
+      {searchTerm && (
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+          Showing {displayedItems.length} of {filtered.length} items
+        </Typography>
+      )}
+    </Box>
   );
 }
 
-function BlockedStreamsTable({ items }: { items: BlockedStream[] }) {
+function BlockedStreamsTable({
+  items,
+  searchTerm = '',
+  pageSize = 20,
+  currentPage = 1,
+  onPageChange,
+}: {
+  items: BlockedStream[];
+  searchTerm?: string;
+  pageSize?: number;
+  currentPage?: number;
+  onPageChange?: (page: number) => void;
+}) {
+  const filtered = items.filter((item) =>
+    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(item.id).includes(searchTerm) ||
+    String(item.category_id).includes(searchTerm) ||
+    (item.category_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
+  );
+
+  const totalPages = pageSize === 0 ? 1 : Math.ceil(filtered.length / pageSize);
+  const displayedItems =
+    pageSize === 0
+      ? filtered
+      : filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
-    <TableContainer>
-      <Table size="small" sx={{ mt: 2 }}>
-        <TableHead>
-          <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-            <TableCell>Stream Name</TableCell>
-            <TableCell>Stream Number</TableCell>
-            <TableCell>Category ID</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {items.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={3} align="center">
-                No blocked streams
-              </TableCell>
+    <Box>
+      <TableContainer>
+        <Table size="small" sx={{ mt: 2 }}>
+          <TableHead>
+            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+              <TableCell>Stream Name</TableCell>
+              <TableCell>Stream Number</TableCell>
+              <TableCell>Category ID</TableCell>
+              <TableCell>Category Name</TableCell>
             </TableRow>
-          ) : (
-            items.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>{item.name}</TableCell>
-                <TableCell>{item.num || '-'}</TableCell>
-                <TableCell>{item.category_id}</TableCell>
+          </TableHead>
+          <TableBody>
+            {displayedItems.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} align="center">
+                  {searchTerm ? 'No streams match your search' : 'No blocked streams'}
+                </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </TableContainer>
+            ) : (
+              displayedItems.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>{item.name}</TableCell>
+                  <TableCell>{item.num || '-'}</TableCell>
+                  <TableCell>{item.category_id}</TableCell>
+                  <TableCell>{item.category_name || '-'}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      {pageSize !== 0 && totalPages > 1 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, mb: 2 }}>
+          <Pagination
+            count={totalPages}
+            page={currentPage}
+            onChange={(_, page) => onPageChange?.(page)}
+          />
+        </Box>
+      )}
+      {searchTerm && (
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+          Showing {displayedItems.length} of {filtered.length} items
+        </Typography>
+      )}
+    </Box>
   );
 }
 
-function AllowedCategoriesTable({ items }: { items: Category[] }) {
+function AllowedCategoriesTable({
+  items,
+  searchTerm = '',
+  pageSize = 20,
+  currentPage = 1,
+  onPageChange,
+}: {
+  items: Category[];
+  searchTerm?: string;
+  pageSize?: number;
+  currentPage?: number;
+  onPageChange?: (page: number) => void;
+}) {
+  const filtered = items.filter((item) =>
+    item.category_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(item.category_id).includes(searchTerm)
+  );
+
+  const totalPages = pageSize === 0 ? 1 : Math.ceil(filtered.length / pageSize);
+  const displayedItems =
+    pageSize === 0
+      ? filtered
+      : filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
-    <TableContainer>
-      <Table size="small" sx={{ mt: 2 }}>
-        <TableHead>
-          <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-            <TableCell>Category ID</TableCell>
-            <TableCell>Category Name</TableCell>
-            <TableCell>Parent ID</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {items.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={3} align="center">
-                No allowed categories
-              </TableCell>
+    <Box>
+      <TableContainer>
+        <Table size="small" sx={{ mt: 2 }}>
+          <TableHead>
+            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+              <TableCell>Category ID</TableCell>
+              <TableCell>Category Name</TableCell>
+              <TableCell>Parent ID</TableCell>
             </TableRow>
-          ) : (
-            items.map((item, idx) => (
-              <TableRow key={idx}>
-                <TableCell>{item.category_id}</TableCell>
-                <TableCell>{item.category_name}</TableCell>
-                <TableCell>{item.parent_id || '-'}</TableCell>
+          </TableHead>
+          <TableBody>
+            {displayedItems.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} align="center">
+                  {searchTerm ? 'No categories match your search' : 'No allowed categories'}
+                </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </TableContainer>
+            ) : (
+              displayedItems.map((item, idx) => (
+                <TableRow key={idx}>
+                  <TableCell>{item.category_id}</TableCell>
+                  <TableCell>{item.category_name}</TableCell>
+                  <TableCell>{item.parent_id || '-'}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      {pageSize !== 0 && totalPages > 1 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, mb: 2 }}>
+          <Pagination
+            count={totalPages}
+            page={currentPage}
+            onChange={(_, page) => onPageChange?.(page)}
+          />
+        </Box>
+      )}
+      {searchTerm && (
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+          Showing {displayedItems.length} of {filtered.length} items
+        </Typography>
+      )}
+    </Box>
   );
 }
 
-function AllowedStreamsTable({ items }: { items: Stream[] }) {
+function AllowedStreamsTable({
+  items,
+  searchTerm = '',
+  pageSize = 20,
+  currentPage = 1,
+  onPageChange,
+}: {
+  items: Stream[];
+  searchTerm?: string;
+  pageSize?: number;
+  currentPage?: number;
+  onPageChange?: (page: number) => void;
+}) {
+  const filtered = items.filter((item) =>
+    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(item.id || '').includes(searchTerm) ||
+    String(item.category_id).includes(searchTerm) ||
+    (item.category_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
+  );
+
+  const totalPages = pageSize === 0 ? 1 : Math.ceil(filtered.length / pageSize);
+  const displayedItems =
+    pageSize === 0
+      ? filtered
+      : filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
-    <TableContainer>
-      <Table size="small" sx={{ mt: 2 }}>
-        <TableHead>
-          <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-            <TableCell>Stream Name</TableCell>
-            <TableCell>Stream Number</TableCell>
-            <TableCell>Category ID</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {items.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={3} align="center">
-                No allowed streams
-              </TableCell>
+    <Box>
+      <TableContainer>
+        <Table size="small" sx={{ mt: 2 }}>
+          <TableHead>
+            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+              <TableCell>Stream Name</TableCell>
+              <TableCell>Stream Number</TableCell>
+              <TableCell>Category ID</TableCell>
+              <TableCell>Category Name</TableCell>
             </TableRow>
-          ) : (
-            items.map((item, idx) => (
-              <TableRow key={idx}>
-                <TableCell>{item.name}</TableCell>
-                <TableCell>{item.num || '-'}</TableCell>
-                <TableCell>{item.category_id}</TableCell>
+          </TableHead>
+          <TableBody>
+            {displayedItems.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} align="center">
+                  {searchTerm ? 'No streams match your search' : 'No allowed streams'}
+                </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </TableContainer>
+            ) : (
+              displayedItems.map((item, idx) => (
+                <TableRow key={idx}>
+                  <TableCell>{item.name}</TableCell>
+                  <TableCell>{item.num || '-'}</TableCell>
+                  <TableCell>{item.category_id}</TableCell>
+                  <TableCell>{item.category_name || '-'}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      {pageSize !== 0 && totalPages > 1 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, mb: 2 }}>
+          <Pagination
+            count={totalPages}
+            page={currentPage}
+            onChange={(_, page) => onPageChange?.(page)}
+          />
+        </Box>
+      )}
+      {searchTerm && (
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+          Showing {displayedItems.length} of {filtered.length} items
+        </Typography>
+      )}
+    </Box>
   );
 }

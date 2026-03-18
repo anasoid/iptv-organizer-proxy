@@ -1,0 +1,242 @@
+package org.anasoid.iptvorganizer.repositories.stream;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.*;
+import org.anasoid.iptvorganizer.models.entity.stream.SourcedEntity;
+import org.anasoid.iptvorganizer.repositories.BaseRepository;
+import org.anasoid.iptvorganizer.utils.db.DatabaseUtils;
+import org.anasoid.iptvorganizer.utils.streaming.JdbcStreamIterator;
+
+/**
+ * Base repository for entities that belong to a source and have ordering.
+ *
+ * @param <T> The entity type extending SourcedEntity
+ */
+public abstract class SourcedEntityRepository<T extends SourcedEntity> extends BaseRepository<T> {
+
+  /** Find entities by source ID */
+  public List<T> findBySourceId(Long sourceId) {
+    List<T> results = new ArrayList<>();
+    String sql =
+        "SELECT * FROM " + getTableName() + " WHERE source_id = ? ORDER BY num ASC, id DESC";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          results.add(mapRow(rs));
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find by source id in " + getTableName(), e);
+    }
+    return results;
+  }
+
+  /**
+   * Stream entities by source ID using lazy iterator for O(1) memory usage.
+   *
+   * <p>Returns a JdbcStreamIterator that fetches rows one at a time from the database instead of
+   * loading all into memory. The iterator manages its own Connection/Statement/ResultSet lifecycle
+   * and closes them automatically when iteration completes or when close() is called.
+   *
+   * <p>Uses database-agnostic streaming configuration that optimizes for each database vendor
+   * (MySQL, PostgreSQL, SQLite, H2).
+   *
+   * @param sourceId The source ID to filter by
+   * @return Iterator that streams rows from the database
+   */
+  public Iterator<T> streamBySourceId(Long sourceId) {
+    String sql =
+        "SELECT * FROM " + getTableName() + " WHERE source_id = ? ORDER BY num ASC, id DESC";
+    try {
+      Connection conn = dataSource.getConnection();
+      // Use forward-only, read-only result set for streaming (standard JDBC)
+      PreparedStatement stmt =
+          conn.prepareStatement(sql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+
+      // Configure streaming based on database vendor
+      // This applies vendor-specific optimizations (e.g., Integer.MIN_VALUE for MySQL,
+      // positive fetch size + autoCommit=false for PostgreSQL)
+      DatabaseUtils.configureStreamingStatement(stmt, conn);
+
+      stmt.setLong(1, sourceId);
+      ResultSet rs = stmt.executeQuery();
+
+      // Return lazy iterator (resources closed when iteration completes)
+      return new JdbcStreamIterator<>(conn, stmt, rs, this::mapRow);
+
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to stream by source id in " + getTableName(), e);
+    }
+  }
+
+  /** Find external IDs by source ID */
+  public List<Integer> findExternalIdsBySourceId(Long sourceId) {
+    List<Integer> ids = new ArrayList<>();
+    String sql = "SELECT external_id FROM " + getTableName() + " WHERE source_id = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          ids.add(rs.getInt("external_id"));
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException(
+          "Failed to find external ids by source id  in " + getTableName(), e);
+    }
+    return ids;
+  }
+
+  public T findByExternalId(Integer externalId, Long sourceId) {
+    String sql = "SELECT * FROM " + getTableName() + " WHERE external_id = ? AND source_id = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setInt(1, externalId);
+      stmt.setLong(2, sourceId);
+      try (ResultSet rs = stmt.executeQuery()) {
+        return rs.next() ? mapRow(rs) : null;
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find by external id  in " + getTableName(), e);
+    }
+  }
+
+  /**
+   * Find entities by external IDs in bulk using IN clause. Much more efficient than individual
+   * queries for batch operations.
+   *
+   * @param externalIds List of external IDs to find
+   * @param sourceId Source ID to filter by
+   * @return Map of external_id -> entity for quick lookup
+   */
+  public Map<Integer, Long> findIdsByExternalIds(List<Integer> externalIds, Long sourceId) {
+    return findIdsByExternalIds(externalIds, sourceId, "");
+  }
+
+  protected Map<Integer, Long> findIdsByExternalIds(
+      List<Integer> externalIds, Long sourceId, String prefilter) {
+    if (externalIds.isEmpty()) {
+      return Map.of();
+    }
+
+    Map<Integer, Long> results = new HashMap<>();
+
+    // Build IN clause with placeholders
+    String placeholders = String.join(",", Collections.nCopies(externalIds.size(), "?"));
+    String sql =
+        "SELECT id, external_id FROM "
+            + getTableName()
+            + " WHERE source_id = ? AND external_id IN ("
+            + placeholders
+            + ")"
+            + prefilter;
+
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+
+      // Bind external IDs
+      for (int i = 0; i < externalIds.size(); i++) {
+        stmt.setInt(i + 2, externalIds.get(i));
+      }
+
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          results.put(rs.getInt("external_id"), rs.getLong("id"));
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException(
+          "Failed to bulk find by external ids in " + getTableName() + "->" + sql, e);
+    }
+
+    return results;
+  }
+
+  /**
+   * Find full entities by external IDs in bulk using IN clause. Much more efficient than individual
+   * queries for batch operations with change detection.
+   *
+   * @param externalIds List of external IDs to find
+   * @param sourceId Source ID to filter by
+   * @return Map of external_id -> entity for quick lookup and change detection
+   */
+  public Map<Integer, T> findEntitiesByExternalIds(List<Integer> externalIds, Long sourceId) {
+    if (externalIds.isEmpty()) {
+      return Map.of();
+    }
+
+    Map<Integer, T> results = new HashMap<>();
+
+    // Build IN clause with placeholders
+    String placeholders = String.join(",", Collections.nCopies(externalIds.size(), "?"));
+    String sql =
+        "SELECT * FROM "
+            + getTableName()
+            + " WHERE source_id = ? AND external_id IN ("
+            + placeholders
+            + ")";
+
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+
+      // Bind external IDs
+      for (int i = 0; i < externalIds.size(); i++) {
+        stmt.setInt(i + 2, externalIds.get(i));
+      }
+
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          T entity = mapRow(rs);
+          results.put(entity.getExternalId(), entity);
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException(
+          "Failed to bulk find entities by external ids in " + getTableName() + "->" + sql, e);
+    }
+
+    return results;
+  }
+
+  /**
+   * Check if entity has any functional field changes compared to existing. Compares SourcedEntity
+   * base fields (sourceId, externalId, num). Subclasses should override to add their own field
+   * comparisons.
+   *
+   * @param newEntity Entity with new data
+   * @param existingEntity Entity from database
+   * @return true if any base field has changed, false otherwise
+   */
+  public boolean hasFunctionalChanges(T newEntity, T existingEntity) {
+    if (existingEntity == null) {
+      return true;
+    }
+
+    // Check SourcedEntity base fields
+    if (!Objects.equals(newEntity.getSourceId(), existingEntity.getSourceId())) return true;
+    if (!Objects.equals(newEntity.getExternalId(), existingEntity.getExternalId())) return true;
+    if (!Objects.equals(newEntity.getNum(), existingEntity.getNum())) return true;
+
+    return false;
+  }
+
+  public void deleteByExternalId(Integer externalId, Long sourceId) {
+    String sql = "DELETE FROM " + getTableName() + " WHERE external_id = ? AND source_id = ?";
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setInt(1, externalId);
+      stmt.setLong(2, sourceId);
+      stmt.executeUpdate();
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to delete by external id  in " + getTableName(), e);
+    }
+  }
+}

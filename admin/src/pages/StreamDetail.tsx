@@ -63,19 +63,19 @@ export default function StreamDetail() {
   });
 
   // Fetch source ID from stream to get all categories as fallback
-  const sourceId = stream?.source_id;
+  const sourceId = stream?.sourceId;
 
   // First try to get single category, fallback to fetching all categories
   const { data: categoryData } = useQuery({
-    queryKey: ['category', stream?.category_id],
+    queryKey: ['category', stream?.categoryId],
     queryFn: async () => {
-      if (!stream?.category_id) {
+      if (!stream?.categoryId) {
         console.log('No category_id on stream');
         return Promise.resolve(null);
       }
-      console.log('Fetching category:', { category_id: stream.category_id, source_id: sourceId });
+      console.log('Fetching category:', { category_id: stream.categoryId, source_id: sourceId });
       try {
-        const result = await categoriesApi.getCategory(Number(stream.category_id), sourceId);
+        const result = await categoriesApi.getCategory(Number(stream.categoryId), sourceId);
         console.log('Category found:', result.data.category_name);
         return result;
       } catch {
@@ -84,9 +84,9 @@ export default function StreamDetail() {
         if (sourceId) {
           try {
             const allCats = await categoriesApi.getCategories(sourceId, 1, 100);
-            const found = allCats.data.find((cat) => cat.id === Number(stream.category_id));
+            const found = allCats.data.find((cat) => cat.id === Number(stream.categoryId));
             if (found) {
-              console.log('Category found in source categories:', found.category_name);
+              console.log('Category found in source categories:', found.name);
               return { success: true, data: found };
             } else {
               console.log('Category not found in source categories either');
@@ -100,7 +100,7 @@ export default function StreamDetail() {
         return null;
       }
     },
-    enabled: isAuthenticated && !!stream?.category_id,
+    enabled: isAuthenticated && !!stream?.categoryId,
   });
 
   const category = categoryData?.data;
@@ -205,16 +205,16 @@ export default function StreamDetail() {
                 <Typography variant="h4" sx={{ flex: '1 1 auto' }}>
                   {stream.name}
                 </Typography>
-                {stream.category_id && (
+                {stream.categoryId && (
                   <Chip
-                    label={category?.category_name || `Category ${stream.category_id}`}
+                    label={category?.name || `Category ${stream.categoryId}`}
                     variant="outlined"
                     color={category ? 'default' : 'warning'}
                     size="medium"
                     onClick={() => {
                       // Store the selected category and navigate to stream listing
                       sessionStorage.setItem('streamDetailReferrer', window.location.pathname);
-                      sessionStorage.setItem('filterByCategoryId', String(stream.category_id));
+                      sessionStorage.setItem('filterByCategoryId', String(stream.categoryId));
                       const streamPageMap: Record<string, string> = {
                         live: '/live-streams',
                         vod: '/vod-streams',
@@ -240,7 +240,7 @@ export default function StreamDetail() {
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
                     Stream ID
                   </Typography>
-                  <Typography variant="body1">{stream.stream_id}</Typography>
+                  <Typography variant="body1">{stream.externalId}</Typography>
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
@@ -263,12 +263,12 @@ export default function StreamDetail() {
                         navigate(`/categories/${category.id}`);
                       }}
                     >
-                      {category.category_name}
+                      {category.name}
                     </Typography>
                   </Grid>
                 )}
 
-                {stream.is_adult && (
+                {stream.isAdult && (
                   <Grid item xs={12} sm={6}>
                     <Chip label="Adult Content" color="error" />
                   </Grid>
@@ -281,8 +281,8 @@ export default function StreamDetail() {
                   <ButtonGroup variant="outlined" size="small">
                     <Button
                       startIcon={<CheckCircleIcon />}
-                      variant={stream.allow_deny === 'allow' ? 'contained' : 'outlined'}
-                      color={stream.allow_deny === 'allow' ? 'success' : 'inherit'}
+                      variant={stream.allowDeny === 'allow' ? 'contained' : 'outlined'}
+                      color={stream.allowDeny === 'allow' ? 'success' : 'inherit'}
                       onClick={() => updateAllowDenyMutation.mutate('allow')}
                       disabled={updateAllowDenyMutation.isPending}
                     >
@@ -290,15 +290,15 @@ export default function StreamDetail() {
                     </Button>
                     <Button
                       startIcon={<BlockIcon />}
-                      variant={stream.allow_deny === 'deny' ? 'contained' : 'outlined'}
-                      color={stream.allow_deny === 'deny' ? 'error' : 'inherit'}
+                      variant={stream.allowDeny === 'deny' ? 'contained' : 'outlined'}
+                      color={stream.allowDeny === 'deny' ? 'error' : 'inherit'}
                       onClick={() => updateAllowDenyMutation.mutate('deny')}
                       disabled={updateAllowDenyMutation.isPending}
                     >
                       Deny
                     </Button>
                     <Button
-                      variant={stream.allow_deny === null ? 'contained' : 'outlined'}
+                      variant={stream.allowDeny === null ? 'contained' : 'outlined'}
                       onClick={() => updateAllowDenyMutation.mutate(null)}
                       disabled={updateAllowDenyMutation.isPending}
                     >

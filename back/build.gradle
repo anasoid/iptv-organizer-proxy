@@ -1,0 +1,166 @@
+plugins {
+    id 'java'
+    id 'io.quarkus' version "${quarkusVersion}"
+    id 'jacoco'
+    id "com.diffplug.spotless" version "${spotlessVersion}"
+    id 'pmd'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Quarkus Platform BOM
+    implementation platform("io.quarkus.platform:quarkus-bom:${quarkusVersion}")
+
+    // REST Framework (blocking)
+    implementation 'io.quarkus:quarkus-resteasy-jackson'
+
+    // Datasource and JDBC Database Clients
+    implementation 'io.quarkus:quarkus-datasource'
+    implementation 'io.quarkus:quarkus-jdbc-mysql'
+    implementation 'io.quarkus:quarkus-jdbc-postgresql'
+    // SQLite JDBC driver - loaded at runtime via db-kind=other + explicit driver class
+    implementation 'org.xerial:sqlite-jdbc:3.46.0.0'
+
+    // Transaction Management
+    implementation 'io.quarkus:quarkus-narayana-jta'
+
+    // JSON/YAML Processing
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
+
+    // Security & JWT
+    implementation 'io.quarkus:quarkus-smallrye-jwt'
+
+    // Scheduler for background tasks
+    implementation 'io.quarkus:quarkus-scheduler'
+
+    // BCrypt for password hashing (pure Java, minimal footprint)
+    implementation "at.favre.lib:bcrypt:${bcryptVersion}"
+
+    // Lombok for reducing boilerplate (compile-time only, zero runtime impact)
+    compileOnly "org.projectlombok:lombok:${lombokVersion}"
+    annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+    testCompileOnly "org.projectlombok:lombok:${lombokVersion}"
+    testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+
+    // Testing
+    testImplementation 'io.quarkus:quarkus-junit5'
+    testImplementation 'io.rest-assured:rest-assured'
+
+
+    // Mockito for mocking in tests
+    testImplementation 'org.mockito:mockito-core'
+    testImplementation 'org.mockito:mockito-junit-jupiter'
+
+    // WireMock for HTTP mocking
+    testImplementation 'org.wiremock:wiremock-standalone:3.3.1'
+
+    // AssertJ for fluent assertions
+    testImplementation 'org.assertj:assertj-core:3.25.1'
+
+    // JaCoCo for code coverage with Quarkus (excluded from native builds)
+    if (!project.hasProperty('buildingNativeImage')) {
+        testImplementation 'io.quarkus:quarkus-jacoco'
+    }
+
+    // Container image extension for Docker builds
+    implementation 'io.quarkus:quarkus-container-image-docker'
+}
+
+spotless {
+    java {
+        // target 'src/*/java/**/*.java' // default
+        removeUnusedImports()
+        googleJavaFormat() // Disabled to preserve 4-space indent
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+// PMD Configuration
+pmd {
+    ignoreFailures = false
+    toolVersion = '7.0.0'
+}
+
+pmdMain {
+    ruleSets = [file('pmd-rules.xml').absolutePath]
+    ignoreFailures = true  // Report violations but don't fail build - can be strictened gradually
+    reports {
+        xml.required = true
+        html.required = true
+
+    }
+}
+
+pmdTest {
+    ruleSets = [file('pmd-rules.xml').absolutePath]
+    ignoreFailures = true  // Test code often has acceptable violations
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+// Java configuration
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+group 'org.anasoid.iptvorganizer'
+version "${projectVersion}"
+
+
+tasks.named('quarkusDev') {
+    jvmArgs = [
+            '-Xmx128M'
+    ]
+}
+tasks.named('quarkusRun') {
+    jvmArgs = [
+            '-Xmx64M'
+    ]
+}
+
+// JaCoCo Configuration
+jacoco {
+    toolVersion = "${jacocoVersion}"
+}
+
+test {
+    finalizedBy jacocoTestReport
+    jacoco {
+        excludeClassLoaders = ["*QuarkusClassLoader"]
+        destinationFile = layout.buildDirectory.file("jacoco/jacoco.exec").get().asFile
+    }
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        xml.outputLocation = layout.buildDirectory.file("reports/jacoco/test/jacocoTestReport.xml")
+        html.required = true
+        html.outputLocation = layout.buildDirectory.dir("reports/jacoco/test/html")
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.0  // Start with 0%, increase gradually
+            }
+        }
+    }
+}
+
+// Convenience task to run all code quality checks
+tasks.register('codeQuality') {
+    dependsOn pmdMain, pmdTest, spotlessCheck, jacocoTestReport
+    description = 'Run all code quality checks (PMD, Spotless, JaCoCo)'
+    group = 'verification'
+}

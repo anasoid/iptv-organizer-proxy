@@ -39,15 +39,5 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Build production bundle for PHP
-        run: npm run build:php
-
-      - name: Upload build artifacts
-        if: matrix.node-version == '20'
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build
-          path: |
-            admin/dist
-            back/public/admin
-          retention-days: 7
+      - name: Build
+        run: npm run build

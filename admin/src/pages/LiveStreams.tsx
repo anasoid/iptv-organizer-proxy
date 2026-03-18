@@ -94,9 +94,9 @@ export default function LiveStreams() {
   if (allowDenyFilter !== 'all') {
     streams = streams.filter((stream) => {
       if (allowDenyFilter === 'default') {
-        return stream.allow_deny === null;
+        return stream.allowDeny === null;
       }
-      return stream.allow_deny === allowDenyFilter;
+      return stream.allowDeny === allowDenyFilter;
     });
   }
 
@@ -109,7 +109,7 @@ export default function LiveStreams() {
 
   if (categoriesData?.data) {
     categoriesData.data.forEach((cat: Category) => {
-      categories[cat.category_id] = cat.category_name;
+      categories[cat.externalId] = cat.name;
     });
   }
 
@@ -121,10 +121,10 @@ export default function LiveStreams() {
   const columns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 50 },
     { field: 'num', headerName: 'Order', width: 60 },
-    { field: 'stream_id', headerName: 'Stream ID', width: 100 },
+    { field: 'externalId', headerName: 'Stream ID', width: 100 },
     { field: 'name', headerName: 'Name', width: 350, flex: 1 },
     {
-      field: 'category_id',
+      field: 'categoryId',
       headerName: 'Category',
       width: 150,
       renderCell: (params) => getCategoryName(params.value),
@@ -152,13 +152,13 @@ export default function LiveStreams() {
       },
     },
     {
-      field: 'is_adult',
+      field: 'isAdult',
       headerName: 'Adult',
       width: 80,
       renderCell: (params) => (params.value ? <Chip label="Adult" color="error" size="small" /> : '—'),
     },
     {
-      field: 'created_at',
+      field: 'createdAt',
       headerName: 'Created',
       width: 140,
       renderCell: (params) => {
@@ -167,7 +167,7 @@ export default function LiveStreams() {
       },
     },
     {
-      field: 'allow_deny',
+      field: 'allowDeny',
       headerName: 'Access Control',
       width: 120,
       sortable: false,
@@ -175,7 +175,7 @@ export default function LiveStreams() {
       renderCell: (params) => {
         const stream = params.row as Stream;
         const isLoading = updateAllowDenyMutation.isPending;
-        const value = stream.allow_deny ?? 'default';
+        const value = stream.allowDeny ?? 'default';
 
         const getColor = (val: string) => {
           switch (val) {
@@ -393,7 +393,7 @@ export default function LiveStreams() {
                   <Grid item xs={12} sm={6} md={4} lg={3} key={stream.id}>
                     <StreamCard
                       stream={stream}
-                      categoryName={getCategoryName(stream.category_id)}
+                      categoryName={getCategoryName(stream.categoryId)}
                       onClick={() => navigate(`/streams/${stream.id}/live`)}
                     />
                   </Grid>
@@ -434,16 +434,16 @@ export default function LiveStreams() {
               {liveCategories.map((category: Category) => (
                 <Box
                   key={category.id}
-                  onClick={() => handleCategorySelect(Number(category.category_id))}
+                  onClick={() => handleCategorySelect(Number(category.externalId))}
                   sx={{
                     p: 1.5,
                     px: 2,
                     cursor: 'pointer',
                     backgroundColor:
-                      selectedCategoryId === Number(category.category_id) ? 'primary.light' : 'transparent',
+                      selectedCategoryId === Number(category.externalId) ? 'primary.light' : 'transparent',
                     '&:hover': {
                       backgroundColor:
-                        selectedCategoryId === Number(category.category_id)
+                        selectedCategoryId === Number(category.externalId)
                           ? 'primary.light'
                           : 'action.hover',
                     },
@@ -534,7 +534,7 @@ export default function LiveStreams() {
                   <Grid item xs={12} sm={6} md={4} lg={3} key={stream.id}>
                     <StreamCard
                       stream={stream}
-                      categoryName={getCategoryName(stream.category_id)}
+                      categoryName={getCategoryName(stream.categoryId)}
                       onClick={() => navigate(`/streams/${stream.id}/live`)}
                     />
                   </Grid>

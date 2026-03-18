@@ -1,0 +1,131 @@
+name: Java Docker Build & Push
+
+on: [ push, pull_request ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 1.5. Setup Node.js for Admin UI build
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: admin/package-lock.json
+
+      # 1.6. Build admin UI
+      - name: Build admin UI
+        working-directory: admin
+        run: |
+          npm ci
+          npm run build:java
+
+      # 1.7. Copy admin UI to Quarkus resources
+      - name: Copy admin UI to Quarkus resources
+        run: |
+          mkdir -p back/src/main/resources/META-INF/resources/admin
+          cp -r admin/dist/* back/src/main/resources/META-INF/resources/admin/
+
+      # 2. Setup JDK 21 with Gradle cache
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      # 3. Grant execute permission for gradlew
+      - name: Grant execute permission for gradlew
+        run: chmod +x back/gradlew
+
+      # 4. Setup Docker Buildx (for multi-platform)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 5. Login to GHCR (skip on PRs)
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 6. Determine image tag
+      - name: Determine image tag
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/java-v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/java-v}"
+            echo "tag=java-${TAG}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/heads/java ]]; then
+            echo "tag=java-latest" >> $GITHUB_OUTPUT
+          else
+            echo "tag=java-pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          fi
+
+      # 7. Build and push container image with Quarkus native (optimized for embedded/OpenWrt)
+      - name: Build and push container image (native)
+        if: github.event_name != 'pull_request'
+        run: |
+          export GRADLE_OPTS="-Xmx2g"
+          export DOCKER_BUILDKIT=1
+          ./gradlew build \
+            -PbuildingNativeImage \
+            -Dquarkus.package.type=native \
+            -Dquarkus.native.container-build=true \
+            -Dquarkus.native.compression.level=9 \
+            -Dquarkus.native.container-runtime-options=--memory=3g \
+            -Dquarkus.container-image.build=true \
+            -Dquarkus.container-image.push=true \
+            -Dquarkus.container-image.registry=${{ env.REGISTRY }} \
+            -Dquarkus.container-image.group=${{ github.repository_owner }} \
+            -Dquarkus.container-image.name=iptv-organizer-proxy \
+            -Dquarkus.container-image.tag=${{ steps.tag.outputs.tag }} \
+            -Dquarkus.docker.buildx.platform=linux/amd64 \
+            --no-daemon
+        working-directory: back
+        env:
+          DOCKER_USERNAME: ${{ github.actor }}
+          DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+      # 8. Build only (for PRs, don't push)
+      - name: Build container image (PR - native)
+        if: github.event_name == 'pull_request'
+        run: |
+          export GRADLE_OPTS="-Xmx2g"
+          export DOCKER_BUILDKIT=1
+          ./gradlew build \
+            -PbuildingNativeImage \
+            -Dquarkus.package.type=native \
+            -Dquarkus.native.container-build=true \
+            -Dquarkus.native.compression.level=9 \
+            -Dquarkus.native.container-runtime-options=--memory=3g \
+            -Dquarkus.container-image.build=true \
+            -Dquarkus.container-image.push=false \
+            --no-daemon
+        working-directory: back
+
+      # 9. Generate build summary
+      - name: Generate build summary
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "## Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** ${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy:${{ steps.tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Platforms:** linux/amd64, linux/arm64, linux/arm/v7" >> $GITHUB_STEP_SUMMARY
+          echo "**Registry:** ${{ env.REGISTRY }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Built with:** Quarkus Native + Mandrel" >> $GITHUB_STEP_SUMMARY

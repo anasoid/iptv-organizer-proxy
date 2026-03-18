@@ -1,0 +1,31 @@
+package org.anasoid.iptvorganizer.services;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
+
+@ApplicationScoped
+public class SourceService extends BaseService<Source, SourceRepository> {
+
+  @Inject SourceRepository repository;
+
+  @Override
+  protected SourceRepository getRepository() {
+    return repository;
+  }
+
+  @Override
+  public Long create(Source source) {
+    if (source.getName() == null || source.getName().isBlank()) {
+      throw new IllegalArgumentException("Name is required");
+    }
+    if (source.getUrl() == null || source.getUrl().isBlank()) {
+      throw new IllegalArgumentException("URL is required");
+    }
+    if (source.getIsActive() == null) {
+      source.setIsActive(true);
+    }
+    return repository.insert(source);
+  }
+}

@@ -1,104 +1,67 @@
-# Stage 1: Composer - install PHP dependencies
-FROM composer:2.9 AS composer-stage
+# Multi-stage Dockerfile for IPTV Organizer Proxy - Quarkus Java Backend
+# Stage 1: Build the Java application
+# Multi-stage Dockerfile for IPTV Organizer Proxy - Quarkus Java Backend
+# Stage 1: Build the Java application
+# Using official Gradle image to avoid downloading Gradle on each build
+FROM gradle:9.2.1-jdk21 AS builder
 
-WORKDIR /app
-COPY back/composer.json back/composer.lock ./
-RUN composer install --no-dev --optimize-autoloader && \
-    rm -rf /tmp/* /var/tmp/*
+WORKDIR /workspace
 
-# Stage 2: Builder - compile PHP extensions with build tools
-FROM php:8.2-fpm-alpine AS builder-stage
+# Copy Gradle build files first (layer caching: dependencies change less often than source)
+COPY back/gradle.properties /workspace/
+COPY back/*.gradle /workspace/
+COPY back/gradle/ /workspace/gradle/
 
-RUN apk add --no-cache --no-scripts --force \
-    $PHPIZE_DEPS \
-    sqlite-dev \
-    libc6-compat && \
-    docker-php-ext-install pdo_sqlite && \
-    docker-php-ext-enable pdo_sqlite && \
-    rm -rf /tmp/* /var/tmp/*
+# Copy source code (includes pre-built admin at src/main/resources/META-INF/resources/admin/)
+# Run `cd admin && npm run build:java` before building the image
+COPY back/src /workspace/src
+COPY back/pmd-rules.xml /workspace/
 
-# Stage 3: Runtime - minimal final image with only compiled extensions
-FROM php:8.2-fpm-alpine
+# Build the application (JAR)
+# Using Quarkus build for optimized output
+# GRADLE_USER_HOME is set by the gradle image — no download needed
+RUN gradle build -DskipTests -Dquarkus.package.jar.type=fast-jar --stacktrace  --console=plain --no-daemon \
+    -x pmdMain -x pmdTest -x spotlessCheck -x spotlessJavaCheck
 
-# Install only essential runtime dependencies and create app user
-RUN apk add --no-cache --no-scripts \
-    sqlite \
-    sqlite-libs \
-    nginx \
-    openssl \
-    libc6-compat && \
-    mkdir -p /etc/nginx/conf.d && \
-    addgroup -g 1000 app && \
-    adduser -D -u 1000 -G app app && \
-    rm -rf /tmp/* /var/tmp/*
+# Stage 2: Runtime image - minimal JVM with Quarkus app
+FROM eclipse-temurin:21-jre-jammy
 
-# Copy compiled PHP extensions from builder stage (early)
-COPY --from=builder-stage /usr/local/lib/php/extensions /usr/local/lib/php/extensions
-COPY --from=builder-stage /usr/local/etc/php/conf.d /usr/local/etc/php/conf.d
-
-# Copy vendor from composer stage and set ownership
-COPY --from=composer-stage --chown=app:app /app/vendor /app/vendor
+LABEL maintainer="IPTV Organizer Proxy"
+LABEL description="IPTV Organizer Proxy - Quarkus Java Backend"
 
 WORKDIR /app
 
-# Copy application code (excluded: vendor, tests, data, logs from .dockerignore)
-COPY --chown=app:app back/ ./
+# Install minimal dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Copy admin frontend
-COPY --chown=app:app admin/dist ./public/admin
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && \
+    mkdir -p /app/data /logs && \
+    chown -R appuser:appuser /app /logs
 
-# Copy nginx and entrypoint configuration
-COPY --chown=app:app docker/nginx.conf /etc/nginx/nginx.conf
-COPY --chown=app:app docker/nginx-default.conf /etc/nginx/conf.d/default.conf
-COPY --chown=app:app docker/docker-entrypoint.sh /app/docker-entrypoint.sh
+# Copy built JAR from builder stage
+COPY --from=builder /workspace/build/quarkus-app/quarkus-run.jar /app/
+COPY --from=builder /workspace/build/quarkus-app/lib /app/lib/
+COPY --from=builder /workspace/build/quarkus-app/app /app/app/
+COPY --from=builder /workspace/build/quarkus-app/quarkus /app/quarkus/
 
-# Configure PHP-FPM, set file permissions, and setup data directory
-RUN chmod +x /app/docker-entrypoint.sh && \
-    chmod +x /app/bin/sync-daemon.sh && \
-    mkdir -p /app/data /logs/iptv /tmp/nginx_temp && \
-    chown -R app:app /app/data /logs/iptv /tmp/nginx_temp && \
-    chmod 777 /app/data /logs/iptv /tmp/nginx_temp && \
-    sed -i 's/user = www-data/user = app/' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's/group = www-data/group = app/' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's/^pm = .*/pm = static/' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's/^pm.max_children = .*/pm.max_children = 2/' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's/^pm.start_servers = .*/pm.start_servers = 1/' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i '/^pm.min_spare_servers/d' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i '/^pm.max_spare_servers/d' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's/^pm.max_requests = .*/pm.max_requests = 100/' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's/^;access.log = .*/access.log = \/dev\/null/' /usr/local/etc/php-fpm.d/www.conf && \
-    echo "output_buffering = 8K" >> /usr/local/etc/php.ini-production && \
-    echo "memory_limit = 32M" >> /usr/local/etc/php.ini-production && \
-    echo "post_max_size = 25M" >> /usr/local/etc/php.ini-production && \
-    echo "upload_max_filesize = 25M" >> /usr/local/etc/php.ini-production && \
-    echo "max_execution_time = 1800" >> /usr/local/etc/php.ini-production && \
-    echo "default_socket_timeout = 1800" >> /usr/local/etc/php.ini-production && \
-    echo "error_log = /logs/iptv/php-errors.log" >> /usr/local/etc/php.ini-production && \
-    echo "log_errors = On" >> /usr/local/etc/php.ini-production && \
-    echo "" >> /usr/local/etc/php.ini-production && \
-    echo "; Proxy configuration for outgoing requests" >> /usr/local/etc/php.ini-production && \
-    echo "allow_url_fopen = On" >> /usr/local/etc/php.ini-production && \
-    echo "allow_url_include = Off" >> /usr/local/etc/php.ini-production && \
-    echo "default_socket_timeout = 1800" >> /usr/local/etc/php.ini-production && \
-    cp /usr/local/etc/php.ini-production /usr/local/etc/php.ini && \
-    chmod -R 755 /app/src /app/config /app/bin /app/migrations /app/public && \
-    find /app/src -name "*.php" -exec chmod 644 {} \; && \
-    find /app/config -name "*.php" -exec chmod 644 {} \; && \
-    find /app/bin -name "*.php" -exec chmod 644 {} \; && \
-    find /app/migrations -name "*.php" -exec chmod 644 {} \; && \
-    find /app/public -name "*.php" -exec chmod 644 {} \; && \
-    rm -rf /tmp/* /var/tmp/* ~/.cache && \
-    php -m | grep -i iconv || echo "iconv not available, will use fallback"
+# Copy entrypoint script
+COPY docker/docker-entrypoint.sh /app/
+RUN chmod +x /app/docker-entrypoint.sh
 
-# Declare data and logs directories as volumes
-VOLUME ["/app/data", "/logs/iptv"]
+# Switch to non-root user
+USER appuser
 
 # Expose port
-EXPOSE 9090
+EXPOSE 8080
 
-# Lightweight health check for OpenWRT (using /dev/tcp instead of wget)
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost:9090/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
 
-# Run entrypoint
+# Entrypoint
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
+
