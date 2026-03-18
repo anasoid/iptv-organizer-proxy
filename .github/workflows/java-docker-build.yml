@@ -70,16 +70,15 @@ jobs:
         run: |
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
-            echo "tag=${TAG}" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
-            echo "tag=latest" >> $GITHUB_OUTPUT
+            TAG="latest"
           elif [[ "${{ github.ref }}" == refs/heads/* ]]; then
             TAG="${GITHUB_REF#refs/heads/}"
-            echo "tag=${TAG}" >> $GITHUB_OUTPUT
           else
-            echo "tag=pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            TAG="pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
           fi
-
+          echo "tag-> ${TAG}" 
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
       # 7. Build and push container image with Quarkus native (optimized for embedded/OpenWrt)
       - name: Build and push container image (native)
         if: github.event_name != 'pull_request'
