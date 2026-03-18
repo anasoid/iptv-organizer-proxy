@@ -87,7 +87,7 @@ jobs:
             -PbuildingNativeImage \
             -Dquarkus.package.type=native \
             -Dquarkus.native.container-build=true \
-            -Dquarkus.native.compression=all \
+            -Dquarkus.native.compression.level=9 \
             -Dquarkus.native.container-runtime-options=--memory=3g \
             -Dquarkus.container-image.build=true \
             -Dquarkus.container-image.push=true \
@@ -112,7 +112,7 @@ jobs:
             -PbuildingNativeImage \
             -Dquarkus.package.type=native \
             -Dquarkus.native.container-build=true \
-            -Dquarkus.native.compression=all \
+            -Dquarkus.native.compression.level=9 \
             -Dquarkus.native.container-runtime-options=--memory=3g \
             -Dquarkus.container-image.build=true \
             -Dquarkus.container-image.push=false \

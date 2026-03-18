@@ -65,8 +65,8 @@ dependencies {
         testImplementation 'io.quarkus:quarkus-jacoco'
     }
 
-    // Container image extension for Docker builds (only used during build, not runtime)
-    compileOnly 'io.quarkus:quarkus-container-image-docker'
+    // Container image extension for Docker builds
+    implementation 'io.quarkus:quarkus-container-image-docker'
 }
 
 spotless {
