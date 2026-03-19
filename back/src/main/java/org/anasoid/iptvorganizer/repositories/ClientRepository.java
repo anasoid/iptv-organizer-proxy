@@ -11,6 +11,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+
+import org.anasoid.iptvorganizer.exceptions.UnauthorizedException;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.enums.ClientConnectXmltvMode;
 import org.anasoid.iptvorganizer.models.enums.ClientConnectXtreamApiMode;
@@ -185,21 +187,21 @@ public class ClientRepository extends BaseRepository<Client> {
   public Client findByUsernameAndPassword(String username, String password) {
     // Validate inputs
     if (username == null || username.trim().isEmpty()) {
-      throw new RuntimeException("Username is required");
+      throw new UnauthorizedException("Username is required");
     }
     Client client = this.findByUsername(username);
     if (client == null) {
-      throw new RuntimeException("Client not found");
+      throw new UnauthorizedException("Client not found");
     }
 
     // Validate password
     if (password == null || !password.equals(client.getPassword())) {
-      throw new RuntimeException("Invalid password");
+      throw new UnauthorizedException("Invalid password");
     }
 
     // Check if client is active
     if (client.getIsActive() != null && !client.getIsActive()) {
-      throw new RuntimeException("Client is inactive");
+      throw new UnauthorizedException("Client is inactive");
     }
     return client;
   }
