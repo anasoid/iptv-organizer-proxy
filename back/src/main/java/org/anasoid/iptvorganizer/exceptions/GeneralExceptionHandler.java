@@ -43,7 +43,7 @@ public class GeneralExceptionHandler implements ExceptionMapper<Exception> {
       status = Response.Status.UNAUTHORIZED;
       errorCode = "UNAUTHORIZED";
       statusCode = 401;
-    } else if (ex instanceof ForbiddenException) {
+    } else if (ex instanceof ForbiddenException || ex instanceof UnauthorizedException) {
       status = Response.Status.FORBIDDEN;
       errorCode = "FORBIDDEN";
       statusCode = 403;
