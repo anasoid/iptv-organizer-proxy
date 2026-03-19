@@ -124,6 +124,7 @@ jobs:
         run: |
           export GRADLE_OPTS="-Xmx2g"
           ./gradlew build \
+            -x test \
             -PbuildingNativeImage \
             -PfullJdbcDrivers=${{ matrix.fullJdbcDrivers }} \
             -Dquarkus.native.enabled=true \
@@ -153,6 +154,7 @@ jobs:
         run: |
           export GRADLE_OPTS="-Xmx2g"
           ./gradlew build \
+            -x test \
             -PbuildingNativeImage \
             -PfullJdbcDrivers=${{ matrix.fullJdbcDrivers }} \
             -Dquarkus.native.enabled=true \
