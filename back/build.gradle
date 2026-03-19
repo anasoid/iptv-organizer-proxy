@@ -27,6 +27,11 @@ dependencies {
     if (fullJdbcDrivers) {
         implementation 'io.quarkus:quarkus-jdbc-mysql'
         implementation 'io.quarkus:quarkus-jdbc-postgresql'
+    } else {
+        // Always needed for test augmentation: %dev profile references MySQL driver.
+        // Quarkus includes testImplementation deps in the test augmented classpath.
+        testImplementation 'io.quarkus:quarkus-jdbc-mysql'
+        testImplementation 'io.quarkus:quarkus-jdbc-postgresql'
     }
     // SQLite JDBC driver - loaded at runtime via db-kind=other + explicit driver class
     implementation 'org.xerial:sqlite-jdbc:3.46.0.0'
