@@ -48,18 +48,12 @@ public class NativeReflectionValidator {
       // If Jackson reflection is broken, every field is null and @JsonInclude(NON_NULL)
       // drops them all, resulting in bare "{}".
       if ("{}".equals(json) || !json.contains("__reflection_probe__")) {
-        log.error(
-            "╔══════════════════════════════════════════════════════════════════════╗");
-        log.error(
-            "║ CRITICAL: Jackson serialization is BROKEN (native reflection issue) ║");
-        log.error(
-            "║ All API responses will return empty JSON {{}}.                       ║");
-        log.error(
-            "║ Fix: rebuild the native image — NativeReflectionConfig must be      ║");
-        log.error(
-            "║ compiled into the binary for GraalVM reflection to work.            ║");
-        log.error(
-            "╚══════════════════════════════════════════════════════════════════════╝");
+        log.error("╔══════════════════════════════════════════════════════════════════════╗");
+        log.error("║ CRITICAL: Jackson serialization is BROKEN (native reflection issue) ║");
+        log.error("║ All API responses will return empty JSON {{}}.                       ║");
+        log.error("║ Fix: rebuild the native image — NativeReflectionConfig must be      ║");
+        log.error("║ compiled into the binary for GraalVM reflection to work.            ║");
+        log.error("╚══════════════════════════════════════════════════════════════════════╝");
         log.error("Serialized probe result was: {}", json);
         return;
       }
@@ -73,8 +67,7 @@ public class NativeReflectionValidator {
                 + "POST /api/sources will always return 400 'Name is required' because "
                 + "request bodies cannot be read. Rebuild the native image.");
         log.error(
-            "Deserialized name was: '{}' (expected '__deser_probe__')",
-            deserialized.getName());
+            "Deserialized name was: '{}' (expected '__deser_probe__')", deserialized.getName());
         return;
       }
 
@@ -84,4 +77,3 @@ public class NativeReflectionValidator {
     }
   }
 }
-
