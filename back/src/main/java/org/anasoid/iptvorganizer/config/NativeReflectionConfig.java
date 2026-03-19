@@ -22,8 +22,11 @@ import org.anasoid.iptvorganizer.models.entity.Proxy;
 import org.anasoid.iptvorganizer.models.entity.ProxyType;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
+import org.anasoid.iptvorganizer.models.entity.SyncLog.SyncLogStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
+import org.anasoid.iptvorganizer.models.entity.stream.BaseStream.AllowDenyStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
+import org.anasoid.iptvorganizer.models.entity.stream.Category.BlackListStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.LiveStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Series;
 import org.anasoid.iptvorganizer.models.entity.stream.SourcedEntity;
@@ -57,8 +60,10 @@ import org.anasoid.iptvorganizer.models.monitor.JvmMetricsEntry;
  * class, all entity/DTO fields are invisible in native mode and Jackson silently returns empty
  * objects ({@code {}}) instead of the real data.
  *
- * <p>Nested/inner classes (e.g. Lombok {@code @Builder} inner builders) are included by default
- * because {@code ignoreNested} defaults to {@code false}.
+ * <p><strong>IMPORTANT:</strong> {@code ignoreNested = false} only applies to the <em>annotated
+ * class itself</em> ({@code NativeReflectionConfig}), NOT to classes listed in {@code targets}.
+ * Therefore every nested/inner class that Jackson needs (e.g. inner enums with {@code @JsonValue})
+ * must be added to this list explicitly.
  */
 @RegisterForReflection(
     targets = {
@@ -89,12 +94,15 @@ import org.anasoid.iptvorganizer.models.monitor.JvmMetricsEntry;
       ProxyType.class,
       AdminUser.class,
       SyncLog.class,
+      SyncLogStatus.class, // inner enum — must be listed explicitly
       ConnectionLog.class,
 
       // ── Stream entities ───────────────────────────────────────────────────
       BaseStream.class,
+      AllowDenyStatus.class, // inner enum of BaseStream — must be listed explicitly
       SourcedEntity.class,
       Category.class,
+      BlackListStatus.class, // inner enum of Category — must be listed explicitly
       LiveStream.class,
       VodStream.class,
       Series.class,
