@@ -24,6 +24,7 @@ dependencies {
 
     // Datasource and JDBC Database Clients
     implementation 'io.quarkus:quarkus-datasource'
+    implementation 'io.quarkus:quarkus-agroal'
     if (fullJdbcDrivers) {
         implementation 'io.quarkus:quarkus-jdbc-mysql'
         implementation 'io.quarkus:quarkus-jdbc-postgresql'
