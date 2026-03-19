@@ -56,4 +56,3 @@ class AdminSpaControllerTest {
         .body(not(containsString("data-test-admin-shell")));
   }
 }
-

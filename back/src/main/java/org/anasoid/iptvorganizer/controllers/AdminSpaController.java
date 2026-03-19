@@ -34,9 +34,9 @@ public class AdminSpaController {
       }
 
       String indexHtml = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-      return Response.ok(indexHtml, MediaType.TEXT_HTML_TYPE.withCharset(StandardCharsets.UTF_8.name()))
+      return Response.ok(
+              indexHtml, MediaType.TEXT_HTML_TYPE.withCharset(StandardCharsets.UTF_8.name()))
           .build();
     }
   }
 }
-
