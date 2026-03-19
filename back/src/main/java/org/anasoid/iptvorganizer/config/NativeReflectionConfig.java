@@ -1,6 +1,7 @@
 package org.anasoid.iptvorganizer.config;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
+import org.anasoid.iptvorganizer.cache.CacheStat;
 import org.anasoid.iptvorganizer.dto.HttpRequestDto;
 import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.dto.history.StreamHistoryEntryDto;
@@ -71,6 +72,7 @@ import org.anasoid.iptvorganizer.models.monitor.JvmMetricsEntry;
       ApiResponse.class,
       ErrorDetails.class,
       PaginationMeta.class,
+      CacheStat.class,
 
       // ── Request DTOs ─────────────────────────────────────────────────────
       LoginRequest.class,
