@@ -5,6 +5,8 @@
 # Using official Gradle image to avoid downloading Gradle on each build
 FROM gradle:9.2.1-jdk21 AS builder
 
+ARG FULL_DRIVERS=true
+
 WORKDIR /workspace
 
 # Copy Gradle build files first (layer caching: dependencies change less often than source)
@@ -21,6 +23,7 @@ COPY back/pmd-rules.xml /workspace/
 # Using Quarkus build for optimized output
 # GRADLE_USER_HOME is set by the gradle image — no download needed
 RUN gradle build -DskipTests -Dquarkus.package.jar.type=fast-jar --stacktrace  --console=plain --no-daemon \
+    -PfullJdbcDrivers=${FULL_DRIVERS} \
     -x pmdMain -x pmdTest -x spotlessCheck -x spotlessJavaCheck
 
 # Stage 2: Runtime image - minimal JVM with Quarkus app

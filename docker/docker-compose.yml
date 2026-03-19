@@ -7,6 +7,9 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+      args:
+        # Local default builds include full JDBC drivers; set false for SQLite-only.
+        FULL_DRIVERS: ${FULL_DRIVERS:-true}
     container_name: iptv-organizer-proxy
 
     ports:

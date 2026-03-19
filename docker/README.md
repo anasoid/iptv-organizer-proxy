@@ -10,6 +10,20 @@ The IPTV Organizer Proxy is a full-stack application consisting of:
 - **Database**: SQLite (single-file database, ideal for deployment)
 - **Deployment**: Docker and Docker Compose
 
+## Image Variants
+
+- Local `docker build` default: **full JDBC drivers** (SQLite + MySQL + PostgreSQL).
+- Registry tags from CI:
+  - no suffix (`:<tag>`) = SQLite-only image
+  - `-full` suffix (`:<tag>-full`) = full-driver image
+
+Examples:
+
+```bash
+docker build -f docker/Dockerfile -t iptv-organizer-proxy:latest-full .
+docker build -f docker/Dockerfile --build-arg FULL_DRIVERS=false -t iptv-organizer-proxy:latest .
+```
+
 ## Files
 
 ### `Dockerfile`
@@ -88,7 +102,10 @@ docker-compose down
 
 Build the image:
 ```bash
-docker build -f docker/Dockerfile -t iptv-organizer-proxy:latest .
+docker build -f docker/Dockerfile -t iptv-organizer-proxy:latest-full .
+
+# Build the SQLite-only image
+docker build -f docker/Dockerfile --build-arg FULL_DRIVERS=false -t iptv-organizer-proxy:latest .
 ```
 
 Run the container:
@@ -118,7 +135,7 @@ Configure the application by setting environment variables in `docker-compose.ym
 
 ### Database (SQLite)
 - `QUARKUS_DATASOURCE_JDBC_URL`: SQLite JDBC URL (default: `jdbc:sqlite:/app/data/app.sqlite`)
-- `QUARKUS_DATASOURCE_DB_KIND`: Database type (default: `sqlite`)
+- `QUARKUS_DATASOURCE_DB_KIND`: Database type (default: `other` for SQLite-only images)
 
 ### HTTP Server
 - `QUARKUS_HTTP_PORT`: Port to listen on (default: `9090`)
@@ -236,15 +253,25 @@ jdbc:sqlite:/app/data/app.sqlite
 docker build -f docker/Dockerfile -t iptv-organizer-proxy:1.0.0 .
 ```
 
+### Full-driver Docker Build
+```bash
+docker build -f docker/Dockerfile --build-arg FULL_DRIVERS=true -t iptv-organizer-proxy:1.0.0-full .
+```
+
 ### With BuildKit (faster, better caching)
 ```bash
 docker buildx build -f docker/Dockerfile -t iptv-organizer-proxy:1.0.0 .
+
+docker buildx build -f docker/Dockerfile --build-arg FULL_DRIVERS=true -t iptv-organizer-proxy:1.0.0-full .
 ```
 
 ### Push to Registry
 ```bash
 docker tag iptv-organizer-proxy:1.0.0 ghcr.io/yourusername/iptv-organizer-proxy:1.0.0
 docker push ghcr.io/yourusername/iptv-organizer-proxy:1.0.0
+
+docker tag iptv-organizer-proxy:1.0.0-full ghcr.io/yourusername/iptv-organizer-proxy:1.0.0-full
+docker push ghcr.io/yourusername/iptv-organizer-proxy:1.0.0-full
 ```
 
 ## Deployment Examples

@@ -10,6 +10,11 @@ repositories {
     mavenCentral()
 }
 
+def fullJdbcDrivers = providers.gradleProperty('fullJdbcDrivers')
+        .map { it.toBoolean() }
+        .orElse(true)
+        .get()
+
 dependencies {
     // Quarkus Platform BOM
     implementation platform("io.quarkus.platform:quarkus-bom:${quarkusVersion}")
@@ -19,8 +24,10 @@ dependencies {
 
     // Datasource and JDBC Database Clients
     implementation 'io.quarkus:quarkus-datasource'
-    implementation 'io.quarkus:quarkus-jdbc-mysql'
-    implementation 'io.quarkus:quarkus-jdbc-postgresql'
+    if (fullJdbcDrivers) {
+        implementation 'io.quarkus:quarkus-jdbc-mysql'
+        implementation 'io.quarkus:quarkus-jdbc-postgresql'
+    }
     // SQLite JDBC driver - loaded at runtime via db-kind=other + explicit driver class
     implementation 'org.xerial:sqlite-jdbc:3.46.0.0'
 

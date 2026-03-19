@@ -4,8 +4,8 @@
 
 services:
   app:
-    # Build from Dockerfile using the new Quarkus Java backend
-    image: ghcr.io/anasoid/iptv-organizer-proxy:develop
+    # Use APP_IMAGE_TAG=develop-full to switch to the full-driver image variant.
+    image: ghcr.io/anasoid/iptv-organizer-proxy:${APP_IMAGE_TAG:-develop}
     container_name: iptv-organizer-proxy
 
     ports:
@@ -17,9 +17,9 @@ services:
       QUARKUS_HTTP_HOST: 0.0.0.0
 
       # Database Configuration - SQLite
-      QUARKUS_DATASOURCE_DB_KIND: sqlite
+      QUARKUS_DATASOURCE_DB_KIND: other
       QUARKUS_DATASOURCE_JDBC_URL: "jdbc:sqlite:/app/data/app.sqlite"
-      QUARKUS_DATASOURCE_USERNAME: sa
+      QUARKUS_DATASOURCE_USERNAME: ""
       QUARKUS_DATASOURCE_PASSWORD: ""
       # Proxy Configuration (optional)
       PROXY_URL: "${PROXY_URL:-http://mitmproxy:8080}"

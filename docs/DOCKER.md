@@ -14,6 +14,11 @@ This project can be deployed using Docker with a minimal Alpine-based image opti
 
 ## Quick Start
 
+## Image Variants
+
+- `ghcr.io/anasoid/iptv-organizer-proxy:<tag>` → SQLite-only image (default)
+- `ghcr.io/anasoid/iptv-organizer-proxy:<tag>-full` → full-driver image with SQLite, MySQL, and PostgreSQL JDBC drivers
+
 ### Using Docker Compose (Recommended for Local Development)
 
 ```bash
@@ -32,7 +37,10 @@ docker-compose up --build
 
 ```bash
 # Build the image from project root
-docker build -f docker/Dockerfile -t iptv-organizer-proxy .
+docker build -f docker/Dockerfile -t iptv-organizer-proxy:full .
+
+# Build the SQLite-only image from project root
+docker build -f docker/Dockerfile --build-arg FULL_DRIVERS=false -t iptv-organizer-proxy .
 
 # Run the container
 docker run -d \
@@ -52,6 +60,7 @@ docker run -d \
 # Database
 DB_TYPE=sqlite              # Only sqlite is included in the Docker image
 DB_PATH=/app/data/app.sqlite
+QUARKUS_DATASOURCE_DB_KIND=other
 
 # JWT Configuration
 JWT_SECRET=your-secret-key  # REQUIRED - Set in production
@@ -111,6 +120,9 @@ The CI/CD pipeline automatically builds and pushes images to GitHub Container Re
 ```bash
 # Pull the latest image
 docker pull ghcr.io/yourusername/iptv-organizer-proxy:latest
+
+# Pull the full-driver image when you need MySQL/PostgreSQL JDBC support too
+docker pull ghcr.io/yourusername/iptv-organizer-proxy:latest-full
 
 # Run in production
 docker run -d \
@@ -177,7 +189,7 @@ The Alpine-based PHP image is optimized for low memory usage. If you still exper
 
 This can happen with concurrent access. Solutions:
 - Ensure only one container instance is accessing the database
-- Use MySQL/PostgreSQL for production with multiple instances
+- Use the `-full` image and an external MySQL/PostgreSQL database for multi-instance deployments
 
 ## Production Deployment
 

@@ -31,9 +31,27 @@ jobs:
           - os: ubuntu-latest
             platform: linux/amd64
             arch: amd64
+            variant: sqlite
+            fullJdbcDrivers: 'false'
+            tagSuffix: ''
+          - os: ubuntu-latest
+            platform: linux/amd64
+            arch: amd64
+            variant: full
+            fullJdbcDrivers: 'true'
+            tagSuffix: '-full'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
+            variant: sqlite
+            fullJdbcDrivers: 'false'
+            tagSuffix: ''
+          - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
+            platform: linux/arm64
+            arch: arm64
+            variant: full
+            fullJdbcDrivers: 'true'
+            tagSuffix: '-full'
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -101,12 +119,13 @@ jobs:
       # 7. Build and push arch-specific image (push builds only)
       #    Step 1: compile the native binary (no container-image flags — just produce the runner).
       #    Step 2: build & push the Docker image ourselves so the build context is unambiguous.
-      - name: Compile native binary (${{ matrix.arch }})
+      - name: Compile native binary (${{ matrix.arch }} / ${{ matrix.variant }})
         if: github.event_name != 'pull_request'
         run: |
           export GRADLE_OPTS="-Xmx2g"
           ./gradlew build \
             -PbuildingNativeImage \
+            -PfullJdbcDrivers=${{ matrix.fullJdbcDrivers }} \
             -Dquarkus.native.enabled=true \
             -Dquarkus.package.jar.enabled=false \
             -Dquarkus.native.container-build=true \
@@ -115,10 +134,10 @@ jobs:
             --no-daemon
         working-directory: back
 
-      - name: Build and push Docker image (${{ matrix.arch }})
+      - name: Build and push Docker image (${{ matrix.arch }} / ${{ matrix.variant }})
         if: github.event_name != 'pull_request'
         run: |
-          IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy:${{ steps.tag.outputs.tag }}-${{ matrix.arch }}"
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy:${{ steps.tag.outputs.tag }}${{ matrix.tagSuffix }}-${{ matrix.arch }}"
           echo "=== build context contents ==="
           ls -la back/build/*-runner 2>/dev/null || { echo "ERROR: no *-runner file in back/build/"; exit 1; }
           docker buildx build \
@@ -129,12 +148,13 @@ jobs:
             back/build/
 
       # 8. PR: build only (no push), amd64 only to keep CI fast
-      - name: Compile native binary (PR / amd64 verification only)
+      - name: Compile native binary (PR / amd64 / ${{ matrix.variant }})
         if: github.event_name == 'pull_request' && matrix.arch == 'amd64'
         run: |
           export GRADLE_OPTS="-Xmx2g"
           ./gradlew build \
             -PbuildingNativeImage \
+            -PfullJdbcDrivers=${{ matrix.fullJdbcDrivers }} \
             -Dquarkus.native.enabled=true \
             -Dquarkus.package.jar.enabled=false \
             -Dquarkus.native.container-build=true \
@@ -143,7 +163,7 @@ jobs:
             --no-daemon
         working-directory: back
 
-      - name: Build Docker image (PR / no push)
+      - name: Build Docker image (PR / no push / ${{ matrix.variant }})
         if: github.event_name == 'pull_request' && matrix.arch == 'amd64'
         run: |
           ls -la back/build/*-runner 2>/dev/null || { echo "ERROR: no *-runner file in back/build/"; exit 1; }
@@ -192,8 +212,8 @@ jobs:
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
-      # Combine arch-specific images into a single multi-arch manifest
-      - name: Create and push multi-arch manifest
+      # Combine arch-specific SQLite-only images into a single multi-arch manifest (no suffix)
+      - name: Create and push multi-arch manifest (sqlite / no suffix)
         run: |
           BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
           TAG="${{ steps.tag.outputs.tag }}"
@@ -201,6 +221,16 @@ jobs:
             -t "${BASE}:${TAG}" \
             "${BASE}:${TAG}-amd64" \
             "${BASE}:${TAG}-arm64"
+
+      # Combine arch-specific full-driver images into a single multi-arch manifest (-full suffix)
+      - name: Create and push multi-arch manifest (full)
+        run: |
+          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
+          TAG="${{ steps.tag.outputs.tag }}"
+          docker buildx imagetools create \
+            -t "${BASE}:${TAG}-full" \
+            "${BASE}:${TAG}-full-amd64" \
+            "${BASE}:${TAG}-full-arm64"
 
       # Build single-layer VFS variant on top of the merged manifest
       - name: Build and push VFS image

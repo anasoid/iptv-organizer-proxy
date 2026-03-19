@@ -7,7 +7,7 @@ A powerful Xtream Codes API proxy with advanced filtering, organization, and mul
 - **Multi-Source Support**: Manage multiple IPTV sources from a single proxy
 - **Advanced Filtering**: YAML-based filtering with include/exclude rules and favoris system
 - **Label Extraction**: Automatic label extraction from channel names for enhanced organization
-- **Database Support**: MySQL and SQLite supported
+- **Database Support**: CI publishes SQLite images with no suffix and full JDBC images with `-full` tags (includes MySQL/PostgreSQL drivers)
 - **Adult Content Filtering**: Per-client adult content blocking
 - **Background Sync**: Automatic synchronization with upstream sources
 - **React Admin Panel**: Modern web-based administration interface
