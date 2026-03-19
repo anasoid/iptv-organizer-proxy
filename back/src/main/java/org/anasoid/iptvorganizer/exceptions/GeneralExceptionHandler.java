@@ -1,6 +1,7 @@
 package org.anasoid.iptvorganizer.exceptions;
 
 import io.quarkus.runtime.LaunchMode;
+import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
@@ -26,8 +27,15 @@ public class GeneralExceptionHandler implements ExceptionMapper<Exception> {
     String errorCode = "INTERNAL_ERROR";
     int statusCode = 500;
 
-    // Determine status and error code based on exception type
-    if (ex instanceof ValidationException) {
+    // JAX-RS standard exceptions (e.g. jakarta.ws.rs.NotFoundException thrown by RESTEasy when no
+    // route matches) already carry the correct HTTP status — use it directly rather than
+    // defaulting to 500.  This also suppresses ERROR-level noise from browser probe requests
+    // like Chrome's /.well-known/appspecific/com.chrome.devtools.json.
+    if (ex instanceof WebApplicationException wae) {
+      statusCode = wae.getResponse().getStatus();
+      status = Response.Status.fromStatusCode(statusCode);
+      errorCode = statusCode == 404 ? "NOT_FOUND" : "CLIENT_ERROR";
+    } else if (ex instanceof ValidationException) {
       status = Response.Status.BAD_REQUEST;
       errorCode = "VALIDATION_ERROR";
       statusCode = 400;
@@ -44,9 +52,7 @@ public class GeneralExceptionHandler implements ExceptionMapper<Exception> {
       errorCode = "NOT_FOUND";
       statusCode = 404;
     } else if (ex instanceof FilterException) {
-      status = Response.Status.INTERNAL_SERVER_ERROR;
       errorCode = "FILTER_ERROR";
-      statusCode = 500;
     } else if (ex instanceof StreamingException) {
       status = Response.Status.BAD_GATEWAY;
       errorCode = "STREAMING_ERROR";
@@ -74,13 +80,12 @@ public class GeneralExceptionHandler implements ExceptionMapper<Exception> {
 
     // Log appropriately based on status
     if (statusCode >= 500) {
-      log.error(
-          "Internal server error ( {} ): {}",
-          errorCode,
-          ex.getMessage(),
-          ex); // Log with full stack trace
+      log.error("Internal server error ( {} ): {}", errorCode, ex.getMessage(), ex);
+    } else if (statusCode == 404) {
+      // 404s are noisy (browser probes, missing favicons, etc.) — DEBUG is enough
+      log.debug("Not found ( {} ): {}", errorCode, ex.getMessage());
     } else {
-      log.warn("Client error ( {} )", errorCode, ex.getMessage()); // Log without stack trace
+      log.warn("Client error ( {} ): {}", errorCode, ex.getMessage());
     }
 
     return Response.status(status).entity(ApiResponse.error(errorDetails)).build();

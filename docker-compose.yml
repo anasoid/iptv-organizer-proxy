@@ -31,7 +31,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: ${MEM_LIMIT:-96M}
+          memory: ${MEM_LIMIT:-128M}
         reservations:
           memory: ${MEM_RESERVATION:-32M}
 

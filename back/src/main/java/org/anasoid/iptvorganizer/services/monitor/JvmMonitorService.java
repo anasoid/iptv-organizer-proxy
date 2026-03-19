@@ -62,9 +62,24 @@ public class JvmMonitorService {
   private final ArrayDeque<JvmMetricsEntry> metrics = new ArrayDeque<>();
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
-  @Scheduled(every = "1m", identity = "jvm-metrics")
+  /**
+   * Collects the first snapshot immediately on startup (delay = 0) so the API never returns an
+   * empty list just because the first scheduled tick hasn't fired yet. Subsequent ticks run every
+   * minute via the normal schedule.
+   *
+   * <p>The entire body is wrapped in try/catch so that a MXBean call that throws in Quarkus native
+   * mode (e.g. an unsupported platform bean) never silently keeps the deque empty — the error is
+   * logged and the next tick will retry.
+   */
+  @Scheduled(every = "1m", delay = 0, identity = "jvm-metrics")
   void collectMetrics() {
-    JvmMetricsEntry entry = collectSnapshot();
+    JvmMetricsEntry entry;
+    try {
+      entry = collectSnapshot();
+    } catch (Exception e) {
+      log.error("JVM metrics snapshot failed (native mode MXBean issue?): {}", e.getMessage(), e);
+      return;
+    }
     rwLock.writeLock().lock();
     try {
       metrics.addFirst(entry);
@@ -209,12 +224,16 @@ public class JvmMonitorService {
     // -- NIO direct buffers --
     long directUsedMb = -1L;
     long directCount = -1L;
-    for (BufferPoolMXBean pool : ManagementFactory.getPlatformMXBeans(BufferPoolMXBean.class)) {
-      if ("direct".equals(pool.getName())) {
-        directUsedMb = toMb(pool.getMemoryUsed());
-        directCount = pool.getCount();
-        break;
+    try {
+      for (BufferPoolMXBean pool : ManagementFactory.getPlatformMXBeans(BufferPoolMXBean.class)) {
+        if ("direct".equals(pool.getName())) {
+          directUsedMb = toMb(pool.getMemoryUsed());
+          directCount = pool.getCount();
+          break;
+        }
       }
+    } catch (Exception e) {
+      log.trace("BufferPoolMXBean unavailable (native mode): {}", e.getMessage());
     }
     // -- Runtime uptime --
     RuntimeMXBean runtimeBean = ManagementFactory.getRuntimeMXBean();
