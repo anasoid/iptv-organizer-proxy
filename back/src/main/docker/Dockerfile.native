@@ -25,7 +25,7 @@ RUN chown 1001 /work \
     && chmod -R "g+rwX" /app /logs
 
 # Native runner produced by Quarkus Gradle native build (lives at the root of back/build/)
-COPY --chown=1001:root *-runner /work/application
+COPY --chown=1001:root *-runner /work/iptv-organizer
 
 # Write the entrypoint inline — avoids any dependency on files outside the Docker build context.
 # The script generates a unique JWT RSA key pair on first boot, then starts the native binary.
@@ -51,7 +51,7 @@ RUN { \
     echo 'export QUARKUS_DATASOURCE_JDBC_URL=${QUARKUS_DATASOURCE_JDBC_URL:-jdbc:sqlite:/app/data/app.sqlite}'; \
     echo 'echo "Starting native application on port $QUARKUS_HTTP_PORT..."'; \
     echo '# Note: JAVA_OPTS does not apply — no JVM in native mode.'; \
-    echo 'exec /work/application -Dquarkus.http.host=0.0.0.0'; \
+    echo 'exec /work/iptv-organizer -Dquarkus.http.host=0.0.0.0'; \
 } > /work/docker-entrypoint.sh && chmod +x /work/docker-entrypoint.sh
 
 # Persistent volumes: SQLite database + JWT keys (generated on first boot) and logs
