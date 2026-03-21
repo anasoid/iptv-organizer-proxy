@@ -27,6 +27,15 @@ services:
       QUARKUS_DATASOURCE_USERNAME: ""
       QUARKUS_DATASOURCE_PASSWORD: ""
 
+      # Native runtime memory tuning (RSS reduction)
+      JAVA_TOOL_OPTIONS: "${JAVA_TOOL_OPTIONS:--Dio.netty.allocator.maxOrder=4}"
+      MALLOC_ARENA_MAX: "${MALLOC_ARENA_MAX:-2}"
+      MALLOC_TRIM_THRESHOLD_: "${MALLOC_TRIM_THRESHOLD_:-131072}"
+
+      # SQLite/JDBC memory knobs consumed by application.properties
+      JDBC_MAX_POOL_SIZE: "${JDBC_MAX_POOL_SIZE:-2}"
+      SQLITE_CACHE_SIZE: "${SQLITE_CACHE_SIZE:--1000}"
+
 
       CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-*}"
 

@@ -21,8 +21,18 @@ services:
       QUARKUS_DATASOURCE_JDBC_URL: "jdbc:sqlite:/app/data/app.sqlite"
       QUARKUS_DATASOURCE_USERNAME: ""
       QUARKUS_DATASOURCE_PASSWORD: ""
+
+      # Native runtime memory tuning (RSS reduction)
+      JAVA_TOOL_OPTIONS: "${JAVA_TOOL_OPTIONS:--Dio.netty.allocator.maxOrder=4}"
+      MALLOC_ARENA_MAX: "${MALLOC_ARENA_MAX:-2}"
+      MALLOC_TRIM_THRESHOLD_: "${MALLOC_TRIM_THRESHOLD_:-131072}"
+
+      # SQLite/JDBC memory knobs consumed by application.properties
+      JDBC_MAX_POOL_SIZE: "${JDBC_MAX_POOL_SIZE:-2}"
+      SQLITE_CACHE_SIZE: "${SQLITE_CACHE_SIZE:--1000}"
+
       # Proxy Configuration (optional)
-      PROXY_URL: "${PROXY_URL:-http://mitmproxy:8080}"
+      PROXY_URL: "${PROXY_URL:-http://proxy:8080}"
 
       # Logging Configuration
       QUARKUS_LOG_LEVEL: "${QUARKUS_LOG_LEVEL:-INFO}"
@@ -52,9 +62,9 @@ services:
 
   # Optional: mitmproxy for request/response interception
   # Uncomment to enable proxy features
-  mitmproxy:
+  proxy:
     image: mitmproxy/mitmproxy:latest
-    command: mitmweb --web-host 0.0.0.0 --web-port 8081
+    command: mitmweb --web-host 0.0.0.0 --web-port 8081 --set web_password=admin
     ports:
       - "7080:8080"   # proxy port
       - "7081:8081"   # web UI
