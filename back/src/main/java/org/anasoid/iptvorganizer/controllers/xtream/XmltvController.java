@@ -52,7 +52,7 @@ public class XmltvController {
    * @return XMLTV formatted EPG data
    */
   @GET
-  @Produces(MediaType.APPLICATION_XML)
+  @Produces("application/xml")
   public Response getXmltv(
       @QueryParam("username") String username,
       @QueryParam("password") String password,
