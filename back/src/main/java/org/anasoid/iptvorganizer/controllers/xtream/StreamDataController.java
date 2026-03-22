@@ -147,7 +147,7 @@ public class StreamDataController extends AbstractDataController {
     Source source = authResult.getSource();
 
     // Validate stream access (single DB lookup via loadAccessibleStream)
-    if (checkAccess) {
+    if (checkAccess && !StreamType.SERIES.equals(streamType)) {
       Optional<BaseStream> accessibleStream =
           loadAccessibleStream(client, source, streamId, streamType);
       if (accessibleStream.isEmpty()) {
