@@ -28,6 +28,49 @@ import { useAuthStore } from '../stores/authStore';
 import streamsApi from '../services/streamsApi';
 import categoriesApi from '../services/categoriesApi';
 
+function parseStreamData(data: unknown): Record<string, unknown> | null {
+  if (!data) {
+    return null;
+  }
+
+  if (typeof data === 'object' && !Array.isArray(data)) {
+    return data as Record<string, unknown>;
+  }
+
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function formatRawStreamData(data: unknown): string {
+  if (data === null || data === undefined) {
+    return '';
+  }
+
+  if (typeof data === 'string') {
+    try {
+      return JSON.stringify(JSON.parse(data), null, 2);
+    } catch {
+      return data;
+    }
+  }
+
+  try {
+    return JSON.stringify(data, null, 2);
+  } catch {
+    return String(data);
+  }
+}
+
 export default function StreamDetail() {
   const { id, type } = useParams<{ id: string; type: string }>();
   const navigate = useNavigate();
@@ -152,10 +195,15 @@ export default function StreamDetail() {
     );
   }
 
-  const streamIcon = stream.data?.stream_icon || stream.data?.cover;
-  const duration = stream.data?.duration;
-  const episodes = stream.data?.episodes;
-  const seasons = stream.data?.seasons;
+  const metadata = parseStreamData(stream.data);
+  const rawDataText = formatRawStreamData(stream.data);
+  const hasMetadata = !!metadata && Object.keys(metadata).length > 0;
+  const hasRawData = rawDataText.length > 0;
+
+  const streamIcon = metadata?.stream_icon || metadata?.cover;
+  const duration = metadata?.duration;
+  const episodes = metadata?.episodes;
+  const seasons = metadata?.seasons;
 
   const formatDuration = (seconds: number): string => {
     if (!seconds) return 'N/A';
@@ -374,7 +422,7 @@ export default function StreamDetail() {
             </Box>
 
             {/* Metadata Table - Below Detail Info */}
-            {stream.data && Object.keys(stream.data).length > 0 && (
+            {hasMetadata && metadata && (
               <Box sx={{ p: 3, pt: 0, backgroundColor: '#fafafa' }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
                   Metadata
@@ -382,7 +430,7 @@ export default function StreamDetail() {
                 <TableContainer sx={{ maxHeight: 250 }}>
                   <Table size="small">
                     <TableBody>
-                      {Object.entries(stream.data).map(([key, value]) => {
+                      {Object.entries(metadata).map(([key, value]) => {
                         // Skip certain fields we already display
                         if (['stream_icon', 'cover', 'url', 'duration', 'episodes', 'seasons'].includes(key)) {
                           return null;
@@ -442,7 +490,7 @@ export default function StreamDetail() {
       </Card>
 
       {/* Raw Data JSON */}
-      {stream.data && Object.keys(stream.data).length > 0 && (
+      {hasRawData && (
         <Card sx={{ mb: 3, p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -453,7 +501,7 @@ export default function StreamDetail() {
                 size="small"
                 onClick={() =>
                   handleCopyToClipboard(
-                    JSON.stringify(stream.data, null, 2),
+                    rawDataText,
                     'Data copied to clipboard!'
                   )
                 }
@@ -477,7 +525,7 @@ export default function StreamDetail() {
               wordBreak: 'break-word',
             }}
           >
-            {JSON.stringify(stream.data, null, 2)}
+            {rawDataText}
           </Paper>
         </Card>
       )}
