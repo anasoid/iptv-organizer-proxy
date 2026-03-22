@@ -93,7 +93,7 @@ export default function LiveStreams() {
   // Categories are already filtered by type on backend
   const liveCategories = categoriesData?.data || [];
 
-  let streams = streamsData?.data || [];
+  let streams = streamsData?.data?.map((s) => ({ ...s, icon: true })) || [];
   const pagination = streamsData?.pagination;
 
   // Apply access control filter
@@ -136,11 +136,24 @@ export default function LiveStreams() {
       renderCell: (params) => getCategoryName(params.value),
     },
     {
-      field: 'data',
+      field: 'icon',
       headerName: 'Icon',
       width: 100,
       renderCell: (params) => {
-        const iconUrl = params.value?.stream_icon || params.value?.cover;
+        let dataObj: Record<string, any> | null = null;
+        const data = params.row.data;
+        if (data) {
+          if (typeof data === 'string') {
+            try {
+              dataObj = JSON.parse(data);
+            } catch {
+              dataObj = null;
+            }
+          } else {
+            dataObj = data as Record<string, any>;
+          }
+        }
+        const iconUrl = dataObj?.stream_icon || dataObj?.cover;
         return iconUrl ? (
           <Box
             component="img"
@@ -374,7 +387,7 @@ export default function LiveStreams() {
                   }}
                   initialState={{
                     pagination: { paginationModel: { pageSize: limit } },
-                    columns: { columnVisibilityModel: { num: false, is_adult: false } },
+                    columns: { columnVisibilityModel: { num: false, is_adult: false, icon: true } },
                   }}
                 />
               </Box>
@@ -394,17 +407,23 @@ export default function LiveStreams() {
           {/* Grid View */}
           {!isLoadingStreams && sourceId && view === 'grid' && streams.length > 0 && (
             <>
-              <Grid container spacing={2}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(5, 1fr)',
+                  gap: 2,
+                }}
+              >
                 {streams.map((stream) => (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={stream.id}>
+                  <Box key={stream.id} sx={{ minWidth: 0 }}>
                     <StreamCard
                       stream={stream}
                       categoryName={getCategoryName(stream.categoryId)}
                       onClick={() => navigate(`/streams/${stream.id}/live`)}
                     />
-                  </Grid>
+                  </Box>
                 ))}
-              </Grid>
+              </Box>
               {pagination && pagination.pages > 1 && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
                   <Pagination

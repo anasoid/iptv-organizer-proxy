@@ -8,8 +8,20 @@ interface StreamCardProps {
 }
 
 export default function StreamCard({ stream, categoryName, onClick }: StreamCardProps) {
-  // Extract stream_icon from data field
-  const streamIcon = stream.data?.stream_icon || '';
+  // Extract stream_icon from data field, parsing if needed
+  let dataObj: Record<string, any> | null = null;
+  if (stream.data) {
+    if (typeof stream.data === 'string') {
+      try {
+        dataObj = JSON.parse(stream.data);
+      } catch {
+        dataObj = null;
+      }
+    } else {
+      dataObj = stream.data as Record<string, any>;
+    }
+  }
+  const streamIcon = dataObj?.stream_icon || dataObj?.cover || '';
 
   // Try to get duration or other info from data
   const getDuration = (): string | null => {
@@ -65,11 +77,12 @@ export default function StreamCard({ stream, categoryName, onClick }: StreamCard
       {streamIcon ? (
         <CardMedia
           component="img"
-          height="200"
           image={streamIcon}
           alt={stream.name}
           sx={{
-            objectFit: 'cover',
+            width: '100%',
+            height: 140,
+            objectFit: 'contain',
             backgroundColor: '#f0f0f0',
           }}
           onError={(e) => {
@@ -80,7 +93,7 @@ export default function StreamCard({ stream, categoryName, onClick }: StreamCard
       ) : (
         <Box
           sx={{
-            height: 200,
+            height: 140,
             backgroundColor: '#f0f0f0',
             display: 'flex',
             alignItems: 'center',

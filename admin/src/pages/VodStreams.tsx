@@ -92,7 +92,7 @@ export default function VodStreams() {
   // Categories are already filtered by type on backend
   const vodCategories = categoriesData?.data || [];
 
-  let streams = streamsData?.data || [];
+  let streams = streamsData?.data?.map((s) => ({ ...s, icon: true })) || [];
   const pagination = streamsData?.pagination;
 
   // Apply access control filter
@@ -135,44 +135,24 @@ export default function VodStreams() {
       renderCell: (params) => getCategoryName(params.value),
     },
     {
-      field: 'added',
-      headerName: 'Added Date',
-      width: 140,
-      renderCell: (params) => {
-        const addedDate = params.row.added_date;
-        if (!addedDate) return '—';
-        const date = new Date(addedDate);
-        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-      },
-    },
-    {
-      field: 'rating',
-      headerName: 'Rating',
-      width: 90,
-      renderCell: (params) => {
-        const stream = streams.find((s) => s.id === params.row.id);
-        const rating = stream?.data?.rating;
-        if (!rating) return '—';
-        return typeof rating === 'number' ? rating.toFixed(1) : rating;
-      },
-    },
-    {
-      field: 'releasedate',
-      headerName: 'Release Date',
-      width: 120,
-      renderCell: (params) => {
-        const releaseDate = params.row.release_date;
-        if (!releaseDate) return '—';
-        return releaseDate;
-      },
-    },
-    {
       field: 'icon',
       headerName: 'Icon',
       width: 100,
       renderCell: (params) => {
-        const stream = streams.find((s) => s.id === params.row.id);
-        const iconUrl = stream?.data?.stream_icon || stream?.data?.cover;
+        let dataObj: Record<string, any> | null = null;
+        const data = params.row.data;
+        if (data) {
+          if (typeof data === 'string') {
+            try {
+              dataObj = JSON.parse(data);
+            } catch {
+              dataObj = null;
+            }
+          } else {
+            dataObj = data as Record<string, any>;
+          }
+        }
+        const iconUrl = dataObj?.stream_icon || dataObj?.cover;
         return iconUrl ? (
           <Box
             component="img"
@@ -406,7 +386,7 @@ export default function VodStreams() {
                   }}
                   initialState={{
                     pagination: { paginationModel: { pageSize: limit } },
-                    columns: { columnVisibilityModel: { num: false, is_adult: false } },
+                    columns: { columnVisibilityModel: { num: false, is_adult: false, icon: true } },
                   }}
                 />
               </Box>
@@ -426,17 +406,23 @@ export default function VodStreams() {
           {/* Grid View */}
           {!isLoadingStreams && sourceId && view === 'grid' && streams.length > 0 && (
             <>
-              <Grid container spacing={2}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(5, 1fr)',
+                  gap: 2,
+                }}
+              >
                 {streams.map((stream) => (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={stream.id}>
+                  <Box key={stream.id} sx={{ minWidth: 0 }}>
                     <StreamCard
                       stream={stream}
                       categoryName={getCategoryName(stream.categoryId)}
                       onClick={() => navigate(`/streams/${stream.id}/vod`)}
                     />
-                  </Grid>
+                  </Box>
                 ))}
-              </Grid>
+              </Box>
               {pagination && pagination.pages > 1 && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
                   <Pagination
