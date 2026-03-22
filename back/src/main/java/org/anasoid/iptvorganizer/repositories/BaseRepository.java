@@ -45,7 +45,7 @@ public abstract class BaseRepository<T extends BaseEntity> {
         return result;
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to find by id: " + id, e);
+      throw new RuntimeException("Failed to find " + getTableName() + " by id: " + id, e);
     }
   }
 
@@ -59,7 +59,7 @@ public abstract class BaseRepository<T extends BaseEntity> {
         results.add(mapRow(rs));
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to find all", e);
+      throw new RuntimeException("Failed to find " + getTableName() + " all", e);
     }
     return results;
   }
@@ -90,7 +90,7 @@ public abstract class BaseRepository<T extends BaseEntity> {
       stmt.executeUpdate();
       getCache().invalidateAll();
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to delete by id: " + id, e);
+      throw new RuntimeException("Failed to delete " + getTableName() + " by id: " + id, e);
     }
   }
 
@@ -102,7 +102,7 @@ public abstract class BaseRepository<T extends BaseEntity> {
         ResultSet rs = stmt.executeQuery()) {
       return rs.next() ? rs.getLong("cnt") : 0L;
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to count records", e);
+      throw new RuntimeException("Failed to count records " + getTableName(), e);
     }
   }
 
@@ -121,7 +121,7 @@ public abstract class BaseRepository<T extends BaseEntity> {
         }
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to find paged results", e);
+      throw new RuntimeException("Failed to find " + getTableName() + " paged results", e);
     }
     return results;
   }
@@ -138,7 +138,7 @@ public abstract class BaseRepository<T extends BaseEntity> {
         return rs.next() ? rs.getLong("cnt") : 0L;
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to count with where clause", e);
+      throw new RuntimeException("Failed to count " + getTableName() + " with where clause", e);
     }
   }
 
@@ -173,7 +173,8 @@ public abstract class BaseRepository<T extends BaseEntity> {
         }
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to find paged results with where clause", e);
+      throw new RuntimeException(
+          "Failed to find " + getTableName() + "paged results with where clause", e);
     }
     return results;
   }
@@ -209,7 +210,8 @@ public abstract class BaseRepository<T extends BaseEntity> {
         }
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to find ids by source id: " + sourceId, e);
+      throw new RuntimeException(
+          "Failed to find " + getTableName() + " ids by source id: " + sourceId, e);
     }
     return ids;
   }
