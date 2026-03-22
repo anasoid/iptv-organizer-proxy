@@ -103,13 +103,43 @@ public class CategoriesController extends BaseController {
     }
   }
 
-  /** Get category by ID GET /api/categories/:id?source_id= */
+  /** Get category by ID GET /api/categories/:id */
   @GET
   @Path("/{id}")
   public Response getCategory(@PathParam("id") Long id) {
     var cat = categoryService.getById(id);
     if (cat == null) {
       throw new NotFoundException("Category not found with ID: " + id);
+    }
+    return ResponseUtils.ok(cat);
+  }
+
+  /**
+   * Get category by external ID and source GET
+   * /api/categories/by-external-id/:externalId?sourceId=&type=
+   */
+  @GET
+  @Path("/by-external-id/{externalId}")
+  public Response getCategoryByExternalId(
+      @PathParam("externalId") Integer externalId,
+      @QueryParam("sourceId") Long sourceId,
+      @QueryParam("type") String type) {
+    if (sourceId == null) {
+      throw new ValidationException("sourceId is required");
+    }
+    if (type == null || type.isBlank()) {
+      throw new ValidationException("type is required");
+    }
+
+    var cat = categoryService.findBySourceAndCategoryId(sourceId, externalId, type);
+    if (cat == null) {
+      throw new NotFoundException(
+          "Category not found with external ID: "
+              + externalId
+              + " and source ID: "
+              + sourceId
+              + " and type: "
+              + type);
     }
     return ResponseUtils.ok(cat);
   }

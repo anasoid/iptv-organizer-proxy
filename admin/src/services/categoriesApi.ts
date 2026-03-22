@@ -68,6 +68,18 @@ class CategoriesApi {
   }
 
   /**
+   * Get single category by external ID and source ID
+   * @param externalId - category external ID (from upstream Xtream)
+   * @param sourceId - source ID
+   * @param type - category type (live, vod, series) - required
+   */
+  async getCategoryByExternalId(externalId: number, sourceId: number, type: string) {
+    const params = { sourceId, type };
+    const response = await api.get(`/categories/by-external-id/${externalId}`, { params });
+    return response.data as CategoryResponse;
+  }
+
+  /**
    * Update category allow_deny field
    * @param id - category database ID
    * @param allowDeny - 'allow', 'deny', or null to remove override

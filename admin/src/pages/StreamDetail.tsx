@@ -65,45 +65,35 @@ export default function StreamDetail() {
   // Fetch source ID from stream to get all categories as fallback
   const sourceId = stream?.sourceId;
 
-  // First try to get single category, fallback to fetching all categories
-  const { data: categoryData } = useQuery({
-    queryKey: ['category', stream?.categoryId],
+  // Fetch category by external ID (stream.categoryId is the external ID from upstream Xtream)
+  // Type comes from route param-derived streamType (stream payload does not include a `type` field).
+  const { data: category } = useQuery({
+    queryKey: ['category', stream?.categoryId, sourceId, streamType],
     queryFn: async () => {
-      if (!stream?.categoryId) {
-        console.log('No category_id on stream');
+      if (!stream?.categoryId || !sourceId) {
+        console.log('No category_id or source_id on stream');
         return Promise.resolve(null);
       }
-      console.log('Fetching category:', { category_id: stream.categoryId, source_id: sourceId });
+      console.log('Fetching category by external ID:', {
+        external_id: stream.categoryId,
+        source_id: sourceId,
+        type: streamType,
+      });
       try {
-        const result = await categoriesApi.getCategory(Number(stream.categoryId), sourceId);
-        console.log('Category found:', result.data.category_name);
-        return result;
-      } catch {
-        console.log('Single category fetch failed, trying to fetch all categories from source...');
-        // Fallback: fetch all categories and find the matching one
-        if (sourceId) {
-          try {
-            const allCats = await categoriesApi.getCategories(sourceId, 1, 100);
-            const found = allCats.data.find((cat) => cat.id === Number(stream.categoryId));
-            if (found) {
-              console.log('Category found in source categories:', found.name);
-              return { success: true, data: found };
-            } else {
-              console.log('Category not found in source categories either');
-              return null;
-            }
-          } catch (fallbackErr) {
-            console.log('Fallback category fetch error:', fallbackErr);
-            return null;
-          }
-        }
+        const result = await categoriesApi.getCategoryByExternalId(
+          Number(stream.categoryId),
+          sourceId,
+          streamType,
+        );
+        console.log('Category found by external ID:', result.data.name);
+        return result.data;  // Return just the Category object, not the response wrapper
+      } catch (err) {
+        console.log('Error fetching category by external ID:', err);
         return null;
       }
     },
-    enabled: isAuthenticated && !!stream?.categoryId,
+    enabled: isAuthenticated && !!stream?.categoryId && !!sourceId,
   });
-
-  const category = categoryData?.data;
 
   const getTypeColor = (type: string): 'default' | 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success' => {
     switch (type.toLowerCase()) {
