@@ -118,6 +118,10 @@ export default function LiveStreams() {
     return categories[categoryId] || `Category ${categoryId}`;
   };
 
+  const getCategoryDisplayName = (category: Category): string => {
+    return category.name || (category as Category & { category_name?: string }).category_name || 'Unnamed Category';
+  };
+
   const columns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 50 },
     { field: 'num', headerName: 'Order', width: 60 },
@@ -451,7 +455,7 @@ export default function LiveStreams() {
                   }}
                 >
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    {category.category_name}
+                    {getCategoryDisplayName(category)}
                   </Typography>
                 </Box>
               ))}
