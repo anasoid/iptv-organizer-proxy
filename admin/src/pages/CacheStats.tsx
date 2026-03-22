@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
+  Button,
   Box,
   Paper,
   Typography,
@@ -17,7 +18,11 @@ import {
   TableSortLabel,
 } from '@mui/material';
 import { Refresh as RefreshIcon } from '@mui/icons-material';
-import { cacheApi, type CacheStat } from '../services/cacheApi';
+import {
+  cacheApi,
+  type CacheStat,
+  type DatabaseShrinkResult,
+} from '../services/cacheApi';
 
 type OrderBy = 'cacheName' | 'size' | 'maxSize' | 'hits' | 'misses' | 'hitRate' | 'puts' | 'sizeEvictions' | 'expiredEvictions' | 'totalEvictions' | 'invalidations' | 'clears';
 type Order = 'asc' | 'desc';
@@ -26,6 +31,8 @@ export default function CacheStats() {
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [orderBy, setOrderBy] = useState<OrderBy>('cacheName');
   const [order, setOrder] = useState<Order>('asc');
+  const [shrinkResult, setShrinkResult] = useState<DatabaseShrinkResult | null>(null);
+  const [shrinkErrorMessage, setShrinkErrorMessage] = useState<string | null>(null);
 
   const { data: cacheStats, isLoading, error, refetch } = useQuery({
     queryKey: ['cacheStats', lastRefresh],
@@ -35,6 +42,26 @@ export default function CacheStats() {
   const handleRefresh = () => {
     setLastRefresh(new Date());
     refetch();
+  };
+
+  const shrinkMutation = useMutation({
+    mutationFn: () => cacheApi.shrinkDatabase(),
+    onSuccess: (result) => {
+      setShrinkResult(result);
+      setShrinkErrorMessage(null);
+      handleRefresh();
+    },
+    onError: (mutationError) => {
+      const message =
+        mutationError instanceof Error ? mutationError.message : 'Unknown error while shrinking database';
+      setShrinkResult(null);
+      setShrinkErrorMessage(message);
+    },
+  });
+
+  const handleShrinkDatabase = () => {
+    setShrinkErrorMessage(null);
+    shrinkMutation.mutate();
   };
 
   const handleSort = (column: OrderBy) => {
@@ -78,6 +105,13 @@ export default function CacheStats() {
     return `${(num * 100).toFixed(2)}%`;
   };
 
+  const formatBytes = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  };
+
   const getHitRateColor = (hitRate: number): 'success' | 'warning' | 'error' => {
     if (hitRate >= 0.8) return 'success';
     if (hitRate >= 0.5) return 'warning';
@@ -88,10 +122,37 @@ export default function CacheStats() {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4">Cache Statistics</Typography>
-        <IconButton onClick={handleRefresh} color="primary" disabled={isLoading}>
-          <RefreshIcon />
-        </IconButton>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="contained"
+            onClick={handleShrinkDatabase}
+            disabled={isLoading || shrinkMutation.isPending}
+          >
+            {shrinkMutation.isPending ? 'Shrinking...' : 'Shrink Database'}
+          </Button>
+          <IconButton
+            onClick={handleRefresh}
+            color="primary"
+            disabled={isLoading || shrinkMutation.isPending}
+          >
+            <RefreshIcon />
+          </IconButton>
+        </Box>
       </Box>
+
+      {shrinkResult && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          Database shrunk successfully. Freed {formatBytes(shrinkResult.freedBytes)} in{' '}
+          {shrinkResult.durationMs} ms ({formatBytes(shrinkResult.sizeBeforeBytes)} -&gt;{' '}
+          {formatBytes(shrinkResult.sizeAfterBytes)}).
+        </Alert>
+      )}
+
+      {shrinkErrorMessage && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Failed to shrink database: {shrinkErrorMessage}
+        </Alert>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>

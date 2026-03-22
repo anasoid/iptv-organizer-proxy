@@ -15,12 +15,29 @@ export interface CacheStat {
   totalEvictions?: number;
 }
 
+export interface DatabaseShrinkResult {
+  dialect: string;
+  databasePath: string;
+  sizeBeforeBytes: number;
+  sizeAfterBytes: number;
+  freedBytes: number;
+  durationMs: number;
+}
+
 class CacheApi {
   /**
    * Get all cache statistics
    */
   async getCacheStats() {
     const response = await api.get<{ data: CacheStat[] }>('/cache/stats');
+    return response.data.data;
+  }
+
+  /**
+   * Trigger SQLite VACUUM to compact database file and free disk space.
+   */
+  async shrinkDatabase() {
+    const response = await api.post<{ data: DatabaseShrinkResult }>('/cache/database/shrink');
     return response.data.data;
   }
 }
