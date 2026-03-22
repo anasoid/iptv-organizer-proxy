@@ -47,6 +47,12 @@ public abstract class BaseStream extends SourcedEntity {
   /** Release date of the content */
   private LocalDate releaseDate;
 
+  /** Rating of the stream (e.g., IMDb/TVDB rating) */
+  private Double rating;
+
+  /** TMDb ID for the stream (Long, nullable) */
+  private Long tmdb;
+
   public enum AllowDenyStatus {
     ALLOW("allow"),
     DENY("deny");

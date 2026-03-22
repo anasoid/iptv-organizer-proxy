@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS series (
     data TEXT,
     added_date DATE,
     release_date DATE,
+    rating REAL,
+    tmdb INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,

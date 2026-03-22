@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS vod_streams (
     data JSON,
     added_date DATE,
     release_date DATE,
+    rating DOUBLE,
+    tmdb BIGINT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
