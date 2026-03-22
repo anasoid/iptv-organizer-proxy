@@ -57,17 +57,13 @@ export interface JvmMetricsEntry {
 }
 
 /**
- * Format a JS Date as a server-local ISO-8601 string without timezone offset.
- * LocalDateTime.parse() on the backend accepts exactly this format.
- * Using string formatting avoids timezone conversion issues that arise with
- * Date.toISOString() (which always outputs UTC).
+ * Format a JS Date as an ISO-8601 timestamp with timezone (UTC "Z").
+ * The backend accepts offset timestamps and converts them to server-local
+ * time using the same instant, which keeps filtering correct across
+ * browser/container timezone differences.
  */
 export function toServerDateTime(date: Date): string {
-  const p = (n: number) => n.toString().padStart(2, '0');
-  return (
-    `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}` +
-    `T${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`
-  );
+  return date.toISOString();
 }
 
 class JvmMetricsApi {

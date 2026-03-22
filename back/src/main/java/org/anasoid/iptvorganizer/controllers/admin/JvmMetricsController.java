@@ -10,6 +10,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
@@ -52,8 +53,14 @@ public class JvmMetricsController extends BaseController {
     } catch (IllegalArgumentException e) {
       return ResponseUtils.badRequest(e.getMessage());
     }
-    log.debug("JVM metrics request: start={} end={}", start, end);
+    log.info("JVM metrics request: start={} end={}", start, end);
     List<JvmMetricsEntry> result = jvmMonitorService.getMetrics(start, end);
+    log.info(
+        "JVM metrics entries: returned={} retained={} start={} end={}",
+        result.size(),
+        jvmMonitorService.size(),
+        start,
+        end);
     return ResponseUtils.ok(result);
   }
 
@@ -64,9 +71,12 @@ public class JvmMetricsController extends BaseController {
     try {
       return LocalDateTime.parse(value);
     } catch (DateTimeParseException ignored) {
-      // Accept RFC3339/ISO offsets from external clients and normalize to server-local time.
+      // Accept RFC3339/ISO offsets and convert the same instant into server-local time.
+      // toLocalDateTime() alone would drop the offset and shift the requested time window.
       try {
-        return OffsetDateTime.parse(value).toLocalDateTime();
+        return OffsetDateTime.parse(value)
+            .atZoneSameInstant(ZoneId.systemDefault())
+            .toLocalDateTime();
       } catch (DateTimeParseException e) {
         throw new IllegalArgumentException(
             "Invalid datetime '"
