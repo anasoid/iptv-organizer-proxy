@@ -486,10 +486,11 @@ export default function StreamDetail() {
                                 sx={{
                                   fontFamily: 'monospace',
                                   whiteSpace: 'pre-wrap',
+                                  overflowWrap: 'anywhere',
                                   wordBreak: 'break-word',
                                 }}
                               >
-                                {displayValue.length > 80 ? displayValue.substring(0, 80) + '...' : displayValue}
+                                {displayValue}
                               </Typography>
                             </TableCell>
                           </TableRow>
