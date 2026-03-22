@@ -97,26 +97,36 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
 
   /** Find categories by source ID with optional category type filter and search */
   public List<Category> findBySourceIdFiltered(
-      Long sourceId, String categoryType, String search, int page, int limit) {
-    StringBuilder whereClause = new StringBuilder("source_id = ?");
-    List<Object> params = new ArrayList<>();
-    params.add(sourceId);
-
-    if (categoryType != null && !categoryType.isEmpty()) {
-      whereClause.append(" AND type = ?");
-      params.add(categoryType);
-    }
-
-    if (search != null && !search.isEmpty()) {
-      whereClause.append(" AND name LIKE ?");
-      params.add("%" + search + "%");
-    }
-
-    return findWherePaged(whereClause.toString(), page, limit, "id DESC", params.toArray());
+      Long sourceId,
+      String categoryType,
+      String search,
+      String allowDenyFilter,
+      String blackListFilter,
+      int page,
+      int limit) {
+    FilterQuery filterQuery =
+        buildFilterQuery(sourceId, categoryType, search, allowDenyFilter, blackListFilter);
+    return findWherePaged(filterQuery.whereClause(), page, limit, "id DESC", filterQuery.params());
   }
 
   /** Count categories by source ID with optional filters */
-  public Long countBySourceIdFiltered(Long sourceId, String categoryType, String search) {
+  public Long countBySourceIdFiltered(
+      Long sourceId,
+      String categoryType,
+      String search,
+      String allowDenyFilter,
+      String blackListFilter) {
+    FilterQuery filterQuery =
+        buildFilterQuery(sourceId, categoryType, search, allowDenyFilter, blackListFilter);
+    return countWhere(filterQuery.whereClause(), filterQuery.params());
+  }
+
+  private FilterQuery buildFilterQuery(
+      Long sourceId,
+      String categoryType,
+      String search,
+      String allowDenyFilter,
+      String blackListFilter) {
     StringBuilder whereClause = new StringBuilder("source_id = ?");
     List<Object> params = new ArrayList<>();
     params.add(sourceId);
@@ -131,8 +141,45 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
       params.add("%" + search + "%");
     }
 
-    return countWhere(whereClause.toString(), params.toArray());
+    if (allowDenyFilter != null && !allowDenyFilter.isEmpty()) {
+      if ("default".equals(allowDenyFilter)) {
+        whereClause.append(" AND allow_deny IS NULL");
+      } else {
+        whereClause.append(" AND allow_deny = ?");
+        params.add(allowDenyFilter);
+      }
+    }
+
+    if (blackListFilter != null && !blackListFilter.isEmpty()) {
+      switch (blackListFilter) {
+        case "default":
+          whereClause.append(" AND (black_list = ? OR black_list IS NULL)");
+          params.add(Category.BlackListStatus.DEFAULT.getValue());
+          break;
+        case "hidden":
+          whereClause.append(" AND black_list IN (?, ?)");
+          params.add(Category.BlackListStatus.HIDE.getValue());
+          params.add(Category.BlackListStatus.FORCE_HIDE.getValue());
+          break;
+        case "visible":
+          whereClause.append(" AND black_list IN (?, ?)");
+          params.add(Category.BlackListStatus.VISIBLE.getValue());
+          params.add(Category.BlackListStatus.FORCE_VISIBLE.getValue());
+          break;
+        case "force_hidden":
+          whereClause.append(" AND black_list IN (?, ?)");
+          params.add(Category.BlackListStatus.FORCE_HIDE.getValue());
+          params.add(Category.BlackListStatus.FORCE_VISIBLE.getValue());
+          break;
+        default:
+          break;
+      }
+    }
+
+    return new FilterQuery(whereClause.toString(), params.toArray());
   }
+
+  private record FilterQuery(String whereClause, Object[] params) {}
 
   /** Find category by source, external_id, and type */
   public Category findBySourceCategoryType(Long sourceId, Integer categoryId, String categoryType) {
@@ -310,7 +357,8 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
    */
   public Map<Integer, Category> findBySourceAndTypeAsMap(Long sourceId, String type) {
     Map<Integer, Category> categoryMap = new HashMap<>();
-    List<Category> categories = findBySourceIdFiltered(sourceId, type, null, 1, Integer.MAX_VALUE);
+    List<Category> categories =
+        findBySourceIdFiltered(sourceId, type, null, null, null, 1, Integer.MAX_VALUE);
     for (Category category : categories) {
       categoryMap.put(category.getExternalId(), category);
     }

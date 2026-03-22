@@ -21,9 +21,34 @@ import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useSourceStore } from '../stores/sourceStore';
-import categoriesApi, { type Category } from '../services/categoriesApi';
+import categoriesApi, {
+  type Category,
+  type CategoryAllowDenyFilter,
+  type CategoryBlackListFilter,
+  type CategoryTypeFilter,
+} from '../services/categoriesApi';
 import SourceSelector from '../components/SourceSelector';
 import ViewToggle, { type ViewMode } from '../components/ViewToggle';
+
+type CategoryBlackListValue = 'default' | 'hide' | 'visible' | 'force_hide' | 'force_visible';
+
+function getCategoryBlackListValue(category: Category): CategoryBlackListValue {
+  const rawValue = (
+    category.blackList
+    ?? (category as Category & { black_list?: string | null }).black_list
+    ?? 'default'
+  ).toLowerCase();
+
+  switch (rawValue) {
+    case 'hide':
+    case 'visible':
+    case 'force_hide':
+    case 'force_visible':
+      return rawValue;
+    default:
+      return 'default';
+  }
+}
 
 export default function Categories() {
   const navigate = useNavigate();
@@ -35,16 +60,30 @@ export default function Categories() {
   const [limit, setLimit] = useState(20);
   const [view, setView] = useState<ViewMode>('list');
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryType, setCategoryType] = useState<'live' | 'vod' | 'series' | ''>('');
-  const [allowDenyFilter, setAllowDenyFilter] = useState<'allow' | 'deny' | 'default' | 'all'>('all');
-  const [blackListFilter, setBlackListFilter] = useState<'all' | 'hidden' | 'visible' | 'force_hidden'>('all');
+  const [categoryType, setCategoryType] = useState<CategoryTypeFilter | ''>('');
+  const [allowDenyFilter, setAllowDenyFilter] = useState<CategoryAllowDenyFilter>('all');
+  const [blackListFilter, setBlackListFilter] = useState<CategoryBlackListFilter>('all');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
   // Fetch categories with optional search and type filter
   const { data, isLoading, error } = useQuery({
-    queryKey: ['categories', sourceId, page, limit, searchQuery, categoryType],
-    queryFn: () => (sourceId ? categoriesApi.getCategories(sourceId, page, limit, searchQuery || undefined, (categoryType as 'live' | 'vod' | 'series') || undefined) : Promise.resolve(null)),
+    queryKey: ['categories', sourceId, page, limit, searchQuery, categoryType, allowDenyFilter, blackListFilter],
+    queryFn: () => (
+      sourceId
+        ? categoriesApi.getCategories(
+            sourceId,
+            page,
+            limit,
+            searchQuery || undefined,
+            categoryType || undefined,
+            {
+              allowDenyFilter,
+              blackListFilter,
+            },
+          )
+        : Promise.resolve(null)
+    ),
     enabled: isAuthenticated && sourceId !== null,
   });
 
@@ -78,34 +117,8 @@ export default function Categories() {
     },
   });
 
-  let categories = data?.data || [];
+  const categories = data?.data || [];
   const pagination = data?.pagination;
-
-  // Apply access control filter
-  if (allowDenyFilter !== 'all') {
-    categories = categories.filter((cat) => {
-      if (allowDenyFilter === 'default') {
-        return cat.allowDeny === null;
-      }
-      return cat.allowDeny === allowDenyFilter;
-    });
-  }
-
-  // Apply blacklist filter
-  if (blackListFilter !== 'all') {
-    categories = categories.filter((cat) => {
-      if (blackListFilter === 'hidden') {
-        return cat.blackList === 'hide' || cat.blackList === 'force_hide';
-      }
-      if (blackListFilter === 'visible') {
-        return cat.blackList === 'visible' || cat.blackList === 'force_visible';
-      }
-      if (blackListFilter === 'force_hidden') {
-        return cat.blackList === 'force_hide' || cat.blackList === 'force_visible';
-      }
-      return true;
-    });
-  }
 
   const getCategoryTypeColor = (type: string): 'default' | 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success' => {
     switch (type) {
@@ -215,10 +228,7 @@ export default function Categories() {
       renderCell: (params) => {
         const category = params.row as Category;
         const isLoading = updateBlackListMutation.isPending;
-        // Handle both camelCase (blackList) and snake_case (black_list) from API
-        // Convert to lowercase to match MenuItem values
-        const rawValue = (category.blackList || category.black_list || 'default').toLowerCase();
-        const value = rawValue === 'default' ? 'default' : rawValue;
+        const value = getCategoryBlackListValue(category);
 
         const getBlackListColor = (val: string): 'success' | 'error' | 'warning' | 'info' | 'default' => {
           switch (val) {
@@ -286,7 +296,10 @@ export default function Categories() {
     },
   ];
 
-  const CategoryGridCard = ({ category }: { category: Category }) => (
+  const CategoryGridCard = ({ category }: { category: Category }) => {
+    const blackListValue = getCategoryBlackListValue(category);
+
+    return (
     <Card
       onClick={() => navigate(`/categories/${category.id}`)}
       sx={{
@@ -326,10 +339,10 @@ export default function Categories() {
               size="small"
             />
           )}
-          {category.blackList && category.blackList !== 'default' && (
+          {blackListValue !== 'default' && (
             <Chip
-              label={category.blackList.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-              color={category.blackList === 'hide' || category.blackList === 'force_hide' ? 'error' : 'success'}
+              label={blackListValue.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+              color={blackListValue === 'hide' || blackListValue === 'force_hide' ? 'error' : 'success'}
               size="small"
             />
           )}
@@ -343,7 +356,8 @@ export default function Categories() {
         </Box>
       </CardContent>
     </Card>
-  );
+    );
+  };
 
   return (
     <Box sx={{ p: 3 }}>
@@ -389,7 +403,7 @@ export default function Categories() {
                 value={categoryType}
                 label="Filter by Type"
                 onChange={(e) => {
-                  setCategoryType(e.target.value as 'live' | 'vod' | 'series' | '');
+                  setCategoryType(e.target.value as CategoryTypeFilter | '');
                   setPage(1);
                 }}
                 size="small"
@@ -409,7 +423,7 @@ export default function Categories() {
                 value={allowDenyFilter}
                 label="Filter by Access Control"
                 onChange={(e) => {
-                  setAllowDenyFilter(e.target.value as 'allow' | 'deny' | 'default' | 'all');
+                  setAllowDenyFilter(e.target.value as CategoryAllowDenyFilter);
                   setPage(1);
                 }}
                 size="small"
@@ -429,12 +443,13 @@ export default function Categories() {
                 value={blackListFilter}
                 label="Filter by Blacklist"
                 onChange={(e) => {
-                  setBlackListFilter(e.target.value as 'all' | 'hidden' | 'visible' | 'force_hidden');
+                  setBlackListFilter(e.target.value as CategoryBlackListFilter);
                   setPage(1);
                 }}
                 size="small"
               >
                 <MenuItem value="all">All</MenuItem>
+                <MenuItem value="default">Default</MenuItem>
                 <MenuItem value="hidden">Hidden</MenuItem>
                 <MenuItem value="visible">Visible</MenuItem>
                 <MenuItem value="force_hidden">Force (Hidden/Visible)</MenuItem>

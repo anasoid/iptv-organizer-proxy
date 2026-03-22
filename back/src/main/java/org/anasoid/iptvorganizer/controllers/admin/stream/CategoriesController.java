@@ -12,6 +12,8 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.util.Locale;
+import java.util.Set;
 import org.anasoid.iptvorganizer.controllers.admin.BaseController;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
@@ -27,6 +29,12 @@ import org.anasoid.iptvorganizer.utils.ResponseUtils;
 @RolesAllowed("admin")
 public class CategoriesController extends BaseController {
 
+  private static final Set<String> VALID_CATEGORY_TYPES = Set.of("live", "vod", "series");
+  private static final Set<String> VALID_ALLOW_DENY_FILTERS =
+      Set.of("all", "allow", "deny", "default");
+  private static final Set<String> VALID_BLACKLIST_FILTERS =
+      Set.of("all", "default", "hidden", "visible", "force_hidden");
+
   @Inject CategoryService categoryService;
 
   /**
@@ -36,6 +44,8 @@ public class CategoriesController extends BaseController {
   public Response getCategories(
       @QueryParam("sourceId") Long sourceId,
       @QueryParam("categoryType") String categoryType,
+      @QueryParam("allowDenyFilter") String allowDenyFilter,
+      @QueryParam("blackListFilter") String blackListFilter,
       @QueryParam("search") String search,
       @QueryParam("page") @DefaultValue("1") int page,
       @QueryParam("limit") @DefaultValue("20") int limit) {
@@ -44,10 +54,53 @@ public class CategoriesController extends BaseController {
       throw new ValidationException("sourceId is required");
     }
 
+    String normalizedCategoryType = normalizeFilter(categoryType);
+    String normalizedAllowDenyFilter = normalizeFilter(allowDenyFilter);
+    String normalizedBlackListFilter = normalizeFilter(blackListFilter);
+
+    validateFilter(normalizedCategoryType, VALID_CATEGORY_TYPES, "categoryType");
+    validateFilter(normalizedAllowDenyFilter, VALID_ALLOW_DENY_FILTERS, "allowDenyFilter");
+    validateFilter(normalizedBlackListFilter, VALID_BLACKLIST_FILTERS, "blackListFilter");
+
+    if ("all".equals(normalizedAllowDenyFilter)) {
+      normalizedAllowDenyFilter = null;
+    }
+
+    if ("all".equals(normalizedBlackListFilter)) {
+      normalizedBlackListFilter = null;
+    }
+
     var categories =
-        categoryService.findBySourceIdFiltered(sourceId, categoryType, search, page, limit);
-    long total = categoryService.countBySourceIdFiltered(sourceId, categoryType, search);
+        categoryService.findBySourceIdFiltered(
+            sourceId,
+            normalizedCategoryType,
+            search,
+            normalizedAllowDenyFilter,
+            normalizedBlackListFilter,
+            page,
+            limit);
+    long total =
+        categoryService.countBySourceIdFiltered(
+            sourceId,
+            normalizedCategoryType,
+            search,
+            normalizedAllowDenyFilter,
+            normalizedBlackListFilter);
     return ResponseUtils.okWithPagination(categories, PaginationMeta.of(page, limit, total));
+  }
+
+  private String normalizeFilter(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    return value.toLowerCase(Locale.ROOT);
+  }
+
+  private void validateFilter(String value, Set<String> validValues, String fieldName) {
+    if (value != null && !validValues.contains(value)) {
+      throw new ValidationException(
+          "Invalid " + fieldName + ". Valid values: " + String.join(", ", validValues));
+    }
   }
 
   /** Get category by ID GET /api/categories/:id?source_id= */
@@ -71,7 +124,7 @@ public class CategoriesController extends BaseController {
     }
 
     if (request != null && request.get("allowDeny") != null) {
-      cat.setAllowDeny(BaseStream.AllowDenyStatus.fromValue((String) request.get("allowDeny")));
+      cat.setAllowDeny(BaseStream.AllowDenyStatus.fromValue(request.get("allowDeny")));
       categoryService.update(cat);
     }
     return ResponseUtils.ok(cat);
@@ -89,7 +142,7 @@ public class CategoriesController extends BaseController {
     if (request != null && request.get("blackList") != null) {
       cat.setBlackList(
           org.anasoid.iptvorganizer.models.entity.stream.Category.BlackListStatus.fromValue(
-              (String) request.get("blackList")));
+              request.get("blackList")));
       categoryService.update(cat);
     }
     return ResponseUtils.ok(cat);

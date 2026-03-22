@@ -1,6 +1,15 @@
 import api from './api';
 import type { Category } from '../types';
 
+export type CategoryTypeFilter = 'live' | 'vod' | 'series';
+export type CategoryAllowDenyFilter = 'all' | 'allow' | 'deny' | 'default';
+export type CategoryBlackListFilter = 'all' | 'default' | 'hidden' | 'visible' | 'force_hidden';
+
+export interface CategoriesFilters {
+  allowDenyFilter?: CategoryAllowDenyFilter;
+  blackListFilter?: CategoryBlackListFilter;
+}
+
 export interface CategoriesListResponse {
   success: boolean;
   data: Category[];
@@ -20,15 +29,28 @@ export interface CategoryResponse {
 class CategoriesApi {
   /**
    * Get all categories by source (paginated)
-   * Optional search by name and filter by category type
+   * Optional search by name and server-side filters by category type, access control, and blacklist
    */
-  async getCategories(sourceId: number, page: number = 1, limit: number = 20, search?: string, categoryType?: 'live' | 'vod' | 'series') {
+  async getCategories(
+    sourceId: number,
+    page: number = 1,
+    limit: number = 20,
+    search?: string,
+    categoryType?: CategoryTypeFilter,
+    filters?: CategoriesFilters,
+  ) {
     const params: Record<string, string | number> = { sourceId, page, limit };
     if (search) {
       params.search = search;
     }
     if (categoryType) {
       params.categoryType = categoryType;
+    }
+    if (filters?.allowDenyFilter && filters.allowDenyFilter !== 'all') {
+      params.allowDenyFilter = filters.allowDenyFilter;
+    }
+    if (filters?.blackListFilter && filters.blackListFilter !== 'all') {
+      params.blackListFilter = filters.blackListFilter;
     }
     const response = await api.get('/categories', { params });
     return response.data as CategoriesListResponse;

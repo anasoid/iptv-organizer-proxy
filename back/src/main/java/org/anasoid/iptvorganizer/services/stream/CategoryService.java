@@ -33,18 +33,31 @@ public class CategoryService extends BaseService<Category, CategoryRepository> {
 
   /** Find categories by source ID with optional filters */
   public List<Category> findBySourceIdFiltered(
-      Long sourceId, String categoryType, String search, int page, int limit) {
-    return repository.findBySourceIdFiltered(sourceId, categoryType, search, page, limit);
+      Long sourceId,
+      String categoryType,
+      String search,
+      String allowDenyFilter,
+      String blackListFilter,
+      int page,
+      int limit) {
+    return repository.findBySourceIdFiltered(
+        sourceId, categoryType, search, allowDenyFilter, blackListFilter, page, limit);
   }
 
   /** Count categories by source ID with optional filters */
-  public Long countBySourceIdFiltered(Long sourceId, String categoryType, String search) {
-    return repository.countBySourceIdFiltered(sourceId, categoryType, search);
+  public Long countBySourceIdFiltered(
+      Long sourceId,
+      String categoryType,
+      String search,
+      String allowDenyFilter,
+      String blackListFilter) {
+    return repository.countBySourceIdFiltered(
+        sourceId, categoryType, search, allowDenyFilter, blackListFilter);
   }
 
   /** Find all categories by source and type */
   public List<Category> findBySourceAndType(Long sourceId, String type) {
-    return findBySourceIdFiltered(sourceId, type, null, 1, Integer.MAX_VALUE);
+    return findBySourceIdFiltered(sourceId, type, null, null, null, 1, Integer.MAX_VALUE);
   }
 
   /** Find categories by source and type with pagination */
@@ -52,7 +65,7 @@ public class CategoryService extends BaseService<Category, CategoryRepository> {
       Long sourceId, String type, int limit, int offset) {
     // Convert offset to page number: page = (offset / limit) + 1
     int page = offset > 0 ? (offset / limit) + 1 : 1;
-    return findBySourceIdFiltered(sourceId, type, null, page, limit);
+    return findBySourceIdFiltered(sourceId, type, null, null, null, page, limit);
   }
 
   /** Find category by source, external category_id, and type */
