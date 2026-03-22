@@ -5,6 +5,8 @@ import {
   Card,
   CardMedia,
   CircularProgress,
+  Dialog,
+  DialogContent,
   Grid,
   Typography,
   Chip,
@@ -77,6 +79,7 @@ export default function StreamDetail() {
   const { isAuthenticated } = useAuthStore();
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
 
   const streamId = id ? parseInt(id, 10) : null;
   const streamType = (type || 'live') as 'live' | 'vod' | 'series';
@@ -220,6 +223,19 @@ export default function StreamDetail() {
     });
   };
 
+  const handleImagePreviewOpen = () => {
+    if (streamIcon) {
+      setImagePreviewOpen(true);
+    }
+  };
+
+  const handleImageKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleImagePreviewOpen();
+    }
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
@@ -233,9 +249,15 @@ export default function StreamDetail() {
 
       {/* Stream Info Card */}
       <Card sx={{ mb: 3 }}>
-        <Grid container spacing={0}>
-          {/* Left Section: Detail Info + Metadata */}
-          <Grid item xs={12} sm={streamIcon ? 8 : 12} md={streamIcon ? 10 : 12}>
+        <Grid
+          container
+          spacing={0}
+          alignItems="flex-start"
+          direction="row"
+          sx={{ flexWrap: { xs: 'wrap', sm: 'nowrap' } }}
+        >
+          {/* Main Section: Detail Info + Metadata */}
+          <Grid item xs={12} sm={streamIcon ? 7 : 12} md={streamIcon ? 8 : 12} lg={streamIcon ? 9 : 12} sx={{ order: 1 }}>
             {/* Detail Info */}
             <Box sx={{ p: 3 }}>
               {/* Header with Type Badge and Category */}
@@ -428,7 +450,7 @@ export default function StreamDetail() {
                   Metadata
                 </Typography>
                 <TableContainer sx={{ maxHeight: 250 }}>
-                  <Table size="small">
+                  <Table size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
                     <TableBody>
                       {Object.entries(metadata).map(([key, value]) => {
                         // Skip certain fields we already display
@@ -445,14 +467,25 @@ export default function StreamDetail() {
 
                         return (
                           <TableRow key={key}>
-                            <TableCell sx={{ verticalAlign: 'top', fontWeight: 500, fontSize: '0.875rem' }}>
+                            <TableCell
+                              sx={{
+                                width: 180,
+                                minWidth: 180,
+                                maxWidth: 180,
+                                verticalAlign: 'top',
+                                fontWeight: 500,
+                                fontSize: '0.875rem',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
                               {key}
                             </TableCell>
-                            <TableCell sx={{ fontSize: '0.875rem' }}>
+                            <TableCell sx={{ width: 'calc(100% - 180px)', fontSize: '0.875rem' }}>
                               <Typography
                                 variant="body2"
                                 sx={{
                                   fontFamily: 'monospace',
+                                  whiteSpace: 'pre-wrap',
                                   wordBreak: 'break-word',
                                 }}
                               >
@@ -469,21 +502,49 @@ export default function StreamDetail() {
             )}
           </Grid>
 
-          {/* Right Section: Image Only */}
           {streamIcon && (
-            <Grid item xs={12} sm={4} md={2} sx={{ display: 'flex', alignItems: 'stretch' }}>
-              <CardMedia
-                component="img"
-                image={streamIcon}
-                alt={stream.name}
-                sx={{
-                  width: '100%',
-                  height: '100%',
-                  minHeight: 150,
-                  objectFit: 'cover',
-                  backgroundColor: '#f0f0f0',
-                }}
-              />
+            <Grid item xs={12} sm={5} md={4} lg={3} sx={{ order: 2, flexShrink: 0 }}>
+              <Box sx={{ p: 3, pt: { xs: 0, sm: 3 }, display: 'flex', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+                <Box
+                  onClick={handleImagePreviewOpen}
+                  onKeyDown={handleImageKeyDown}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open full size image for ${stream.name}`}
+                  sx={{
+                    width: '100%',
+                    maxWidth: { xs: 220, sm: 280, md: 320 },
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    boxShadow: 2,
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                    '&:hover': {
+                      transform: 'scale(1.02)',
+                      boxShadow: 4,
+                    },
+                    '&:focus-visible': {
+                      outline: '2px solid',
+                      outlineColor: 'primary.main',
+                      outlineOffset: 2,
+                    },
+                  }}
+                >
+                  <CardMedia
+                    component="img"
+                    image={streamIcon}
+                    alt={stream.name}
+                    sx={{
+                      width: '100%',
+                      height: 'auto',
+                      maxHeight: { xs: 320, sm: 420 },
+                      objectFit: 'cover',
+                      display: 'block',
+                      backgroundColor: '#f0f0f0',
+                    }}
+                  />
+                </Box>
+              </Box>
             </Grid>
           )}
         </Grid>
@@ -529,6 +590,37 @@ export default function StreamDetail() {
           </Paper>
         </Card>
       )}
+
+      <Dialog
+        open={imagePreviewOpen}
+        onClose={() => setImagePreviewOpen(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogContent
+          sx={{
+            p: 2,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: '#111',
+          }}
+        >
+          {streamIcon && (
+            <Box
+              component="img"
+              src={streamIcon}
+              alt={stream.name}
+              sx={{
+                maxWidth: '100%',
+                maxHeight: '80vh',
+                objectFit: 'contain',
+                borderRadius: 1,
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
 
       {/* Snackbar for copy notification */}
