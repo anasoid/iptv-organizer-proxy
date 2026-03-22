@@ -149,12 +149,14 @@ public class XtreamUserService {
     List<Category> categories =
         contentFilterService.getAllowedCategories(context, source.getId(), type.getCategoryType());
     // Filter out blacklisted categories (HIDE and FORCE_HIDE)
-    List<Category> nonBlacklistedCategories = categories.stream()
-        .filter(cat -> {
-          Category.BlackListStatus blackListStatus = cat.getBlackList();
-          return blackListStatus == null || !blackListStatus.isHide();
-        })
-        .collect(Collectors.toList());
+    List<Category> nonBlacklistedCategories =
+        categories.stream()
+            .filter(
+                cat -> {
+                  Category.BlackListStatus blackListStatus = cat.getBlackList();
+                  return blackListStatus == null || !blackListStatus.isHide();
+                })
+            .collect(Collectors.toList());
     // Materialize all data to Maps
     List<Map<?, ?>> categoryMaps = materializeCategories(nonBlacklistedCategories);
     return new JsonStreamResult<>(categoryMaps.iterator(), new AtomicLong(0), null);

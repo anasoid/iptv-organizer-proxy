@@ -294,9 +294,8 @@ class XtreamUserServiceTest {
 
     assertThat(categoriesList).hasSize(2);
     @SuppressWarnings("unchecked")
-    List<String> names = categoriesList.stream()
-        .map(cat -> (String) cat.get("category_name"))
-        .toList();
+    List<String> names =
+        categoriesList.stream().map(cat -> (String) cat.get("category_name")).toList();
     assertThat(names).containsExactly("Sports", "Movies");
   }
 
