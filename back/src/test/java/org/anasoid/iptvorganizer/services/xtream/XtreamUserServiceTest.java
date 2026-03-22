@@ -4,12 +4,16 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.anasoid.iptvorganizer.dto.HttpRequestDto;
 import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.entity.stream.Category;
+import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.ProxyOptions;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
@@ -20,6 +24,7 @@ import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
 import org.anasoid.iptvorganizer.services.stream.SeriesService;
 import org.anasoid.iptvorganizer.services.stream.VodStreamService;
 import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
+import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
 import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -234,6 +239,65 @@ class XtreamUserServiceTest {
                     new HttpRequestDto("http://proxy.local:9000", RequestType.API, null)))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("Invalid authentication response from upstream");
+  }
+
+  @Test
+  void testGetCategories_FiltersOutBlacklistedCategories() {
+    // Given: Categories with mixed blacklist statuses
+    FilterContext filterContext = new FilterContext();
+    filterContext.setHideAdultContent(false);
+    when(contentFilterService.buildFilterContext(testClient)).thenReturn(filterContext);
+
+    List<Category> filteredCategories = new ArrayList<>();
+    Category allowedCategory = new Category();
+    allowedCategory.setId(1L);
+    allowedCategory.setExternalId(101);
+    allowedCategory.setName("Sports");
+    allowedCategory.setType("live");
+    allowedCategory.setBlackList(Category.BlackListStatus.DEFAULT);
+    filteredCategories.add(allowedCategory);
+
+    Category visibleCategory = new Category();
+    visibleCategory.setId(2L);
+    visibleCategory.setExternalId(102);
+    visibleCategory.setName("Movies");
+    visibleCategory.setType("vod");
+    visibleCategory.setBlackList(Category.BlackListStatus.VISIBLE);
+    filteredCategories.add(visibleCategory);
+
+    Category hiddenCategory = new Category();
+    hiddenCategory.setId(3L);
+    hiddenCategory.setExternalId(103);
+    hiddenCategory.setName("Hidden Category");
+    hiddenCategory.setType("live");
+    hiddenCategory.setBlackList(Category.BlackListStatus.HIDE);
+    filteredCategories.add(hiddenCategory);
+
+    Category forceHiddenCategory = new Category();
+    forceHiddenCategory.setId(4L);
+    forceHiddenCategory.setExternalId(104);
+    forceHiddenCategory.setName("Force Hidden");
+    forceHiddenCategory.setType("live");
+    forceHiddenCategory.setBlackList(Category.BlackListStatus.FORCE_HIDE);
+    filteredCategories.add(forceHiddenCategory);
+
+    when(contentFilterService.getAllowedCategories(filterContext, 1L, "live"))
+        .thenReturn(filteredCategories);
+
+    // When: Get categories
+    JsonStreamResult<Map<?, ?>> result =
+        xtreamUserService.getCategories(testClient, testSource, StreamType.LIVE);
+
+    // Then: Should exclude HIDE and FORCE_HIDE, include others
+    List<Map<?, ?>> categoriesList = new ArrayList<>();
+    result.iterator().forEachRemaining(categoriesList::add);
+
+    assertThat(categoriesList).hasSize(2);
+    @SuppressWarnings("unchecked")
+    List<String> names = categoriesList.stream()
+        .map(cat -> (String) cat.get("category_name"))
+        .toList();
+    assertThat(names).containsExactly("Sports", "Movies");
   }
 
   /**
