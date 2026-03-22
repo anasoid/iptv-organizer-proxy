@@ -125,6 +125,36 @@ public class XtreamClient {
   }
 
   /**
+   * Fetch detailed VOD info as raw streaming response (proxy passthrough).
+   *
+   * @param client The client
+   * @param source The source configuration containing credentials and URL
+   * @param vodId The VOD ID to fetch info for
+   * @return HttpStreamingResponse with raw response stream
+   */
+  public HttpStreamingResponse getVodInfoRaw(Client client, Source source, Integer vodId) {
+    String url = buildApiUrlWithParam(source, "get_vod_info", "vod_id", vodId);
+
+    log.info("Fetching VOD info (proxy) for vod_id={} from source: {}", vodId, source.getName());
+
+    try {
+      return httpStreamingService.streamHttpWithHeaders(
+          url,
+          createDefaultHttpOptions(client, source),
+          createDefaultProxyOptions(client, source),
+          null,
+          source);
+    } catch (Exception ex) {
+      log.error(
+          "Failed to fetch VOD info for vod_id={} from source {}: {}",
+          vodId,
+          source.getName(),
+          ex.getMessage());
+      throw ex;
+    }
+  }
+
+  /**
    * Fetch detailed series info as raw streaming response (proxy passthrough).
    *
    * @param source The source configuration containing credentials and URL

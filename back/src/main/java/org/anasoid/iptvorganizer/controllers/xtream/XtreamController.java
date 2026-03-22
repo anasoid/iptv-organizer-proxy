@@ -71,6 +71,7 @@ public class XtreamController {
       @QueryParam("category_id") Long categoryId,
       @QueryParam("series_id") Integer seriesId,
       @QueryParam("stream_id") Integer streamId,
+      @QueryParam("vod_id") Integer vodId,
       @Context UriInfo uriInfo,
       @Context HttpHeaders httpHeaders) {
 
@@ -85,7 +86,7 @@ public class XtreamController {
     Source source = authResult.getSource();
 
     // Route to appropriate handler
-    return handleAction(action, client, source, categoryId, streamId, seriesId);
+    return handleAction(action, client, source, categoryId, streamId, seriesId, vodId);
   }
 
   /**
@@ -125,7 +126,8 @@ public class XtreamController {
       Source source,
       Long categoryId,
       Integer streamId,
-      Integer seriesId) {
+      Integer seriesId,
+      Integer vodId) {
     switch (action) {
       case "get_live_categories":
         return streamJsonArray(xtreamUserService.getLiveCategories(client, source));
@@ -153,6 +155,14 @@ public class XtreamController {
               .build();
         }
         return streamSeriesInfo(client, source, seriesId);
+      case "get_vod_info":
+        if (vodId == null) {
+          return Response.status(Response.Status.BAD_REQUEST)
+              .entity("{\"error\":\"vod_id parameter required\"}")
+              .header("Content-Type", MediaType.APPLICATION_JSON)
+              .build();
+        }
+        return streamVodInfo(client, source, vodId);
       case "get_simple_data_table":
         if (streamId == null) {
           return Response.status(Response.Status.BAD_REQUEST)
@@ -303,6 +313,52 @@ public class XtreamController {
     } catch (NotFoundException ex) {
       return Response.status(Response.Status.NOT_FOUND)
           .entity("{\"error\":\"Series not found\"}")
+          .header("Content-Type", MediaType.APPLICATION_JSON)
+          .build();
+
+    } catch (ForbiddenException ex) {
+      return Response.status(Response.Status.FORBIDDEN)
+          .entity("{\"error\":\"Access denied\"}")
+          .header("Content-Type", MediaType.APPLICATION_JSON)
+          .build();
+    }
+  }
+
+  /**
+   * Stream VOD info response (proxy passthrough).
+   *
+   * @param client The authenticated client
+   * @param source The source
+   * @param vodId The VOD ID
+   * @return Response with streamed JSON
+   */
+  private Response streamVodInfo(Client client, Source source, Integer vodId) {
+    try {
+      HttpStreamingResponse streamResponse = xtreamUserService.getVodInfoRaw(client, source, vodId);
+
+      return Response.ok(
+              (StreamingOutput)
+                  os -> {
+                    try (InputStream is = streamResponse.getBody()) {
+                      byte[] buffer = new byte[8192];
+                      int bytesRead;
+                      while ((bytesRead = is.read(buffer)) != -1) {
+                        os.write(buffer, 0, bytesRead);
+                      }
+                      os.flush();
+                    } catch (IOException ex) {
+                      if (ex.getMessage() != null
+                          && !ex.getMessage().contains("Stream is closed")) {
+                        log.error("Error streaming VOD info", ex);
+                      }
+                    }
+                  })
+          .header("Content-Type", MediaType.APPLICATION_JSON)
+          .build();
+
+    } catch (NotFoundException ex) {
+      return Response.status(Response.Status.NOT_FOUND)
+          .entity("{\"error\":\"VOD not found\"}")
           .header("Content-Type", MediaType.APPLICATION_JSON)
           .build();
 

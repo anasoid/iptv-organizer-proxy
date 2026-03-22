@@ -23,6 +23,7 @@ import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.LiveStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Series;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
+import org.anasoid.iptvorganizer.models.entity.stream.VodStream;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
 import org.anasoid.iptvorganizer.models.http.ProxyOptions;
@@ -243,6 +244,30 @@ public class XtreamUserService {
     checkStreamAccess(stream, client, source);
     // Fetch raw response from upstream (proxy passthrough)
     return xtreamClient.getLiveSimpleDataTableRaw(client, source, streamId);
+  }
+
+  /**
+   * Get detailed VOD info with access control (proxy passthrough).
+   *
+   * @param client The authenticated client
+   * @param source The source
+   * @param vodId The VOD ID to fetch info for
+   * @return HttpStreamingResponse with raw upstream response
+   * @throws NotFoundException if VOD not in database
+   * @throws ForbiddenException if client access denied
+   */
+  public HttpStreamingResponse getVodInfoRaw(Client client, Source source, Integer vodId) {
+    // Load VOD from database for filtering check
+    VodStream stream = vodStreamService.findBySourceAndStreamId(source.getId(), vodId);
+
+    if (stream == null) {
+      log.warn("VOD {} not found in database for source {}", vodId, source.getName());
+      throw new NotFoundException("VOD not found");
+    }
+
+    checkStreamAccess(stream, client, source);
+    // Fetch raw response from upstream (proxy passthrough)
+    return xtreamClient.getVodInfoRaw(client, source, vodId);
   }
 
   /**
