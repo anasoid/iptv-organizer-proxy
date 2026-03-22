@@ -6,7 +6,6 @@ import jakarta.inject.Inject;
 import java.lang.management.BufferPoolMXBean;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
@@ -22,8 +21,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.function.Supplier;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
@@ -187,9 +186,14 @@ public class JvmMonitorService {
 
   private JvmMetricsEntry collectSnapshot() {
     // -- Heap --
-    MemoryUsage heap = safeCall("heap memory", () -> ManagementFactory.getMemoryMXBean().getHeapMemoryUsage(), null);
+    MemoryUsage heap =
+        safeCall(
+            "heap memory", () -> ManagementFactory.getMemoryMXBean().getHeapMemoryUsage(), null);
     MemoryUsage nonHeap =
-        safeCall("non-heap memory", () -> ManagementFactory.getMemoryMXBean().getNonHeapMemoryUsage(), null);
+        safeCall(
+            "non-heap memory",
+            () -> ManagementFactory.getMemoryMXBean().getNonHeapMemoryUsage(),
+            null);
     long heapUsedMb = heap != null ? toMb(heap.getUsed()) : -1L;
     long heapCommittedMb = heap != null ? toMb(heap.getCommitted()) : -1L;
     long heapMaxMb = heap != null && heap.getMax() >= 0 ? toMb(heap.getMax()) : -1L;
