@@ -55,8 +55,9 @@ public class ContentFilterService {
         client.getHideAdultContent() != null && client.getHideAdultContent());
 
     // Load and cache filter if assigned
-    if (client.getFilterId() != null) {
-      Filter filter = filterRepository.findById(client.getFilterId());
+    Long filterId = client.getFilterId();
+    if (filterId != null && filterId > 0) {
+      Filter filter = filterRepository.findById(filterId);
       if (filter != null && Boolean.TRUE.equals(filter.getUseSourceFilter())) {
         context.setFilter(filter);
         context.setFilterConfig(filterService.getCachedFilterConfig(filter));

@@ -238,6 +238,17 @@ public abstract class BaseRepository<T extends BaseEntity> {
     return Boolean.parseBoolean(value.toString());
   }
 
+  /**
+   * Reads a nullable LONG column while preserving SQL NULL semantics.
+   *
+   * <p>ResultSet#getLong returns 0 for SQL NULL, so callers must check wasNull() to distinguish an
+   * actual 0 value from NULL.
+   */
+  protected Long getNullableLong(ResultSet rs, String column) throws SQLException {
+    long value = rs.getLong(column);
+    return rs.wasNull() ? null : value;
+  }
+
   @PostConstruct
   protected void init() {
     cache = cacheManager.getCache(getTableName(), cacheSize(), cacheDuration());

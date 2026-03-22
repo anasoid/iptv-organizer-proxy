@@ -129,7 +129,7 @@ public class ClientRepository extends BaseRepository<Client> {
     return Client.builder()
         .id(rs.getLong("id"))
         .sourceId(rs.getLong("source_id"))
-        .filterId(rs.getLong("filter_id"))
+        .filterId(getNullableLong(rs, "filter_id"))
         .username(rs.getString("username"))
         .password(rs.getString("password"))
         .name(rs.getString("name"))

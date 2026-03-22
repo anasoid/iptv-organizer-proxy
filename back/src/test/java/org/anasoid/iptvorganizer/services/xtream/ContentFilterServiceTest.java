@@ -74,6 +74,21 @@ class ContentFilterServiceTest {
   }
 
   @Test
+  void testBuildFilterContext_FilterIdZeroTreatedAsUnassigned() {
+    // Given: Client with invalid/legacy filter id 0
+    testClient.setFilterId(0L);
+    testClient.setHideAdultContent(false);
+
+    // When: Build filter context
+    FilterContext context = contentFilterService.buildFilterContext(testClient);
+
+    // Then: Filter is treated as not assigned and no lookup occurs
+    assertThat(context).isNotNull();
+    assertThat(context.getFilter()).isNull();
+    verifyNoInteractions(filterRepository);
+  }
+
+  @Test
   void testBuildFilterContext_WithAdultContentHiding() {
     // Given: Client with adult content hiding enabled
     testClient.setHideAdultContent(true);
