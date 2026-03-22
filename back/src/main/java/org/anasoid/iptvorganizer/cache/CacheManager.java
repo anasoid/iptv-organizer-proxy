@@ -412,7 +412,11 @@ public class CacheManager {
         cacheName,
         entry.getStringKey(),
         entry.getLongKey());
-    return (Optional<V>) Optional.of(entry.getValue());
+    if (entry.getValue() == null) {
+      return Optional.empty();
+    } else {
+      return (Optional<V>) Optional.of(entry.getValue());
+    }
   }
 
   private CacheStore getOrCreateStore(String cacheName) {
