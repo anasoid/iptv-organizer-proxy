@@ -276,4 +276,19 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
   protected Duration cacheDuration() {
     return Duration.ofHours(1);
   }
+  /**
+   * Safely extract a Long value from a ResultSet column, handling nulls and type variations.
+   */
+  protected Long getLongSafe(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
+    Object value = rs.getObject(column);
+    if (value == null) return null;
+    if (value instanceof Long) return (Long) value;
+    if (value instanceof Integer) return ((Integer) value).longValue();
+    if (value instanceof Number) return ((Number) value).longValue();
+    try {
+      return Long.parseLong(value.toString());
+    } catch (Exception e) {
+      return null;
+    }
+  }
 }

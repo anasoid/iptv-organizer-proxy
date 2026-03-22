@@ -13,9 +13,9 @@ CREATE TABLE IF NOT EXISTS vod_streams (
     added_date DATE,
     release_date DATE,
     rating REAL,
-    tmdb INTEGER,
+    tmdb INTEGER, -- store as Long in Java
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    tmdb INTEGER,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     UNIQUE (source_id, external_id)
 );

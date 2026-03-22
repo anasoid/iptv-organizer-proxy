@@ -103,7 +103,7 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
         .addedDate(rs.getObject("added_date", LocalDate.class))
         .releaseDate(rs.getObject("release_date", LocalDate.class))
         .rating((Double) rs.getObject("rating"))
-        .tmdb((Long) rs.getObject("tmdb"))
+        .tmdb(this.getLongSafe(rs, "tmdb"))
         .createdAt(rs.getObject("created_at", LocalDateTime.class))
         .updatedAt(rs.getObject("updated_at", LocalDateTime.class))
         .build();
