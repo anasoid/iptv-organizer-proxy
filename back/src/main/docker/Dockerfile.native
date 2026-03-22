@@ -51,9 +51,10 @@ RUN { \
     echo 'export QUARKUS_DATASOURCE_JDBC_URL=${QUARKUS_DATASOURCE_JDBC_URL:-jdbc:sqlite:/app/data/app.sqlite}'; \
     echo 'echo "Starting native application on port $QUARKUS_HTTP_PORT..."'; \
     echo '# Note: JAVA_OPTS does not apply — no JVM in native mode.'; \
-    echo '# Use NATIVE_STARTUP_OPTS to pass args to the native binary (e.g. -Xmx512m).'; \
+    echo '# Use NATIVE_STARTUP_OPTS for baseline args and NATIVE_EXTRA_OPTS for optional extras.'; \
     echo 'export NATIVE_STARTUP_OPTS=${NATIVE_STARTUP_OPTS:--Dquarkus.http.host=0.0.0.0}'; \
-    echo 'exec /work/iptv-organizer ${NATIVE_STARTUP_OPTS}'; \
+    echo 'export NATIVE_EXTRA_OPTS=${NATIVE_EXTRA_OPTS:-}'; \
+    echo 'exec /work/iptv-organizer ${NATIVE_STARTUP_OPTS} ${NATIVE_EXTRA_OPTS}'; \
 } > /work/docker-entrypoint.sh && chmod +x /work/docker-entrypoint.sh
 
 # Persistent volumes: SQLite database + JWT keys (generated on first boot) and logs
