@@ -174,7 +174,7 @@ public abstract class BaseRepository<T extends BaseEntity> {
       }
     } catch (SQLException e) {
       throw new RuntimeException(
-          "Failed to find " + getTableName() + "paged results with where clause", e);
+          "Failed to find " + getTableName() + "paged results with where clause " + whereClause, e);
     }
     return results;
   }

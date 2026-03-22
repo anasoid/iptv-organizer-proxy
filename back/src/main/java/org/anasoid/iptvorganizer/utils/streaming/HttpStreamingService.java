@@ -119,7 +119,7 @@ public class HttpStreamingService {
             "HTTP error: " + response.statusCode() + " " + response.statusCode());
       }
 
-      log.info("HTTP request successful for: {}, status: {}", url, response.statusCode());
+      log.debug("HTTP request successful for: {}, status: {}", url, response.statusCode());
       return response.body();
     } catch (ProxyException e) {
       log.error("Proxy error during HTTP request for: {}, error: {}", url, e.getMessage());
