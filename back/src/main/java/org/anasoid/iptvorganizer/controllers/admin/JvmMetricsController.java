@@ -9,6 +9,8 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.monitor.JvmMetricsEntry;
@@ -42,12 +44,35 @@ public class JvmMetricsController extends BaseController {
   @GET
   public Response getMetrics(
       @QueryParam("startDate") String startDate, @QueryParam("endDate") String endDate) {
-    LocalDateTime start =
-        (startDate != null && !startDate.isBlank()) ? LocalDateTime.parse(startDate) : null;
-    LocalDateTime end =
-        (endDate != null && !endDate.isBlank()) ? LocalDateTime.parse(endDate) : null;
+    LocalDateTime start;
+    LocalDateTime end;
+    try {
+      start = parseQueryDateTime(startDate);
+      end = parseQueryDateTime(endDate);
+    } catch (IllegalArgumentException e) {
+      return ResponseUtils.badRequest(e.getMessage());
+    }
     log.debug("JVM metrics request: start={} end={}", start, end);
     List<JvmMetricsEntry> result = jvmMonitorService.getMetrics(start, end);
     return ResponseUtils.ok(result);
+  }
+
+  private LocalDateTime parseQueryDateTime(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    try {
+      return LocalDateTime.parse(value);
+    } catch (DateTimeParseException ignored) {
+      // Accept RFC3339/ISO offsets from external clients and normalize to server-local time.
+      try {
+        return OffsetDateTime.parse(value).toLocalDateTime();
+      } catch (DateTimeParseException e) {
+        throw new IllegalArgumentException(
+            "Invalid datetime '"
+                + value
+                + "'. Expected yyyy-MM-ddTHH:mm:ss (or ISO timestamp with offset).");
+      }
+    }
   }
 }

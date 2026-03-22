@@ -22,6 +22,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
@@ -76,7 +77,7 @@ public class JvmMonitorService {
     JvmMetricsEntry entry;
     try {
       entry = collectSnapshot();
-    } catch (Exception e) {
+    } catch (Throwable e) {
       log.error("JVM metrics snapshot failed (native mode MXBean issue?): {}", e.getMessage(), e);
       return;
     }
@@ -186,17 +187,26 @@ public class JvmMonitorService {
 
   private JvmMetricsEntry collectSnapshot() {
     // -- Heap --
-    MemoryMXBean memBean = ManagementFactory.getMemoryMXBean();
-    MemoryUsage heap = memBean.getHeapMemoryUsage();
-    MemoryUsage nonHeap = memBean.getNonHeapMemoryUsage();
-    long heapMax = heap.getMax(); // -1 when no -Xmx limit
+    MemoryUsage heap = safeCall("heap memory", () -> ManagementFactory.getMemoryMXBean().getHeapMemoryUsage(), null);
+    MemoryUsage nonHeap =
+        safeCall("non-heap memory", () -> ManagementFactory.getMemoryMXBean().getNonHeapMemoryUsage(), null);
+    long heapUsedMb = heap != null ? toMb(heap.getUsed()) : -1L;
+    long heapCommittedMb = heap != null ? toMb(heap.getCommitted()) : -1L;
+    long heapMaxMb = heap != null && heap.getMax() >= 0 ? toMb(heap.getMax()) : -1L;
+
+    long nonHeapUsedMb = nonHeap != null ? toMb(nonHeap.getUsed()) : -1L;
+
     // -- Metaspace --
     long metaspaceMb =
-        ManagementFactory.getMemoryPoolMXBeans().stream()
-            .filter(p -> p.getName().contains("Metaspace"))
-            .findFirst()
-            .map(p -> toMb(p.getUsage().getUsed()))
-            .orElse(-1L);
+        safeCall(
+            "metaspace",
+            () ->
+                ManagementFactory.getMemoryPoolMXBeans().stream()
+                    .filter(p -> p.getName().contains("Metaspace"))
+                    .findFirst()
+                    .map(p -> toMb(p.getUsage().getUsed()))
+                    .orElse(-1L),
+            -1L);
     // -- OS / process memory + CPU --
     // instanceof guards ensure GraalVM native safety (no ClassCastException, no reflection).
     OperatingSystemMXBean osBean = ManagementFactory.getOperatingSystemMXBean();
@@ -204,20 +214,29 @@ public class JvmMonitorService {
     long freePhysicalMb = -1L;
     double processCpuLoad = -1.0;
     double systemCpuLoad = -1.0;
-    if (osBean instanceof com.sun.management.OperatingSystemMXBean sunOs) {
-      virtualMemoryMb = toMb(sunOs.getCommittedVirtualMemorySize());
-      freePhysicalMb = toMb(sunOs.getFreeMemorySize());
-      processCpuLoad = sunOs.getProcessCpuLoad();
-      systemCpuLoad = sunOs.getCpuLoad();
+    try {
+      if (osBean instanceof com.sun.management.OperatingSystemMXBean sunOs) {
+        virtualMemoryMb = toMb(sunOs.getCommittedVirtualMemorySize());
+        freePhysicalMb = toMb(sunOs.getFreeMemorySize());
+        processCpuLoad = sunOs.getProcessCpuLoad();
+        systemCpuLoad = sunOs.getCpuLoad();
+      }
+    } catch (Throwable t) {
+      log.debug("OperatingSystemMXBean metrics unavailable: {}", t.toString());
     }
     // -- Threads --
-    ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
+    ThreadMXBean threadBean = safeCall("thread bean", ManagementFactory::getThreadMXBean, null);
+    int threadCount = threadBean != null ? threadBean.getThreadCount() : -1;
+    int peakThreadCount = threadBean != null ? threadBean.getPeakThreadCount() : -1;
+    int daemonThreadCount = threadBean != null ? threadBean.getDaemonThreadCount() : -1;
     // -- GC totals across all collectors --
     long gcCount = 0L;
     long gcTime = 0L;
-    for (GarbageCollectorMXBean gc : ManagementFactory.getGarbageCollectorMXBeans()) {
-      long c = gc.getCollectionCount();
-      long t = gc.getCollectionTime();
+    List<GarbageCollectorMXBean> gcBeans =
+        safeCall("gc beans", ManagementFactory::getGarbageCollectorMXBeans, List.of());
+    for (GarbageCollectorMXBean gc : gcBeans) {
+      long c = safeCall("gc collection count", gc::getCollectionCount, -1L);
+      long t = safeCall("gc collection time", gc::getCollectionTime, -1L);
       if (c > 0) gcCount += c;
       if (t > 0) gcTime += t;
     }
@@ -236,7 +255,8 @@ public class JvmMonitorService {
       log.trace("BufferPoolMXBean unavailable (native mode): {}", e.getMessage());
     }
     // -- Runtime uptime --
-    RuntimeMXBean runtimeBean = ManagementFactory.getRuntimeMXBean();
+    RuntimeMXBean runtimeBean = safeCall("runtime bean", ManagementFactory::getRuntimeMXBean, null);
+    long jvmUptimeSeconds = runtimeBean != null ? runtimeBean.getUptime() / 1000L : -1L;
     // -- Database size --
     long dbSizeMb = queryDbSizeMb();
     // -- RSS (actual physical RAM used by this process, from /proc/self/status) --
@@ -248,10 +268,10 @@ public class JvmMonitorService {
     long freePhysicalFinal = meminfo[1] >= 0 ? meminfo[1] : freePhysicalMb;
     return JvmMetricsEntry.builder()
         .timestamp(LocalDateTime.now())
-        .heapUsedMb(toMb(heap.getUsed()))
-        .heapMaxMb(heapMax < 0 ? -1L : toMb(heapMax))
-        .heapCommittedMb(toMb(heap.getCommitted()))
-        .nonHeapUsedMb(toMb(nonHeap.getUsed()))
+        .heapUsedMb(heapUsedMb)
+        .heapMaxMb(heapMaxMb)
+        .heapCommittedMb(heapCommittedMb)
+        .nonHeapUsedMb(nonHeapUsedMb)
         .metaspaceMb(metaspaceMb)
         .processRssMb(rssMb)
         .processVirtualMemoryMb(virtualMemoryMb)
@@ -259,16 +279,25 @@ public class JvmMonitorService {
         .memAvailableMb(memAvailableMb)
         .processCpuLoad(processCpuLoad)
         .systemCpuLoad(systemCpuLoad)
-        .threadCount(threadBean.getThreadCount())
-        .peakThreadCount(threadBean.getPeakThreadCount())
-        .daemonThreadCount(threadBean.getDaemonThreadCount())
+        .threadCount(threadCount)
+        .peakThreadCount(peakThreadCount)
+        .daemonThreadCount(daemonThreadCount)
         .gcCollectionCount(gcCount)
         .gcCollectionTimeMs(gcTime)
         .directBufferUsedMb(directUsedMb)
         .directBufferCount(directCount)
-        .jvmUptimeSeconds(runtimeBean.getUptime() / 1000L)
+        .jvmUptimeSeconds(jvmUptimeSeconds)
         .dbSizeMb(dbSizeMb)
         .build();
+  }
+
+  private <T> T safeCall(String metricName, Supplier<T> supplier, T fallback) {
+    try {
+      return supplier.get();
+    } catch (Throwable t) {
+      log.debug("{} unavailable in current runtime: {}", metricName, t.toString());
+      return fallback;
+    }
   }
 
   /**
