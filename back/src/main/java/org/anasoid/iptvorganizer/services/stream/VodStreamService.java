@@ -58,4 +58,15 @@ public class VodStreamService extends BaseService<VodStream, VodStreamRepository
   public long countBySourceId(Long sourceId) {
     return repository.countBySourceId(sourceId);
   }
+
+  /** Find streams by source ID with pagination and search (case-insensitive, name/labels) */
+  public java.util.List<VodStream> findBySourceIdPagedWithSearch(
+      Long sourceId, String search, int page, int limit) {
+    return repository.findBySourceIdPagedWithSearch(sourceId, search, page, limit);
+  }
+
+  /** Count total streams by source ID with search (case-insensitive, name/labels) */
+  public long countBySourceIdWithSearch(Long sourceId, String search) {
+    return repository.countBySourceIdWithSearch(sourceId, search);
+  }
 }

@@ -7,7 +7,6 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.controllers.admin.BaseController;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
@@ -67,7 +66,6 @@ public class StreamsController extends BaseController {
           streams = stream != null ? List.of(stream) : Collections.emptyList();
           total = streams.size();
         } else {
-          // Use paginated query instead of loading all streams
           streams = liveStreamService.findBySourceIdPaged(sourceId, page, limit);
           total = liveStreamService.countBySourceId(sourceId);
         }
@@ -80,8 +78,10 @@ public class StreamsController extends BaseController {
           var stream = vodStreamService.findBySourceAndStreamId(sourceId, streamId);
           streams = stream != null ? List.of(stream) : Collections.emptyList();
           total = streams.size();
+        } else if (search != null && !search.isBlank()) {
+          streams = vodStreamService.findBySourceIdPagedWithSearch(sourceId, search, page, limit);
+          total = vodStreamService.countBySourceIdWithSearch(sourceId, search);
         } else {
-          // Use paginated query instead of loading all streams
           streams = vodStreamService.findBySourceIdPaged(sourceId, page, limit);
           total = vodStreamService.countBySourceId(sourceId);
         }
@@ -95,7 +95,6 @@ public class StreamsController extends BaseController {
           streams = stream != null ? List.of(stream) : Collections.emptyList();
           total = streams.size();
         } else {
-          // Use paginated query instead of loading all streams
           streams = seriesService.findBySourceIdPaged(sourceId, page, limit);
           total = seriesService.countBySourceId(sourceId);
         }
@@ -104,20 +103,7 @@ public class StreamsController extends BaseController {
         throw new ValidationException("Invalid type. Must be 'live', 'vod', or 'series'");
     }
 
-    // Apply search filter if provided (only when no pagination was done in database)
-    if (search != null && !search.isBlank() && categoryId == null && streamId == null) {
-      final String searchTerm = search.toLowerCase();
-      streams =
-          streams.stream()
-              .filter(
-                  s ->
-                      s.getName().toLowerCase().contains(searchTerm)
-                          || (s.getLabels() != null
-                              && s.getLabels().toLowerCase().contains(searchTerm)))
-              .collect(Collectors.toList());
-      // Recalculate total after search filter
-      total = streams.size();
-    }
+    // Search is now handled in the database for VOD paginated queries.
 
     return ResponseUtils.okWithPagination(streams, PaginationMeta.of(page, limit, total));
   }

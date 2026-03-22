@@ -204,6 +204,69 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
     return 0;
   }
 
+  /**
+   * Find streams by source ID with pagination and case-insensitive search on name only.
+   *
+   * @param sourceId The source ID
+   * @param search The search term (case-insensitive, matches name only)
+   * @param page The page number (1-indexed)
+   * @param limit The number of results per page
+   * @return List of streams for the page matching the search
+   */
+  public List<T> findBySourceIdPagedWithSearch(Long sourceId, String search, int page, int limit) {
+    List<T> results = new ArrayList<>();
+    int offset = (page - 1) * limit;
+    String sql =
+        "SELECT * FROM "
+            + getTableName()
+            + " WHERE source_id = ? AND LOWER(name) LIKE ? "
+            + "ORDER BY num ASC, id DESC LIMIT ? OFFSET ?";
+    String searchTerm = "%" + search.toLowerCase() + "%";
+    try (java.sql.Connection conn = dataSource.getConnection();
+        java.sql.PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+      stmt.setString(2, searchTerm);
+      stmt.setInt(3, limit);
+      stmt.setInt(4, offset);
+      try (java.sql.ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          results.add(mapRow(rs));
+        }
+      }
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException(
+          "Failed to find by source ID with pagination and search in " + getTableName(), e);
+    }
+    return results;
+  }
+
+  /**
+   * Count all streams for a source ID matching a case-insensitive search on name only.
+   *
+   * @param sourceId The source ID
+   * @param search The search term (case-insensitive, matches name only)
+   * @return Total count of streams matching the search
+   */
+  public long countBySourceIdWithSearch(Long sourceId, String search) {
+    String sql =
+        "SELECT COUNT(*) FROM " + getTableName() + " WHERE source_id = ? AND LOWER(name) LIKE ?";
+    String searchTerm = "%" + search.toLowerCase() + "%";
+    try (java.sql.Connection conn = dataSource.getConnection();
+        java.sql.PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+      stmt.setString(2, searchTerm);
+      try (java.sql.ResultSet rs = stmt.executeQuery()) {
+        if (rs.next()) {
+          return rs.getLong(1);
+        }
+      }
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException(
+          "Failed to count by source ID with search in " + getTableName(), e);
+    }
+    return 0;
+  }
+
   @Override
   protected int cacheSize() {
     return 5;
