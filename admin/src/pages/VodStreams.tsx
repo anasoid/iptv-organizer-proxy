@@ -27,6 +27,7 @@ import ViewToggle, { type ViewMode } from '../components/ViewToggle';
 import StreamCard from '../components/StreamCard';
 import CategoryFilterSidebar from '../components/CategoryFilterSidebar';
 import { getCategoryDisplayName } from '../utils/categoryDisplayName';
+import { useDebounce } from '../hooks/useDebounce';
 
 export default function VodStreams() {
   const navigate = useNavigate();
@@ -68,13 +69,15 @@ export default function VodStreams() {
     },
   });
 
+  // Debounce the search query so API is only called after user stops typing
+  const debouncedSearchQuery = useDebounce(searchQuery);
+
   // Fetch VOD streams with optional category filter, search, and stream_id
   const { data: streamsData, isLoading: isLoadingStreams, error: streamsError } = useQuery({
-    queryKey: ['streams-vod', sourceId, selectedCategoryId, page, limit, searchQuery, streamId],
+    queryKey: ['streams-vod', sourceId, selectedCategoryId, page, limit, debouncedSearchQuery, streamId],
     queryFn: () => {
       if (!sourceId) return Promise.resolve(null);
-      console.log('Fetching VOD with:', { sourceId, selectedCategoryId, page, limit, searchQuery, streamId });
-      return streamsApi.getVodStreams(sourceId, selectedCategoryId || undefined, page, limit, searchQuery || undefined, streamId || undefined);
+      return streamsApi.getVodStreams(sourceId, selectedCategoryId || undefined, page, limit, debouncedSearchQuery || undefined, streamId || undefined);
     },
     enabled: isAuthenticated && sourceId !== null,
   });

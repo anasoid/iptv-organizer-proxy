@@ -27,6 +27,7 @@ import ViewToggle, { type ViewMode } from '../components/ViewToggle';
 import StreamCard from '../components/StreamCard';
 import CategoryFilterSidebar from '../components/CategoryFilterSidebar';
 import { getCategoryDisplayName } from '../utils/categoryDisplayName';
+import { useDebounce } from '../hooks/useDebounce';
 
 export default function SeriesStreams() {
   const navigate = useNavigate();
@@ -68,13 +69,15 @@ export default function SeriesStreams() {
     },
   });
 
-  // Fetch series with optional category filter, search, and stream_id
+  // Debounce the search query so API is only called after user stops typing
+  const debouncedSearchQuery = useDebounce(searchQuery);
+
+  // Fetch series streams with optional category filter, search, and stream_id
   const { data: streamsData, isLoading: isLoadingStreams, error: streamsError } = useQuery({
-    queryKey: ['streams-series', sourceId, selectedCategoryId, page, limit, searchQuery, streamId],
+    queryKey: ['streams-series', sourceId, selectedCategoryId, page, limit, debouncedSearchQuery, streamId],
     queryFn: () => {
       if (!sourceId) return Promise.resolve(null);
-      console.log('Fetching series with:', { sourceId, selectedCategoryId, page, limit, searchQuery, streamId });
-      return streamsApi.getSeriesStreams(sourceId, selectedCategoryId || undefined, page, limit, searchQuery || undefined, streamId || undefined);
+      return streamsApi.getSeriesStreams(sourceId, selectedCategoryId || undefined, page, limit, debouncedSearchQuery || undefined, streamId || undefined);
     },
     enabled: isAuthenticated && sourceId !== null,
   });
