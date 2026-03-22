@@ -52,6 +52,7 @@ import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
 import org.anasoid.iptvorganizer.models.http.ProxyOptions;
 import org.anasoid.iptvorganizer.models.http.RedirectCheckResult;
 import org.anasoid.iptvorganizer.models.monitor.JvmMetricsEntry;
+import org.anasoid.iptvorganizer.services.DatabaseMaintenanceService;
 
 /**
  * Registers all Jackson-serialised/deserialised types for GraalVM native-image reflection.
@@ -73,6 +74,7 @@ import org.anasoid.iptvorganizer.models.monitor.JvmMetricsEntry;
       ErrorDetails.class,
       PaginationMeta.class,
       CacheStat.class,
+      DatabaseMaintenanceService.DatabaseShrinkResult.class,
 
       // ── Request DTOs ─────────────────────────────────────────────────────
       LoginRequest.class,

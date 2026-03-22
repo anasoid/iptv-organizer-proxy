@@ -1,5 +1,6 @@
 package org.anasoid.iptvorganizer.services;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.nio.file.Files;
@@ -79,6 +80,7 @@ public class DatabaseMaintenanceService {
     return Path.of(rawPath).toAbsolutePath().normalize();
   }
 
+  @RegisterForReflection
   public record DatabaseShrinkResult(
       String dialect,
       String databasePath,
