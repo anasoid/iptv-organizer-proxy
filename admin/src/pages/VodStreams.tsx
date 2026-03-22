@@ -25,6 +25,8 @@ import categoriesApi, { type Category } from '../services/categoriesApi';
 import SourceSelector from '../components/SourceSelector';
 import ViewToggle, { type ViewMode } from '../components/ViewToggle';
 import StreamCard from '../components/StreamCard';
+import CategoryFilterSidebar from '../components/CategoryFilterSidebar';
+import { getCategoryDisplayName } from '../utils/categoryDisplayName';
 
 export default function VodStreams() {
   const navigate = useNavigate();
@@ -109,7 +111,7 @@ export default function VodStreams() {
 
   if (categoriesData?.data) {
     categoriesData.data.forEach((cat: Category) => {
-      categories[cat.externalId] = cat.name;
+      categories[cat.externalId] = getCategoryDisplayName(cat);
     });
   }
 
@@ -446,51 +448,11 @@ export default function VodStreams() {
           )}
         </Box>
 
-        {/* Right: Categories Sidebar */}
-        <Box sx={{ flex: '0 0 calc(25% - 24px)' }}>
-          <Card sx={{ position: 'sticky', top: 20, width: '100%', minHeight: 200, backgroundColor: '#fafafa' }}>
-            <Box sx={{ p: 2, backgroundColor: 'background.paper' }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-                Filter by Category ({vodCategories.length})
-              </Typography>
-              <Chip
-                label="All Categories"
-                onClick={() => handleCategorySelect(null)}
-                variant={selectedCategoryId === null ? 'filled' : 'outlined'}
-                color={selectedCategoryId === null ? 'primary' : 'default'}
-                size="small"
-                sx={{ width: '100%', mb: 1 }}
-              />
-            </Box>
-
-            <Box sx={{ maxHeight: 400, overflow: 'auto', borderTop: '1px solid #e0e0e0' }}>
-              {vodCategories.map((category: Category) => (
-                <Box
-                  key={category.id}
-                  onClick={() => handleCategorySelect(Number(category.externalId))}
-                  sx={{
-                    p: 1.5,
-                    px: 2,
-                    cursor: 'pointer',
-                    backgroundColor:
-                      selectedCategoryId === Number(category.externalId) ? 'primary.light' : 'transparent',
-                    '&:hover': {
-                      backgroundColor:
-                        selectedCategoryId === Number(category.externalId)
-                          ? 'primary.light'
-                          : 'action.hover',
-                    },
-                    borderBottom: '1px solid #f0f0f0',
-                  }}
-                >
-                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    {category.name}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
-          </Card>
-        </Box>
+        <CategoryFilterSidebar
+          categories={vodCategories}
+          selectedCategoryId={selectedCategoryId}
+          onCategorySelect={handleCategorySelect}
+        />
       </Box>
       ) : (
         <>
