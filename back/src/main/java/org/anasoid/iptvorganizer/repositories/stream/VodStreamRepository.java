@@ -7,7 +7,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 import org.anasoid.iptvorganizer.models.entity.Source;
@@ -47,8 +46,8 @@ public class VodStreamRepository extends BaseStreamRepository<VodStream> {
       stmt.setBoolean(8, stream.getIsAdult());
       stmt.setString(9, stream.getLabels());
       stmt.setString(10, stream.getData());
-      stmt.setObject(11, stream.getAddedDate());
-      stmt.setObject(12, stream.getReleaseDate());
+      setLocalDate(stmt, 11, stream.getAddedDate());
+      setLocalDate(stmt, 12, stream.getReleaseDate());
       stmt.setObject(13, stream.getRating());
       stmt.setObject(14, stream.getTmdb());
       stmt.executeUpdate();
@@ -76,8 +75,8 @@ public class VodStreamRepository extends BaseStreamRepository<VodStream> {
       stmt.setBoolean(8, stream.getIsAdult());
       stmt.setString(9, stream.getLabels());
       stmt.setString(10, stream.getData());
-      stmt.setObject(11, stream.getAddedDate());
-      stmt.setObject(12, stream.getReleaseDate());
+      setLocalDate(stmt, 11, stream.getAddedDate());
+      setLocalDate(stmt, 12, stream.getReleaseDate());
       stmt.setObject(13, stream.getRating());
       stmt.setObject(14, stream.getTmdb());
       stmt.setLong(15, stream.getId());
@@ -101,8 +100,8 @@ public class VodStreamRepository extends BaseStreamRepository<VodStream> {
         .isAdult(rs.getBoolean("is_adult"))
         .labels(rs.getString("labels"))
         .data(rs.getString("data"))
-        .addedDate(rs.getObject("added_date", LocalDate.class))
-        .releaseDate(rs.getObject("release_date", LocalDate.class))
+        .addedDate(getLocalDate(rs, "added_date"))
+        .releaseDate(getLocalDate(rs, "release_date"))
         .rating((Double) rs.getObject("rating"))
         .tmdb(this.getLongSafe(rs, "tmdb"))
         .createdAt(rs.getObject("created_at", LocalDateTime.class))

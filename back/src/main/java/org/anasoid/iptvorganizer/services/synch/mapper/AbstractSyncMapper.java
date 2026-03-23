@@ -111,7 +111,19 @@ public abstract class AbstractSyncMapper<T extends BaseStream & StreamLike> {
       } else if (value instanceof String) {
         try {
           if (!((String) value).isEmpty()) {
-            return java.time.LocalDate.parse((String) value);
+            String raw = ((String) value).trim();
+            // Accept datetime strings by keeping only YYYY-MM-DD.
+            if (raw.length() >= 10 && raw.charAt(4) == '-' && raw.charAt(7) == '-') {
+              return java.time.LocalDate.parse(raw.substring(0, 10));
+            }
+            // Some providers send unix timestamp as string.
+            long ts = Long.parseLong(raw);
+            if (ts > 1000000000000L) {
+              ts = ts / 1000L;
+            }
+            return java.time.Instant.ofEpochSecond(ts)
+                .atZone(java.time.ZoneId.systemDefault())
+                .toLocalDate();
           }
         } catch (Exception ignored) {
         }

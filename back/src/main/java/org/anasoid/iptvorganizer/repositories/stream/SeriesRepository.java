@@ -7,7 +7,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 import org.anasoid.iptvorganizer.models.entity.Source;
@@ -46,8 +45,8 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
       stmt.setBoolean(8, series.getIsAdult());
       stmt.setString(9, series.getLabels());
       stmt.setString(10, series.getData());
-      stmt.setObject(11, series.getAddedDate());
-      stmt.setObject(12, series.getReleaseDate());
+      setLocalDate(stmt, 11, series.getAddedDate());
+      setLocalDate(stmt, 12, series.getReleaseDate());
       stmt.setObject(13, series.getRating());
       stmt.setObject(14, series.getTmdb());
       stmt.executeUpdate();
@@ -75,8 +74,8 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
       stmt.setBoolean(8, series.getIsAdult());
       stmt.setString(9, series.getLabels());
       stmt.setString(10, series.getData());
-      stmt.setObject(11, series.getAddedDate());
-      stmt.setObject(12, series.getReleaseDate());
+      setLocalDate(stmt, 11, series.getAddedDate());
+      setLocalDate(stmt, 12, series.getReleaseDate());
       stmt.setObject(13, series.getRating());
       stmt.setObject(14, series.getTmdb());
       stmt.setLong(15, series.getId());
@@ -100,8 +99,8 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
         .isAdult(rs.getBoolean("is_adult"))
         .labels(rs.getString("labels"))
         .data(rs.getString("data"))
-        .addedDate(rs.getObject("added_date", LocalDate.class))
-        .releaseDate(rs.getObject("release_date", LocalDate.class))
+        .addedDate(getLocalDate(rs, "added_date"))
+        .releaseDate(getLocalDate(rs, "release_date"))
         .rating((Double) rs.getObject("rating"))
         .tmdb(this.getLongSafe(rs, "tmdb"))
         .createdAt(rs.getObject("created_at", LocalDateTime.class))

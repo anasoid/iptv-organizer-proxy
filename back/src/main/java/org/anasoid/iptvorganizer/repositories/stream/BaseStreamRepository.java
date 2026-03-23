@@ -291,4 +291,36 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
       return null;
     }
   }
+
+  /**
+   * Safely set a LocalDate parameter on a PreparedStatement. Stores as ISO-8601 string
+   * "YYYY-MM-DD" to ensure compatibility across all JDBC drivers (SQLite, MySQL, H2). Using
+   * setObject(LocalDate) is unreliable with SQLite JDBC which may store in datetime format
+   * "YYYY-MM-DD HH:mm:ss.SSS", making it impossible to read back as LocalDate.
+   */
+  protected void setLocalDate(java.sql.PreparedStatement stmt, int index, java.time.LocalDate date)
+      throws java.sql.SQLException {
+    if (date != null) {
+      stmt.setString(index, date.toString()); // ISO-8601: "YYYY-MM-DD"
+    } else {
+      stmt.setNull(index, java.sql.Types.DATE);
+    }
+  }
+
+  /**
+   * Safely read a LocalDate from a ResultSet column. Handles both "YYYY-MM-DD" and
+   * "YYYY-MM-DD HH:mm:ss.SSS" formats that SQLite JDBC may produce.
+   */
+  protected java.time.LocalDate getLocalDate(java.sql.ResultSet rs, String column)
+      throws java.sql.SQLException {
+    String value = rs.getString(column);
+    if (value == null || value.isEmpty()) return null;
+    try {
+      // Trim to first 10 chars to strip any time component (e.g. "2023-01-01 00:00:00.000")
+      String datePart = value.length() > 10 ? value.substring(0, 10) : value;
+      return java.time.LocalDate.parse(datePart);
+    } catch (Exception e) {
+      return null;
+    }
+  }
 }
