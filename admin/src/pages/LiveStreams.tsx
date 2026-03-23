@@ -17,7 +17,12 @@ import {
   MenuItem,
   InputLabel,
 } from '@mui/material';
-import { DataGrid, type GridColDef, type GridSortModel } from '@mui/x-data-grid';
+import {
+  DataGrid,
+  type GridColDef,
+  type GridColumnVisibilityModel,
+  type GridSortModel,
+} from '@mui/x-data-grid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useSourceStore } from '../stores/sourceStore';
@@ -26,11 +31,23 @@ import categoriesApi, { type Category } from '../services/categoriesApi';
 import SourceSelector from '../components/SourceSelector';
 import ViewToggle, { type ViewMode } from '../components/ViewToggle';
 import StreamCard from '../components/StreamCard';
+import StreamDateFilterField from '../components/StreamDateFilterField';
 import CategoryFilterSidebar from '../components/CategoryFilterSidebar';
 import { getCategoryDisplayName } from '../utils/categoryDisplayName';
+import { formatDisplayDate } from '../utils/dateFormat';
 import { useDebounce } from '../hooks/useDebounce';
 
 export default function LiveStreams() {
+  const columnVisibilityStorageKey = 'streams-live-column-visibility';
+  const defaultColumnVisibilityModel: GridColumnVisibilityModel = {
+    num: false,
+    isAdult: false,
+    addedDate: false,
+    releaseDate: false,
+    rating: false,
+    tmdb: false,
+  };
+
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
@@ -43,6 +60,19 @@ export default function LiveStreams() {
   const [streamId, setStreamId] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [sortModel, setSortModel] = useState<GridSortModel>([]);
+  const [columnVisibilityModel, setColumnVisibilityModel] = useState<GridColumnVisibilityModel>(
+    () => {
+      const stored = localStorage.getItem(columnVisibilityStorageKey);
+      if (!stored) {
+        return defaultColumnVisibilityModel;
+      }
+      try {
+        return { ...defaultColumnVisibilityModel, ...JSON.parse(stored) };
+      } catch {
+        return defaultColumnVisibilityModel;
+      }
+    }
+  );
   const [addedDateFrom, setAddedDateFrom] = useState('');
   const [addedDateTo, setAddedDateTo] = useState('');
   const [createdDateFrom, setCreatedDateFrom] = useState('');
@@ -53,6 +83,7 @@ export default function LiveStreams() {
   const [releaseDateTo, setReleaseDateTo] = useState('');
   const [ratingMin, setRatingMin] = useState('');
   const [ratingMax, setRatingMax] = useState('');
+  const [tmdb, setTmdb] = useState('');
   const [allowDenyFilter, setAllowDenyFilter] = useState<'allow' | 'deny' | 'default' | 'all'>('all');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -99,6 +130,7 @@ export default function LiveStreams() {
     releaseDateTo: releaseDateTo || undefined,
     ratingMin: ratingMin !== '' ? Number(ratingMin) : undefined,
     ratingMax: ratingMax !== '' ? Number(ratingMax) : undefined,
+    tmdb: tmdb !== '' ? Number.parseInt(tmdb, 10) : undefined,
   };
 
   // Fetch live streams with optional category filter, search, and stream_id
@@ -151,19 +183,8 @@ export default function LiveStreams() {
     });
   }
 
-  if (queryOptions.tmdbMin !== undefined || queryOptions.tmdbMax !== undefined) {
-    streams = streams.filter((stream) => {
-      if (stream.tmdb === null || stream.tmdb === undefined) {
-        return false;
-      }
-      if (queryOptions.tmdbMin !== undefined && stream.tmdb < queryOptions.tmdbMin) {
-        return false;
-      }
-      if (queryOptions.tmdbMax !== undefined && stream.tmdb > queryOptions.tmdbMax) {
-        return false;
-      }
-      return true;
-    });
+  if (queryOptions.tmdb !== undefined) {
+    streams = streams.filter((stream) => stream.tmdb === queryOptions.tmdb);
   }
 
   // Debug logging
@@ -189,6 +210,11 @@ export default function LiveStreams() {
       return null;
     }
     return value as Record<string, unknown>;
+  };
+
+  const handleColumnVisibilityModelChange = (model: GridColumnVisibilityModel) => {
+    setColumnVisibilityModel(model);
+    localStorage.setItem(columnVisibilityStorageKey, JSON.stringify(model));
   };
 
   const columns: GridColDef[] = [
@@ -250,31 +276,25 @@ export default function LiveStreams() {
       field: 'addedDate',
       headerName: 'Added Date',
       width: 130,
-      renderCell: (params) => params.value || '—',
+      renderCell: (params) => formatDisplayDate(params.value),
     },
     {
       field: 'createdAt',
       headerName: 'Created',
       width: 140,
-      renderCell: (params) => {
-        const date = new Date(params.value);
-        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-      },
+      renderCell: (params) => formatDisplayDate(params.value),
     },
     {
       field: 'updatedAt',
       headerName: 'Updated',
       width: 140,
-      renderCell: (params) => {
-        const date = new Date(params.value);
-        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-      },
+      renderCell: (params) => formatDisplayDate(params.value),
     },
     {
       field: 'releaseDate',
       headerName: 'Release Date',
       width: 140,
-      renderCell: (params) => params.value || '—',
+      renderCell: (params) => formatDisplayDate(params.value),
     },
     {
       field: 'rating',
@@ -442,70 +462,14 @@ export default function LiveStreams() {
 
         {sourceId && showAdvancedFilters && (
           <Box sx={{ mt: 2, display: 'grid', gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', gap: 1.5 }}>
-            <TextField
-              label="Added From"
-              type="date"
-              value={addedDateFrom}
-              onChange={(e) => { setAddedDateFrom(e.target.value); setPage(1); }}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="Added To"
-              type="date"
-              value={addedDateTo}
-              onChange={(e) => { setAddedDateTo(e.target.value); setPage(1); }}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="Created From"
-              type="date"
-              value={createdDateFrom}
-              onChange={(e) => { setCreatedDateFrom(e.target.value); setPage(1); }}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="Created To"
-              type="date"
-              value={createdDateTo}
-              onChange={(e) => { setCreatedDateTo(e.target.value); setPage(1); }}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="Updated From"
-              type="date"
-              value={updateDateFrom}
-              onChange={(e) => { setUpdateDateFrom(e.target.value); setPage(1); }}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="Updated To"
-              type="date"
-              value={updateDateTo}
-              onChange={(e) => { setUpdateDateTo(e.target.value); setPage(1); }}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="Release From"
-              type="date"
-              value={releaseDateFrom}
-              onChange={(e) => { setReleaseDateFrom(e.target.value); setPage(1); }}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="Release To"
-              type="date"
-              value={releaseDateTo}
-              onChange={(e) => { setReleaseDateTo(e.target.value); setPage(1); }}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-            />
+            <StreamDateFilterField label="Added From" value={addedDateFrom} onChange={(value) => { setAddedDateFrom(value); setPage(1); }} />
+            <StreamDateFilterField label="Added To" value={addedDateTo} onChange={(value) => { setAddedDateTo(value); setPage(1); }} />
+            <StreamDateFilterField label="Created From" value={createdDateFrom} onChange={(value) => { setCreatedDateFrom(value); setPage(1); }} />
+            <StreamDateFilterField label="Created To" value={createdDateTo} onChange={(value) => { setCreatedDateTo(value); setPage(1); }} />
+            <StreamDateFilterField label="Updated From" value={updateDateFrom} onChange={(value) => { setUpdateDateFrom(value); setPage(1); }} />
+            <StreamDateFilterField label="Updated To" value={updateDateTo} onChange={(value) => { setUpdateDateTo(value); setPage(1); }} />
+            <StreamDateFilterField label="Release From" value={releaseDateFrom} onChange={(value) => { setReleaseDateFrom(value); setPage(1); }} />
+            <StreamDateFilterField label="Release To" value={releaseDateTo} onChange={(value) => { setReleaseDateTo(value); setPage(1); }} />
             <TextField
               label="Rating Min"
               type="number"
@@ -518,6 +482,13 @@ export default function LiveStreams() {
               type="number"
               value={ratingMax}
               onChange={(e) => { setRatingMax(e.target.value); setPage(1); }}
+              size="small"
+            />
+            <TextField
+              label="TMDB"
+              type="number"
+              value={tmdb}
+              onChange={(e) => { setTmdb(e.target.value); setPage(1); }}
               size="small"
             />
           </Box>
@@ -571,6 +542,8 @@ export default function LiveStreams() {
                 <DataGrid
                   rows={streams}
                   columns={columns}
+                  columnVisibilityModel={columnVisibilityModel}
+                  onColumnVisibilityModelChange={handleColumnVisibilityModelChange}
                   sortingMode="server"
                   sortModel={sortModel}
                   onSortModelChange={(model) => {
@@ -586,7 +559,6 @@ export default function LiveStreams() {
                   }}
                   initialState={{
                     pagination: { paginationModel: { pageSize: limit } },
-                    columns: { columnVisibilityModel: { num: false, isAdult: false, addedDate: false, releaseDate: false, rating: false, tmdb: false } },
                   }}
                 />
               </Box>
@@ -684,6 +656,8 @@ export default function LiveStreams() {
                 <DataGrid
                   rows={streams}
                   columns={columns}
+                  columnVisibilityModel={columnVisibilityModel}
+                  onColumnVisibilityModelChange={handleColumnVisibilityModelChange}
                   sortingMode="server"
                   sortModel={sortModel}
                   onSortModelChange={(model) => {
@@ -699,7 +673,6 @@ export default function LiveStreams() {
                   }}
                   initialState={{
                     pagination: { paginationModel: { pageSize: limit } },
-                    columns: { columnVisibilityModel: { num: false, is_adult: false } },
                   }}
                 />
               </Box>

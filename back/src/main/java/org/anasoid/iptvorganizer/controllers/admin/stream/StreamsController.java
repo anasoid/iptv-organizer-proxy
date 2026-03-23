@@ -55,8 +55,7 @@ public class StreamsController extends BaseController {
       @QueryParam("releaseDateTo") String releaseDateTo,
       @QueryParam("ratingMin") Double ratingMin,
       @QueryParam("ratingMax") Double ratingMax,
-      @QueryParam("tmdbMin") Long tmdbMin,
-      @QueryParam("tmdbMax") Long tmdbMax,
+      @QueryParam("tmdb") Long tmdb,
       @QueryParam("page") @DefaultValue("1") int page,
       @QueryParam("limit") @DefaultValue("20") int limit) {
 
@@ -87,7 +86,8 @@ public class StreamsController extends BaseController {
             parseDate(releaseDateFrom, "releaseDateFrom"),
             parseDate(releaseDateTo, "releaseDateTo"),
             ratingMin,
-            ratingMax);
+            ratingMax,
+            tmdb);
 
     List<? extends BaseStream> streams = Collections.emptyList();
     long total = 0;

@@ -34,11 +34,27 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
       LocalDate releaseDateFrom,
       LocalDate releaseDateTo,
       Double ratingMin,
-      Double ratingMax) {
+      Double ratingMax,
+      Long tmdb) {
 
     public static StreamQueryOptions empty() {
       return new StreamQueryOptions(
-          null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null);
     }
   }
 
@@ -219,7 +235,22 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
   public List<T> findBySourceIdPagedWithSearch(Long sourceId, String search, int page, int limit) {
     StreamQueryOptions options =
         new StreamQueryOptions(
-            null, search, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            null,
+            search,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     return findBySourceIdPagedWithFilters(sourceId, options, page, limit);
   }
 
@@ -235,6 +266,7 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
         new StreamQueryOptions(
             null,
             search,
+            null,
             null,
             null,
             null,
@@ -360,6 +392,11 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
     if (effective.ratingMin() != null) {
       whereClause.append(" AND rating >= ?");
       parameters.add(effective.ratingMin());
+    }
+
+    if (effective.tmdb() != null) {
+      whereClause.append(" AND tmdb = ?");
+      parameters.add(effective.tmdb());
     }
     if (effective.ratingMax() != null) {
       whereClause.append(" AND rating <= ?");

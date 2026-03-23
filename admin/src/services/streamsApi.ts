@@ -33,6 +33,7 @@ export interface StreamListQueryOptions {
   releaseDateTo?: string;
   ratingMin?: number;
   ratingMax?: number;
+  tmdb?: number;
 }
 
 class StreamsApi {
@@ -95,6 +96,9 @@ class StreamsApi {
     }
     if (options?.ratingMax !== undefined && options.ratingMax !== null) {
       params.ratingMax = options.ratingMax;
+    }
+    if (options?.tmdb !== undefined && options.tmdb !== null) {
+      params.tmdb = options.tmdb;
     }
 
     const response = await api.get('/streams', { params });
