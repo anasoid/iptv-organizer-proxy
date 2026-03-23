@@ -56,8 +56,7 @@ public class LiveStreamService extends BaseService<LiveStream, LiveStreamReposit
 
   public java.util.List<LiveStream> findBySourceIdPagedWithFilters(
       Long sourceId,
-      org.anasoid.iptvorganizer.repositories.stream.BaseStreamRepository.StreamQueryOptions
-          options,
+      org.anasoid.iptvorganizer.repositories.stream.BaseStreamRepository.StreamQueryOptions options,
       int page,
       int limit) {
     return repository.findBySourceIdPagedWithFilters(sourceId, options, page, limit);

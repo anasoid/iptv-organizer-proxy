@@ -56,8 +56,7 @@ public class SeriesService extends BaseService<Series, SeriesRepository> {
 
   public java.util.List<Series> findBySourceIdPagedWithFilters(
       Long sourceId,
-      org.anasoid.iptvorganizer.repositories.stream.BaseStreamRepository.StreamQueryOptions
-          options,
+      org.anasoid.iptvorganizer.repositories.stream.BaseStreamRepository.StreamQueryOptions options,
       int page,
       int limit) {
     return repository.findBySourceIdPagedWithFilters(sourceId, options, page, limit);

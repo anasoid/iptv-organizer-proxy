@@ -39,21 +39,7 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
 
     public static StreamQueryOptions empty() {
       return new StreamQueryOptions(
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
+          null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
           null);
     }
   }
@@ -235,22 +221,8 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
   public List<T> findBySourceIdPagedWithSearch(Long sourceId, String search, int page, int limit) {
     StreamQueryOptions options =
         new StreamQueryOptions(
-            null,
-            search,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null);
+            null, search, null, null, null, null, null, null, null, null, null, null, null, null,
+            null, null);
     return findBySourceIdPagedWithFilters(sourceId, options, page, limit);
   }
 
@@ -264,22 +236,8 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
   public long countBySourceIdWithSearch(Long sourceId, String search) {
     StreamQueryOptions options =
         new StreamQueryOptions(
-            null,
-            search,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null);
+            null, search, null, null, null, null, null, null, null, null, null, null, null, null,
+            null, null);
     return countBySourceIdWithFilters(sourceId, options);
   }
 
@@ -403,7 +361,6 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
       parameters.add(effective.ratingMax());
     }
 
-
     return new QueryParts(whereClause.toString(), parameters);
   }
 
@@ -442,9 +399,8 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
   protected Duration cacheDuration() {
     return Duration.ofHours(1);
   }
-  /**
-   * Safely extract a Long value from a ResultSet column, handling nulls and type variations.
-   */
+
+  /** Safely extract a Long value from a ResultSet column, handling nulls and type variations. */
   protected Long getLongSafe(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
     Object value = rs.getObject(column);
     if (value == null) return null;
@@ -459,10 +415,10 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
   }
 
   /**
-   * Safely set a LocalDate parameter on a PreparedStatement. Stores as ISO-8601 string
-   * "YYYY-MM-DD" to ensure compatibility across all JDBC drivers (SQLite, MySQL, H2). Using
-   * setObject(LocalDate) is unreliable with SQLite JDBC which may store in datetime format
-   * "YYYY-MM-DD HH:mm:ss.SSS", making it impossible to read back as LocalDate.
+   * Safely set a LocalDate parameter on a PreparedStatement. Stores as ISO-8601 string "YYYY-MM-DD"
+   * to ensure compatibility across all JDBC drivers (SQLite, MySQL, H2). Using setObject(LocalDate)
+   * is unreliable with SQLite JDBC which may store in datetime format "YYYY-MM-DD HH:mm:ss.SSS",
+   * making it impossible to read back as LocalDate.
    */
   protected void setLocalDate(java.sql.PreparedStatement stmt, int index, java.time.LocalDate date)
       throws java.sql.SQLException {
@@ -474,8 +430,8 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
   }
 
   /**
-   * Safely read a LocalDate from a ResultSet column. Handles both "YYYY-MM-DD" and
-   * "YYYY-MM-DD HH:mm:ss.SSS" formats that SQLite JDBC may produce.
+   * Safely read a LocalDate from a ResultSet column. Handles both "YYYY-MM-DD" and "YYYY-MM-DD
+   * HH:mm:ss.SSS" formats that SQLite JDBC may produce.
    */
   protected java.time.LocalDate getLocalDate(java.sql.ResultSet rs, String column)
       throws java.sql.SQLException {

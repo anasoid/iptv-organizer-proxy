@@ -56,8 +56,7 @@ public class VodStreamService extends BaseService<VodStream, VodStreamRepository
 
   public java.util.List<VodStream> findBySourceIdPagedWithFilters(
       Long sourceId,
-      org.anasoid.iptvorganizer.repositories.stream.BaseStreamRepository.StreamQueryOptions
-          options,
+      org.anasoid.iptvorganizer.repositories.stream.BaseStreamRepository.StreamQueryOptions options,
       int page,
       int limit) {
     return repository.findBySourceIdPagedWithFilters(sourceId, options, page, limit);
