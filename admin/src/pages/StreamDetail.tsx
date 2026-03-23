@@ -17,18 +17,24 @@ import {
   TableBody,
   TableCell,
   TableContainer,
+  TableHead,
   TableRow,
   Paper,
   IconButton,
   Tooltip,
   Snackbar,
   ButtonGroup,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import { ArrowBack as ArrowBackIcon, ContentCopy as ContentCopyIcon, CheckCircle as CheckCircleIcon, Block as BlockIcon } from '@mui/icons-material';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
-import streamsApi from '../services/streamsApi';
+import streamsApi, { type Stream } from '../services/streamsApi';
 import categoriesApi from '../services/categoriesApi';
+import sourcesApi from '../services/sourcesApi';
+import { getCategoryDisplayName } from '../utils/categoryDisplayName';
+import { formatDisplayDate } from '../utils/dateFormat';
 
 function parseStreamData(data: unknown): Record<string, unknown> | null {
   if (!data) {
@@ -73,6 +79,28 @@ function formatRawStreamData(data: unknown): string {
   }
 }
 
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`stream-tabpanel-${index}`}
+      aria-labelledby={`stream-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  );
+}
+
 export default function StreamDetail() {
   const { id, type } = useParams<{ id: string; type: string }>();
   const navigate = useNavigate();
@@ -80,9 +108,10 @@ export default function StreamDetail() {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
+  const [tabValue, setTabValue] = useState(0);
 
   const streamId = id ? parseInt(id, 10) : null;
-  const streamType = (type || 'live') as 'live' | 'vod' | 'series';
+  const streamType = type === 'vod' || type === 'series' || type === 'live' ? type : 'live';
 
   // Fetch stream details
   const { data: streamData, isLoading: isLoadingStream, error: streamError, refetch: refetchStream } = useQuery({
@@ -106,6 +135,98 @@ export default function StreamDetail() {
       setSnackbarMessage('Failed to update Allow/Deny status');
       setSnackbarOpen(true);
     },
+  });
+
+  // Fetch all sources for TMDB-linked streams
+  const { data: allSources } = useQuery({
+    queryKey: ['sources'],
+    queryFn: () => sourcesApi.getSources(1, 1000),
+    enabled: isAuthenticated,
+  });
+
+  // Fetch streams with the same TMDB ID from all sources
+  const { data: tmdbLinkedStreams } = useQuery({
+    queryKey: ['streams-by-tmdb', stream?.tmdb, streamType],
+    queryFn: async () => {
+      if (!stream?.tmdb || !allSources?.data) {
+        return [];
+      }
+
+      try {
+        const linkedStreams: Stream[] = [];
+
+        // Query each source for streams with the same TMDB ID
+        for (const source of allSources.data) {
+          try {
+            const response = await streamsApi.getStreams(
+              source.id,
+              streamType,
+              undefined,
+              1,
+              1000,
+              undefined,
+              undefined,
+              { tmdb: stream.tmdb }
+            );
+
+            if (response.data && response.data.length > 0) {
+              linkedStreams.push(...response.data);
+            }
+          } catch (error) {
+            console.error(`Error fetching streams with TMDB ${stream.tmdb} from source ${source.id}:`, error);
+          }
+        }
+
+        // Remove the current stream from the list
+        return linkedStreams.filter((s) => s.id !== stream.id);
+      } catch (error) {
+        console.error('Error fetching TMDB-linked streams:', error);
+        return [];
+      }
+    },
+    enabled: isAuthenticated && !!stream?.tmdb && !!allSources?.data,
+  });
+
+  const { data: linkedCategoryNames } = useQuery({
+    queryKey: [
+      'linked-stream-category-names',
+      streamType,
+      (tmdbLinkedStreams ?? []).map((linkedStream) => `${linkedStream.sourceId}:${linkedStream.categoryId}`).sort(),
+    ],
+    queryFn: async () => {
+      if (!tmdbLinkedStreams || tmdbLinkedStreams.length === 0) {
+        return {} as Record<string, string>;
+      }
+
+      const uniqueStreamsWithCategories = Array.from(
+        new Map(
+          tmdbLinkedStreams
+            .filter((linkedStream) => linkedStream.categoryId !== null)
+            .map((linkedStream) => [`${linkedStream.sourceId}:${linkedStream.categoryId}`, linkedStream])
+        ).values()
+      );
+
+      const entries = await Promise.all(
+        uniqueStreamsWithCategories.map(async (linkedStream) => {
+          const key = `${linkedStream.sourceId}:${linkedStream.categoryId}`;
+
+          try {
+            const result = await categoriesApi.getCategoryByExternalId(
+              Number(linkedStream.categoryId),
+              linkedStream.sourceId,
+              streamType,
+            );
+
+            return [key, getCategoryDisplayName(result.data)] as const;
+          } catch {
+            return [key, `Category ${linkedStream.categoryId}`] as const;
+          }
+        })
+      );
+
+      return Object.fromEntries(entries);
+    },
+    enabled: isAuthenticated && !!tmdbLinkedStreams?.length,
   });
 
   // Fetch source ID from stream to get all categories as fallback
@@ -203,10 +324,16 @@ export default function StreamDetail() {
   const hasMetadata = !!metadata && Object.keys(metadata).length > 0;
   const hasRawData = rawDataText.length > 0;
 
-  const streamIcon = metadata?.stream_icon || metadata?.cover;
+  const streamIcon =
+    typeof metadata?.stream_icon === 'string'
+      ? metadata.stream_icon
+      : typeof metadata?.cover === 'string'
+        ? metadata.cover
+        : null;
   const duration = metadata?.duration;
   const episodes = metadata?.episodes;
   const seasons = metadata?.seasons;
+  const rawDataTabIndex = stream.tmdb ? 2 : 1;
 
   const formatDuration = (seconds: number): string => {
     if (!seconds) return 'N/A';
@@ -376,6 +503,33 @@ export default function StreamDetail() {
                   </Grid>
                 )}
 
+                {stream.releaseDate && (
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                      Release Date
+                    </Typography>
+                    <Typography variant="body1">{formatDisplayDate(stream.releaseDate)}</Typography>
+                  </Grid>
+                )}
+
+                {stream.rating !== null && stream.rating !== undefined && (
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                      Rating
+                    </Typography>
+                    <Typography variant="body1">{stream.rating.toFixed(1)}</Typography>
+                  </Grid>
+                )}
+
+                {stream.tmdb && (
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                      TMDb ID
+                    </Typography>
+                    <Typography variant="body1">{stream.tmdb}</Typography>
+                  </Grid>
+                )}
+
                 {seasons && (
                   <Grid item xs={12} sm={6}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
@@ -414,7 +568,7 @@ export default function StreamDetail() {
                     Created At
                   </Typography>
                   <Typography variant="body2">
-                    {new Date(stream.created_at).toLocaleDateString('en-US', {
+                    {new Date(stream.createdAt).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
@@ -424,13 +578,13 @@ export default function StreamDetail() {
                   </Typography>
                 </Grid>
 
-                {stream.updated_at && (
+                {stream.updatedAt && (
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
                       Updated At
                     </Typography>
                     <Typography variant="body2">
-                      {new Date(stream.updated_at).toLocaleDateString('en-US', {
+                      {new Date(stream.updatedAt).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',
@@ -442,65 +596,6 @@ export default function StreamDetail() {
                 )}
               </Grid>
             </Box>
-
-            {/* Metadata Table - Below Detail Info */}
-            {hasMetadata && metadata && (
-              <Box sx={{ p: 3, pt: 0, backgroundColor: '#fafafa' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-                  Metadata
-                </Typography>
-                <TableContainer sx={{ maxHeight: 250 }}>
-                  <Table size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
-                    <TableBody>
-                      {Object.entries(metadata).map(([key, value]) => {
-                        // Skip certain fields we already display
-                        if (['stream_icon', 'cover', 'url', 'duration', 'episodes', 'seasons'].includes(key)) {
-                          return null;
-                        }
-
-                        let displayValue: string;
-                        if (typeof value === 'object') {
-                          displayValue = JSON.stringify(value, null, 2);
-                        } else {
-                          displayValue = String(value);
-                        }
-
-                        return (
-                          <TableRow key={key}>
-                            <TableCell
-                              sx={{
-                                width: 180,
-                                minWidth: 180,
-                                maxWidth: 180,
-                                verticalAlign: 'top',
-                                fontWeight: 500,
-                                fontSize: '0.875rem',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {key}
-                            </TableCell>
-                            <TableCell sx={{ width: 'calc(100% - 180px)', fontSize: '0.875rem' }}>
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontFamily: 'monospace',
-                                  whiteSpace: 'pre-wrap',
-                                  overflowWrap: 'anywhere',
-                                  wordBreak: 'break-word',
-                                }}
-                              >
-                                {displayValue}
-                              </Typography>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Box>
-            )}
           </Grid>
 
           {streamIcon && (
@@ -551,46 +646,183 @@ export default function StreamDetail() {
         </Grid>
       </Card>
 
-      {/* Raw Data JSON */}
-      {hasRawData && (
-        <Card sx={{ mb: 3, p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Raw Data (JSON)
-            </Typography>
-            <Tooltip title="Copy to clipboard">
-              <IconButton
-                size="small"
-                onClick={() =>
-                  handleCopyToClipboard(
-                    rawDataText,
-                    'Data copied to clipboard!'
-                  )
-                }
-              >
-                <ContentCopyIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
-
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 2,
-              backgroundColor: '#f5f5f5',
-              overflow: 'auto',
-              maxHeight: 400,
-              fontFamily: 'monospace',
-              fontSize: '0.875rem',
-              lineHeight: 1.6,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-            }}
+      {/* Tabs for Metadata and TMDB Linked Streams */}
+      <Card sx={{ mb: 3 }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs
+            value={tabValue}
+            onChange={(_, newValue) => setTabValue(newValue)}
+            aria-label="stream details tabs"
           >
-            {rawDataText}
-          </Paper>
-        </Card>
-      )}
+            <Tab label="Metadata" id="stream-tab-0" aria-controls="stream-tabpanel-0" />
+            {stream.tmdb && <Tab label={`Same TMDB ID (${tmdbLinkedStreams?.length || 0})`} id="stream-tab-1" aria-controls="stream-tabpanel-1" />}
+            {hasRawData && <Tab label="Raw Data" id={`stream-tab-${rawDataTabIndex}`} aria-controls={`stream-tabpanel-${rawDataTabIndex}`} />}
+          </Tabs>
+        </Box>
+
+        {/* Metadata Tab */}
+        <TabPanel value={tabValue} index={0}>
+          {hasMetadata && metadata ? (
+            <TableContainer sx={{ maxHeight: 400 }}>
+              <Table size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
+                <TableBody>
+                  {Object.entries(metadata).map(([key, value]) => {
+                    // Skip certain fields we already display
+                    if (['stream_icon', 'cover', 'url', 'duration', 'episodes', 'seasons'].includes(key)) {
+                      return null;
+                    }
+
+                    let displayValue: string;
+                    if (typeof value === 'object') {
+                      displayValue = JSON.stringify(value, null, 2);
+                    } else {
+                      displayValue = String(value);
+                    }
+
+                    return (
+                      <TableRow key={key}>
+                        <TableCell
+                          sx={{
+                            width: 180,
+                            minWidth: 180,
+                            maxWidth: 180,
+                            verticalAlign: 'top',
+                            fontWeight: 500,
+                            fontSize: '0.875rem',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {key}
+                        </TableCell>
+                        <TableCell sx={{ width: 'calc(100% - 180px)', fontSize: '0.875rem' }}>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontFamily: 'monospace',
+                              whiteSpace: 'pre-wrap',
+                              overflowWrap: 'anywhere',
+                              wordBreak: 'break-word',
+                            }}
+                          >
+                            {displayValue}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              No metadata available
+            </Typography>
+          )}
+        </TabPanel>
+
+        {/* TMDB Linked Streams Tab */}
+        {stream.tmdb && (
+          <TabPanel value={tabValue} index={1}>
+            {tmdbLinkedStreams && tmdbLinkedStreams.length > 0 ? (
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                  Streams with the same TMDB ID ({stream.tmdb}) across different sources:
+                </Typography>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                        <TableCell sx={{ fontWeight: 600 }}>Stream Name</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Source</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Action</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {tmdbLinkedStreams.map((linkedStream) => {
+                        const sourceInfo = allSources?.data?.find((s) => s.id === linkedStream.sourceId);
+                        return (
+                          <TableRow key={linkedStream.id}>
+                            <TableCell>{linkedStream.name}</TableCell>
+                            <TableCell>
+                              <Chip label={streamType.toUpperCase()} size="small" color={getTypeColor(streamType)} />
+                            </TableCell>
+                            <TableCell>{sourceInfo?.name || `Source ${linkedStream.sourceId}`}</TableCell>
+                            <TableCell>
+                              {linkedStream.categoryId
+                                ? linkedCategoryNames?.[`${linkedStream.sourceId}:${linkedStream.categoryId}`] || `Category ${linkedStream.categoryId}`
+                                : '—'}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => {
+                                  sessionStorage.setItem('streamDetailReferrer', window.location.pathname);
+                                  navigate(`/streams/${linkedStream.id}/${streamType}`);
+                                }}
+                              >
+                                View
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No other streams with the same TMDB ID found
+              </Typography>
+            )}
+          </TabPanel>
+        )}
+
+        {/* Raw Data Tab */}
+        {hasRawData && (
+          <TabPanel value={tabValue} index={rawDataTabIndex}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                JSON
+              </Typography>
+              <Tooltip title="Copy to clipboard">
+                <IconButton
+                  size="small"
+                  onClick={() =>
+                    handleCopyToClipboard(
+                      rawDataText,
+                      'Data copied to clipboard!'
+                    )
+                  }
+                >
+                  <ContentCopyIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
+                backgroundColor: '#f5f5f5',
+                overflow: 'auto',
+                maxHeight: 400,
+                fontFamily: 'monospace',
+                fontSize: '0.875rem',
+                lineHeight: 1.6,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+            >
+              {rawDataText}
+            </Paper>
+          </TabPanel>
+        )}
+      </Card>
+
+      {/* Removed: Raw Data JSON section (now in tabs) */}
 
       <Dialog
         open={imagePreviewOpen}

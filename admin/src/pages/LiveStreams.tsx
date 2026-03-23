@@ -196,13 +196,57 @@ export default function LiveStreams() {
 
   if (categoriesData?.data) {
     categoriesData.data.forEach((cat: Category) => {
-      categories[cat.externalId] = getCategoryDisplayName(cat);
+      const displayName = getCategoryDisplayName(cat);
+      categories[String(cat.externalId)] = displayName;
     });
   }
 
+  const missingCategoryIds = Array.from(
+    new Set(
+      streams
+        .map((stream) => stream.categoryId)
+        .filter(
+          (categoryId): categoryId is number =>
+            categoryId !== null && categoryId !== undefined && !categories[String(categoryId)]
+        )
+    )
+  );
+
+  const { data: missingCategoryNames } = useQuery({
+    queryKey: ['stream-category-names-live', sourceId, missingCategoryIds],
+    queryFn: async () => {
+      if (!sourceId || missingCategoryIds.length === 0) {
+        return {} as Record<string, string>;
+      }
+
+      const entries = await Promise.all(
+        missingCategoryIds.map(async (externalId) => {
+          try {
+            const result = await categoriesApi.getCategoryByExternalId(externalId, sourceId, 'live');
+            return [String(externalId), getCategoryDisplayName(result.data)] as const;
+          } catch {
+            return [String(externalId), `Category ${externalId}`] as const;
+          }
+        })
+      );
+
+      return Object.fromEntries(entries);
+    },
+    enabled: isAuthenticated && sourceId !== null && missingCategoryIds.length > 0,
+  });
+
+  const categoryNames = {
+    ...categories,
+    ...(missingCategoryNames ?? {}),
+  };
+
   const getCategoryName = (categoryId: string | number | null): string => {
     if (!categoryId) return 'Unknown';
-    return categories[categoryId] || `Category ${categoryId}`;
+    const categoryName = categoryNames[String(categoryId)];
+    if (categoryName) {
+      return categoryName;
+    }
+    return `Category ${categoryId}`;
   };
 
   const asRecord = (value: unknown): Record<string, unknown> | null => {
