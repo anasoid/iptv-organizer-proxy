@@ -8,28 +8,39 @@ interface StreamCardProps {
 }
 
 export default function StreamCard({ stream, categoryName, onClick }: StreamCardProps) {
+  const asRecord = (value: unknown): Record<string, unknown> | null => {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+    return value as Record<string, unknown>;
+  };
+
   // Extract stream_icon from data field, parsing if needed
-  let dataObj: Record<string, any> | null = null;
+  let dataObj: Record<string, unknown> | null = null;
   if (stream.data) {
     if (typeof stream.data === 'string') {
       try {
-        dataObj = JSON.parse(stream.data);
+        dataObj = asRecord(JSON.parse(stream.data));
       } catch {
         dataObj = null;
       }
     } else {
-      dataObj = stream.data as Record<string, any>;
+      dataObj = asRecord(stream.data);
     }
   }
-  const streamIcon = dataObj?.stream_icon || dataObj?.cover || '';
+  const streamIcon =
+    (typeof dataObj?.stream_icon === 'string' && dataObj.stream_icon) ||
+    (typeof dataObj?.cover === 'string' && dataObj.cover) ||
+    '';
 
   // Try to get duration or other info from data
   const getDuration = (): string | null => {
     if (!stream.data) return null;
-    if (stream.data.duration) {
-      return typeof stream.data.duration === 'number'
-        ? formatSeconds(stream.data.duration)
-        : stream.data.duration;
+    if (typeof stream.data.duration === 'number') {
+      return formatSeconds(stream.data.duration);
+    }
+    if (typeof stream.data.duration === 'string') {
+      return stream.data.duration;
     }
     return null;
   };
@@ -150,7 +161,7 @@ export default function StreamCard({ stream, categoryName, onClick }: StreamCard
             variant="outlined"
           />
           {duration && <Chip label={duration} size="small" variant="outlined" />}
-          {stream.is_adult ? <Chip label="Adult" size="small" color="error" variant="outlined" /> : null}
+          {stream.isAdult ? <Chip label="Adult" size="small" color="error" variant="outlined" /> : null}
         </Box>
       </CardContent>
     </Card>

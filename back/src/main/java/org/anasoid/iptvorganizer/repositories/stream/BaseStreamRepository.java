@@ -2,9 +2,12 @@ package org.anasoid.iptvorganizer.repositories.stream;
 
 import jakarta.transaction.Transactional;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 
@@ -15,6 +18,38 @@ import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
  */
 public abstract class BaseStreamRepository<T extends BaseStream> extends SourcedEntityRepository<T>
     implements SynchronizedItemRepository<T> {
+
+  public record StreamQueryOptions(
+      Integer categoryId,
+      String search,
+      Integer streamId,
+      String sortBy,
+      String sortDir,
+      LocalDate addedDateFrom,
+      LocalDate addedDateTo,
+      LocalDate createdDateFrom,
+      LocalDate createdDateTo,
+      LocalDate updateDateFrom,
+      LocalDate updateDateTo,
+      LocalDate releaseDateFrom,
+      LocalDate releaseDateTo,
+      Double ratingMin,
+      Double ratingMax) {
+
+    public static StreamQueryOptions empty() {
+      return new StreamQueryOptions(
+          null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+    }
+  }
+
+  private static final Map<String, String> SORT_FIELD_MAP =
+      Map.ofEntries(
+          Map.entry("addedDate", "added_date"),
+          Map.entry("createdAt", "created_at"),
+          Map.entry("updatedAt", "updated_at"),
+          Map.entry("releaseDate", "release_date"),
+          Map.entry("rating", "rating"),
+          Map.entry("tmdb", "tmdb"));
 
   @Override
   @Transactional
@@ -159,27 +194,7 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
    * @return List of streams for the page
    */
   public List<T> findBySourceIdPaged(Long sourceId, int page, int limit) {
-    List<T> results = new ArrayList<>();
-    int offset = (page - 1) * limit;
-    String sql =
-        "SELECT * FROM "
-            + getTableName()
-            + " WHERE source_id = ? ORDER BY num ASC, id DESC LIMIT ? OFFSET ?";
-    try (java.sql.Connection conn = dataSource.getConnection();
-        java.sql.PreparedStatement stmt = conn.prepareStatement(sql)) {
-      stmt.setLong(1, sourceId);
-      stmt.setInt(2, limit);
-      stmt.setInt(3, offset);
-      try (java.sql.ResultSet rs = stmt.executeQuery()) {
-        while (rs.next()) {
-          results.add(mapRow(rs));
-        }
-      }
-    } catch (java.sql.SQLException e) {
-      throw new RuntimeException(
-          "Failed to find by source ID with pagination in " + getTableName(), e);
-    }
-    return results;
+    return findBySourceIdPagedWithFilters(sourceId, StreamQueryOptions.empty(), page, limit);
   }
 
   /**
@@ -189,19 +204,7 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
    * @return Total count of streams
    */
   public long countBySourceId(Long sourceId) {
-    String sql = "SELECT COUNT(*) FROM " + getTableName() + " WHERE source_id = ?";
-    try (java.sql.Connection conn = dataSource.getConnection();
-        java.sql.PreparedStatement stmt = conn.prepareStatement(sql)) {
-      stmt.setLong(1, sourceId);
-      try (java.sql.ResultSet rs = stmt.executeQuery()) {
-        if (rs.next()) {
-          return rs.getLong(1);
-        }
-      }
-    } catch (java.sql.SQLException e) {
-      throw new RuntimeException("Failed to count by source ID in " + getTableName(), e);
-    }
-    return 0;
+    return countBySourceIdWithFilters(sourceId, StreamQueryOptions.empty());
   }
 
   /**
@@ -214,30 +217,10 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
    * @return List of streams for the page matching the search
    */
   public List<T> findBySourceIdPagedWithSearch(Long sourceId, String search, int page, int limit) {
-    List<T> results = new ArrayList<>();
-    int offset = (page - 1) * limit;
-    String sql =
-        "SELECT * FROM "
-            + getTableName()
-            + " WHERE source_id = ? AND LOWER(name) LIKE ? "
-            + "ORDER BY num ASC, id DESC LIMIT ? OFFSET ?";
-    String searchTerm = "%" + search.toLowerCase() + "%";
-    try (java.sql.Connection conn = dataSource.getConnection();
-        java.sql.PreparedStatement stmt = conn.prepareStatement(sql)) {
-      stmt.setLong(1, sourceId);
-      stmt.setString(2, searchTerm);
-      stmt.setInt(3, limit);
-      stmt.setInt(4, offset);
-      try (java.sql.ResultSet rs = stmt.executeQuery()) {
-        while (rs.next()) {
-          results.add(mapRow(rs));
-        }
-      }
-    } catch (java.sql.SQLException e) {
-      throw new RuntimeException(
-          "Failed to find by source ID with pagination and search in " + getTableName(), e);
-    }
-    return results;
+    StreamQueryOptions options =
+        new StreamQueryOptions(
+            null, search, null, null, null, null, null, null, null, null, null, null, null, null, null);
+    return findBySourceIdPagedWithFilters(sourceId, options, page, limit);
   }
 
   /**
@@ -248,13 +231,63 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
    * @return Total count of streams matching the search
    */
   public long countBySourceIdWithSearch(Long sourceId, String search) {
+    StreamQueryOptions options =
+        new StreamQueryOptions(
+            null,
+            search,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    return countBySourceIdWithFilters(sourceId, options);
+  }
+
+  public List<T> findBySourceIdPagedWithFilters(
+      Long sourceId, StreamQueryOptions options, int page, int limit) {
+    List<T> results = new ArrayList<>();
+    int offset = (page - 1) * limit;
+    QueryParts queryParts = buildWhereClause(sourceId, options);
     String sql =
-        "SELECT COUNT(*) FROM " + getTableName() + " WHERE source_id = ? AND LOWER(name) LIKE ?";
-    String searchTerm = "%" + search.toLowerCase() + "%";
+        "SELECT * FROM "
+            + getTableName()
+            + queryParts.whereSql
+            + " ORDER BY "
+            + buildOrderBy(options)
+            + " LIMIT ? OFFSET ?";
+
     try (java.sql.Connection conn = dataSource.getConnection();
         java.sql.PreparedStatement stmt = conn.prepareStatement(sql)) {
-      stmt.setLong(1, sourceId);
-      stmt.setString(2, searchTerm);
+      int parameterIndex = bindParameters(stmt, queryParts.parameters);
+      stmt.setInt(parameterIndex++, limit);
+      stmt.setInt(parameterIndex, offset);
+
+      try (java.sql.ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          results.add(mapRow(rs));
+        }
+      }
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException(
+          "Failed to find by source ID with pagination and filters in " + getTableName(), e);
+    }
+    return results;
+  }
+
+  public long countBySourceIdWithFilters(Long sourceId, StreamQueryOptions options) {
+    QueryParts queryParts = buildWhereClause(sourceId, options);
+    String sql = "SELECT COUNT(*) FROM " + getTableName() + queryParts.whereSql;
+    try (java.sql.Connection conn = dataSource.getConnection();
+        java.sql.PreparedStatement stmt = conn.prepareStatement(sql)) {
+      bindParameters(stmt, queryParts.parameters);
       try (java.sql.ResultSet rs = stmt.executeQuery()) {
         if (rs.next()) {
           return rs.getLong(1);
@@ -262,10 +295,106 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
       }
     } catch (java.sql.SQLException e) {
       throw new RuntimeException(
-          "Failed to count by source ID with search in " + getTableName(), e);
+          "Failed to count by source ID with filters in " + getTableName(), e);
     }
     return 0;
   }
+
+  private QueryParts buildWhereClause(Long sourceId, StreamQueryOptions options) {
+    StreamQueryOptions effective = options != null ? options : StreamQueryOptions.empty();
+    StringBuilder whereClause = new StringBuilder(" WHERE source_id = ?");
+    List<Object> parameters = new ArrayList<>();
+    parameters.add(sourceId);
+
+    if (effective.categoryId() != null) {
+      whereClause.append(" AND category_id = ?");
+      parameters.add(effective.categoryId());
+    }
+
+    if (effective.search() != null && !effective.search().isBlank()) {
+      whereClause.append(" AND LOWER(name) LIKE ?");
+      parameters.add("%" + effective.search().toLowerCase(Locale.ROOT) + "%");
+    }
+
+    if (effective.streamId() != null) {
+      whereClause.append(" AND external_id = ?");
+      parameters.add(effective.streamId());
+    }
+
+    if (effective.addedDateFrom() != null) {
+      whereClause.append(" AND added_date >= ?");
+      parameters.add(effective.addedDateFrom().toString());
+    }
+    if (effective.addedDateTo() != null) {
+      whereClause.append(" AND added_date <= ?");
+      parameters.add(effective.addedDateTo().toString());
+    }
+
+    if (effective.createdDateFrom() != null) {
+      whereClause.append(" AND DATE(created_at) >= ?");
+      parameters.add(effective.createdDateFrom().toString());
+    }
+    if (effective.createdDateTo() != null) {
+      whereClause.append(" AND DATE(created_at) <= ?");
+      parameters.add(effective.createdDateTo().toString());
+    }
+
+    if (effective.updateDateFrom() != null) {
+      whereClause.append(" AND DATE(updated_at) >= ?");
+      parameters.add(effective.updateDateFrom().toString());
+    }
+    if (effective.updateDateTo() != null) {
+      whereClause.append(" AND DATE(updated_at) <= ?");
+      parameters.add(effective.updateDateTo().toString());
+    }
+
+    if (effective.releaseDateFrom() != null) {
+      whereClause.append(" AND release_date >= ?");
+      parameters.add(effective.releaseDateFrom().toString());
+    }
+    if (effective.releaseDateTo() != null) {
+      whereClause.append(" AND release_date <= ?");
+      parameters.add(effective.releaseDateTo().toString());
+    }
+
+    if (effective.ratingMin() != null) {
+      whereClause.append(" AND rating >= ?");
+      parameters.add(effective.ratingMin());
+    }
+    if (effective.ratingMax() != null) {
+      whereClause.append(" AND rating <= ?");
+      parameters.add(effective.ratingMax());
+    }
+
+
+    return new QueryParts(whereClause.toString(), parameters);
+  }
+
+  private String buildOrderBy(StreamQueryOptions options) {
+    if (options == null || options.sortBy() == null || options.sortBy().isBlank()) {
+      return "num ASC, id DESC";
+    }
+    String column = SORT_FIELD_MAP.get(options.sortBy());
+    if (column == null) {
+      return "num ASC, id DESC";
+    }
+    String direction =
+        "asc".equalsIgnoreCase(options.sortDir()) || "desc".equalsIgnoreCase(options.sortDir())
+            ? options.sortDir().toUpperCase(Locale.ROOT)
+            : "DESC";
+    return column + " " + direction + ", id DESC";
+  }
+
+  private int bindParameters(java.sql.PreparedStatement stmt, List<Object> parameters)
+      throws java.sql.SQLException {
+    int parameterIndex = 1;
+    for (Object parameter : parameters) {
+      stmt.setObject(parameterIndex++, parameter);
+    }
+    return parameterIndex;
+  }
+
+  private record QueryParts(String whereSql, List<Object> parameters) {}
 
   @Override
   protected int cacheSize() {

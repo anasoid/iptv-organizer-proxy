@@ -5,6 +5,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import org.anasoid.iptvorganizer.controllers.admin.BaseController;
@@ -12,6 +13,7 @@ import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.ValidationException;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
+import org.anasoid.iptvorganizer.repositories.stream.BaseStreamRepository;
 import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
 import org.anasoid.iptvorganizer.services.stream.SeriesService;
 import org.anasoid.iptvorganizer.services.stream.VodStreamService;
@@ -41,6 +43,20 @@ public class StreamsController extends BaseController {
       @QueryParam("categoryId") Integer categoryId,
       @QueryParam("search") String search,
       @QueryParam("streamId") Integer streamId,
+      @QueryParam("sortBy") String sortBy,
+      @QueryParam("sortDir") String sortDir,
+      @QueryParam("addedDateFrom") String addedDateFrom,
+      @QueryParam("addedDateTo") String addedDateTo,
+      @QueryParam("createdDateFrom") String createdDateFrom,
+      @QueryParam("createdDateTo") String createdDateTo,
+      @QueryParam("updateDateFrom") String updateDateFrom,
+      @QueryParam("updateDateTo") String updateDateTo,
+      @QueryParam("releaseDateFrom") String releaseDateFrom,
+      @QueryParam("releaseDateTo") String releaseDateTo,
+      @QueryParam("ratingMin") Double ratingMin,
+      @QueryParam("ratingMax") Double ratingMax,
+      @QueryParam("tmdbMin") Long tmdbMin,
+      @QueryParam("tmdbMax") Long tmdbMax,
       @QueryParam("page") @DefaultValue("1") int page,
       @QueryParam("limit") @DefaultValue("20") int limit) {
 
@@ -52,60 +68,83 @@ public class StreamsController extends BaseController {
       throw new ValidationException("type is required (live, vod, or series)");
     }
 
+    validateSort(sortBy, sortDir);
+    validateRanges(ratingMin, ratingMax);
+
+    BaseStreamRepository.StreamQueryOptions options =
+        new BaseStreamRepository.StreamQueryOptions(
+            categoryId,
+            search,
+            streamId,
+            sortBy,
+            sortDir,
+            parseDate(addedDateFrom, "addedDateFrom"),
+            parseDate(addedDateTo, "addedDateTo"),
+            parseDate(createdDateFrom, "createdDateFrom"),
+            parseDate(createdDateTo, "createdDateTo"),
+            parseDate(updateDateFrom, "updateDateFrom"),
+            parseDate(updateDateTo, "updateDateTo"),
+            parseDate(releaseDateFrom, "releaseDateFrom"),
+            parseDate(releaseDateTo, "releaseDateTo"),
+            ratingMin,
+            ratingMax);
+
     List<? extends BaseStream> streams = Collections.emptyList();
     long total = 0;
 
-    // Fetch streams by type - use paginated queries for memory efficiency
     switch (type.toLowerCase()) {
       case "live":
-        if (categoryId != null) {
-          streams = liveStreamService.findBySourceAndCategory(sourceId, categoryId, limit);
-          total = streams.size(); // No total count for category queries
-        } else if (streamId != null) {
-          var stream = liveStreamService.findBySourceAndStreamId(sourceId, streamId);
-          streams = stream != null ? List.of(stream) : Collections.emptyList();
-          total = streams.size();
-        } else {
-          streams = liveStreamService.findBySourceIdPaged(sourceId, page, limit);
-          total = liveStreamService.countBySourceId(sourceId);
-        }
+        streams = liveStreamService.findBySourceIdPagedWithFilters(sourceId, options, page, limit);
+        total = liveStreamService.countBySourceIdWithFilters(sourceId, options);
         break;
       case "vod":
-        if (categoryId != null) {
-          streams = vodStreamService.findBySourceAndCategory(sourceId, categoryId, limit);
-          total = streams.size(); // No total count for category queries
-        } else if (streamId != null) {
-          var stream = vodStreamService.findBySourceAndStreamId(sourceId, streamId);
-          streams = stream != null ? List.of(stream) : Collections.emptyList();
-          total = streams.size();
-        } else if (search != null && !search.isBlank()) {
-          streams = vodStreamService.findBySourceIdPagedWithSearch(sourceId, search, page, limit);
-          total = vodStreamService.countBySourceIdWithSearch(sourceId, search);
-        } else {
-          streams = vodStreamService.findBySourceIdPaged(sourceId, page, limit);
-          total = vodStreamService.countBySourceId(sourceId);
-        }
+        streams = vodStreamService.findBySourceIdPagedWithFilters(sourceId, options, page, limit);
+        total = vodStreamService.countBySourceIdWithFilters(sourceId, options);
         break;
       case "series":
-        if (categoryId != null) {
-          streams = seriesService.findBySourceAndCategory(sourceId, categoryId, limit);
-          total = streams.size(); // No total count for category queries
-        } else if (streamId != null) {
-          var stream = seriesService.findBySourceAndStreamId(sourceId, streamId);
-          streams = stream != null ? List.of(stream) : Collections.emptyList();
-          total = streams.size();
-        } else {
-          streams = seriesService.findBySourceIdPaged(sourceId, page, limit);
-          total = seriesService.countBySourceId(sourceId);
-        }
+        streams = seriesService.findBySourceIdPagedWithFilters(sourceId, options, page, limit);
+        total = seriesService.countBySourceIdWithFilters(sourceId, options);
         break;
       default:
         throw new ValidationException("Invalid type. Must be 'live', 'vod', or 'series'");
     }
 
-    // Search is now handled in the database for VOD paginated queries.
-
     return ResponseUtils.okWithPagination(streams, PaginationMeta.of(page, limit, total));
+  }
+
+  private void validateSort(String sortBy, String sortDir) {
+    if (sortBy == null || sortBy.isBlank()) {
+      return;
+    }
+    List<String> supportedSortBy =
+        List.of("addedDate", "createdAt", "updatedAt", "releaseDate", "rating", "tmdb");
+    if (!supportedSortBy.contains(sortBy)) {
+      throw new ValidationException(
+          "Invalid sortBy. Must be one of: addedDate, createdAt, updatedAt, releaseDate, rating, tmdb");
+    }
+    if (sortDir != null
+        && !sortDir.isBlank()
+        && !"asc".equalsIgnoreCase(sortDir)
+        && !"desc".equalsIgnoreCase(sortDir)) {
+      throw new ValidationException("Invalid sortDir. Must be 'asc' or 'desc'");
+    }
+  }
+
+  private void validateRanges(Double ratingMin, Double ratingMax) {
+    if (ratingMin != null && ratingMax != null && ratingMin > ratingMax) {
+      throw new ValidationException("ratingMin cannot be greater than ratingMax");
+    }
+  }
+
+  private LocalDate parseDate(String value, String fieldName) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    try {
+      return LocalDate.parse(value);
+    } catch (Exception e) {
+      throw new ValidationException("Invalid " + fieldName + ". Expected format: YYYY-MM-DD");
+    }
   }
 
   /** Get stream by ID GET /api/streams/:id?type= */

@@ -92,6 +92,8 @@ export interface Stream {
   data: Record<string, unknown> | null;
   addedDate: string | null;
   releaseDate: string | null;
+  rating: number | null;
+  tmdb: number | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -54,8 +54,24 @@ public class SeriesService extends BaseService<Series, SeriesRepository> {
     return repository.findBySourceIdPaged(sourceId, page, limit);
   }
 
+  public java.util.List<Series> findBySourceIdPagedWithFilters(
+      Long sourceId,
+      org.anasoid.iptvorganizer.repositories.stream.BaseStreamRepository.StreamQueryOptions
+          options,
+      int page,
+      int limit) {
+    return repository.findBySourceIdPagedWithFilters(sourceId, options, page, limit);
+  }
+
   /** Count total streams by source ID */
   public long countBySourceId(Long sourceId) {
     return repository.countBySourceId(sourceId);
+  }
+
+  public long countBySourceIdWithFilters(
+      Long sourceId,
+      org.anasoid.iptvorganizer.repositories.stream.BaseStreamRepository.StreamQueryOptions
+          options) {
+    return repository.countBySourceIdWithFilters(sourceId, options);
   }
 }

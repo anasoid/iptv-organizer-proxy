@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
+  Button,
   Card,
   CircularProgress,
   Grid,
@@ -16,7 +17,7 @@ import {
   MenuItem,
   InputLabel,
 } from '@mui/material';
-import { DataGrid, type GridColDef } from '@mui/x-data-grid';
+import { DataGrid, type GridColDef, type GridSortModel } from '@mui/x-data-grid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useSourceStore } from '../stores/sourceStore';
@@ -40,6 +41,18 @@ export default function LiveStreams() {
   const [view, setView] = useState<ViewMode>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [streamId, setStreamId] = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [sortModel, setSortModel] = useState<GridSortModel>([]);
+  const [addedDateFrom, setAddedDateFrom] = useState('');
+  const [addedDateTo, setAddedDateTo] = useState('');
+  const [createdDateFrom, setCreatedDateFrom] = useState('');
+  const [createdDateTo, setCreatedDateTo] = useState('');
+  const [updateDateFrom, setUpdateDateFrom] = useState('');
+  const [updateDateTo, setUpdateDateTo] = useState('');
+  const [releaseDateFrom, setReleaseDateFrom] = useState('');
+  const [releaseDateTo, setReleaseDateTo] = useState('');
+  const [ratingMin, setRatingMin] = useState('');
+  const [ratingMax, setRatingMax] = useState('');
   const [allowDenyFilter, setAllowDenyFilter] = useState<'allow' | 'deny' | 'default' | 'all'>('all');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -72,13 +85,45 @@ export default function LiveStreams() {
   // Debounce the search query so API is only called after user stops typing
   const debouncedSearchQuery = useDebounce(searchQuery); // use default delay
 
+  const sort = sortModel[0];
+  const queryOptions = {
+    sortBy: sort?.field as 'addedDate' | 'createdAt' | 'updatedAt' | 'releaseDate' | 'rating' | 'tmdb' | undefined,
+    sortDir: sort?.sort as 'asc' | 'desc' | undefined,
+    addedDateFrom: addedDateFrom || undefined,
+    addedDateTo: addedDateTo || undefined,
+    createdDateFrom: createdDateFrom || undefined,
+    createdDateTo: createdDateTo || undefined,
+    updateDateFrom: updateDateFrom || undefined,
+    updateDateTo: updateDateTo || undefined,
+    releaseDateFrom: releaseDateFrom || undefined,
+    releaseDateTo: releaseDateTo || undefined,
+    ratingMin: ratingMin !== '' ? Number(ratingMin) : undefined,
+    ratingMax: ratingMax !== '' ? Number(ratingMax) : undefined,
+  };
+
   // Fetch live streams with optional category filter, search, and stream_id
   const { data: streamsData, isLoading: isLoadingStreams, error: streamsError } = useQuery({
-    queryKey: ['streams-live', sourceId, selectedCategoryId, page, limit, debouncedSearchQuery, streamId],
+    queryKey: [
+      'streams-live',
+      sourceId,
+      selectedCategoryId,
+      page,
+      limit,
+      debouncedSearchQuery,
+      streamId,
+      queryOptions,
+    ],
     queryFn: () => {
       if (!sourceId) return Promise.resolve(null);
-      // Only use debouncedSearchQuery here
-      return streamsApi.getLiveStreams(sourceId, selectedCategoryId || undefined, page, limit, debouncedSearchQuery || undefined, streamId || undefined);
+      return streamsApi.getLiveStreams(
+        sourceId,
+        selectedCategoryId || undefined,
+        page,
+        limit,
+        debouncedSearchQuery || undefined,
+        streamId || undefined,
+        queryOptions
+      );
     },
     enabled: isAuthenticated && sourceId !== null,
   });
@@ -106,6 +151,21 @@ export default function LiveStreams() {
     });
   }
 
+  if (queryOptions.tmdbMin !== undefined || queryOptions.tmdbMax !== undefined) {
+    streams = streams.filter((stream) => {
+      if (stream.tmdb === null || stream.tmdb === undefined) {
+        return false;
+      }
+      if (queryOptions.tmdbMin !== undefined && stream.tmdb < queryOptions.tmdbMin) {
+        return false;
+      }
+      if (queryOptions.tmdbMax !== undefined && stream.tmdb > queryOptions.tmdbMax) {
+        return false;
+      }
+      return true;
+    });
+  }
+
   // Debug logging
   if (selectedCategoryId !== null) {
     console.log('Live streams filtered by category', selectedCategoryId, ':', streams.length, streams);
@@ -124,6 +184,13 @@ export default function LiveStreams() {
     return categories[categoryId] || `Category ${categoryId}`;
   };
 
+  const asRecord = (value: unknown): Record<string, unknown> | null => {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+    return value as Record<string, unknown>;
+  };
+
   const columns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 50 },
     { field: 'num', headerName: 'Order', width: 60 },
@@ -140,20 +207,23 @@ export default function LiveStreams() {
       headerName: 'Icon',
       width: 100,
       renderCell: (params) => {
-        let dataObj: Record<string, any> | null = null;
+        let dataObj: Record<string, unknown> | null = null;
         const data = params.row.data;
         if (data) {
           if (typeof data === 'string') {
             try {
-              dataObj = JSON.parse(data);
+              dataObj = asRecord(JSON.parse(data));
             } catch {
               dataObj = null;
             }
           } else {
-            dataObj = data as Record<string, any>;
+            dataObj = asRecord(data);
           }
         }
-        const iconUrl = dataObj?.stream_icon || dataObj?.cover;
+        const iconUrl =
+          (typeof dataObj?.stream_icon === 'string' && dataObj.stream_icon) ||
+          (typeof dataObj?.cover === 'string' && dataObj.cover) ||
+          null;
         return iconUrl ? (
           <Box
             component="img"
@@ -177,6 +247,12 @@ export default function LiveStreams() {
       renderCell: (params) => (params.value ? <Chip label="Adult" color="error" size="small" /> : '—'),
     },
     {
+      field: 'addedDate',
+      headerName: 'Added Date',
+      width: 130,
+      renderCell: (params) => params.value || '—',
+    },
+    {
       field: 'createdAt',
       headerName: 'Created',
       width: 140,
@@ -184,6 +260,33 @@ export default function LiveStreams() {
         const date = new Date(params.value);
         return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
       },
+    },
+    {
+      field: 'updatedAt',
+      headerName: 'Updated',
+      width: 140,
+      renderCell: (params) => {
+        const date = new Date(params.value);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      },
+    },
+    {
+      field: 'releaseDate',
+      headerName: 'Release Date',
+      width: 140,
+      renderCell: (params) => params.value || '—',
+    },
+    {
+      field: 'rating',
+      headerName: 'Rating',
+      width: 90,
+      renderCell: (params) => (params.value ?? '—'),
+    },
+    {
+      field: 'tmdb',
+      headerName: 'TMDB',
+      width: 110,
+      renderCell: (params) => (params.value ?? '—'),
     },
     {
       field: 'allowDeny',
@@ -326,9 +429,99 @@ export default function LiveStreams() {
                   <MenuItem value="default">Default</MenuItem>
                 </Select>
               </FormControl>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setShowAdvancedFilters((current) => !current)}
+              >
+                {showAdvancedFilters ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
+              </Button>
             </>
           )}
         </Box>
+
+        {sourceId && showAdvancedFilters && (
+          <Box sx={{ mt: 2, display: 'grid', gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', gap: 1.5 }}>
+            <TextField
+              label="Added From"
+              type="date"
+              value={addedDateFrom}
+              onChange={(e) => { setAddedDateFrom(e.target.value); setPage(1); }}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="Added To"
+              type="date"
+              value={addedDateTo}
+              onChange={(e) => { setAddedDateTo(e.target.value); setPage(1); }}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="Created From"
+              type="date"
+              value={createdDateFrom}
+              onChange={(e) => { setCreatedDateFrom(e.target.value); setPage(1); }}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="Created To"
+              type="date"
+              value={createdDateTo}
+              onChange={(e) => { setCreatedDateTo(e.target.value); setPage(1); }}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="Updated From"
+              type="date"
+              value={updateDateFrom}
+              onChange={(e) => { setUpdateDateFrom(e.target.value); setPage(1); }}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="Updated To"
+              type="date"
+              value={updateDateTo}
+              onChange={(e) => { setUpdateDateTo(e.target.value); setPage(1); }}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="Release From"
+              type="date"
+              value={releaseDateFrom}
+              onChange={(e) => { setReleaseDateFrom(e.target.value); setPage(1); }}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="Release To"
+              type="date"
+              value={releaseDateTo}
+              onChange={(e) => { setReleaseDateTo(e.target.value); setPage(1); }}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="Rating Min"
+              type="number"
+              value={ratingMin}
+              onChange={(e) => { setRatingMin(e.target.value); setPage(1); }}
+              size="small"
+            />
+            <TextField
+              label="Rating Max"
+              type="number"
+              value={ratingMax}
+              onChange={(e) => { setRatingMax(e.target.value); setPage(1); }}
+              size="small"
+            />
+          </Box>
+        )}
       </Card>
 
       {/* Main Content with Optional Sidebar */}
@@ -378,6 +571,12 @@ export default function LiveStreams() {
                 <DataGrid
                   rows={streams}
                   columns={columns}
+                  sortingMode="server"
+                  sortModel={sortModel}
+                  onSortModelChange={(model) => {
+                    setSortModel(model);
+                    setPage(1);
+                  }}
                   pageSizeOptions={[10, 20, 50]}
                   disableSelectionOnClick
                   onRowClick={(params) => navigate(`/streams/${params.row.id}/live`)}
@@ -387,7 +586,7 @@ export default function LiveStreams() {
                   }}
                   initialState={{
                     pagination: { paginationModel: { pageSize: limit } },
-                    columns: { columnVisibilityModel: { num: false, is_adult: false, icon: true } },
+                    columns: { columnVisibilityModel: { num: false, isAdult: false, addedDate: false, releaseDate: false, rating: false, tmdb: false } },
                   }}
                 />
               </Box>
@@ -485,6 +684,12 @@ export default function LiveStreams() {
                 <DataGrid
                   rows={streams}
                   columns={columns}
+                  sortingMode="server"
+                  sortModel={sortModel}
+                  onSortModelChange={(model) => {
+                    setSortModel(model);
+                    setPage(1);
+                  }}
                   pageSizeOptions={[10, 20, 50]}
                   disableSelectionOnClick
                   onRowClick={(params) => navigate(`/streams/${params.row.id}/live`)}
