@@ -32,26 +32,45 @@ jobs:
             platform: linux/amd64
             arch: amd64
             variant: sqlite
+            graalvmVersion: '21'
             fullJdbcDrivers: 'false'
             tagSuffix: ''
           - os: ubuntu-latest
             platform: linux/amd64
             arch: amd64
             variant: full
+            graalvmVersion: '21'
             fullJdbcDrivers: 'true'
             tagSuffix: '-full'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
             variant: sqlite
+            graalvmVersion: '21'
             fullJdbcDrivers: 'false'
             tagSuffix: ''
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
             variant: full
+            graalvmVersion: '21'
             fullJdbcDrivers: 'true'
             tagSuffix: '-full'
+          # GraalVM 25 optimized variants (SQLite only, memory optimized)
+          - os: ubuntu-latest
+            platform: linux/amd64
+            arch: amd64
+            variant: sqlite
+            graalvmVersion: '25'
+            fullJdbcDrivers: 'false'
+            tagSuffix: '-25'
+          - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
+            platform: linux/arm64
+            arch: arm64
+            variant: sqlite
+            graalvmVersion: '25'
+            fullJdbcDrivers: 'false'
+            tagSuffix: '-25'
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -77,12 +96,12 @@ jobs:
           npm ci
           npm run build:java
 
-      # 3. Setup JDK 21 with Gradle cache
-      - name: Setup JDK 21
+      # 3. Setup JDK 21 or GraalVM 25 based on matrix configuration
+      - name: Setup JDK ${{ matrix.graalvmVersion }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '${{ matrix.graalvmVersion }}'
           cache: 'gradle'
 
       - name: Grant execute permission for gradlew
@@ -119,10 +138,15 @@ jobs:
       # 7. Build and push arch-specific image (push builds only)
       #    Step 1: compile the native binary (no container-image flags — just produce the runner).
       #    Step 2: build & push the Docker image ourselves so the build context is unambiguous.
-      - name: Compile native binary (${{ matrix.arch }} / ${{ matrix.variant }})
+      - name: Compile native binary (${{ matrix.arch }} / ${{ matrix.variant }}{{ matrix.graalvmVersion == '25' && ' / GraalVM-25-optimized' || '' }})
         if: github.event_name != 'pull_request'
         run: |
           export GRADLE_OPTS="-Xmx2g"
+          # GraalVM 25 specific optimizations for minimum memory footprint
+          NATIVE_OPTS=""
+          if [[ "${{ matrix.graalvmVersion }}" == "25" ]]; then
+            NATIVE_OPTS="-Dquarkus.native.additional-build-args=-H:+UnlockExperimentalVMOptions,-H:HeapStrategies=adaptive,-H:ImageHeapOffsetInAddressSpace=0,-H:+InlineAllBoolean"
+          fi
           ./gradlew build \
             -x test \
             -PbuildingNativeImage \
@@ -132,6 +156,7 @@ jobs:
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.compression.level=9 \
             "-Dquarkus.native.container-runtime-options=--memory=3g" \
+            ${NATIVE_OPTS} \
             --no-daemon
         working-directory: back
 
@@ -149,10 +174,15 @@ jobs:
             back/build/
 
       # 8. PR: build only (no push), amd64 only to keep CI fast
-      - name: Compile native binary (PR / amd64 / ${{ matrix.variant }})
+      - name: Compile native binary (PR / amd64 / ${{ matrix.variant }}{{ matrix.graalvmVersion == '25' && ' / GraalVM-25-optimized' || '' }})
         if: github.event_name == 'pull_request' && matrix.arch == 'amd64'
         run: |
           export GRADLE_OPTS="-Xmx2g"
+          # GraalVM 25 specific optimizations for minimum memory footprint
+          NATIVE_OPTS=""
+          if [[ "${{ matrix.graalvmVersion }}" == "25" ]]; then
+            NATIVE_OPTS="-Dquarkus.native.additional-build-args=-H:+UnlockExperimentalVMOptions,-H:HeapStrategies=adaptive,-H:ImageHeapOffsetInAddressSpace=0,-H:+InlineAllBoolean"
+          fi
           ./gradlew build \
             -x test \
             -PbuildingNativeImage \
@@ -162,6 +192,7 @@ jobs:
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.compression.level=9 \
             "-Dquarkus.native.container-runtime-options=--memory=3g" \
+            ${NATIVE_OPTS} \
             --no-daemon
         working-directory: back
 
@@ -233,6 +264,16 @@ jobs:
             -t "${BASE}:${TAG}-full" \
             "${BASE}:${TAG}-full-amd64" \
             "${BASE}:${TAG}-full-arm64"
+
+      # Combine arch-specific GraalVM 25 SQLite images into a single multi-arch manifest (-25 suffix)
+      - name: Create and push multi-arch manifest (GraalVM 25 / sqlite / -25)
+        run: |
+          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
+          TAG="${{ steps.tag.outputs.tag }}"
+          docker buildx imagetools create \
+            -t "${BASE}:${TAG}-25" \
+            "${BASE}:${TAG}-25-amd64" \
+            "${BASE}:${TAG}-25-arm64"
 
       # Build single-layer VFS variant on top of the merged manifest
       - name: Build and push VFS image
