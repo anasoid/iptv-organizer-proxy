@@ -52,6 +52,7 @@ import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
 import org.anasoid.iptvorganizer.models.http.ProxyOptions;
 import org.anasoid.iptvorganizer.models.http.RedirectCheckResult;
 import org.anasoid.iptvorganizer.models.monitor.JvmMetricsEntry;
+import org.anasoid.iptvorganizer.models.monitor.ThreadInfo;
 import org.anasoid.iptvorganizer.services.DatabaseMaintenanceService;
 
 /**
@@ -132,6 +133,7 @@ import org.anasoid.iptvorganizer.services.DatabaseMaintenanceService;
       // ── History / metrics ─────────────────────────────────────────────────
       StreamHistoryEntry.class,
       JvmMetricsEntry.class,
+      ThreadInfo.class,
 
       // ── HTTP / proxy helpers ──────────────────────────────────────────────
       HttpOptions.class,

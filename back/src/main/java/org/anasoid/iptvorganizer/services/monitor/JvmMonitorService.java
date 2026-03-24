@@ -192,10 +192,41 @@ public class JvmMonitorService {
    * states map directly to {@link java.lang.Thread.State} names (e.g. {@code "RUNNABLE"}, {@code
    * "BLOCKED"}, {@code "WAITING"}, {@code "TIMED_WAITING"}).
    *
-   * @return list of {@link ThreadInfo}; never {@code null} but may be empty when the {@link
-   *     ThreadMXBean} is unavailable.
+   * @return list of {@link ThreadInfo}; never {@code null} but may be empty only when both the
+   *     Thread API and {@link ThreadMXBean} are unavailable.
    */
   public List<ThreadInfo> getThreads() {
+    // Native images can limit ThreadMXBean detail APIs. Thread#getAllStackTraces is the most
+    // portable source and includes daemon/priority directly.
+    List<ThreadInfo> result = getThreadsFromThreadApi();
+    if (result.isEmpty()) {
+      result = getThreadsFromMxBean();
+    }
+    result.sort(Comparator.comparing(ThreadInfo::getName));
+    return result;
+  }
+
+  private List<ThreadInfo> getThreadsFromThreadApi() {
+    List<ThreadInfo> result = new ArrayList<>();
+    List<Thread> threads =
+        safeCall("thread snapshot", () -> new ArrayList<>(Thread.getAllStackTraces().keySet()), List.of());
+    for (Thread thread : threads) {
+      if (thread == null) {
+        continue;
+      }
+      result.add(
+          ThreadInfo.builder()
+              .id(thread.threadId())
+              .name(thread.getName())
+              .state(thread.getState().name())
+              .daemon(thread.isDaemon())
+              .priority(thread.getPriority())
+              .build());
+    }
+    return result;
+  }
+
+  private List<ThreadInfo> getThreadsFromMxBean() {
     ThreadMXBean threadBean = safeCall("thread bean", ManagementFactory::getThreadMXBean, null);
     if (threadBean == null) {
       return List.of();
@@ -208,7 +239,9 @@ public class JvmMonitorService {
     }
     List<ThreadInfo> result = new ArrayList<>();
     for (java.lang.management.ThreadInfo info : rawInfos) {
-      if (info == null) continue;
+      if (info == null) {
+        continue;
+      }
       result.add(
           ThreadInfo.builder()
               .id(info.getThreadId())
@@ -218,7 +251,6 @@ public class JvmMonitorService {
               .priority(info.getPriority())
               .build());
     }
-    result.sort(Comparator.comparing(ThreadInfo::getName));
     return result;
   }
 
