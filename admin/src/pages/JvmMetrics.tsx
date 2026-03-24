@@ -180,10 +180,18 @@ interface MetricChartProps {
   lines: ChartLine[];
   yFormatter?: (v: number) => string;
   height?: number;
+  defaultHiddenKeys?: string[];
 }
-function MetricChart({ title, data, lines, yFormatter, height = 220 }: MetricChartProps) {
+function MetricChart({
+  title,
+  data,
+  lines,
+  yFormatter,
+  height = 220,
+  defaultHiddenKeys = [],
+}: MetricChartProps) {
   const fmt = yFormatter ?? ((v: number) => String(v));
-  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
+  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => new Set(defaultHiddenKeys));
 
   const handleLegendClick = (entry: { dataKey?: unknown }) => {
     const key = entry.dataKey as string;
@@ -475,6 +483,7 @@ export default function JvmMetrics() {
                 { key: 'virtualMem', name: 'VSZ (virtual)', color: '#bdbdbd' },
               ]}
               yFormatter={mb}
+              defaultHiddenKeys={['virtualMem']}
             />
           </Grid>
           {/* 5 – Host memory */}
