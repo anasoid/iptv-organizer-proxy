@@ -295,7 +295,7 @@ export default function CacheStats() {
                     </TableCell>
                     <TableCell align="right">{formatNumber(stat.size)}</TableCell>
                     <TableCell align="right">
-                      {stat.maxSize === 0 ? '∞' : formatNumber(stat.maxSize)}
+                      {formatNumber(stat.maxSize)}
                     </TableCell>
                     <TableCell align="right">{formatNumber(stat.hits)}</TableCell>
                     <TableCell align="right">{formatNumber(stat.misses)}</TableCell>
