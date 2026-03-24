@@ -15,13 +15,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 public class InMemoryTokenService {
 
   private static final int TOKEN_SIZE_BYTES = 48;
-
-  // Use lazy initialization pattern to avoid SecureRandom instantiation at compile time
-  private static class SecureRandomHolder {
-    static final SecureRandom INSTANCE = new SecureRandom();
-  }
-
-  // ...existing code...
+  private final SecureRandom secureRandom = new SecureRandom();
 
   private final ConcurrentMap<String, TokenSession> tokenStore = new ConcurrentHashMap<>();
 
@@ -73,9 +67,9 @@ public class InMemoryTokenService {
     }
   }
 
-  private static String generateTokenValue() {
+  private String generateTokenValue() {
     byte[] bytes = new byte[TOKEN_SIZE_BYTES];
-    SecureRandomHolder.INSTANCE.nextBytes(bytes);
+    secureRandom.nextBytes(bytes);
     return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
   }
 

@@ -145,7 +145,7 @@ jobs:
           # GraalVM 25 specific optimizations for minimum memory footprint
           NATIVE_OPTS=""
           if [[ "${{ matrix.graalvmVersion }}" == "25" ]]; then
-            NATIVE_OPTS="-Dquarkus.native.additional-build-args=-H:+UnlockExperimentalVMOptions,-H:HeapStrategies=adaptive,-H:ImageHeapOffsetInAddressSpace=0,-H:+InlineAllBoolean"
+            NATIVE_OPTS="-Dquarkus.native.additional-build-args-append=-H:+UnlockExperimentalVMOptions,-H:HeapStrategies=adaptive,-H:ImageHeapOffsetInAddressSpace=0,-H:+InlineAllBoolean"
           fi
           ./gradlew build \
             -x test \
@@ -181,7 +181,7 @@ jobs:
           # GraalVM 25 specific optimizations for minimum memory footprint
           NATIVE_OPTS=""
           if [[ "${{ matrix.graalvmVersion }}" == "25" ]]; then
-            NATIVE_OPTS="-Dquarkus.native.additional-build-args=-H:+UnlockExperimentalVMOptions,-H:HeapStrategies=adaptive,-H:ImageHeapOffsetInAddressSpace=0,-H:+InlineAllBoolean"
+            NATIVE_OPTS="-Dquarkus.native.additional-build-args-append=-H:+UnlockExperimentalVMOptions,-H:HeapStrategies=adaptive,-H:ImageHeapOffsetInAddressSpace=0,-H:+InlineAllBoolean"
           fi
           ./gradlew build \
             -x test \
