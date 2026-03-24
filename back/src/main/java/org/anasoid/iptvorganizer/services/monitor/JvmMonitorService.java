@@ -209,7 +209,10 @@ public class JvmMonitorService {
   private List<ThreadInfo> getThreadsFromThreadApi() {
     List<ThreadInfo> result = new ArrayList<>();
     List<Thread> threads =
-        safeCall("thread snapshot", () -> new ArrayList<>(Thread.getAllStackTraces().keySet()), List.of());
+        safeCall(
+            "thread snapshot",
+            () -> new ArrayList<>(Thread.getAllStackTraces().keySet()),
+            List.of());
     for (Thread thread : threads) {
       if (thread == null) {
         continue;
