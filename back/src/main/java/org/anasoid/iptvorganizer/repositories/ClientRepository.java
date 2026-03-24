@@ -174,7 +174,9 @@ public class ClientRepository extends BaseRepository<Client> {
       stmt.setString(1, username);
       try (ResultSet rs = stmt.executeQuery()) {
         Client client = rs.next() ? mapRow(rs) : null;
-        getCache().put(username, client.getId(), client);
+        if (client != null) {
+          getCache().put(username, client.getId(), client);
+        }
         return client;
       }
     } catch (SQLException e) {
