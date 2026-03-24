@@ -10,8 +10,6 @@ FROM scratch
 
 COPY --from=base / /
 
-WORKDIR /work/
-
 VOLUME ["/app/data"]
 EXPOSE 8080
 
