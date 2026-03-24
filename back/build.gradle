@@ -95,7 +95,7 @@ spotless {
 // PMD Configuration
 pmd {
     ignoreFailures = false
-    toolVersion = '7.0.0'
+    toolVersion = '7.5.0'
 }
 
 pmdMain {
