@@ -33,7 +33,6 @@ jobs:
             arch: amd64
             variant: sqlite
             graalvmVersion: '25'
-            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-25
             fullJdbcDrivers: 'false'
             tagSuffix: ''
           - os: ubuntu-latest
@@ -41,7 +40,6 @@ jobs:
             arch: amd64
             variant: full
             graalvmVersion: '25'
-            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-25
             fullJdbcDrivers: 'true'
             tagSuffix: '-full'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
@@ -49,7 +47,6 @@ jobs:
             arch: arm64
             variant: sqlite
             graalvmVersion: '25'
-            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-25
             fullJdbcDrivers: 'false'
             tagSuffix: ''
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
@@ -57,7 +54,6 @@ jobs:
             arch: arm64
             variant: full
             graalvmVersion: '25'
-            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-25
             fullJdbcDrivers: 'true'
             tagSuffix: '-full'
     runs-on: ${{ matrix.os }}
@@ -100,10 +96,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Verify native builder image exists so -25 never silently falls back to -21
-      - name: Verify native builder image
-        run: docker manifest inspect "${{ matrix.nativeBuilderImage }}" >/dev/null
-
       # 5. Login to GHCR (skip on PRs)
       - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
@@ -135,7 +127,6 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           export GRADLE_OPTS="-Xmx2g"
-          BUILDER_IMAGE_OPT="-Dquarkus.native.builder-image=${{ matrix.nativeBuilderImage }}"
           NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
           ./gradlew build \
             -x test \
@@ -146,7 +137,6 @@ jobs:
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.compression.level=9 \
             "-Dquarkus.native.container-runtime-options=--memory=3g" \
-            ${BUILDER_IMAGE_OPT} \
             ${NATIVE_XMX_OPT} \
             --no-daemon
         working-directory: back
@@ -169,7 +159,6 @@ jobs:
         if: github.event_name == 'pull_request' && matrix.arch == 'amd64'
         run: |
           export GRADLE_OPTS="-Xmx2g"
-          BUILDER_IMAGE_OPT="-Dquarkus.native.builder-image=${{ matrix.nativeBuilderImage }}"
           NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
           ./gradlew build \
             -x test \
@@ -180,7 +169,6 @@ jobs:
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.compression.level=9 \
             "-Dquarkus.native.container-runtime-options=--memory=3g" \
-            ${BUILDER_IMAGE_OPT} \
             ${NATIVE_XMX_OPT} \
             --no-daemon
         working-directory: back
