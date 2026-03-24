@@ -28,19 +28,17 @@ type OrderBy = 'cacheName' | 'size' | 'maxSize' | 'hits' | 'misses' | 'hitRate' 
 type Order = 'asc' | 'desc';
 
 export default function CacheStats() {
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [orderBy, setOrderBy] = useState<OrderBy>('cacheName');
   const [order, setOrder] = useState<Order>('asc');
   const [shrinkResult, setShrinkResult] = useState<DatabaseShrinkResult | null>(null);
   const [shrinkErrorMessage, setShrinkErrorMessage] = useState<string | null>(null);
 
   const { data: cacheStats, isLoading, error, refetch } = useQuery({
-    queryKey: ['cacheStats', lastRefresh],
+    queryKey: ['cacheStats'],
     queryFn: () => cacheApi.getCacheStats(),
   });
 
   const handleRefresh = () => {
-    setLastRefresh(new Date());
     refetch();
   };
 
