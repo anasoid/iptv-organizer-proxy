@@ -93,14 +93,19 @@ spotless {
 }
 
 // PMD Configuration
+// Note: PMD has incomplete Java 25 bytecode support even with latest versions.
+// We skip PMD for Java 25 builds but keep it for Java 21 (production default).
 pmd {
     ignoreFailures = false
     toolVersion = '7.8.0'
 }
 
+def isJava25 = JavaVersion.current() >= JavaVersion.VERSION_25
+
 pmdMain {
+    enabled = !isJava25
     ruleSets = [file('pmd-rules.xml').absolutePath]
-    ignoreFailures = true  // Report violations but don't fail build - can be strictened gradually
+    ignoreFailures = !isJava25  // PMD disabled for Java 25; report violations for Java 21
     reports {
         xml.required = true
         html.required = true
@@ -109,8 +114,9 @@ pmdMain {
 }
 
 pmdTest {
+    enabled = !isJava25
     ruleSets = [file('pmd-rules.xml').absolutePath]
-    ignoreFailures = true  // Test code often has acceptable violations
+    ignoreFailures = !isJava25  // PMD disabled for Java 25; report violations for Java 21
     reports {
         xml.required = true
         html.required = true
