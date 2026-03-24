@@ -153,9 +153,24 @@ public class TunnelUtils {
    * @param source The source
    * @return Configured HttpOptions
    */
-  public HttpOptions.HttpOptionsBuilder buildHttpOptions(Client client, Source source) {
+  public HttpOptions buildHttpOptions(Client client, Source source) {
 
     return streamProxyHttpClient.buildHttpOptions(client, source);
+  }
+
+  /**
+   * Build HTTP options with runtime overrides.
+   *
+   * @param client The client
+   * @param source The source
+   * @param timeout Timeout in milliseconds (null uses default)
+   * @param followRedirects Follow redirects flag (null uses default)
+   * @return Configured HttpOptions
+   */
+  public HttpOptions buildHttpOptions(
+      Client client, Source source, Long timeout, Boolean followRedirects) {
+
+    return streamProxyHttpClient.buildHttpOptions(client, source, timeout, followRedirects);
   }
 
   /**

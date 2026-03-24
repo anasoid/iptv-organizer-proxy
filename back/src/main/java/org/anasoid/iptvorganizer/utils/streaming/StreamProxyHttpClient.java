@@ -165,8 +165,26 @@ public class StreamProxyHttpClient {
    * @param source The source
    * @return Configured HttpOptions
    */
-  public HttpOptions.HttpOptionsBuilder buildHttpOptions(Client client, Source source) {
-    return HttpOptions.builder().timeout(300000L).maxRetries(1).followRedirects(true);
+  public HttpOptions buildHttpOptions(Client client, Source source) {
+    return buildHttpOptions(client, source, null, null);
+  }
+
+  /**
+   * Build HTTP options with runtime overrides.
+   *
+   * @param client The client
+   * @param source The source
+   * @param timeout Timeout in milliseconds (null uses default)
+   * @param followRedirects Follow redirects flag (null uses default)
+   * @return Configured HttpOptions
+   */
+  public HttpOptions buildHttpOptions(
+      Client client, Source source, Long timeout, Boolean followRedirects) {
+    return HttpOptions.builder()
+        .timeout(timeout != null ? timeout : 300000L)
+        .maxRetries(1)
+        .followRedirects(followRedirects != null ? followRedirects : true)
+        .build();
   }
 
   /**

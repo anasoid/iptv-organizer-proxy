@@ -80,7 +80,7 @@ public class ProxyController {
           new HttpRequestDto(decodedUrl, RequestType.STREAM, httpHeaders),
           client,
           source,
-          tunnelUtils.buildHttpOptions(client, source).followRedirects(true).build(),
+          tunnelUtils.buildHttpOptions(client, source, null, true),
           tunnelUtils.buildProxyOptions(client, source));
 
     } catch (UnauthorizedException ex) {
