@@ -11,7 +11,7 @@
 #   ./gradlew build -Dquarkus.native.enabled=true
 #   docker build -f src/main/docker/Dockerfile.native -t quarkus/iptv-organizer-proxy build/
 ###
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.3
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7
 WORKDIR /work/
 
 RUN chown 1001 /work \
