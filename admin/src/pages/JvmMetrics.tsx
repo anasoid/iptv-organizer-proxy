@@ -13,6 +13,12 @@ import {
   CircularProgress,
   Alert,
   Tooltip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import { Refresh as RefreshIcon } from '@mui/icons-material';
 import {
@@ -25,7 +31,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import jvmMetricsApi, { type JvmMetricsEntry } from '../services/jvmMetricsApi';
+import jvmMetricsApi, { type JvmMetricsEntry, type ThreadInfo } from '../services/jvmMetricsApi';
 // ---------------------------------------------------------------------------
 // Time range helpers
 // ---------------------------------------------------------------------------
@@ -57,6 +63,107 @@ function fmtUptime(seconds: number): string {
 // Map -1 (unavailable) to null so Recharts skips those points.
 function avail(v: number): number | null {
   return v < 0 ? null : v;
+}
+
+// Thread state → MUI Chip color
+type ChipColor = 'default' | 'success' | 'error' | 'warning' | 'info' | 'primary' | 'secondary';
+function threadStateColor(state: string): ChipColor {
+  switch (state) {
+    case 'RUNNABLE':     return 'success';
+    case 'BLOCKED':      return 'error';
+    case 'WAITING':      return 'warning';
+    case 'TIMED_WAITING': return 'info';
+    case 'NEW':          return 'default';
+    case 'TERMINATED':   return 'secondary';
+    default:             return 'default';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Thread list table
+// ---------------------------------------------------------------------------
+interface ThreadTableProps {
+  threads: ThreadInfo[];
+  isLoading: boolean;
+  error: unknown;
+  onRefresh: () => void;
+}
+function ThreadTable({ threads, isLoading, error, onRefresh }: ThreadTableProps) {
+  return (
+    <Paper sx={{ p: 2, mt: 3 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+        <Typography variant="subtitle1" fontWeight="bold">
+          Current Threads ({threads.length})
+        </Typography>
+        <Tooltip title="Refresh threads">
+          <IconButton size="small" onClick={onRefresh}>
+            <RefreshIcon />
+          </IconButton>
+        </Tooltip>
+      </Box>
+      {isLoading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+          <CircularProgress size={24} />
+        </Box>
+      )}
+      {error && (
+        <Alert severity="error" sx={{ mb: 1 }}>
+          Failed to load thread list.
+        </Alert>
+      )}
+      {!isLoading && !error && (
+        <TableContainer sx={{ maxHeight: 480 }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                <TableCell>ID</TableCell>
+                <TableCell>Name</TableCell>
+                <TableCell>State</TableCell>
+                <TableCell>Daemon</TableCell>
+                <TableCell align="right">Priority</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {threads.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} align="center" sx={{ color: 'text.secondary' }}>
+                    No thread data available.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                threads.map((t) => (
+                  <TableRow key={t.id} hover>
+                    <TableCell sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
+                      {t.id}
+                    </TableCell>
+                    <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.78rem', wordBreak: 'break-all' }}>
+                      {t.name}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={t.state}
+                        color={threadStateColor(t.state)}
+                        size="small"
+                        sx={{ fontFamily: 'monospace', fontSize: '0.7rem' }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {t.daemon ? (
+                        <Chip label="daemon" size="small" variant="outlined" />
+                      ) : (
+                        <Chip label="user" size="small" color="primary" variant="outlined" />
+                      )}
+                    </TableCell>
+                    <TableCell align="right">{t.priority}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </Paper>
+  );
 }
 // ---------------------------------------------------------------------------
 // Reusable chart component
@@ -161,6 +268,7 @@ export default function JvmMetrics() {
   const [rangeMinutes, setRangeMinutes] = useState(60);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshSeed, setRefreshSeed] = useState(0);
+  const [threadRefreshSeed, setThreadRefreshSeed] = useState(0);
   const fetchMetrics = useCallback(() => {
     const end = new Date();
     const start = new Date(end.getTime() - rangeMinutes * 60 * 1000);
@@ -169,6 +277,15 @@ export default function JvmMetrics() {
   const { data: raw, isLoading, error } = useQuery({
     queryKey: ['jvmMetrics', rangeMinutes, refreshSeed],
     queryFn: fetchMetrics,
+    refetchInterval: autoRefresh ? 60_000 : false,
+  });
+  const {
+    data: threads = [],
+    isLoading: threadsLoading,
+    error: threadsError,
+  } = useQuery({
+    queryKey: ['jvmThreads', threadRefreshSeed],
+    queryFn: () => jvmMetricsApi.getThreads(),
     refetchInterval: autoRefresh ? 60_000 : false,
   });
   const entries: JvmMetricsEntry[] = raw ?? [];
@@ -232,7 +349,7 @@ export default function JvmMetrics() {
             label={<Typography variant="body2">Auto-refresh (1 min)</Typography>}
           />
           <Tooltip title="Refresh now">
-            <IconButton size="small" onClick={() => setRefreshSeed((s) => s + 1)}>
+            <IconButton size="small" onClick={() => { setRefreshSeed((s) => s + 1); setThreadRefreshSeed((s) => s + 1); }}>
               <RefreshIcon />
             </IconButton>
           </Tooltip>
@@ -408,6 +525,13 @@ export default function JvmMetrics() {
           </Grid>
         </Grid>
       )}
+      {/* ── Thread list ─────────────────────────────────────────────────── */}
+      <ThreadTable
+        threads={threads}
+        isLoading={threadsLoading}
+        error={threadsError}
+        onRefresh={() => setThreadRefreshSeed((s) => s + 1)}
+      />
     </Box>
   );
 }

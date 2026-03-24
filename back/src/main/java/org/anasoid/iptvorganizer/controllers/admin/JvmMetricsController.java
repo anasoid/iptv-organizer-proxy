@@ -15,6 +15,7 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.monitor.JvmMetricsEntry;
+import org.anasoid.iptvorganizer.models.monitor.ThreadInfo;
 import org.anasoid.iptvorganizer.services.monitor.JvmMonitorService;
 import org.anasoid.iptvorganizer.utils.ResponseUtils;
 
@@ -62,6 +63,22 @@ public class JvmMetricsController extends BaseController {
         start,
         end);
     return ResponseUtils.ok(result);
+  }
+
+  /**
+   * Returns a live snapshot of all JVM threads with their current state.
+   *
+   * <p>{@code GET /api/jvm/metrics/threads}
+   *
+   * <p>The list is sorted alphabetically by thread name and includes id, name, state, daemon flag,
+   * and scheduling priority.
+   */
+  @GET
+  @Path("/threads")
+  public Response getThreads() {
+    List<ThreadInfo> threads = jvmMonitorService.getThreads();
+    log.debug("JVM threads request: returned={}", threads.size());
+    return ResponseUtils.ok(threads);
   }
 
   private LocalDateTime parseQueryDateTime(String value) {

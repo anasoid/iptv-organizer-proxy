@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.monitor.JvmMetricsEntry;
+import org.anasoid.iptvorganizer.models.monitor.ThreadInfo;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
@@ -182,6 +183,43 @@ public class JvmMonitorService {
     } finally {
       rwLock.readLock().unlock();
     }
+  }
+
+  /**
+   * Returns a live snapshot of all JVM threads, sorted by name.
+   *
+   * <p>Each entry holds the thread id, name, state, daemon flag, and scheduling priority. Thread
+   * states map directly to {@link java.lang.Thread.State} names (e.g. {@code "RUNNABLE"}, {@code
+   * "BLOCKED"}, {@code "WAITING"}, {@code "TIMED_WAITING"}).
+   *
+   * @return list of {@link ThreadInfo}; never {@code null} but may be empty when the {@link
+   *     ThreadMXBean} is unavailable.
+   */
+  public List<ThreadInfo> getThreads() {
+    ThreadMXBean threadBean = safeCall("thread bean", ManagementFactory::getThreadMXBean, null);
+    if (threadBean == null) {
+      return List.of();
+    }
+    long[] ids = safeCall("thread ids", threadBean::getAllThreadIds, new long[0]);
+    java.lang.management.ThreadInfo[] rawInfos =
+        safeCall("thread infos", () -> threadBean.getThreadInfo(ids), null);
+    if (rawInfos == null) {
+      return List.of();
+    }
+    List<ThreadInfo> result = new ArrayList<>();
+    for (java.lang.management.ThreadInfo info : rawInfos) {
+      if (info == null) continue;
+      result.add(
+          ThreadInfo.builder()
+              .id(info.getThreadId())
+              .name(info.getThreadName())
+              .state(info.getThreadState() != null ? info.getThreadState().name() : "UNKNOWN")
+              .daemon(info.isDaemon())
+              .priority(info.getPriority())
+              .build());
+    }
+    result.sort(Comparator.comparing(ThreadInfo::getName));
+    return result;
   }
 
   private JvmMetricsEntry collectSnapshot() {

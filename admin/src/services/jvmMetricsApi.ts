@@ -57,6 +57,24 @@ export interface JvmMetricsEntry {
 }
 
 /**
+ * Live snapshot of a single JVM thread returned by GET /api/jvm/metrics/threads.
+ */
+export interface ThreadInfo {
+  /** JVM-assigned thread id — unique within a single JVM lifetime. */
+  id: number;
+  /** Thread name (e.g. "executor-thread-1"). */
+  name: string;
+  /**
+   * Current state: "NEW" | "RUNNABLE" | "BLOCKED" | "WAITING" | "TIMED_WAITING" | "TERMINATED"
+   */
+  state: 'NEW' | 'RUNNABLE' | 'BLOCKED' | 'WAITING' | 'TIMED_WAITING' | 'TERMINATED' | string;
+  /** true for daemon (background JVM) threads. */
+  daemon: boolean;
+  /** Thread scheduling priority (1–10; normal = 5). */
+  priority: number;
+}
+
+/**
  * Format a JS Date as an ISO-8601 timestamp with timezone (UTC "Z").
  * The backend accepts offset timestamps and converts them to server-local
  * time using the same instant, which keeps filtering correct across
@@ -77,6 +95,15 @@ class JvmMetricsApi {
     if (start) params.startDate = toServerDateTime(start);
     if (end) params.endDate = toServerDateTime(end);
     const response = await api.get<{ data: JvmMetricsEntry[] }>('/jvm/metrics', { params });
+    return response.data.data;
+  }
+
+  /**
+   * Fetch a live snapshot of all JVM threads with their current state.
+   * The list is sorted alphabetically by thread name.
+   */
+  async getThreads(): Promise<ThreadInfo[]> {
+    const response = await api.get<{ data: ThreadInfo[] }>('/jvm/metrics/threads');
     return response.data.data;
   }
 }
