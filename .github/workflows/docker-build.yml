@@ -32,43 +32,18 @@ jobs:
             platform: linux/amd64
             arch: amd64
             variant: sqlite
-            graalvmVersion: '21'
-            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21
-            fullJdbcDrivers: 'false'
-            tagSuffix: ''
-          - os: ubuntu-latest
-            platform: linux/amd64
-            arch: amd64
-            variant: full
-            graalvmVersion: '21'
-            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21
-            fullJdbcDrivers: 'true'
-            tagSuffix: '-full'
-          - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
-            platform: linux/arm64
-            arch: arm64
-            variant: sqlite
-            graalvmVersion: '21'
-            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21
-            fullJdbcDrivers: 'false'
-            tagSuffix: ''
-          - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
-            platform: linux/arm64
-            arch: arm64
-            variant: full
-            graalvmVersion: '21'
-            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21
-            fullJdbcDrivers: 'true'
-            tagSuffix: '-full'
-          # GraalVM 25 optimized variants (SQLite only, memory optimized)
-          - os: ubuntu-latest
-            platform: linux/amd64
-            arch: amd64
-            variant: sqlite
             graalvmVersion: '25'
             nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-25
             fullJdbcDrivers: 'false'
-            tagSuffix: '-25'
+            tagSuffix: ''
+          - os: ubuntu-latest
+            platform: linux/amd64
+            arch: amd64
+            variant: full
+            graalvmVersion: '25'
+            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-25
+            fullJdbcDrivers: 'true'
+            tagSuffix: '-full'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
@@ -76,7 +51,15 @@ jobs:
             graalvmVersion: '25'
             nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-25
             fullJdbcDrivers: 'false'
-            tagSuffix: '-25'
+            tagSuffix: ''
+          - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
+            platform: linux/arm64
+            arch: arm64
+            variant: full
+            graalvmVersion: '25'
+            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-25
+            fullJdbcDrivers: 'true'
+            tagSuffix: '-full'
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -102,7 +85,7 @@ jobs:
           npm ci
           npm run build:java
 
-      # 3. Setup JDK 21 or GraalVM 25 based on matrix configuration
+      # 3. Setup JDK 25 based on matrix configuration
       - name: Setup JDK ${{ matrix.graalvmVersion }}
         uses: actions/setup-java@v4
         with:
@@ -148,15 +131,12 @@ jobs:
       # 7. Build and push arch-specific image (push builds only)
       #    Step 1: compile the native binary (no container-image flags — just produce the runner).
       #    Step 2: build & push the Docker image ourselves so the build context is unambiguous.
-      - name: Compile native binary (${{ matrix.arch }} / ${{ matrix.variant }}{{ matrix.graalvmVersion == '25' && ' / GraalVM-25-optimized' || '' }})
+      - name: Compile native binary (${{ matrix.arch }} / ${{ matrix.variant }})
         if: github.event_name != 'pull_request'
         run: |
           export GRADLE_OPTS="-Xmx2g"
           BUILDER_IMAGE_OPT="-Dquarkus.native.builder-image=${{ matrix.nativeBuilderImage }}"
-          NATIVE_XMX_OPT=""
-          if [[ "${{ matrix.graalvmVersion }}" == "25" ]]; then
-            NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
-          fi
+          NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
           ./gradlew build \
             -x test \
             -PbuildingNativeImage \
@@ -185,15 +165,12 @@ jobs:
             back/build/
 
       # 8. PR: build only (no push), amd64 only to keep CI fast
-      - name: Compile native binary (PR / amd64 / ${{ matrix.variant }}{{ matrix.graalvmVersion == '25' && ' / GraalVM-25-optimized' || '' }})
+      - name: Compile native binary (PR / amd64 / ${{ matrix.variant }})
         if: github.event_name == 'pull_request' && matrix.arch == 'amd64'
         run: |
           export GRADLE_OPTS="-Xmx2g"
           BUILDER_IMAGE_OPT="-Dquarkus.native.builder-image=${{ matrix.nativeBuilderImage }}"
-          NATIVE_XMX_OPT=""
-          if [[ "${{ matrix.graalvmVersion }}" == "25" ]]; then
-            NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
-          fi
+          NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
           ./gradlew build \
             -x test \
             -PbuildingNativeImage \
@@ -277,15 +254,6 @@ jobs:
             "${BASE}:${TAG}-full-amd64" \
             "${BASE}:${TAG}-full-arm64"
 
-      # Combine arch-specific GraalVM 25 SQLite images into a single multi-arch manifest (-25 suffix)
-      - name: Create and push multi-arch manifest (GraalVM 25 / sqlite / -25)
-        run: |
-          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
-          TAG="${{ steps.tag.outputs.tag }}"
-          docker buildx imagetools create \
-            -t "${BASE}:${TAG}-25" \
-            "${BASE}:${TAG}-25-amd64" \
-            "${BASE}:${TAG}-25-arm64"
 
       # Build single-layer VFS variant on top of the merged manifest
       - name: Build and push VFS image
@@ -299,19 +267,5 @@ jobs:
             --build-arg BASE_IMAGE="${BASE}:${TAG}" \
             --push \
             --tag "${VFS_TAG}" \
-            .
-
-      # Build single-layer VFS variant on top of the GraalVM 25 manifest (memory-optimized)
-      - name: Build and push VFS image (GraalVM 25 / -25)
-        run: |
-          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
-          TAG="${{ steps.tag.outputs.tag }}"
-          VFS_25_TAG="${BASE}:${TAG}-25-vfs"
-          docker buildx build \
-            --file ./docker/Dockerfile.vfs \
-            --platform linux/amd64,linux/arm64 \
-            --build-arg BASE_IMAGE="${BASE}:${TAG}-25" \
-            --push \
-            --tag "${VFS_25_TAG}" \
             .
 

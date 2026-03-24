@@ -3,7 +3,7 @@
 # Multi-stage Dockerfile for IPTV Organizer Proxy - Quarkus Java Backend
 # Stage 1: Build the Java application
 # Using official Gradle image to avoid downloading Gradle on each build
-FROM gradle:9.2.1-jdk21 AS builder
+FROM gradle:9.2.1-jdk25 AS builder
 
 ARG FULL_DRIVERS=true
 
@@ -27,7 +27,7 @@ RUN gradle build -DskipTests -Dquarkus.package.jar.type=fast-jar --stacktrace  -
     -x pmdMain -x pmdTest -x spotlessCheck -x spotlessJavaCheck
 
 # Stage 2: Runtime image - minimal JVM with Quarkus app
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:25-jre-noble
 
 LABEL maintainer="IPTV Organizer Proxy"
 LABEL description="IPTV Organizer Proxy - Quarkus Java Backend"
