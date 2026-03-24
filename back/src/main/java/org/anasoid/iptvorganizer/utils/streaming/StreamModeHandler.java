@@ -26,7 +26,7 @@ public class StreamModeHandler {
    * @return Response with redirect
    */
   public Response handleRedirectMode(String streamUrl) {
-    return Response.seeOther(URI.create(streamUrl)).build();
+    return Response.status(Response.Status.FOUND).location(URI.create(streamUrl)).build();
   }
 
   /**
@@ -48,7 +48,9 @@ public class StreamModeHandler {
     }
     if (redirectCheck.isRedirect()) {
       log.debug("Returning upstream redirect location: {}", redirectCheck.getLocation());
-      return Response.seeOther(URI.create(redirectCheck.getLocation())).build();
+      return Response.status(Response.Status.FOUND)
+          .location(URI.create(redirectCheck.getLocation()))
+          .build();
     } else {
       log.warn(
           "Upstream does not redirect, cannot hide credentials. Status: {}",
@@ -70,7 +72,7 @@ public class StreamModeHandler {
   public Response handleProxyMode(UriInfo uriInfo, Client client, String streamUrl) {
 
     String proxyUrl = buildProxyUrl(uriInfo, client, streamUrl);
-    return Response.seeOther(URI.create(proxyUrl)).build();
+    return Response.status(Response.Status.FOUND).location(URI.create(proxyUrl)).build();
   }
 
   /**

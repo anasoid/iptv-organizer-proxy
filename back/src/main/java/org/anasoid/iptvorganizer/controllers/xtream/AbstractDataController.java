@@ -78,7 +78,7 @@ public abstract class AbstractDataController {
       case DIRECT -> streamModeHandler.handleDirectMode(request, client, source);
       case PROXY -> streamModeHandler.handleProxyMode(uriInfo, client, request.getUrl());
       case NO_PROXY -> streamModeHandler.handleDirectMode(request, client, source);
-      case DEFAULT -> streamModeHandler.handleProxyMode(uriInfo, client, request.getUrl());
+      case DEFAULT -> streamModeHandler.handleDirectMode(request, client, source);
       default -> streamModeHandler.handleUnknownMode(streamMode.toString());
     };
   }

@@ -73,7 +73,7 @@ public class ProxyController {
 
       // Decode URL
       String decodedUrl = decodeUrl(encodedUrl);
-      log.info("Proxy request - user: {}, decodedUrl: {}", username, decodedUrl);
+      log.debug("Proxy request - user: {}, decodedUrl: {}", username, decodedUrl);
 
       // Stream content from upstream
       return tunnelUtils.streamFromUpstream(

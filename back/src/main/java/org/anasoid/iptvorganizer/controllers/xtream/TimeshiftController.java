@@ -161,7 +161,7 @@ public class TimeshiftController extends AbstractDataController {
       ConnectXtreamStreamMode streamMode,
       UriInfo uriInfo) {
     log.info("Timeshift redirect, mode: {}, url: {}", streamMode, request.getUrl());
-    return Response.seeOther(URI.create(request.getUrl())).build();
+    return Response.status(Response.Status.FOUND).location(URI.create(request.getUrl())).build();
   }
 
   /**

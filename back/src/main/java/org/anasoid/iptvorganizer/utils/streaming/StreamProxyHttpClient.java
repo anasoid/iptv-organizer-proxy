@@ -51,7 +51,7 @@ public class StreamProxyHttpClient {
       HttpOptions options,
       ProxyOptions proxyOptions) {
     String upstreamUrl = request.getUrl();
-    log.info("Loading stream via proxy: {}", upstreamUrl);
+    log.debug("Loading stream via proxy: {}", upstreamUrl);
 
     // Extract and filter client headers to forward
     Map<String, String> requestHeaders =

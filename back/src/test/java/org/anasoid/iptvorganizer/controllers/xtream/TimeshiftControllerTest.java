@@ -129,7 +129,7 @@ class TimeshiftControllerTest {
             "testuser", "testpass", "2026-03-15:03-30", "50", "3600", "ts", uriInfo, null);
 
     // Should succeed since start time is within archive window
-    assertThat(response.getStatus()).isEqualTo(Response.Status.SEE_OTHER.getStatusCode());
+    assertThat(response.getStatus()).isEqualTo(Response.Status.FOUND.getStatusCode());
   }
 
   @Test
@@ -165,7 +165,7 @@ class TimeshiftControllerTest {
         timeshiftController.handleTimeshiftStream(
             "testuser", "testpass", "100", "50", "3600", "ts", uriInfo, null);
 
-    assertThat(response.getStatus()).isEqualTo(Response.Status.SEE_OTHER.getStatusCode());
+    assertThat(response.getStatus()).isEqualTo(Response.Status.FOUND.getStatusCode());
   }
 
   @Test
@@ -184,7 +184,7 @@ class TimeshiftControllerTest {
         timeshiftController.handleTimeshiftStream(
             "testuser", "testpass", "2026-03-15:03-30", "50", "3600", "ts", uriInfo, null);
 
-    assertThat(response.getStatus()).isEqualTo(Response.Status.SEE_OTHER.getStatusCode());
+    assertThat(response.getStatus()).isEqualTo(Response.Status.FOUND.getStatusCode());
   }
 
   @Test
@@ -203,7 +203,7 @@ class TimeshiftControllerTest {
         timeshiftController.handleTimeshiftStream(
             "testuser", "testpass", "2026-03-15:03-30", "50", "3600", "ts", uriInfo, null);
 
-    assertThat(response.getStatus()).isEqualTo(Response.Status.SEE_OTHER.getStatusCode());
+    assertThat(response.getStatus()).isEqualTo(Response.Status.FOUND.getStatusCode());
 
     // Verify the redirect URL uses official Xtream API format
     String redirectUrl = response.getLocation().toString();
@@ -237,7 +237,7 @@ class TimeshiftControllerTest {
         timeshiftController.handleTimeshiftStream(
             "testuser", "testpass", "2026-03-15:03-30", "50", "3600", "ts", uriInfo, null);
 
-    assertThat(response.getStatus()).isEqualTo(Response.Status.SEE_OTHER.getStatusCode());
+    assertThat(response.getStatus()).isEqualTo(Response.Status.FOUND.getStatusCode());
     String redirectUrl = response.getLocation().toString();
 
     // Verify credentials are URL encoded
