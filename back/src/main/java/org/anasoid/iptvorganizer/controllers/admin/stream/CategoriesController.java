@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.controllers.admin.stream;
 
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
@@ -26,7 +25,6 @@ import org.anasoid.iptvorganizer.utils.ResponseUtils;
 @Path("/api/categories")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-@RolesAllowed("admin")
 public class CategoriesController extends BaseController {
 
   private static final Set<String> VALID_CATEGORY_TYPES = Set.of("live", "vod", "series");

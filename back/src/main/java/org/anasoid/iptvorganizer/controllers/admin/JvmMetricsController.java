@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.controllers.admin;
 
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -31,7 +30,6 @@ import org.anasoid.iptvorganizer.utils.ResponseUtils;
 @Slf4j
 @Path("/api/jvm/metrics")
 @Produces(MediaType.APPLICATION_JSON)
-@RolesAllowed("admin")
 public class JvmMetricsController extends BaseController {
   @Inject JvmMonitorService jvmMonitorService;
 

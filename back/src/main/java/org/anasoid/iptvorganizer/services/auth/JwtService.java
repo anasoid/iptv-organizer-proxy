@@ -1,48 +1,22 @@
 package org.anasoid.iptvorganizer.services.auth;
 
-import io.smallrye.jwt.build.Jwt;
 import jakarta.enterprise.context.ApplicationScoped;
-import java.util.Set;
+import jakarta.inject.Inject;
 import org.anasoid.iptvorganizer.models.entity.AdminUser;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-/** JWT token generation service using SmallRye JWT */
+/** Backward-compatible token service adapter. */
 @ApplicationScoped
 public class JwtService {
 
-  @ConfigProperty(name = "smallrye.jwt.new-token.issuer")
-  String issuer;
+  @Inject InMemoryTokenService tokenService;
 
-  @ConfigProperty(name = "smallrye.jwt.new-token.lifespan", defaultValue = "28800")
-  Long lifespan;
-
-  /** Generate JWT token for authenticated admin user */
+  /** Generate admin bearer token for an authenticated user. */
   public String generateToken(AdminUser user) {
-    if (user == null || user.getId() == null) {
-      throw new IllegalArgumentException("User and user ID are required");
-    }
-
-    return Jwt.issuer(issuer)
-        .upn(user.getUsername())
-        .groups(Set.of("admin"))
-        .claim("userId", user.getId())
-        .claim("email", user.getEmail())
-        .expiresIn(lifespan)
-        .sign();
+    return tokenService.issueToken(user);
   }
 
-  /** Generate token with custom lifespan (in seconds) */
+  /** Generate token with custom lifespan (kept for API compatibility). */
   public String generateToken(AdminUser user, long customLifespanSeconds) {
-    if (user == null || user.getId() == null) {
-      throw new IllegalArgumentException("User and user ID are required");
-    }
-
-    return Jwt.issuer(issuer)
-        .upn(user.getUsername())
-        .groups(Set.of("admin"))
-        .claim("userId", user.getId())
-        .claim("email", user.getEmail())
-        .expiresIn(customLifespanSeconds)
-        .sign();
+    return tokenService.issueToken(user, customLifespanSeconds);
   }
 }

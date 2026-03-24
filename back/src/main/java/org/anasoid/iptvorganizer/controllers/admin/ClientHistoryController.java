@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.controllers.admin;
 
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DELETE;
@@ -32,7 +31,7 @@ import org.anasoid.iptvorganizer.utils.ResponseUtils;
 /**
  * Admin REST controller exposing the in-memory stream-watch history for a given client.
  *
- * <p>All endpoints require the {@code admin} role (JWT).
+ * <p>All endpoints require an authenticated admin bearer token.
  *
  * <ul>
  *   <li>{@code GET /api/clients/{clientId}/history} – history list, most-recent-first, enriched
@@ -44,7 +43,6 @@ import org.anasoid.iptvorganizer.utils.ResponseUtils;
  */
 @Path("/api/clients/{clientId}/history")
 @Produces(MediaType.APPLICATION_JSON)
-@RolesAllowed("admin")
 @ApplicationScoped
 @Slf4j
 public class ClientHistoryController extends BaseController {

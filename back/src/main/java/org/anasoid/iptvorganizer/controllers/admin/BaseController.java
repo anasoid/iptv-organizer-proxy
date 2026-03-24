@@ -9,20 +9,18 @@ public class BaseController {
 
   @Inject SecurityIdentity securityIdentity;
 
-  /** Get the current authenticated user's ID from JWT claims */
+  /** Get the current authenticated user's ID from security identity attributes. */
   protected Long getCurrentUserId() {
     if (securityIdentity == null || securityIdentity.getPrincipal() == null) {
       throw new UnauthorizedException("User not authenticated");
     }
-    String userId = securityIdentity.getAttribute("userId");
-    if (userId == null) {
-      throw new UnauthorizedException("User ID not found in token");
+
+    Long userId = securityIdentity.getAttribute("userId");
+    if (userId != null) {
+      return userId;
     }
-    try {
-      return Long.parseLong(userId.toString());
-    } catch (NumberFormatException e) {
-      throw new UnauthorizedException("Invalid user ID in token");
-    }
+
+    throw new UnauthorizedException("User ID not found in token");
   }
 
   /** Get the current authenticated user's username */

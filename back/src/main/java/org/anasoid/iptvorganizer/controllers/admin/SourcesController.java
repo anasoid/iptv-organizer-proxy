@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.controllers.admin;
 
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
@@ -38,7 +37,6 @@ import org.anasoid.iptvorganizer.utils.ResponseUtils;
 @Path("/api/sources")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-@RolesAllowed("admin")
 public class SourcesController extends BaseController {
 
   @Inject SourceService sourceService;

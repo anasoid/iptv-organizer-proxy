@@ -14,9 +14,6 @@
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.3
 WORKDIR /work/
 
-# openssl is required to generate a unique JWT RSA key pair on first boot
-RUN microdnf install -y openssl && microdnf clean all
-
 RUN chown 1001 /work \
     && chmod "g+rwX" /work \
     && chown 1001:root /work \
@@ -28,24 +25,11 @@ RUN chown 1001 /work \
 COPY --chown=1001:root *-runner /work/iptv-organizer
 
 # Write the entrypoint inline — avoids any dependency on files outside the Docker build context.
-# The script generates a unique JWT RSA key pair on first boot, then starts the native binary.
 RUN { \
     echo '#!/bin/bash'; \
     echo 'set -e'; \
     echo 'echo "Starting IPTV Organizer Proxy - Quarkus Native"'; \
     echo 'mkdir -p /app/data /logs'; \
-    echo 'if [ ! -f /app/data/privateKey.pem ] || [ ! -f /app/data/publicKey.pem ]; then'; \
-    echo '    echo "Generating JWT RSA-2048 key pair (first boot)..."'; \
-    echo '    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /app/data/privateKey.pem 2>/dev/null'; \
-    echo '    openssl pkey -in /app/data/privateKey.pem -pubout -out /app/data/publicKey.pem 2>/dev/null'; \
-    echo '    chmod 600 /app/data/privateKey.pem'; \
-    echo '    chmod 644 /app/data/publicKey.pem'; \
-    echo '    echo "JWT keys generated and stored in /app/data/"'; \
-    echo 'else'; \
-    echo '    echo "Using existing JWT keys from /app/data/"'; \
-    echo 'fi'; \
-    echo 'export SMALLRYE_JWT_SIGN_KEY_LOCATION=file:/app/data/privateKey.pem'; \
-    echo 'export MP_JWT_VERIFY_PUBLICKEY_LOCATION=file:/app/data/publicKey.pem'; \
     echo 'export QUARKUS_HTTP_PORT=${QUARKUS_HTTP_PORT:-8080}'; \
     echo 'export QUARKUS_DATASOURCE_DB_KIND=${QUARKUS_DATASOURCE_DB_KIND:-sqlite}'; \
     echo 'export QUARKUS_DATASOURCE_JDBC_URL=${QUARKUS_DATASOURCE_JDBC_URL:-jdbc:sqlite:/app/data/app.sqlite}'; \
@@ -57,7 +41,7 @@ RUN { \
     echo 'exec /work/iptv-organizer ${NATIVE_STARTUP_OPTS} ${NATIVE_EXTRA_OPTS}'; \
 } > /work/docker-entrypoint.sh && chmod +x /work/docker-entrypoint.sh
 
-# Persistent volumes: SQLite database + JWT keys (generated on first boot) and logs
+# Persistent volumes: SQLite database and logs
 VOLUME ["/app/data"]
 
 EXPOSE 8080

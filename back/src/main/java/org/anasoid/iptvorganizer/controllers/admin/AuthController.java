@@ -1,8 +1,8 @@
 package org.anasoid.iptvorganizer.controllers.admin;
 
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.HashMap;
@@ -13,6 +13,7 @@ import org.anasoid.iptvorganizer.exceptions.ValidationException;
 import org.anasoid.iptvorganizer.models.entity.AdminUser;
 import org.anasoid.iptvorganizer.services.AdminUserService;
 import org.anasoid.iptvorganizer.services.auth.AuthService;
+import org.anasoid.iptvorganizer.services.auth.InMemoryTokenService;
 
 /**
  * Authentication controller POST /api/auth/login - Public endpoint for login GET /api/auth/me -
@@ -25,9 +26,11 @@ public class AuthController extends BaseController {
 
   @Inject AuthService authService;
 
+  @Inject InMemoryTokenService tokenService;
+
   @Inject AdminUserService adminUserService;
 
-  /** Login endpoint - PUBLIC (no @RolesAllowed) POST /api/auth/login */
+  /** Login endpoint - PUBLIC POST /api/auth/login */
   @POST
   @Path("/login")
   public Response login(LoginRequest request) {
@@ -56,7 +59,6 @@ public class AuthController extends BaseController {
   /** Get current user info - PROTECTED GET /api/auth/me */
   @GET
   @Path("/me")
-  @RolesAllowed("admin")
   public Response getCurrentUser() {
     Long userId = getCurrentUserId();
     AdminUser user = adminUserService.getById(userId);
@@ -66,9 +68,18 @@ public class AuthController extends BaseController {
   /** Logout endpoint - PROTECTED POST /api/auth/logout */
   @POST
   @Path("/logout")
-  @RolesAllowed("admin")
-  public Response logout() {
-    // JWT is stateless, logout is just a client-side action
+  public Response logout(@HeaderParam(HttpHeaders.AUTHORIZATION) String authorizationHeader) {
+    String token = extractBearerToken(authorizationHeader);
+    tokenService.revokeToken(token);
     return Response.ok(ApiResponse.success("Logged out successfully")).build();
+  }
+
+  private static String extractBearerToken(String authorizationHeader) {
+    if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+      return null;
+    }
+
+    String token = authorizationHeader.substring(7).trim();
+    return token.isBlank() ? null : token;
   }
 }

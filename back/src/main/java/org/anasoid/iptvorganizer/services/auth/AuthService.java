@@ -16,7 +16,7 @@ public class AuthService {
 
   @Inject PasswordService passwordService;
 
-  @Inject JwtService jwtService;
+  @Inject InMemoryTokenService tokenService;
 
   /**
    * Authenticate user and return JWT token with user info
@@ -50,8 +50,8 @@ public class AuthService {
     user.setLastLogin(LocalDateTime.now());
     adminUserRepository.updateLastLogin(user.getId(), user.getLastLogin());
 
-    // Generate JWT token
-    String token = jwtService.generateToken(user);
+    // Generate opaque bearer token kept in in-memory session store
+    String token = tokenService.issueToken(user);
     Map<String, Object> response = new HashMap<>();
     response.put("token", token);
     response.put("user", user);

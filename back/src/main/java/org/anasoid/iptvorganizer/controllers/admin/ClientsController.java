@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.controllers.admin;
 
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -30,7 +29,6 @@ import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
 @Path("/api/clients")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-@RolesAllowed("admin")
 public class ClientsController extends BaseController {
 
   @Inject ClientService clientService;

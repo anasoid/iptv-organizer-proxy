@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.controllers.admin;
 
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -15,7 +14,6 @@ import org.anasoid.iptvorganizer.utils.ResponseUtils;
 @Path("/api/sync-logs")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-@RolesAllowed("admin")
 public class SyncLogsController extends BaseController {
 
   @Inject SyncLogService syncLogService;

@@ -1,6 +1,5 @@
 package org.anasoid.iptvorganizer.controllers.admin;
 
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -18,7 +17,6 @@ import org.anasoid.iptvorganizer.utils.ResponseUtils;
 @Slf4j
 @Path("/api/cache")
 @Produces(MediaType.APPLICATION_JSON)
-@RolesAllowed("admin")
 public class CacheController extends BaseController {
 
   @Inject CacheManager cacheManager;

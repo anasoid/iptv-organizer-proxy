@@ -63,7 +63,7 @@ services:
           memory: ${MEM_RESERVATION:-32M}
 
     volumes:
-      # Persistent SQLite database + JWT key pair (generated on first boot)
+      # Persistent SQLite database
       - app-data:/app/data
 
     restart: unless-stopped

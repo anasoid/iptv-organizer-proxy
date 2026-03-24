@@ -43,8 +43,8 @@ dependencies {
     // JSON/YAML Processing
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
 
-    // Security & JWT
-    implementation 'io.quarkus:quarkus-smallrye-jwt'
+    // Security
+    implementation 'io.quarkus:quarkus-security'
 
     // Scheduler for background tasks
     implementation 'io.quarkus:quarkus-scheduler'

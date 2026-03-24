@@ -112,7 +112,6 @@ docker-compose -f docker/docker-compose.yml up --build
 2. **Migration** — add `V0XX__create_my_entity.sql` in all three dialect folders (`sqlite/`, `mysql/`, `h2/`); add filename to `SimpleMigrator.MIGRATIONS`
 3. **Repository** — extend `BaseRepository<MyEntity>`, override `getTableName()` and `mapRow()`
 4. **Service** — extend `BaseService<MyEntity, MyEntityRepository>`
-5. **Admin controller** — extend `BaseController`, annotate with `@RolesAllowed("admin")`
 6. **Frontend** — add `services/myEntityApi.ts`; add page under `pages/`; wire route in `App.tsx`
 
 ---
