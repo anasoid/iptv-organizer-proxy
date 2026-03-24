@@ -288,3 +288,18 @@ jobs:
             --push \
             --tag "${VFS_TAG}" \
             .
+
+      # Build single-layer VFS variant on top of the GraalVM 25 manifest (memory-optimized)
+      - name: Build and push VFS image (GraalVM 25 / -25)
+        run: |
+          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
+          TAG="${{ steps.tag.outputs.tag }}"
+          VFS_25_TAG="${BASE}:${TAG}-25-vfs"
+          docker buildx build \
+            --file ./docker/Dockerfile.vfs \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg BASE_IMAGE="${BASE}:${TAG}-25" \
+            --push \
+            --tag "${VFS_25_TAG}" \
+            .
+
