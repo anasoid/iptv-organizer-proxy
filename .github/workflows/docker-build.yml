@@ -15,30 +15,58 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Build native binary and arch-specific image on each platform's own runner.
+  # Each job compiles the Quarkus native binary natively (no cross-compilation,
+  # no QEMU for the compile step) and pushes a platform-tagged image.
+  # ──────────────────────────────────────────────────────────────────────────
+  build-native:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - variant: sqlite
+          - os: ubuntu-latest
+            platform: linux/amd64
+            arch: amd64
+            variant: sqlite
+            graalvmVersion: '25'
             fullJdbcDrivers: 'false'
             tagSuffix: ''
-          - variant: full
+          - os: ubuntu-latest
+            platform: linux/amd64
+            arch: amd64
+            variant: full
+            graalvmVersion: '25'
             fullJdbcDrivers: 'true'
             tagSuffix: '-full'
-    runs-on: ubuntu-latest
+          - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
+            platform: linux/arm64
+            arch: arm64
+            variant: sqlite
+            graalvmVersion: '25'
+            fullJdbcDrivers: 'false'
+            tagSuffix: ''
+          - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
+            platform: linux/arm64
+            arch: arm64
+            variant: full
+            graalvmVersion: '25'
+            fullJdbcDrivers: 'true'
+            tagSuffix: '-full'
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       packages: write
 
     steps:
-      # 1. Checkout
+      # 1. Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Admin UI (platform-independent)
+      # 2. Build admin UI (platform-independent JS build)
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
@@ -46,31 +74,29 @@ jobs:
           cache: 'npm'
           cache-dependency-path: admin/package-lock.json
 
+      # build:java compiles TS, runs vite build, and copies dist → back/src/main/resources/META-INF/resources/admin/
       - name: Build admin UI
         working-directory: admin
         run: |
           npm ci
           npm run build:java
 
-      # 3. Java / Gradle
-      - name: Setup JDK 25
+      # 3. Setup JDK 25 based on matrix configuration
+      - name: Setup JDK ${{ matrix.graalvmVersion }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '25'
+          java-version: '${{ matrix.graalvmVersion }}'
           cache: 'gradle'
 
       - name: Grant execute permission for gradlew
         run: chmod +x back/gradlew
 
-      # 4. Docker infra — QEMU needed for arm64 cross-compilation
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
+      # 4. Docker Buildx (single-platform per job — no cross-compilation needed)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 5. Registry login (skip on PRs)
+      # 5. Login to GHCR (skip on PRs)
       - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
@@ -79,7 +105,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 6. Resolve image tag
+      # 6. Determine image tag
       - name: Determine image tag
         id: tag
         run: |
@@ -94,10 +120,14 @@ jobs:
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
-      # ── amd64 ──────────────────────────────────────────────────────────────
-      - name: Compile native binary (amd64 / ${{ matrix.variant }})
+      # 7. Build and push arch-specific image (push builds only)
+      #    Step 1: compile the native binary (no container-image flags — just produce the runner).
+      #    Step 2: build & push the Docker image ourselves so the build context is unambiguous.
+      - name: Compile native binary (${{ matrix.arch }} / ${{ matrix.variant }})
+        if: github.event_name != 'pull_request'
         run: |
           export GRADLE_OPTS="-Xmx2g"
+          NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
           ./gradlew build \
             -x test \
             -PbuildingNativeImage \
@@ -107,38 +137,30 @@ jobs:
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.compression.level=9 \
             "-Dquarkus.native.container-runtime-options=--memory=3g" \
-            -DNATIVE_IMAGE_XMX=2300m \
+            ${NATIVE_XMX_OPT} \
             --no-daemon
         working-directory: back
 
-      - name: Build & push amd64 image by digest (${{ matrix.variant }})
+      - name: Build and push Docker image (${{ matrix.arch }} / ${{ matrix.variant }})
         if: github.event_name != 'pull_request'
         run: |
-          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
-          ls -la back/build/*-runner || { echo "ERROR: no runner binary"; exit 1; }
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy:${{ steps.tag.outputs.tag }}${{ matrix.tagSuffix }}-${{ matrix.arch }}"
+          echo "=== build context contents ==="
+          ls -la back/build/*-runner 2>/dev/null || { echo "ERROR: no *-runner file in back/build/"; exit 1; }
           docker buildx build \
-            --platform linux/amd64 \
+            --platform "${{ matrix.platform }}" \
             --file back/src/main/docker/Dockerfile.native \
-            --output "type=image,name=${BASE},push-by-digest=true,push=true" \
-            --metadata-file /tmp/amd64-meta.json \
-            back/build/
-          echo "AMD64_DIGEST=$(jq -r '."containerimage.digest"' /tmp/amd64-meta.json)" >> $GITHUB_ENV
-
-      - name: Build Docker image (PR / amd64 / no push / ${{ matrix.variant }})
-        if: github.event_name == 'pull_request'
-        run: |
-          ls -la back/build/*-runner || { echo "ERROR: no runner binary"; exit 1; }
-          docker buildx build \
-            --platform linux/amd64 \
-            --file back/src/main/docker/Dockerfile.native \
+            --tag "${IMAGE}" \
+            --push \
             back/build/
 
-      # ── arm64 (push builds only — QEMU via container-build platform flag) ──
-      - name: Compile native binary (arm64 / ${{ matrix.variant }})
-        if: github.event_name != 'pull_request'
+      # 8. PR: build only (no push), amd64 only to keep CI fast
+      - name: Compile native binary (PR / amd64 / ${{ matrix.variant }})
+        if: github.event_name == 'pull_request' && matrix.arch == 'amd64'
         run: |
           export GRADLE_OPTS="-Xmx2g"
-          ./gradlew clean build \
+          NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
+          ./gradlew build \
             -x test \
             -PbuildingNativeImage \
             -PfullJdbcDrivers=${{ matrix.fullJdbcDrivers }} \
@@ -146,46 +168,92 @@ jobs:
             -Dquarkus.package.jar.enabled=false \
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.compression.level=9 \
-            "-Dquarkus.native.container-runtime-options=--platform linux/arm64 --memory=3g" \
-            -DNATIVE_IMAGE_XMX=2300m \
+            "-Dquarkus.native.container-runtime-options=--memory=3g" \
+            ${NATIVE_XMX_OPT} \
             --no-daemon
         working-directory: back
 
-      - name: Build & push arm64 image by digest (${{ matrix.variant }})
-        if: github.event_name != 'pull_request'
+      - name: Build Docker image (PR / no push / ${{ matrix.variant }})
+        if: github.event_name == 'pull_request' && matrix.arch == 'amd64'
         run: |
-          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
-          ls -la back/build/*-runner || { echo "ERROR: no runner binary"; exit 1; }
+          ls -la back/build/*-runner 2>/dev/null || { echo "ERROR: no *-runner file in back/build/"; exit 1; }
           docker buildx build \
-            --platform linux/arm64 \
+            --platform "${{ matrix.platform }}" \
             --file back/src/main/docker/Dockerfile.native \
-            --output "type=image,name=${BASE},push-by-digest=true,push=true" \
-            --metadata-file /tmp/arm64-meta.json \
             back/build/
-          echo "ARM64_DIGEST=$(jq -r '."containerimage.digest"' /tmp/arm64-meta.json)" >> $GITHUB_ENV
 
-      # ── Multi-arch manifest ────────────────────────────────────────────────
-      - name: Create and push multi-arch manifest (${{ matrix.variant }})
-        if: github.event_name != 'pull_request'
+  # ──────────────────────────────────────────────────────────────────────────
+  # After all arch-specific images are pushed, merge them into a single
+  # multi-arch manifest and build the VFS variant.
+  # ──────────────────────────────────────────────────────────────────────────
+  merge-manifest:
+    needs: build-native
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine image tag
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
+            TAG="latest"
+          elif [[ "${{ github.ref }}" == refs/heads/* ]]; then
+            TAG="${GITHUB_REF#refs/heads/}"
+          else
+            TAG="pr-${{ github.event.pull_request.number }}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # Combine arch-specific SQLite-only images into a single multi-arch manifest (no suffix)
+      - name: Create and push multi-arch manifest (sqlite / no suffix)
         run: |
           BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
           TAG="${{ steps.tag.outputs.tag }}"
           docker buildx imagetools create \
-            -t "${BASE}:${TAG}${{ matrix.tagSuffix }}" \
-            "${BASE}@${AMD64_DIGEST}" \
-            "${BASE}@${ARM64_DIGEST}"
+            -t "${BASE}:${TAG}" \
+            "${BASE}:${TAG}-amd64" \
+            "${BASE}:${TAG}-arm64"
 
-      # ── VFS variant — only for the default (sqlite) image ─────────────────
-      - name: Build and push VFS image
-        if: github.event_name != 'pull_request' && matrix.variant == 'sqlite'
+      # Combine arch-specific full-driver images into a single multi-arch manifest (-full suffix)
+      - name: Create and push multi-arch manifest (full)
         run: |
           BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
           TAG="${{ steps.tag.outputs.tag }}"
+          docker buildx imagetools create \
+            -t "${BASE}:${TAG}-full" \
+            "${BASE}:${TAG}-full-amd64" \
+            "${BASE}:${TAG}-full-arm64"
+
+
+      # Build single-layer VFS variant on top of the merged manifest
+      - name: Build and push VFS image
+        run: |
+          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
+          TAG="${{ steps.tag.outputs.tag }}"
+          VFS_TAG="${BASE}:${TAG}-vfs"
           docker buildx build \
             --file ./docker/Dockerfile.vfs \
             --platform linux/amd64,linux/arm64 \
             --build-arg BASE_IMAGE="${BASE}:${TAG}" \
             --push \
-            --tag "${BASE}:${TAG}-vfs" \
+            --tag "${VFS_TAG}" \
             .
 
