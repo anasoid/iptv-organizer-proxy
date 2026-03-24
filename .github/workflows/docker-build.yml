@@ -33,6 +33,7 @@ jobs:
             arch: amd64
             variant: sqlite
             graalvmVersion: '21'
+            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21
             fullJdbcDrivers: 'false'
             tagSuffix: ''
           - os: ubuntu-latest
@@ -40,6 +41,7 @@ jobs:
             arch: amd64
             variant: full
             graalvmVersion: '21'
+            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21
             fullJdbcDrivers: 'true'
             tagSuffix: '-full'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
@@ -47,6 +49,7 @@ jobs:
             arch: arm64
             variant: sqlite
             graalvmVersion: '21'
+            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21
             fullJdbcDrivers: 'false'
             tagSuffix: ''
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
@@ -54,6 +57,7 @@ jobs:
             arch: arm64
             variant: full
             graalvmVersion: '21'
+            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21
             fullJdbcDrivers: 'true'
             tagSuffix: '-full'
           # GraalVM 25 optimized variants (SQLite only, memory optimized)
@@ -62,6 +66,7 @@ jobs:
             arch: amd64
             variant: sqlite
             graalvmVersion: '25'
+            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-25
             fullJdbcDrivers: 'false'
             tagSuffix: '-25'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
@@ -69,6 +74,7 @@ jobs:
             arch: arm64
             variant: sqlite
             graalvmVersion: '25'
+            nativeBuilderImage: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-25
             fullJdbcDrivers: 'false'
             tagSuffix: '-25'
     runs-on: ${{ matrix.os }}
@@ -111,6 +117,10 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Verify native builder image exists so -25 never silently falls back to -21
+      - name: Verify native builder image
+        run: docker manifest inspect "${{ matrix.nativeBuilderImage }}" >/dev/null
+
       # 5. Login to GHCR (skip on PRs)
       - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
@@ -142,10 +152,10 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           export GRADLE_OPTS="-Xmx2g"
-          # GraalVM 25 specific optimizations for minimum memory footprint
-          NATIVE_OPTS=""
+          BUILDER_IMAGE_OPT="-Dquarkus.native.builder-image=${{ matrix.nativeBuilderImage }}"
+          NATIVE_XMX_OPT=""
           if [[ "${{ matrix.graalvmVersion }}" == "25" ]]; then
-            NATIVE_OPTS="-Dquarkus.native.additional-build-args-append=-H:+UnlockExperimentalVMOptions,-H:HeapStrategies=adaptive,-H:ImageHeapOffsetInAddressSpace=0,-H:+InlineAllBoolean"
+            NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
           fi
           ./gradlew build \
             -x test \
@@ -156,7 +166,8 @@ jobs:
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.compression.level=9 \
             "-Dquarkus.native.container-runtime-options=--memory=3g" \
-            ${NATIVE_OPTS} \
+            ${BUILDER_IMAGE_OPT} \
+            ${NATIVE_XMX_OPT} \
             --no-daemon
         working-directory: back
 
@@ -178,10 +189,10 @@ jobs:
         if: github.event_name == 'pull_request' && matrix.arch == 'amd64'
         run: |
           export GRADLE_OPTS="-Xmx2g"
-          # GraalVM 25 specific optimizations for minimum memory footprint
-          NATIVE_OPTS=""
+          BUILDER_IMAGE_OPT="-Dquarkus.native.builder-image=${{ matrix.nativeBuilderImage }}"
+          NATIVE_XMX_OPT=""
           if [[ "${{ matrix.graalvmVersion }}" == "25" ]]; then
-            NATIVE_OPTS="-Dquarkus.native.additional-build-args-append=-H:+UnlockExperimentalVMOptions,-H:HeapStrategies=adaptive,-H:ImageHeapOffsetInAddressSpace=0,-H:+InlineAllBoolean"
+            NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
           fi
           ./gradlew build \
             -x test \
@@ -192,7 +203,8 @@ jobs:
             -Dquarkus.native.container-build=true \
             -Dquarkus.native.compression.level=9 \
             "-Dquarkus.native.container-runtime-options=--memory=3g" \
-            ${NATIVE_OPTS} \
+            ${BUILDER_IMAGE_OPT} \
+            ${NATIVE_XMX_OPT} \
             --no-daemon
         working-directory: back
 
