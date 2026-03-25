@@ -1,5 +1,6 @@
 ####
 # This Dockerfile is used in order to build a container that runs the Quarkus application in native (no JVM) mode.
+# Uses Quarkus-optimized micro image with minimal footprint and pre-configured runtime.
 # The Quarkus Gradle plugin sets the Docker build context to back/build/, so only files produced
 # by the build (e.g. *-runner) are accessible via COPY. The Gradle build copies
 # src/main/docker/docker-entrypoint.sh into back/build/ for this image.
@@ -11,7 +12,7 @@
 #   ./gradlew build -Dquarkus.native.enabled=true
 #   docker build -f src/main/docker/Dockerfile.native -t quarkus/iptv-organizer-proxy build/
 ###
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7
+FROM quay.io/quarkus/ubi9-quarkus-micro-image:2.0
 WORKDIR /work/
 
 RUN chown 1001 /work \
