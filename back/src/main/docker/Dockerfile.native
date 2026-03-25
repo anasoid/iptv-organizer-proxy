@@ -23,7 +23,7 @@ RUN chown 1001 /work \
 
 # Native runner produced by Quarkus Gradle native build (lives at the root of back/build/)
 COPY --chown=1001:root *-runner /work/iptv-organizer
-COPY --chown=1001:root docker-entrypoint.sh /work/docker-entrypoint.sh
+COPY --chown=1001:root quarkus-docker/docker-entrypoint.sh /work/docker-entrypoint.sh
 
 RUN chmod +x /work/docker-entrypoint.sh
 
