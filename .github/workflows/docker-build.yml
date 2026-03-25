@@ -35,6 +35,7 @@ jobs:
             graalvmVersion: '25'
             fullJdbcDrivers: 'false'
             tagSuffix: ''
+            nativeExtraArgs: ''
           - os: ubuntu-latest
             platform: linux/amd64
             arch: amd64
@@ -42,6 +43,15 @@ jobs:
             graalvmVersion: '25'
             fullJdbcDrivers: 'true'
             tagSuffix: '-full'
+            nativeExtraArgs: ''
+          - os: ubuntu-latest
+            platform: linux/amd64
+            arch: amd64
+            variant: openwrt
+            graalvmVersion: '25'
+            fullJdbcDrivers: 'false'
+            tagSuffix: '-openwrt'
+            nativeExtraArgs: '-Dquarkus.native.additional-build-args=--static,--libc=musl'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
@@ -49,6 +59,7 @@ jobs:
             graalvmVersion: '25'
             fullJdbcDrivers: 'false'
             tagSuffix: ''
+            nativeExtraArgs: ''
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
@@ -56,6 +67,15 @@ jobs:
             graalvmVersion: '25'
             fullJdbcDrivers: 'true'
             tagSuffix: '-full'
+            nativeExtraArgs: ''
+          - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
+            platform: linux/arm64
+            arch: arm64
+            variant: openwrt
+            graalvmVersion: '25'
+            fullJdbcDrivers: 'false'
+            tagSuffix: '-openwrt'
+            nativeExtraArgs: '-Dquarkus.native.additional-build-args=--static,--libc=musl'
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -138,6 +158,7 @@ jobs:
             -Dquarkus.native.compression.level=9 \
             "-Dquarkus.native.container-runtime-options=--memory=3g" \
             ${NATIVE_XMX_OPT} \
+            ${{ matrix.nativeExtraArgs }} \
             --no-daemon
         working-directory: back
 
@@ -170,6 +191,7 @@ jobs:
             -Dquarkus.native.compression.level=9 \
             "-Dquarkus.native.container-runtime-options=--memory=3g" \
             ${NATIVE_XMX_OPT} \
+            ${{ matrix.nativeExtraArgs }} \
             --no-daemon
         working-directory: back
 
@@ -242,6 +264,15 @@ jobs:
             "${BASE}:${TAG}-full-amd64" \
             "${BASE}:${TAG}-full-arm64"
 
+      # Combine arch-specific openwrt images into a single multi-arch manifest (-openwrt suffix)
+      - name: Create and push multi-arch manifest (openwrt)
+        run: |
+          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
+          TAG="${{ steps.tag.outputs.tag }}"
+          docker buildx imagetools create \
+            -t "${BASE}:${TAG}-openwrt" \
+            "${BASE}:${TAG}-openwrt-amd64" \
+            "${BASE}:${TAG}-openwrt-arm64"
 
       # Build single-layer VFS variant on top of the merged manifest
       - name: Build and push VFS image
@@ -253,6 +284,34 @@ jobs:
             --file ./docker/Dockerfile.vfs \
             --platform linux/amd64,linux/arm64 \
             --build-arg BASE_IMAGE="${BASE}:${TAG}" \
+            --push \
+            --tag "${VFS_TAG}" \
+            .
+
+      # Build VFS variant for full-driver image
+      - name: Build and push VFS image (full)
+        run: |
+          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
+          TAG="${{ steps.tag.outputs.tag }}"
+          VFS_TAG="${BASE}:${TAG}-vfs-full"
+          docker buildx build \
+            --file ./docker/Dockerfile.vfs \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg BASE_IMAGE="${BASE}:${TAG}-full" \
+            --push \
+            --tag "${VFS_TAG}" \
+            .
+
+      # Build VFS variant for openwrt image
+      - name: Build and push VFS image (openwrt)
+        run: |
+          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
+          TAG="${{ steps.tag.outputs.tag }}"
+          VFS_TAG="${BASE}:${TAG}-vfs-openwrt"
+          docker buildx build \
+            --file ./docker/Dockerfile.vfs \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg BASE_IMAGE="${BASE}:${TAG}-openwrt" \
             --push \
             --tag "${VFS_TAG}" \
             .
