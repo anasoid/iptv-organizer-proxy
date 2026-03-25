@@ -142,6 +142,19 @@ tasks.named('quarkusRun') {
     ]
 }
 
+tasks.register('prepareNativeDockerContext', Copy) {
+    from('src/main/docker/docker-entrypoint.sh')
+    into(layout.buildDirectory)
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('prepareNativeDockerContext')
+}
+
+tasks.named('quarkusBuild') {
+    dependsOn tasks.named('prepareNativeDockerContext')
+}
+
 // JaCoCo Configuration
 jacoco {
     toolVersion = "${jacocoVersion}"

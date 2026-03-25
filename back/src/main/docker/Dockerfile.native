@@ -1,8 +1,8 @@
 ####
 # This Dockerfile is used in order to build a container that runs the Quarkus application in native (no JVM) mode.
 # The Quarkus Gradle plugin sets the Docker build context to back/build/, so only files produced
-# by the build (e.g. *-runner) are accessible via COPY. External files (src/main/docker/*.sh)
-# are NOT in that context — the entrypoint is therefore written inline via RUN.
+# by the build (e.g. *-runner) are accessible via COPY. The Gradle build copies
+# src/main/docker/docker-entrypoint.sh into back/build/ for this image.
 #
 # Build via Quarkus Gradle plugin (recommended):
 #   ./gradlew build -Dquarkus.native.enabled=true -Dquarkus.container-image.build=true
@@ -11,7 +11,7 @@
 #   ./gradlew build -Dquarkus.native.enabled=true
 #   docker build -f src/main/docker/Dockerfile.native -t quarkus/iptv-organizer-proxy build/
 ###
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7
+FROM registry.access.redhat.com/ubi9/ubi-micro:9.7
 WORKDIR /work/
 
 RUN chown 1001 /work \
@@ -23,23 +23,9 @@ RUN chown 1001 /work \
 
 # Native runner produced by Quarkus Gradle native build (lives at the root of back/build/)
 COPY --chown=1001:root *-runner /work/iptv-organizer
+COPY --chown=1001:root docker-entrypoint.sh /work/docker-entrypoint.sh
 
-# Write the entrypoint inline — avoids any dependency on files outside the Docker build context.
-RUN { \
-    echo '#!/bin/bash'; \
-    echo 'set -e'; \
-    echo 'echo "Starting IPTV Organizer Proxy - Quarkus Native"'; \
-    echo 'mkdir -p /app/data /logs'; \
-    echo 'export QUARKUS_HTTP_PORT=${QUARKUS_HTTP_PORT:-8080}'; \
-    echo 'export QUARKUS_DATASOURCE_DB_KIND=${QUARKUS_DATASOURCE_DB_KIND:-sqlite}'; \
-    echo 'export QUARKUS_DATASOURCE_JDBC_URL=${QUARKUS_DATASOURCE_JDBC_URL:-jdbc:sqlite:/app/data/app.sqlite}'; \
-    echo 'echo "Starting native application on port $QUARKUS_HTTP_PORT..."'; \
-    echo '# Note: JAVA_OPTS does not apply — no JVM in native mode.'; \
-    echo '# Use NATIVE_STARTUP_OPTS for baseline args and NATIVE_EXTRA_OPTS for optional extras.'; \
-    echo 'export NATIVE_STARTUP_OPTS=${NATIVE_STARTUP_OPTS:--Dquarkus.http.host=0.0.0.0}'; \
-    echo 'export NATIVE_EXTRA_OPTS=${NATIVE_EXTRA_OPTS:-}'; \
-    echo 'exec /work/iptv-organizer ${NATIVE_STARTUP_OPTS} ${NATIVE_EXTRA_OPTS}'; \
-} > /work/docker-entrypoint.sh && chmod +x /work/docker-entrypoint.sh
+RUN chmod +x /work/docker-entrypoint.sh
 
 # Persistent volumes: SQLite database and logs
 VOLUME ["/app/data"]
