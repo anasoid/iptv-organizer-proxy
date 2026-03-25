@@ -36,6 +36,8 @@ jobs:
             fullJdbcDrivers: 'false'
             tagSuffix: ''
             nativeExtraArgs: ''
+            useContainerBuild: 'true'
+            jdkDistribution: 'temurin'
           - os: ubuntu-latest
             platform: linux/amd64
             arch: amd64
@@ -44,6 +46,8 @@ jobs:
             fullJdbcDrivers: 'true'
             tagSuffix: '-full'
             nativeExtraArgs: ''
+            useContainerBuild: 'true'
+            jdkDistribution: 'temurin'
           - os: ubuntu-latest
             platform: linux/amd64
             arch: amd64
@@ -51,7 +55,9 @@ jobs:
             graalvmVersion: '25'
             fullJdbcDrivers: 'false'
             tagSuffix: '-openwrt'
-            nativeExtraArgs: '-Dquarkus.native.additional-build-args-append=--static,--libc=musl'
+            nativeExtraArgs: '-Dquarkus.profile=openwrt'
+            useContainerBuild: 'false'
+            jdkDistribution: 'mandrel'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
@@ -60,6 +66,8 @@ jobs:
             fullJdbcDrivers: 'false'
             tagSuffix: ''
             nativeExtraArgs: ''
+            useContainerBuild: 'true'
+            jdkDistribution: 'temurin'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
@@ -68,6 +76,8 @@ jobs:
             fullJdbcDrivers: 'true'
             tagSuffix: '-full'
             nativeExtraArgs: ''
+            useContainerBuild: 'true'
+            jdkDistribution: 'temurin'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
@@ -75,7 +85,9 @@ jobs:
             graalvmVersion: '25'
             fullJdbcDrivers: 'false'
             tagSuffix: '-openwrt'
-            nativeExtraArgs: '-Dquarkus.native.additional-build-args-append=--static,--libc=musl'
+            nativeExtraArgs: '-Dquarkus.profile=openwrt'
+            useContainerBuild: 'false'
+            jdkDistribution: 'mandrel'
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -101,13 +113,22 @@ jobs:
           npm ci
           npm run build:java
 
-      # 3. Setup JDK 25 based on matrix configuration
+      # 3. Setup JDK based on matrix configuration (temurin for regular builds, mandrel for openwrt musl)
       - name: Setup JDK ${{ matrix.graalvmVersion }}
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: '${{ matrix.jdkDistribution }}'
           java-version: '${{ matrix.graalvmVersion }}'
           cache: 'gradle'
+
+      # Install musl toolchain on runner for openwrt static build (container-build is disabled for this variant)
+      - name: Install musl toolchain (openwrt only)
+        if: matrix.variant == 'openwrt'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y musl-tools
+          # GraalVM looks for <arch>-linux-musl-gcc; musl-tools provides musl-gcc — create the alias
+          sudo ln -sf /usr/bin/musl-gcc /usr/bin/$(uname -m)-linux-musl-gcc
 
       - name: Grant execute permission for gradlew
         run: chmod +x back/gradlew
@@ -154,7 +175,7 @@ jobs:
             -PfullJdbcDrivers=${{ matrix.fullJdbcDrivers }} \
             -Dquarkus.native.enabled=true \
             -Dquarkus.package.jar.enabled=false \
-            -Dquarkus.native.container-build=true \
+            -Dquarkus.native.container-build=${{ matrix.useContainerBuild }} \
             -Dquarkus.native.compression.level=9 \
             "-Dquarkus.native.container-runtime-options=--memory=3g" \
             ${NATIVE_XMX_OPT} \
@@ -187,7 +208,7 @@ jobs:
             -PfullJdbcDrivers=${{ matrix.fullJdbcDrivers }} \
             -Dquarkus.native.enabled=true \
             -Dquarkus.package.jar.enabled=false \
-            -Dquarkus.native.container-build=true \
+            -Dquarkus.native.container-build=${{ matrix.useContainerBuild }} \
             -Dquarkus.native.compression.level=9 \
             "-Dquarkus.native.container-runtime-options=--memory=3g" \
             ${NATIVE_XMX_OPT} \
