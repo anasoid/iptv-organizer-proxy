@@ -133,8 +133,15 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y musl-tools
-          # GraalVM looks for <arch>-linux-musl-gcc; musl-tools provides musl-gcc — create the alias
-          sudo ln -sf /usr/bin/musl-gcc /usr/bin/$(uname -m)-linux-musl-gcc
+          # GraalVM looks for <arch>-linux-musl-gcc; musl-tools provides musl-gcc.
+          # Some runners already provide an equivalent path, so create/update only when needed.
+          TARGET="/usr/bin/$(uname -m)-linux-musl-gcc"
+          SOURCE="/usr/bin/musl-gcc"
+          if [ ! -e "$TARGET" ] || [ "$(readlink -f "$TARGET")" != "$(readlink -f "$SOURCE")" ]; then
+            sudo ln -sf "$SOURCE" "$TARGET"
+          else
+            echo "musl compiler alias already configured: $TARGET"
+          fi
 
       - name: Grant execute permission for gradlew
         run: chmod +x back/gradlew
