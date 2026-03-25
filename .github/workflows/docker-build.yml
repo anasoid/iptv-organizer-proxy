@@ -121,6 +121,35 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           cache: 'gradle'
 
+      - name: Check OpenWrt musl static support
+        id: openwrt-support
+        if: matrix.variant == 'openwrt'
+        run: |
+          set -euo pipefail
+          GRAAL_HOME="${GRAALVM_HOME:-${JAVA_HOME:-}}"
+          if [ -z "$GRAAL_HOME" ]; then
+            echo "supported=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::OpenWrt build skipped: GRAALVM_HOME/JAVA_HOME is not set"
+            exit 0
+          fi
+
+          MUSL_DIR="$GRAAL_HOME/lib/static/linux-aarch64/musl"
+          MISSING=0
+          for lib in libjava.a libnio.a libnet.a; do
+            if [ ! -f "$MUSL_DIR/$lib" ]; then
+              echo "missing: $MUSL_DIR/$lib"
+              MISSING=1
+            fi
+          done
+
+          if [ "$MISSING" -eq 0 ]; then
+            echo "supported=true" >> "$GITHUB_OUTPUT"
+            echo "OpenWrt musl static support detected at: $MUSL_DIR"
+          else
+            echo "supported=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::OpenWrt build skipped: GraalVM musl static libraries are not available on this runner/toolchain"
+          fi
+
       - name: Install musl toolchain (openwrt)
         if: matrix.variant == 'openwrt'
         run: |
@@ -211,7 +240,7 @@ jobs:
       #    Step 1: compile the native binary (no container-image flags — just produce the runner).
       #    Step 2: build & push the Docker image ourselves so the build context is unambiguous.
       - name: Compile native binary (${{ matrix.arch }} / ${{ matrix.variant }})
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (matrix.variant != 'openwrt' || steps.openwrt-support.outputs.supported == 'true')
         run: |
           export GRADLE_OPTS="-Xmx2g"
           NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
@@ -234,7 +263,7 @@ jobs:
         working-directory: back
 
       - name: Build and push Docker image (${{ matrix.arch }} / ${{ matrix.variant }})
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (matrix.variant != 'openwrt' || steps.openwrt-support.outputs.supported == 'true')
         run: |
           IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy:${{ steps.tag.outputs.tag }}${{ matrix.tagSuffix }}-${{ matrix.arch }}"
           echo "=== build context contents ==="
@@ -245,6 +274,11 @@ jobs:
             --tag "${IMAGE}" \
             --push \
             back/build/
+
+      - name: OpenWrt build skipped notice
+        if: github.event_name != 'pull_request' && matrix.variant == 'openwrt' && steps.openwrt-support.outputs.supported != 'true'
+        run: |
+          echo "::warning::Skipping OpenWrt arm64 image build because this GraalVM toolchain does not provide aarch64 musl static libraries"
 
       # 8. PR: build only (no push), amd64 only to keep CI fast
       - name: Compile native binary (PR / amd64 / ${{ matrix.variant }})
@@ -331,6 +365,19 @@ jobs:
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
+      - name: Check OpenWrt arm64 image availability
+        id: openwrt-image-check
+        run: |
+          set -euo pipefail
+          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
+          TAG="${{ steps.tag.outputs.tag }}"
+          if docker buildx imagetools inspect "${BASE}:${TAG}-openwrt-arm64" >/dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::OpenWrt image not found; skipping openwrt manifest and vfs-openwrt publish"
+          fi
+
       # Combine arch-specific SQLite-only images into a single multi-arch manifest (no suffix)
       - name: Create and push multi-arch manifest (sqlite / no suffix)
         run: |
@@ -353,6 +400,7 @@ jobs:
 
       # Combine arch-specific openwrt images into a single multi-arch manifest (-openwrt suffix)
       - name: Create and push multi-arch manifest (openwrt)
+        if: steps.openwrt-image-check.outputs.available == 'true'
         run: |
           BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
           TAG="${{ steps.tag.outputs.tag }}"
@@ -390,6 +438,7 @@ jobs:
 
       # Build VFS variant for openwrt image
       - name: Build and push VFS image (openwrt)
+        if: steps.openwrt-image-check.outputs.available == 'true'
         run: |
           BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
           TAG="${{ steps.tag.outputs.tag }}"
