@@ -6,13 +6,19 @@ export interface Source {
   url: string;
   username: string;
   password: string;
-  sync_interval: number;
-  sync_status: 'idle' | 'syncing' | 'error';
-  last_sync?: string | null;
-  next_sync?: string | null;
-  is_active: number;
-  created_at?: string;
-  updated_at?: string;
+  syncInterval: number;
+  syncStatus?: 'idle' | 'syncing' | 'error';
+  lastSync?: string | null;
+  nextSync?: string | null;
+  isActive: number;
+  proxyId?: number | null;
+  enableProxy?: boolean | null;
+  connectXtreamApi?: 'DEFAULT' | 'NO_PROXY' | null;
+  connectXtreamStream?: 'DIRECT' | 'NO_PROXY' | 'PROXY' | 'REDIRECT' | 'DEFAULT' | null;
+  connectXmltv?: 'REDIRECT' | 'TUNNEL' | 'NO_PROXY' | 'DEFAULT' | null;
+  blackListFilter?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface SyncLog {

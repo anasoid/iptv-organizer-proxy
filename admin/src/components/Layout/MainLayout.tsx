@@ -31,6 +31,9 @@ import {
   MovieCreation as MovieIcon,
   VideoLibrary as SeriesIcon,
   History as HistoryIcon,
+  Cloud as CloudIcon,
+  Assessment as AssessmentIcon,
+  Memory as MemoryIcon,
 } from '@mui/icons-material';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -56,6 +59,9 @@ const navItems: NavItem[] = [
   { title: 'VOD Streams', path: '/vod-streams', icon: <MovieIcon /> },
   { title: 'Series', path: '/series', icon: <SeriesIcon /> },
   { title: 'Sync Logs', path: '/sync-logs', icon: <HistoryIcon /> },
+  { title: 'Proxies', path: '/proxies', icon: <CloudIcon /> },
+  { title: 'Cache Stats', path: '/cache-stats', icon: <AssessmentIcon /> },
+  { title: 'JVM Metrics', path: '/jvm-metrics', icon: <MemoryIcon /> },
   { title: 'Filters', path: '/filters', icon: <FilterListIcon /> },
   { title: 'Admin Users', path: '/admin-users', icon: <SupervisorAccountIcon /> },
 ];

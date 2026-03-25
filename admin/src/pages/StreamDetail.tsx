@@ -5,6 +5,8 @@ import {
   Card,
   CardMedia,
   CircularProgress,
+  Dialog,
+  DialogContent,
   Grid,
   Typography,
   Chip,
@@ -15,18 +17,89 @@ import {
   TableBody,
   TableCell,
   TableContainer,
+  TableHead,
   TableRow,
   Paper,
   IconButton,
   Tooltip,
   Snackbar,
   ButtonGroup,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import { ArrowBack as ArrowBackIcon, ContentCopy as ContentCopyIcon, CheckCircle as CheckCircleIcon, Block as BlockIcon } from '@mui/icons-material';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
-import streamsApi from '../services/streamsApi';
+import streamsApi, { type Stream } from '../services/streamsApi';
 import categoriesApi from '../services/categoriesApi';
+import sourcesApi from '../services/sourcesApi';
+import { getCategoryDisplayName } from '../utils/categoryDisplayName';
+import { formatDisplayDate } from '../utils/dateFormat';
+
+function parseStreamData(data: unknown): Record<string, unknown> | null {
+  if (!data) {
+    return null;
+  }
+
+  if (typeof data === 'object' && !Array.isArray(data)) {
+    return data as Record<string, unknown>;
+  }
+
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function formatRawStreamData(data: unknown): string {
+  if (data === null || data === undefined) {
+    return '';
+  }
+
+  if (typeof data === 'string') {
+    try {
+      return JSON.stringify(JSON.parse(data), null, 2);
+    } catch {
+      return data;
+    }
+  }
+
+  try {
+    return JSON.stringify(data, null, 2);
+  } catch {
+    return String(data);
+  }
+}
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`stream-tabpanel-${index}`}
+      aria-labelledby={`stream-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  );
+}
 
 export default function StreamDetail() {
   const { id, type } = useParams<{ id: string; type: string }>();
@@ -34,9 +107,11 @@ export default function StreamDetail() {
   const { isAuthenticated } = useAuthStore();
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
+  const [tabValue, setTabValue] = useState(0);
 
   const streamId = id ? parseInt(id, 10) : null;
-  const streamType = (type || 'live') as 'live' | 'vod' | 'series';
+  const streamType = type === 'vod' || type === 'series' || type === 'live' ? type : 'live';
 
   // Fetch stream details
   const { data: streamData, isLoading: isLoadingStream, error: streamError, refetch: refetchStream } = useQuery({
@@ -62,48 +137,130 @@ export default function StreamDetail() {
     },
   });
 
-  // Fetch source ID from stream to get all categories as fallback
-  const sourceId = stream?.source_id;
+  // Fetch all sources for TMDB-linked streams
+  const { data: allSources } = useQuery({
+    queryKey: ['sources'],
+    queryFn: () => sourcesApi.getSources(1, 1000),
+    enabled: isAuthenticated,
+  });
 
-  // First try to get single category, fallback to fetching all categories
-  const { data: categoryData } = useQuery({
-    queryKey: ['category', stream?.category_id],
+  // Fetch streams with the same TMDB ID from all sources
+  const { data: tmdbLinkedStreams } = useQuery({
+    queryKey: ['streams-by-tmdb', stream?.tmdb, streamType],
     queryFn: async () => {
-      if (!stream?.category_id) {
-        console.log('No category_id on stream');
-        return Promise.resolve(null);
+      if (!stream?.tmdb || !allSources?.data) {
+        return [];
       }
-      console.log('Fetching category:', { category_id: stream.category_id, source_id: sourceId });
+
       try {
-        const result = await categoriesApi.getCategory(Number(stream.category_id), sourceId);
-        console.log('Category found:', result.data.category_name);
-        return result;
-      } catch {
-        console.log('Single category fetch failed, trying to fetch all categories from source...');
-        // Fallback: fetch all categories and find the matching one
-        if (sourceId) {
+        const linkedStreams: Stream[] = [];
+
+        // Query each source for streams with the same TMDB ID
+        for (const source of allSources.data) {
           try {
-            const allCats = await categoriesApi.getCategories(sourceId, 1, 100);
-            const found = allCats.data.find((cat) => cat.id === Number(stream.category_id));
-            if (found) {
-              console.log('Category found in source categories:', found.category_name);
-              return { success: true, data: found };
-            } else {
-              console.log('Category not found in source categories either');
-              return null;
+            const response = await streamsApi.getStreams(
+              source.id,
+              streamType,
+              undefined,
+              1,
+              1000,
+              undefined,
+              undefined,
+              { tmdb: stream.tmdb }
+            );
+
+            if (response.data && response.data.length > 0) {
+              linkedStreams.push(...response.data);
             }
-          } catch (fallbackErr) {
-            console.log('Fallback category fetch error:', fallbackErr);
-            return null;
+          } catch (error) {
+            console.error(`Error fetching streams with TMDB ${stream.tmdb} from source ${source.id}:`, error);
           }
         }
+
+        // Remove the current stream from the list
+        return linkedStreams.filter((s) => s.id !== stream.id);
+      } catch (error) {
+        console.error('Error fetching TMDB-linked streams:', error);
+        return [];
+      }
+    },
+    enabled: isAuthenticated && !!stream?.tmdb && !!allSources?.data,
+  });
+
+  const { data: linkedCategoryNames } = useQuery({
+    queryKey: [
+      'linked-stream-category-names',
+      streamType,
+      (tmdbLinkedStreams ?? []).map((linkedStream) => `${linkedStream.sourceId}:${linkedStream.categoryId}`).sort(),
+    ],
+    queryFn: async () => {
+      if (!tmdbLinkedStreams || tmdbLinkedStreams.length === 0) {
+        return {} as Record<string, string>;
+      }
+
+      const uniqueStreamsWithCategories = Array.from(
+        new Map(
+          tmdbLinkedStreams
+            .filter((linkedStream) => linkedStream.categoryId !== null)
+            .map((linkedStream) => [`${linkedStream.sourceId}:${linkedStream.categoryId}`, linkedStream])
+        ).values()
+      );
+
+      const entries = await Promise.all(
+        uniqueStreamsWithCategories.map(async (linkedStream) => {
+          const key = `${linkedStream.sourceId}:${linkedStream.categoryId}`;
+
+          try {
+            const result = await categoriesApi.getCategoryByExternalId(
+              Number(linkedStream.categoryId),
+              linkedStream.sourceId,
+              streamType,
+            );
+
+            return [key, getCategoryDisplayName(result.data)] as const;
+          } catch {
+            return [key, `Category ${linkedStream.categoryId}`] as const;
+          }
+        })
+      );
+
+      return Object.fromEntries(entries);
+    },
+    enabled: isAuthenticated && !!tmdbLinkedStreams?.length,
+  });
+
+  // Fetch source ID from stream to get all categories as fallback
+  const sourceId = stream?.sourceId;
+
+  // Fetch category by external ID (stream.categoryId is the external ID from upstream Xtream)
+  // Type comes from route param-derived streamType (stream payload does not include a `type` field).
+  const { data: category } = useQuery({
+    queryKey: ['category', stream?.categoryId, sourceId, streamType],
+    queryFn: async () => {
+      if (!stream?.categoryId || !sourceId) {
+        console.log('No category_id or source_id on stream');
+        return Promise.resolve(null);
+      }
+      console.log('Fetching category by external ID:', {
+        external_id: stream.categoryId,
+        source_id: sourceId,
+        type: streamType,
+      });
+      try {
+        const result = await categoriesApi.getCategoryByExternalId(
+          Number(stream.categoryId),
+          sourceId,
+          streamType,
+        );
+        console.log('Category found by external ID:', result.data.name);
+        return result.data;  // Return just the Category object, not the response wrapper
+      } catch (err) {
+        console.log('Error fetching category by external ID:', err);
         return null;
       }
     },
-    enabled: isAuthenticated && !!stream?.category_id,
+    enabled: isAuthenticated && !!stream?.categoryId && !!sourceId,
   });
-
-  const category = categoryData?.data;
 
   const getTypeColor = (type: string): 'default' | 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success' => {
     switch (type.toLowerCase()) {
@@ -162,10 +319,21 @@ export default function StreamDetail() {
     );
   }
 
-  const streamIcon = stream.data?.stream_icon;
-  const duration = stream.data?.duration;
-  const episodes = stream.data?.episodes;
-  const seasons = stream.data?.seasons;
+  const metadata = parseStreamData(stream.data);
+  const rawDataText = formatRawStreamData(stream.data);
+  const hasMetadata = !!metadata && Object.keys(metadata).length > 0;
+  const hasRawData = rawDataText.length > 0;
+
+  const streamIcon =
+    typeof metadata?.stream_icon === 'string'
+      ? metadata.stream_icon
+      : typeof metadata?.cover === 'string'
+        ? metadata.cover
+        : null;
+  const duration = metadata?.duration;
+  const episodes = metadata?.episodes;
+  const seasons = metadata?.seasons;
+  const rawDataTabIndex = stream.tmdb ? 2 : 1;
 
   const formatDuration = (seconds: number): string => {
     if (!seconds) return 'N/A';
@@ -182,6 +350,19 @@ export default function StreamDetail() {
     });
   };
 
+  const handleImagePreviewOpen = () => {
+    if (streamIcon) {
+      setImagePreviewOpen(true);
+    }
+  };
+
+  const handleImageKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleImagePreviewOpen();
+    }
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
@@ -195,9 +376,15 @@ export default function StreamDetail() {
 
       {/* Stream Info Card */}
       <Card sx={{ mb: 3 }}>
-        <Grid container spacing={0}>
-          {/* Left Section: Detail Info + Metadata */}
-          <Grid item xs={12} sm={streamIcon ? 8 : 12} md={streamIcon ? 10 : 12}>
+        <Grid
+          container
+          spacing={0}
+          alignItems="flex-start"
+          direction="row"
+          sx={{ flexWrap: { xs: 'wrap', sm: 'nowrap' } }}
+        >
+          {/* Main Section: Detail Info + Metadata */}
+          <Grid item xs={12} sm={streamIcon ? 7 : 12} md={streamIcon ? 8 : 12} lg={streamIcon ? 9 : 12} sx={{ order: 1 }}>
             {/* Detail Info */}
             <Box sx={{ p: 3 }}>
               {/* Header with Type Badge and Category */}
@@ -205,16 +392,16 @@ export default function StreamDetail() {
                 <Typography variant="h4" sx={{ flex: '1 1 auto' }}>
                   {stream.name}
                 </Typography>
-                {stream.category_id && (
+                {stream.categoryId && (
                   <Chip
-                    label={category?.category_name || `Category ${stream.category_id}`}
+                    label={category?.name || `Category ${stream.categoryId}`}
                     variant="outlined"
                     color={category ? 'default' : 'warning'}
                     size="medium"
                     onClick={() => {
                       // Store the selected category and navigate to stream listing
                       sessionStorage.setItem('streamDetailReferrer', window.location.pathname);
-                      sessionStorage.setItem('filterByCategoryId', String(stream.category_id));
+                      sessionStorage.setItem('filterByCategoryId', String(stream.categoryId));
                       const streamPageMap: Record<string, string> = {
                         live: '/live-streams',
                         vod: '/vod-streams',
@@ -240,7 +427,7 @@ export default function StreamDetail() {
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
                     Stream ID
                   </Typography>
-                  <Typography variant="body1">{stream.stream_id}</Typography>
+                  <Typography variant="body1">{stream.externalId}</Typography>
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
@@ -263,12 +450,12 @@ export default function StreamDetail() {
                         navigate(`/categories/${category.id}`);
                       }}
                     >
-                      {category.category_name}
+                      {category.name}
                     </Typography>
                   </Grid>
                 )}
 
-                {stream.is_adult && (
+                {stream.isAdult && (
                   <Grid item xs={12} sm={6}>
                     <Chip label="Adult Content" color="error" />
                   </Grid>
@@ -281,8 +468,8 @@ export default function StreamDetail() {
                   <ButtonGroup variant="outlined" size="small">
                     <Button
                       startIcon={<CheckCircleIcon />}
-                      variant={stream.allow_deny === 'allow' ? 'contained' : 'outlined'}
-                      color={stream.allow_deny === 'allow' ? 'success' : 'inherit'}
+                      variant={stream.allowDeny === 'allow' ? 'contained' : 'outlined'}
+                      color={stream.allowDeny === 'allow' ? 'success' : 'inherit'}
                       onClick={() => updateAllowDenyMutation.mutate('allow')}
                       disabled={updateAllowDenyMutation.isPending}
                     >
@@ -290,15 +477,15 @@ export default function StreamDetail() {
                     </Button>
                     <Button
                       startIcon={<BlockIcon />}
-                      variant={stream.allow_deny === 'deny' ? 'contained' : 'outlined'}
-                      color={stream.allow_deny === 'deny' ? 'error' : 'inherit'}
+                      variant={stream.allowDeny === 'deny' ? 'contained' : 'outlined'}
+                      color={stream.allowDeny === 'deny' ? 'error' : 'inherit'}
                       onClick={() => updateAllowDenyMutation.mutate('deny')}
                       disabled={updateAllowDenyMutation.isPending}
                     >
                       Deny
                     </Button>
                     <Button
-                      variant={stream.allow_deny === null ? 'contained' : 'outlined'}
+                      variant={stream.allowDeny === null ? 'contained' : 'outlined'}
                       onClick={() => updateAllowDenyMutation.mutate(null)}
                       disabled={updateAllowDenyMutation.isPending}
                     >
@@ -313,6 +500,33 @@ export default function StreamDetail() {
                       Duration
                     </Typography>
                     <Typography variant="body1">{formatDuration(Number(duration))}</Typography>
+                  </Grid>
+                )}
+
+                {stream.releaseDate && (
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                      Release Date
+                    </Typography>
+                    <Typography variant="body1">{formatDisplayDate(stream.releaseDate)}</Typography>
+                  </Grid>
+                )}
+
+                {stream.rating !== null && stream.rating !== undefined && (
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                      Rating
+                    </Typography>
+                    <Typography variant="body1">{stream.rating.toFixed(1)}</Typography>
+                  </Grid>
+                )}
+
+                {stream.tmdb && (
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                      TMDb ID
+                    </Typography>
+                    <Typography variant="body1">{stream.tmdb}</Typography>
                   </Grid>
                 )}
 
@@ -354,7 +568,7 @@ export default function StreamDetail() {
                     Created At
                   </Typography>
                   <Typography variant="body2">
-                    {new Date(stream.created_at).toLocaleDateString('en-US', {
+                    {new Date(stream.createdAt).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
@@ -364,13 +578,13 @@ export default function StreamDetail() {
                   </Typography>
                 </Grid>
 
-                {stream.updated_at && (
+                {stream.updatedAt && (
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
                       Updated At
                     </Typography>
                     <Typography variant="body2">
-                      {new Date(stream.updated_at).toLocaleDateString('en-US', {
+                      {new Date(stream.updatedAt).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',
@@ -382,44 +596,175 @@ export default function StreamDetail() {
                 )}
               </Grid>
             </Box>
+          </Grid>
 
-            {/* Metadata Table - Below Detail Info */}
-            {stream.data && Object.keys(stream.data).length > 0 && (
-              <Box sx={{ p: 3, pt: 0, backgroundColor: '#fafafa' }}>
+          {streamIcon && (
+            <Grid item xs={12} sm={5} md={4} lg={3} sx={{ order: 2, flexShrink: 0 }}>
+              <Box sx={{ p: 3, pt: { xs: 0, sm: 3 }, display: 'flex', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+                <Box
+                  onClick={handleImagePreviewOpen}
+                  onKeyDown={handleImageKeyDown}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open full size image for ${stream.name}`}
+                  sx={{
+                    width: '100%',
+                    maxWidth: { xs: 220, sm: 280, md: 320 },
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    boxShadow: 2,
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                    '&:hover': {
+                      transform: 'scale(1.02)',
+                      boxShadow: 4,
+                    },
+                    '&:focus-visible': {
+                      outline: '2px solid',
+                      outlineColor: 'primary.main',
+                      outlineOffset: 2,
+                    },
+                  }}
+                >
+                  <CardMedia
+                    component="img"
+                    image={streamIcon}
+                    alt={stream.name}
+                    sx={{
+                      width: '100%',
+                      height: 'auto',
+                      maxHeight: { xs: 320, sm: 420 },
+                      objectFit: 'cover',
+                      display: 'block',
+                      backgroundColor: '#f0f0f0',
+                    }}
+                  />
+                </Box>
+              </Box>
+            </Grid>
+          )}
+        </Grid>
+      </Card>
+
+      {/* Tabs for Metadata and TMDB Linked Streams */}
+      <Card sx={{ mb: 3 }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs
+            value={tabValue}
+            onChange={(_, newValue) => setTabValue(newValue)}
+            aria-label="stream details tabs"
+          >
+            <Tab label="Metadata" id="stream-tab-0" aria-controls="stream-tabpanel-0" />
+            {stream.tmdb && <Tab label={`Same TMDB ID (${tmdbLinkedStreams?.length || 0})`} id="stream-tab-1" aria-controls="stream-tabpanel-1" />}
+            {hasRawData && <Tab label="Raw Data" id={`stream-tab-${rawDataTabIndex}`} aria-controls={`stream-tabpanel-${rawDataTabIndex}`} />}
+          </Tabs>
+        </Box>
+
+        {/* Metadata Tab */}
+        <TabPanel value={tabValue} index={0}>
+          {hasMetadata && metadata ? (
+            <TableContainer sx={{ maxHeight: 400 }}>
+              <Table size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
+                <TableBody>
+                  {Object.entries(metadata).map(([key, value]) => {
+                    // Skip certain fields we already display
+                    if (['stream_icon', 'cover', 'url', 'duration', 'episodes', 'seasons'].includes(key)) {
+                      return null;
+                    }
+
+                    let displayValue: string;
+                    if (typeof value === 'object') {
+                      displayValue = JSON.stringify(value, null, 2);
+                    } else {
+                      displayValue = String(value);
+                    }
+
+                    return (
+                      <TableRow key={key}>
+                        <TableCell
+                          sx={{
+                            width: 180,
+                            minWidth: 180,
+                            maxWidth: 180,
+                            verticalAlign: 'top',
+                            fontWeight: 500,
+                            fontSize: '0.875rem',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {key}
+                        </TableCell>
+                        <TableCell sx={{ width: 'calc(100% - 180px)', fontSize: '0.875rem' }}>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontFamily: 'monospace',
+                              whiteSpace: 'pre-wrap',
+                              overflowWrap: 'anywhere',
+                              wordBreak: 'break-word',
+                            }}
+                          >
+                            {displayValue}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              No metadata available
+            </Typography>
+          )}
+        </TabPanel>
+
+        {/* TMDB Linked Streams Tab */}
+        {stream.tmdb && (
+          <TabPanel value={tabValue} index={1}>
+            {tmdbLinkedStreams && tmdbLinkedStreams.length > 0 ? (
+              <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-                  Metadata
+                  Streams with the same TMDB ID ({stream.tmdb}) across different sources:
                 </Typography>
-                <TableContainer sx={{ maxHeight: 250 }}>
+                <TableContainer>
                   <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                        <TableCell sx={{ fontWeight: 600 }}>Stream Name</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Source</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Action</TableCell>
+                      </TableRow>
+                    </TableHead>
                     <TableBody>
-                      {Object.entries(stream.data).map(([key, value]) => {
-                        // Skip certain fields we already display
-                        if (['stream_icon', 'url', 'duration', 'episodes', 'seasons'].includes(key)) {
-                          return null;
-                        }
-
-                        let displayValue: string;
-                        if (typeof value === 'object') {
-                          displayValue = JSON.stringify(value, null, 2);
-                        } else {
-                          displayValue = String(value);
-                        }
-
+                      {tmdbLinkedStreams.map((linkedStream) => {
+                        const sourceInfo = allSources?.data?.find((s) => s.id === linkedStream.sourceId);
                         return (
-                          <TableRow key={key}>
-                            <TableCell sx={{ verticalAlign: 'top', fontWeight: 500, fontSize: '0.875rem' }}>
-                              {key}
+                          <TableRow key={linkedStream.id}>
+                            <TableCell>{linkedStream.name}</TableCell>
+                            <TableCell>
+                              <Chip label={streamType.toUpperCase()} size="small" color={getTypeColor(streamType)} />
                             </TableCell>
-                            <TableCell sx={{ fontSize: '0.875rem' }}>
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontFamily: 'monospace',
-                                  wordBreak: 'break-word',
+                            <TableCell>{sourceInfo?.name || `Source ${linkedStream.sourceId}`}</TableCell>
+                            <TableCell>
+                              {linkedStream.categoryId
+                                ? linkedCategoryNames?.[`${linkedStream.sourceId}:${linkedStream.categoryId}`] || `Category ${linkedStream.categoryId}`
+                                : '—'}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => {
+                                  sessionStorage.setItem('streamDetailReferrer', window.location.pathname);
+                                  navigate(`/streams/${linkedStream.id}/${streamType}`);
                                 }}
                               >
-                                {displayValue.length > 80 ? displayValue.substring(0, 80) + '...' : displayValue}
-                              </Typography>
+                                View
+                              </Button>
                             </TableCell>
                           </TableRow>
                         );
@@ -428,69 +773,87 @@ export default function StreamDetail() {
                   </Table>
                 </TableContainer>
               </Box>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No other streams with the same TMDB ID found
+              </Typography>
             )}
-          </Grid>
+          </TabPanel>
+        )}
 
-          {/* Right Section: Image Only */}
-          {streamIcon && (
-            <Grid item xs={12} sm={4} md={2} sx={{ display: 'flex', alignItems: 'stretch' }}>
-              <CardMedia
-                component="img"
-                image={streamIcon}
-                alt={stream.name}
-                sx={{
-                  width: '100%',
-                  height: '100%',
-                  minHeight: 150,
-                  objectFit: 'cover',
-                  backgroundColor: '#f0f0f0',
-                }}
-              />
-            </Grid>
-          )}
-        </Grid>
+        {/* Raw Data Tab */}
+        {hasRawData && (
+          <TabPanel value={tabValue} index={rawDataTabIndex}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                JSON
+              </Typography>
+              <Tooltip title="Copy to clipboard">
+                <IconButton
+                  size="small"
+                  onClick={() =>
+                    handleCopyToClipboard(
+                      rawDataText,
+                      'Data copied to clipboard!'
+                    )
+                  }
+                >
+                  <ContentCopyIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
+                backgroundColor: '#f5f5f5',
+                overflow: 'auto',
+                maxHeight: 400,
+                fontFamily: 'monospace',
+                fontSize: '0.875rem',
+                lineHeight: 1.6,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+            >
+              {rawDataText}
+            </Paper>
+          </TabPanel>
+        )}
       </Card>
 
-      {/* Raw Data JSON */}
-      {stream.data && Object.keys(stream.data).length > 0 && (
-        <Card sx={{ mb: 3, p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Raw Data (JSON)
-            </Typography>
-            <Tooltip title="Copy to clipboard">
-              <IconButton
-                size="small"
-                onClick={() =>
-                  handleCopyToClipboard(
-                    JSON.stringify(stream.data, null, 2),
-                    'Data copied to clipboard!'
-                  )
-                }
-              >
-                <ContentCopyIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
+      {/* Removed: Raw Data JSON section (now in tabs) */}
 
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 2,
-              backgroundColor: '#f5f5f5',
-              overflow: 'auto',
-              maxHeight: 400,
-              fontFamily: 'monospace',
-              fontSize: '0.875rem',
-              lineHeight: 1.6,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-            }}
-          >
-            {JSON.stringify(stream.data, null, 2)}
-          </Paper>
-        </Card>
-      )}
+      <Dialog
+        open={imagePreviewOpen}
+        onClose={() => setImagePreviewOpen(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogContent
+          sx={{
+            p: 2,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: '#111',
+          }}
+        >
+          {streamIcon && (
+            <Box
+              component="img"
+              src={streamIcon}
+              alt={stream.name}
+              sx={{
+                maxWidth: '100%',
+                maxHeight: '80vh',
+                objectFit: 'contain',
+                borderRadius: 1,
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
 
       {/* Snackbar for copy notification */}

@@ -1,16 +1,13 @@
 import api from './api';
+import type { Category } from '../types';
 
-export interface Category {
-  id: number;
-  source_id: number;
-  category_id: string | number;
-  category_name: string;
-  category_type: 'live' | 'vod' | 'series';
-  num: number;
-  allow_deny?: 'allow' | 'deny' | null;
-  parent_id?: number | null;
-  labels?: string | null;
-  created_at: string;
+export type CategoryTypeFilter = 'live' | 'vod' | 'series';
+export type CategoryAllowDenyFilter = 'all' | 'allow' | 'deny' | 'default';
+export type CategoryBlackListFilter = 'all' | 'default' | 'hidden' | 'visible' | 'force_hidden';
+
+export interface CategoriesFilters {
+  allowDenyFilter?: CategoryAllowDenyFilter;
+  blackListFilter?: CategoryBlackListFilter;
 }
 
 export interface CategoriesListResponse {
@@ -32,15 +29,28 @@ export interface CategoryResponse {
 class CategoriesApi {
   /**
    * Get all categories by source (paginated)
-   * Optional search by name and filter by category type
+   * Optional search by name and server-side filters by category type, access control, and blacklist
    */
-  async getCategories(sourceId: number, page: number = 1, limit: number = 20, search?: string, categoryType?: 'live' | 'vod' | 'series') {
-    const params: { source_id: number; page: number; limit: number; search?: string; category_type?: string } = { source_id: sourceId, page, limit };
+  async getCategories(
+    sourceId: number,
+    page: number = 1,
+    limit: number = 20,
+    search?: string,
+    categoryType?: CategoryTypeFilter,
+    filters?: CategoriesFilters,
+  ) {
+    const params: Record<string, string | number> = { sourceId, page, limit };
     if (search) {
       params.search = search;
     }
     if (categoryType) {
-      params.category_type = categoryType;
+      params.categoryType = categoryType;
+    }
+    if (filters?.allowDenyFilter && filters.allowDenyFilter !== 'all') {
+      params.allowDenyFilter = filters.allowDenyFilter;
+    }
+    if (filters?.blackListFilter && filters.blackListFilter !== 'all') {
+      params.blackListFilter = filters.blackListFilter;
     }
     const response = await api.get('/categories', { params });
     return response.data as CategoriesListResponse;
@@ -48,12 +58,24 @@ class CategoriesApi {
 
   /**
    * Get single category by ID
-   * @param id - category ID (can be database id or functional category_id depending on lookup)
-   * @param sourceId - if provided, searches by source_id + category_id (functional lookup)
+   * @param id - category ID
+   * @param sourceId - if provided, searches by source_id
    */
   async getCategory(id: number, sourceId?: number) {
-    const params = sourceId ? { source_id: sourceId } : {};
+    const params = sourceId ? { sourceId } : {};
     const response = await api.get(`/categories/${id}`, { params });
+    return response.data as CategoryResponse;
+  }
+
+  /**
+   * Get single category by external ID and source ID
+   * @param externalId - category external ID (from upstream Xtream)
+   * @param sourceId - source ID
+   * @param type - category type (live, vod, series) - required
+   */
+  async getCategoryByExternalId(externalId: number, sourceId: number, type: string) {
+    const params = { sourceId, type };
+    const response = await api.get(`/categories/by-external-id/${externalId}`, { params });
     return response.data as CategoryResponse;
   }
 
@@ -63,7 +85,17 @@ class CategoriesApi {
    * @param allowDeny - 'allow', 'deny', or null to remove override
    */
   async updateAllowDeny(id: number, allowDeny: 'allow' | 'deny' | null) {
-    const response = await api.patch(`/categories/${id}/allow-deny`, { allow_deny: allowDeny });
+    const response = await api.patch(`/categories/${id}/allow-deny`, { allowDeny });
+    return response.data as CategoryResponse;
+  }
+
+  /**
+   * Update category blacklist status
+   * @param id - category database ID
+   * @param blackList - 'hide', 'visible', 'force_hide', 'force_visible', or 'default'
+   */
+  async updateBlackList(id: number, blackList: 'default' | 'hide' | 'visible' | 'force_hide' | 'force_visible') {
+    const response = await api.patch(`/categories/${id}/blacklist`, { blackList });
     return response.data as CategoryResponse;
   }
 }

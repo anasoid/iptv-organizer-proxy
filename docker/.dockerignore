@@ -1,25 +1,59 @@
+# Git
 .git
 .github
 .gitignore
 .gitlab-ci.yml
 .editorconfig
+
+# IDE
 .vscode
 .idea
 .DS_Store
+
+# Documentation
 *.md
 LICENSE
 Makefile
+
+# Docker/Compose
 docker-compose*.yml
-Dockerfile
+
+# Environment
 .env
 .env.local
-node_modules
+
+# Node/Admin UI (pre-built should be in build)
+admin/node_modules/
+admin/.env
+admin/.env.local
 npm-debug.log
-admin/dist
-admin/node_modules
+
+# Pre-built frontend (don't include source)
+admin/src/
+admin/public/
+admin/*.config.*
+admin/tsconfig*
+admin/index.html
+
+# Gradle/Java build artifacts (Docker builds from source)
+back/.gradle/
+back/build/
+back/bin/
+back/*.jar
+back/target/
+# NOTE: back/gradle/wrapper/gradle-wrapper.jar is intentionally NOT excluded
+# It is required by the Docker builder stage to run ./gradlew
+
+# Old PHP backend (not needed for Java image)
 back/vendor
 back/logs
 back/data
 back/tests
 back/.htaccess
+back/src/
+
+# Development tools
 .taskmaster
+java/
+coverage/
+jacoco/

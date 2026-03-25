@@ -1,23 +1,194 @@
-name: Build and Push Docker Image
+name: Docker Build & Push
 
 on:
   push:
     branches:
       - main
-      - devlop
+      - develop
+      - release/*
     tags:
-      - 'v*'
+      - '*'
   pull_request:
     branches:
       - main
-      - devlop
+      - develop
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Build native binary and arch-specific image on each platform's own runner.
+  # Each job compiles the Quarkus native binary natively (no cross-compilation,
+  # no QEMU for the compile step) and pushes a platform-tagged image.
+  # ──────────────────────────────────────────────────────────────────────────
+  build-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux/amd64
+            arch: amd64
+            variant: sqlite
+            graalvmVersion: '25'
+            fullJdbcDrivers: 'false'
+            tagSuffix: ''
+          - os: ubuntu-latest
+            platform: linux/amd64
+            arch: amd64
+            variant: full
+            graalvmVersion: '25'
+            fullJdbcDrivers: 'true'
+            tagSuffix: '-full'
+          - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
+            platform: linux/arm64
+            arch: arm64
+            variant: sqlite
+            graalvmVersion: '25'
+            fullJdbcDrivers: 'false'
+            tagSuffix: ''
+          - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
+            platform: linux/arm64
+            arch: arm64
+            variant: full
+            graalvmVersion: '25'
+            fullJdbcDrivers: 'true'
+            tagSuffix: '-full'
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Build admin UI (platform-independent JS build)
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: admin/package-lock.json
+
+      # build:java compiles TS, runs vite build, and copies dist → back/src/main/resources/META-INF/resources/admin/
+      - name: Build admin UI
+        working-directory: admin
+        run: |
+          npm ci
+          npm run build:java
+
+      # 3. Setup JDK 25 based on matrix configuration
+      - name: Setup JDK ${{ matrix.graalvmVersion }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '${{ matrix.graalvmVersion }}'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x back/gradlew
+
+      # 4. Docker Buildx (single-platform per job — no cross-compilation needed)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 5. Login to GHCR (skip on PRs)
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 6. Determine image tag
+      - name: Determine image tag
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
+            TAG="latest"
+          elif [[ "${{ github.ref }}" == refs/heads/* ]]; then
+            TAG="${GITHUB_REF#refs/heads/}"
+          else
+            TAG="pr-${{ github.event.pull_request.number }}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # 7. Build and push arch-specific image (push builds only)
+      #    Step 1: compile the native binary (no container-image flags — just produce the runner).
+      #    Step 2: build & push the Docker image ourselves so the build context is unambiguous.
+      - name: Compile native binary (${{ matrix.arch }} / ${{ matrix.variant }})
+        if: github.event_name != 'pull_request'
+        run: |
+          export GRADLE_OPTS="-Xmx2g"
+          NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
+          ./gradlew build \
+            -x test \
+            -PbuildingNativeImage \
+            -PfullJdbcDrivers=${{ matrix.fullJdbcDrivers }} \
+            -Dquarkus.native.enabled=true \
+            -Dquarkus.package.jar.enabled=false \
+            -Dquarkus.native.container-build=true \
+            -Dquarkus.native.compression.level=9 \
+            "-Dquarkus.native.container-runtime-options=--memory=3g" \
+            ${NATIVE_XMX_OPT} \
+            --no-daemon
+        working-directory: back
+
+      - name: Build and push Docker image (${{ matrix.arch }} / ${{ matrix.variant }})
+        if: github.event_name != 'pull_request'
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy:${{ steps.tag.outputs.tag }}${{ matrix.tagSuffix }}-${{ matrix.arch }}"
+          echo "=== build context contents ==="
+          ls -la back/build/*-runner 2>/dev/null || { echo "ERROR: no *-runner file in back/build/"; exit 1; }
+          docker buildx build \
+            --platform "${{ matrix.platform }}" \
+            --file back/src/main/docker/Dockerfile.native \
+            --tag "${IMAGE}" \
+            --push \
+            back/build/
+
+      # 8. PR: build only (no push), amd64 only to keep CI fast
+      - name: Compile native binary (PR / amd64 / ${{ matrix.variant }})
+        if: github.event_name == 'pull_request' && matrix.arch == 'amd64'
+        run: |
+          export GRADLE_OPTS="-Xmx2g"
+          NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
+          ./gradlew build \
+            -x test \
+            -PbuildingNativeImage \
+            -PfullJdbcDrivers=${{ matrix.fullJdbcDrivers }} \
+            -Dquarkus.native.enabled=true \
+            -Dquarkus.package.jar.enabled=false \
+            -Dquarkus.native.container-build=true \
+            -Dquarkus.native.compression.level=9 \
+            "-Dquarkus.native.container-runtime-options=--memory=3g" \
+            ${NATIVE_XMX_OPT} \
+            --no-daemon
+        working-directory: back
+
+      - name: Build Docker image (PR / no push / ${{ matrix.variant }})
+        if: github.event_name == 'pull_request' && matrix.arch == 'amd64'
+        run: |
+          ls -la back/build/*-runner 2>/dev/null || { echo "ERROR: no *-runner file in back/build/"; exit 1; }
+          docker buildx build \
+            --platform "${{ matrix.platform }}" \
+            --file back/src/main/docker/Dockerfile.native \
+            back/build/
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # After all arch-specific images are pushed, merge them into a single
+  # multi-arch manifest and build the VFS variant.
+  # ──────────────────────────────────────────────────────────────────────────
+  merge-manifest:
+    needs: build-native
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -27,126 +198,62 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Build admin UI
-        working-directory: ./admin
-        run: |
-          npm install
-          VITE_BASE_PATH=/admin/ npm run build
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        if: github.event_name != 'pull_request'
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        id: build
-        with:
-          context: .
-          file: ./docker/Dockerfile
-          # Build for multiple architectures
-          # - linux/amd64: Servers, desktops, cloud platforms
-          # - linux/arm64: Modern routers, Raspberry Pi 4+, ARM servers
-          # Uses apk --no-scripts to work around QEMU post-install script issues
-          platforms: |
-            linux/amd64
-            linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Generate VFS tags
-        if: github.event_name != 'pull_request'
-        id: vfs-tags
+      - name: Determine image tag
+        id: tag
         run: |
-          TAGS="${{ steps.meta.outputs.tags }}"
-          VFS_TAGS=$(echo "$TAGS" | sed 's/$/-vfs/')
-          echo "tags<<EOF" >> $GITHUB_OUTPUT
-          echo "$VFS_TAGS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
+            TAG="latest"
+          elif [[ "${{ github.ref }}" == refs/heads/* ]]; then
+            TAG="${GITHUB_REF#refs/heads/}"
+          else
+            TAG="pr-${{ github.event.pull_request.number }}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
-      - name: Build and push VFS image for ARM and AMD (single layer)
-        if: github.event_name != 'pull_request'
+      # Combine arch-specific SQLite-only images into a single multi-arch manifest (no suffix)
+      - name: Create and push multi-arch manifest (sqlite / no suffix)
         run: |
-          VFS_TAGS="${{ steps.vfs-tags.outputs.tags }}"
-          BASE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n 1)
-          TAG_ARGS=""
-          while IFS= read -r tag; do
-            TAG_ARGS="$TAG_ARGS --tag $tag"
-          done <<< "$VFS_TAGS"
+          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
+          TAG="${{ steps.tag.outputs.tag }}"
+          docker buildx imagetools create \
+            -t "${BASE}:${TAG}" \
+            "${BASE}:${TAG}-amd64" \
+            "${BASE}:${TAG}-arm64"
+
+      # Combine arch-specific full-driver images into a single multi-arch manifest (-full suffix)
+      - name: Create and push multi-arch manifest (full)
+        run: |
+          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
+          TAG="${{ steps.tag.outputs.tag }}"
+          docker buildx imagetools create \
+            -t "${BASE}:${TAG}-full" \
+            "${BASE}:${TAG}-full-amd64" \
+            "${BASE}:${TAG}-full-arm64"
+
+
+      # Build single-layer VFS variant on top of the merged manifest
+      - name: Build and push VFS image
+        run: |
+          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
+          TAG="${{ steps.tag.outputs.tag }}"
+          VFS_TAG="${BASE}:${TAG}-vfs"
           docker buildx build \
             --file ./docker/Dockerfile.vfs \
             --platform linux/amd64,linux/arm64 \
-            --build-arg BASE_IMAGE=$BASE_TAG \
+            --build-arg BASE_IMAGE="${BASE}:${TAG}" \
             --push \
-            $TAG_ARGS \
+            --tag "${VFS_TAG}" \
             .
 
-  test:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Run PHP linter
-        working-directory: ./back
-        run: |
-          php -l public/index.php
-          php -l bootstrap.php
-          find src -name "*.php" -type f -exec php -l {} \;
-
-      - name: Check composer.json validity
-        working-directory: ./back
-        run: composer validate --strict
-
-  security:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-        continue-on-error: true
-
-      - name: Upload Trivy results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v2
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
-        continue-on-error: true

@@ -1,0 +1,326 @@
+package org.anasoid.iptvorganizer.services.xtream;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.anasoid.iptvorganizer.dto.HttpRequestDto;
+import org.anasoid.iptvorganizer.dto.RequestType;
+import org.anasoid.iptvorganizer.models.entity.Client;
+import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.entity.stream.Category;
+import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
+import org.anasoid.iptvorganizer.models.http.HttpOptions;
+import org.anasoid.iptvorganizer.models.http.ProxyOptions;
+import org.anasoid.iptvorganizer.repositories.ClientRepository;
+import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
+import org.anasoid.iptvorganizer.services.ProxyConfigService;
+import org.anasoid.iptvorganizer.services.stream.CategoryService;
+import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
+import org.anasoid.iptvorganizer.services.stream.SeriesService;
+import org.anasoid.iptvorganizer.services.stream.VodStreamService;
+import org.anasoid.iptvorganizer.utils.streaming.HttpStreamingService;
+import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
+import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+/** Unit tests for XtreamUserService using Mockito. */
+@ExtendWith(MockitoExtension.class)
+class XtreamUserServiceTest {
+
+  @Mock private ClientRepository clientRepository;
+  @Mock private SourceRepository sourceRepository;
+  @Mock private HttpStreamingService httpStreamingService;
+  @Mock private CategoryService categoryService;
+  @Mock private LiveStreamService liveStreamService;
+  @Mock private VodStreamService vodStreamService;
+  @Mock private SeriesService seriesService;
+  @Mock private ContentFilterService contentFilterService;
+  @Mock private ProxyConfigService proxyConfigService;
+  @Mock private XtreamClient xtreamClient;
+  @Mock private ObjectMapper objectMapper;
+
+  @InjectMocks private XtreamUserService xtreamUserService;
+
+  private Client testClient;
+  private Source testSource;
+
+  @BeforeEach
+  void setUp() {
+    testClient = new Client();
+    testClient.setId(1L);
+    testClient.setUsername("testclient");
+    testClient.setPassword("clientpass");
+    testClient.setSourceId(1L);
+
+    testSource = new Source();
+    testSource.setId(1L);
+    testSource.setUrl("http://upstream.example.com");
+    testSource.setUsername("upstream_user");
+    testSource.setPassword("upstream_pass");
+
+    // Ensure proxyConfigService never returns null ProxyOptions (lenient: not all tests invoke it)
+    lenient()
+        .when(proxyConfigService.getProxyOption(any(), any(), any(RequestType.class)))
+        .thenReturn(new ProxyOptions());
+  }
+
+  @Test
+  void testAuthenticate_Success_ReplacesServerInfo() {
+    // Given: Mock client and source
+    when(clientRepository.findByUsernameAndPassword("testclient", "clientpass"))
+        .thenReturn(testClient);
+    when(sourceRepository.findById(1L)).thenReturn(testSource);
+
+    // Mock upstream authentication response
+    Map<String, Object> upstreamAuth = createUpstreamAuthResponse();
+    when(httpStreamingService.fetchJsonObject(
+            contains("upstream_user"),
+            any(HttpOptions.class),
+            any(ProxyOptions.class),
+            eq(testSource)))
+        .thenReturn(upstreamAuth);
+
+    // When: Authenticate via proxy
+    Map<String, Object> result =
+        xtreamUserService.authenticate(
+            "testclient",
+            "clientpass",
+            new HttpRequestDto("http://proxy.local:9000", RequestType.API, null));
+
+    // Then: Verify server_info and user_info replaced
+    assertThat(result).isNotNull();
+    assertThat(result).containsKeys("user_info", "server_info");
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> serverInfo = (Map<String, Object>) result.get("server_info");
+    assertThat(serverInfo)
+        .containsEntry("url", "proxy.local")
+        .containsEntry("port", "9000")
+        .containsEntry("server_protocol", "http");
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> userInfo = (Map<String, Object>) result.get("user_info");
+    assertThat(userInfo)
+        .containsEntry("username", "testclient")
+        .containsEntry("password", "clientpass");
+  }
+
+  @Test
+  void testAuthenticate_Success_WithHttpsProxyUrl() {
+    // Given: HTTPS proxy URL
+    when(clientRepository.findByUsernameAndPassword("testclient", "clientpass"))
+        .thenReturn(testClient);
+    when(sourceRepository.findById(1L)).thenReturn(testSource);
+
+    Map<String, Object> upstreamAuth = createUpstreamAuthResponse();
+    when(httpStreamingService.fetchJsonObject(
+            anyString(), any(HttpOptions.class), any(ProxyOptions.class), eq(testSource)))
+        .thenReturn(upstreamAuth);
+
+    // When: Authenticate with HTTPS proxy
+    Map<String, Object> result =
+        xtreamUserService.authenticate(
+            "testclient",
+            "clientpass",
+            new HttpRequestDto("https://proxy.local:8443", RequestType.API, null));
+
+    // Then: Verify HTTPS port mapping
+    @SuppressWarnings("unchecked")
+    Map<String, Object> serverInfo = (Map<String, Object>) result.get("server_info");
+    assertThat(serverInfo)
+        .containsEntry("url", "proxy.local")
+        .containsEntry("https_port", "8443")
+        .containsEntry("server_protocol", "https");
+  }
+
+  @Test
+  void testAuthenticate_SourceNotFound() {
+    // Given: Source not found
+    when(clientRepository.findByUsernameAndPassword("testclient", "clientpass"))
+        .thenReturn(testClient);
+    when(sourceRepository.findById(1L)).thenReturn(null);
+
+    // When/Then: Should throw exception
+    assertThatThrownBy(
+            () ->
+                xtreamUserService.authenticate(
+                    "testclient",
+                    "clientpass",
+                    new HttpRequestDto("http://proxy.local:9000", RequestType.API, null)))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessage("Source not found for client");
+  }
+
+  @Test
+  void testAuthenticateAndValidateClient_Success() {
+    // Given: Valid credentials
+    when(clientRepository.findByUsernameAndPassword("testclient", "clientpass"))
+        .thenReturn(testClient);
+    when(sourceRepository.findById(1L)).thenReturn(testSource);
+
+    // When: Authenticate and validate
+    ClientAuthenticationResult result =
+        xtreamUserService.authenticateAndValidateClient("testclient", "clientpass");
+
+    // Then: Should return client and source
+    assertThat(result).isNotNull();
+    assertThat(result.getClient()).isEqualTo(testClient);
+    assertThat(result.getSource()).isEqualTo(testSource);
+  }
+
+  @Test
+  void testAuthenticateAndValidateClient_EmptyUsername() {
+    // When/Then: Empty username should throw UnauthorizedException
+    assertThatThrownBy(() -> xtreamUserService.authenticateAndValidateClient("", "password"))
+        .isInstanceOf(org.anasoid.iptvorganizer.exceptions.UnauthorizedException.class);
+  }
+
+  @Test
+  void testAuthenticateAndValidateClient_NullPassword() {
+    // When/Then: Null password should throw UnauthorizedException
+    assertThatThrownBy(() -> xtreamUserService.authenticateAndValidateClient("username", null))
+        .isInstanceOf(org.anasoid.iptvorganizer.exceptions.UnauthorizedException.class);
+  }
+
+  @Test
+  void testAuthenticateAndValidateClient_ClientNotFound() {
+    // Given: Client not found
+    when(clientRepository.findByUsernameAndPassword("invalid", "password"))
+        .thenThrow(new RuntimeException("Client not found"));
+
+    // When/Then: Should throw exception
+    assertThatThrownBy(() -> xtreamUserService.authenticateAndValidateClient("invalid", "password"))
+        .isInstanceOf(RuntimeException.class);
+  }
+
+  @Test
+  void testAuthenticateAndValidateClient_SourceNotConfigured() {
+    // Given: Source not found for client
+    when(clientRepository.findByUsernameAndPassword("testclient", "clientpass"))
+        .thenReturn(testClient);
+    when(sourceRepository.findById(1L)).thenReturn(null);
+
+    // When/Then: Should throw ForbiddenException
+    assertThatThrownBy(
+            () -> xtreamUserService.authenticateAndValidateClient("testclient", "clientpass"))
+        .isInstanceOf(org.anasoid.iptvorganizer.exceptions.ForbiddenException.class)
+        .hasMessage("Source not configured for this client");
+  }
+
+  @Test
+  void testAuthenticate_InvalidAuthResponse() {
+    // Given: Invalid upstream response (missing required fields)
+    when(clientRepository.findByUsernameAndPassword("testclient", "clientpass"))
+        .thenReturn(testClient);
+    when(sourceRepository.findById(1L)).thenReturn(testSource);
+
+    Map<String, Object> invalidResponse = new HashMap<>();
+    invalidResponse.put("invalid_field", "value");
+    when(httpStreamingService.fetchJsonObject(
+            anyString(), any(HttpOptions.class), any(ProxyOptions.class), eq(testSource)))
+        .thenReturn(invalidResponse);
+
+    // When/Then: Should throw exception
+    assertThatThrownBy(
+            () ->
+                xtreamUserService.authenticate(
+                    "testclient",
+                    "clientpass",
+                    new HttpRequestDto("http://proxy.local:9000", RequestType.API, null)))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessage("Invalid authentication response from upstream");
+  }
+
+  @Test
+  void testGetCategories_FiltersOutBlacklistedCategories() {
+    // Given: Categories with mixed blacklist statuses
+    FilterContext filterContext = new FilterContext();
+    filterContext.setHideAdultContent(false);
+    when(contentFilterService.buildFilterContext(testClient)).thenReturn(filterContext);
+
+    List<Category> filteredCategories = new ArrayList<>();
+    Category allowedCategory = new Category();
+    allowedCategory.setId(1L);
+    allowedCategory.setExternalId(101);
+    allowedCategory.setName("Sports");
+    allowedCategory.setType("live");
+    allowedCategory.setBlackList(Category.BlackListStatus.DEFAULT);
+    filteredCategories.add(allowedCategory);
+
+    Category visibleCategory = new Category();
+    visibleCategory.setId(2L);
+    visibleCategory.setExternalId(102);
+    visibleCategory.setName("Movies");
+    visibleCategory.setType("vod");
+    visibleCategory.setBlackList(Category.BlackListStatus.VISIBLE);
+    filteredCategories.add(visibleCategory);
+
+    Category hiddenCategory = new Category();
+    hiddenCategory.setId(3L);
+    hiddenCategory.setExternalId(103);
+    hiddenCategory.setName("Hidden Category");
+    hiddenCategory.setType("live");
+    hiddenCategory.setBlackList(Category.BlackListStatus.HIDE);
+    filteredCategories.add(hiddenCategory);
+
+    Category forceHiddenCategory = new Category();
+    forceHiddenCategory.setId(4L);
+    forceHiddenCategory.setExternalId(104);
+    forceHiddenCategory.setName("Force Hidden");
+    forceHiddenCategory.setType("live");
+    forceHiddenCategory.setBlackList(Category.BlackListStatus.FORCE_HIDE);
+    filteredCategories.add(forceHiddenCategory);
+
+    when(contentFilterService.getAllowedCategories(filterContext, 1L, "live"))
+        .thenReturn(filteredCategories);
+
+    // When: Get categories
+    JsonStreamResult<Map<?, ?>> result =
+        xtreamUserService.getCategories(testClient, testSource, StreamType.LIVE);
+
+    // Then: Should exclude HIDE and FORCE_HIDE, include others
+    List<Map<?, ?>> categoriesList = new ArrayList<>();
+    result.iterator().forEachRemaining(categoriesList::add);
+
+    assertThat(categoriesList).hasSize(2);
+    @SuppressWarnings("unchecked")
+    List<String> names =
+        categoriesList.stream().map(cat -> (String) cat.get("category_name")).toList();
+    assertThat(names).containsExactly("Sports", "Movies");
+  }
+
+  /**
+   * Create a mock upstream authentication response
+   *
+   * @return Map with user_info and server_info
+   */
+  private Map<String, Object> createUpstreamAuthResponse() {
+    Map<String, Object> response = new HashMap<>();
+
+    Map<String, Object> userInfo = new HashMap<>();
+    userInfo.put("username", "upstream_user");
+    userInfo.put("password", "upstream_pass");
+    userInfo.put("auth", 1);
+    userInfo.put("status", "Active");
+    response.put("user_info", userInfo);
+
+    Map<String, Object> serverInfo = new HashMap<>();
+    serverInfo.put("url", "upstream.example.com");
+    serverInfo.put("port", "8080");
+    serverInfo.put("https_port", "8443");
+    serverInfo.put("server_protocol", "http");
+    response.put("server_info", serverInfo);
+
+    return response;
+  }
+}

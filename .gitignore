@@ -43,3 +43,16 @@ tmp
 /public/debug.php
 /back/public/admin/
 /back/.phpunit.cache/test-results
+
+
+#java
+.gradle
+classes/
+build
+buildSrc/build
+buildUtils/*/build
+target/
+/java/bin/
+/back/bin/
+/back/src/main/resources/META-INF/resources/admin/
+/back/db/

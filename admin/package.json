@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --skipLibCheck && vite build",
+    "build:java": "tsc --skipLibCheck && VITE_BASE_PATH=/admin/ vite build && rm -rf ../back/src/main/resources/META-INF/resources/admin && mkdir -p ../back/src/main/resources/META-INF/resources/admin && cp -r dist/* ../back/src/main/resources/META-INF/resources/admin/",
     "build:php": "tsc --skipLibCheck && VITE_BASE_PATH=/admin/ vite build && rm -rf ../back/public/admin/* && mkdir -p ../back/public/admin && cp -r dist/* ../back/public/admin/",
     "build:prod": "tsc --skipLibCheck && VITE_BASE_PATH=/admin/ VITE_API_BASE_URL=https://freeforever4584.free.nf vite build && rm -rf ../back/public/admin/* && mkdir -p ../back/public/admin && cp -r dist/* ../back/public/admin/",
     "lint": "eslint .",
@@ -26,6 +27,7 @@
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.67.0",
     "react-router-dom": "^7.9.6",
+    "recharts": "^3.8.0",
     "zustand": "^5.0.9"
   },
   "devDependencies": {
@@ -34,6 +36,7 @@
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "baseline-browser-mapping": "^2.9.19",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",

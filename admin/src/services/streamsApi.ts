@@ -1,25 +1,6 @@
 import api from './api';
-
-export interface StreamData {
-  [key: string]: unknown;
-  stream_icon?: string;
-}
-
-export interface Stream {
-  id: number;
-  source_id: number;
-  stream_id: string | number;
-  num: number;
-  name: string;
-  category_id: string | number | null;
-  category_ids?: string | number[] | null;
-  is_adult: number;
-  allow_deny?: 'allow' | 'deny' | null;
-  labels?: string | null;
-  data?: StreamData | null;
-  created_at: string;
-  updated_at: string;
-}
+import type { Stream } from '../types';
+export type { Stream } from '../types';
 
 export interface StreamsListResponse {
   success: boolean;
@@ -39,20 +20,26 @@ export interface StreamResponse {
 
 type StreamType = 'live' | 'vod' | 'series';
 
-interface StreamsParams {
-  source_id: number;
-  type: StreamType;
-  page: number;
-  limit: number;
-  category_id?: number;
-  search?: string;
-  stream_id?: number | string;
+export interface StreamListQueryOptions {
+  sortBy?: 'addedDate' | 'createdAt' | 'updatedAt' | 'releaseDate' | 'rating' | 'tmdb';
+  sortDir?: 'asc' | 'desc';
+  addedDateFrom?: string;
+  addedDateTo?: string;
+  createdDateFrom?: string;
+  createdDateTo?: string;
+  updateDateFrom?: string;
+  updateDateTo?: string;
+  releaseDateFrom?: string;
+  releaseDateTo?: string;
+  ratingMin?: number;
+  ratingMax?: number;
+  tmdb?: number;
 }
 
 class StreamsApi {
   /**
    * Get all streams by source and type (paginated)
-   * Optional filter by category_id, search by name, and stream_id
+   * Optional filter by categoryId, search by name, and streamId
    */
   async getStreams(
     sourceId: number,
@@ -61,17 +48,57 @@ class StreamsApi {
     page: number = 1,
     limit: number = 20,
     search?: string,
-    streamId?: number | string
+    streamId?: number | string,
+    options?: StreamListQueryOptions
   ) {
-    const params: StreamsParams = { source_id: sourceId, type, page, limit };
+    const params: Record<string, string | number | boolean> = { sourceId, type, page, limit };
     if (categoryId) {
-      params.category_id = categoryId;
+      params.categoryId = categoryId;
     }
     if (search) {
       params.search = search;
     }
     if (streamId !== undefined && streamId !== '') {
-      params.stream_id = streamId;
+      params.streamId = streamId;
+    }
+    if (options?.sortBy) {
+      params.sortBy = options.sortBy;
+    }
+    if (options?.sortDir) {
+      params.sortDir = options.sortDir;
+    }
+    if (options?.addedDateFrom) {
+      params.addedDateFrom = options.addedDateFrom;
+    }
+    if (options?.addedDateTo) {
+      params.addedDateTo = options.addedDateTo;
+    }
+    if (options?.createdDateFrom) {
+      params.createdDateFrom = options.createdDateFrom;
+    }
+    if (options?.createdDateTo) {
+      params.createdDateTo = options.createdDateTo;
+    }
+    if (options?.updateDateFrom) {
+      params.updateDateFrom = options.updateDateFrom;
+    }
+    if (options?.updateDateTo) {
+      params.updateDateTo = options.updateDateTo;
+    }
+    if (options?.releaseDateFrom) {
+      params.releaseDateFrom = options.releaseDateFrom;
+    }
+    if (options?.releaseDateTo) {
+      params.releaseDateTo = options.releaseDateTo;
+    }
+    if (options?.ratingMin !== undefined && options.ratingMin !== null) {
+      params.ratingMin = options.ratingMin;
+    }
+    if (options?.ratingMax !== undefined && options.ratingMax !== null) {
+      params.ratingMax = options.ratingMax;
+    }
+    if (options?.tmdb !== undefined && options.tmdb !== null) {
+      params.tmdb = options.tmdb;
     }
 
     const response = await api.get('/streams', { params });
@@ -93,22 +120,46 @@ class StreamsApi {
   /**
    * Get live streams
    */
-  async getLiveStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20, search?: string, streamId?: number | string) {
-    return this.getStreams(sourceId, 'live', categoryId, page, limit, search, streamId);
+  async getLiveStreams(
+    sourceId: number,
+    categoryId?: number,
+    page: number = 1,
+    limit: number = 20,
+    search?: string,
+    streamId?: number | string,
+    options?: StreamListQueryOptions
+  ) {
+    return this.getStreams(sourceId, 'live', categoryId, page, limit, search, streamId, options);
   }
 
   /**
    * Get VOD streams
    */
-  async getVodStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20, search?: string, streamId?: number | string) {
-    return this.getStreams(sourceId, 'vod', categoryId, page, limit, search, streamId);
+  async getVodStreams(
+    sourceId: number,
+    categoryId?: number,
+    page: number = 1,
+    limit: number = 20,
+    search?: string,
+    streamId?: number | string,
+    options?: StreamListQueryOptions
+  ) {
+    return this.getStreams(sourceId, 'vod', categoryId, page, limit, search, streamId, options);
   }
 
   /**
    * Get series streams
    */
-  async getSeriesStreams(sourceId: number, categoryId?: number, page: number = 1, limit: number = 20, search?: string, streamId?: number | string) {
-    return this.getStreams(sourceId, 'series', categoryId, page, limit, search, streamId);
+  async getSeriesStreams(
+    sourceId: number,
+    categoryId?: number,
+    page: number = 1,
+    limit: number = 20,
+    search?: string,
+    streamId?: number | string,
+    options?: StreamListQueryOptions
+  ) {
+    return this.getStreams(sourceId, 'series', categoryId, page, limit, search, streamId, options);
   }
 
   /**
@@ -122,7 +173,7 @@ class StreamsApi {
     if (type) {
       params.type = type;
     }
-    const response = await api.patch(`/streams/${id}/allow-deny`, { allow_deny: allowDeny }, { params });
+    const response = await api.patch(`/streams/${id}/allow-deny`, { allowDeny }, { params });
     return response.data as StreamResponse;
   }
 }

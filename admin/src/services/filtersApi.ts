@@ -4,11 +4,11 @@ export interface Filter {
   id: number;
   name: string;
   description?: string;
-  filter_config: string;
-  use_source_filter?: boolean | number;
+  filterConfig: string;
+  useSourceFilter?: boolean | number;
   favoris?: string | null;
-  created_at?: string;
-  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface FilterResponse {
@@ -39,8 +39,8 @@ const filtersApi = {
   async createFilter(data: {
     name: string;
     description?: string;
-    filter_config: string;
-    use_source_filter?: boolean | number;
+    filterConfig: string;
+    useSourceFilter?: boolean | number;
   }): Promise<FilterResponse> {
     const response = await api.post('/filters', data);
     return response.data;
@@ -51,8 +51,8 @@ const filtersApi = {
     data: {
       name?: string;
       description?: string;
-      filter_config?: string;
-      use_source_filter?: boolean | number;
+      filterConfig?: string;
+      useSourceFilter?: boolean | number;
     }
   ): Promise<FilterResponse> {
     const response = await api.put(`/filters/${id}`, data);
@@ -65,7 +65,7 @@ const filtersApi = {
   },
 
   async updateUseSourceFilter(id: number, useSourceFilter: boolean): Promise<FilterResponse> {
-    const response = await api.patch(`/filters/${id}/use-source-filter`, { use_source_filter: useSourceFilter });
+    const response = await api.patch(`/filters/${id}/use-source-filter`, { useSourceFilter });
     return response.data;
   },
 };

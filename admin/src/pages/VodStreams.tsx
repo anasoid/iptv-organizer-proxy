@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
+  Button,
   Card,
   CircularProgress,
   Grid,
@@ -16,7 +17,12 @@ import {
   MenuItem,
   InputLabel,
 } from '@mui/material';
-import { DataGrid, type GridColDef } from '@mui/x-data-grid';
+import {
+  DataGrid,
+  type GridColDef,
+  type GridColumnVisibilityModel,
+  type GridSortModel,
+} from '@mui/x-data-grid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useSourceStore } from '../stores/sourceStore';
@@ -25,8 +31,23 @@ import categoriesApi, { type Category } from '../services/categoriesApi';
 import SourceSelector from '../components/SourceSelector';
 import ViewToggle, { type ViewMode } from '../components/ViewToggle';
 import StreamCard from '../components/StreamCard';
+import StreamDateFilterField from '../components/StreamDateFilterField';
+import CategoryFilterSidebar from '../components/CategoryFilterSidebar';
+import { getCategoryDisplayName } from '../utils/categoryDisplayName';
+import { formatDisplayDate } from '../utils/dateFormat';
+import { useDebounce } from '../hooks/useDebounce';
 
 export default function VodStreams() {
+  const columnVisibilityStorageKey = 'streams-vod-column-visibility';
+  const defaultColumnVisibilityModel: GridColumnVisibilityModel = {
+    num: false,
+    isAdult: false,
+    addedDate: false,
+    releaseDate: false,
+    rating: false,
+    tmdb: false,
+  };
+
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
@@ -37,6 +58,32 @@ export default function VodStreams() {
   const [view, setView] = useState<ViewMode>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [streamId, setStreamId] = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [sortModel, setSortModel] = useState<GridSortModel>([]);
+  const [columnVisibilityModel, setColumnVisibilityModel] = useState<GridColumnVisibilityModel>(
+    () => {
+      const stored = localStorage.getItem(columnVisibilityStorageKey);
+      if (!stored) {
+        return defaultColumnVisibilityModel;
+      }
+      try {
+        return { ...defaultColumnVisibilityModel, ...JSON.parse(stored) };
+      } catch {
+        return defaultColumnVisibilityModel;
+      }
+    }
+  );
+  const [addedDateFrom, setAddedDateFrom] = useState('');
+  const [addedDateTo, setAddedDateTo] = useState('');
+  const [createdDateFrom, setCreatedDateFrom] = useState('');
+  const [createdDateTo, setCreatedDateTo] = useState('');
+  const [updateDateFrom, setUpdateDateFrom] = useState('');
+  const [updateDateTo, setUpdateDateTo] = useState('');
+  const [releaseDateFrom, setReleaseDateFrom] = useState('');
+  const [releaseDateTo, setReleaseDateTo] = useState('');
+  const [ratingMin, setRatingMin] = useState('');
+  const [ratingMax, setRatingMax] = useState('');
+  const [tmdb, setTmdb] = useState('');
   const [allowDenyFilter, setAllowDenyFilter] = useState<'allow' | 'deny' | 'default' | 'all'>('all');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -66,13 +113,50 @@ export default function VodStreams() {
     },
   });
 
+  // Debounce the search query so API is only called after user stops typing
+  // Debounce the search query so API is only called after user stops typing
+  const debouncedSearchQuery = useDebounce(searchQuery);
+
+  const sort = sortModel[0];
+  const queryOptions = {
+    sortBy: sort?.field as 'addedDate' | 'createdAt' | 'updatedAt' | 'releaseDate' | 'rating' | 'tmdb' | undefined,
+    sortDir: sort?.sort as 'asc' | 'desc' | undefined,
+    addedDateFrom: addedDateFrom || undefined,
+    addedDateTo: addedDateTo || undefined,
+    createdDateFrom: createdDateFrom || undefined,
+    createdDateTo: createdDateTo || undefined,
+    updateDateFrom: updateDateFrom || undefined,
+    updateDateTo: updateDateTo || undefined,
+    releaseDateFrom: releaseDateFrom || undefined,
+    releaseDateTo: releaseDateTo || undefined,
+    ratingMin: ratingMin !== '' ? Number(ratingMin) : undefined,
+    ratingMax: ratingMax !== '' ? Number(ratingMax) : undefined,
+    tmdb: tmdb !== '' ? Number.parseInt(tmdb, 10) : undefined,
+  };
+
   // Fetch VOD streams with optional category filter, search, and stream_id
   const { data: streamsData, isLoading: isLoadingStreams, error: streamsError } = useQuery({
-    queryKey: ['streams-vod', sourceId, selectedCategoryId, page, limit, searchQuery, streamId],
+    queryKey: [
+      'streams-vod',
+      sourceId,
+      selectedCategoryId,
+      page,
+      limit,
+      debouncedSearchQuery,
+      streamId,
+      queryOptions,
+    ],
     queryFn: () => {
       if (!sourceId) return Promise.resolve(null);
-      console.log('Fetching VOD with:', { sourceId, selectedCategoryId, page, limit, searchQuery, streamId });
-      return streamsApi.getVodStreams(sourceId, selectedCategoryId || undefined, page, limit, searchQuery || undefined, streamId || undefined);
+      return streamsApi.getVodStreams(
+        sourceId,
+        selectedCategoryId || undefined,
+        page,
+        limit,
+        debouncedSearchQuery || undefined,
+        streamId || undefined,
+        queryOptions
+      );
     },
     enabled: isAuthenticated && sourceId !== null,
   });
@@ -87,17 +171,21 @@ export default function VodStreams() {
   // Categories are already filtered by type on backend
   const vodCategories = categoriesData?.data || [];
 
-  let streams = streamsData?.data || [];
+  let streams = streamsData?.data?.map((s) => ({ ...s, icon: true })) || [];
   const pagination = streamsData?.pagination;
 
   // Apply access control filter
   if (allowDenyFilter !== 'all') {
     streams = streams.filter((stream) => {
       if (allowDenyFilter === 'default') {
-        return stream.allow_deny === null;
+        return stream.allowDeny === null;
       }
-      return stream.allow_deny === allowDenyFilter;
+      return stream.allowDeny === allowDenyFilter;
     });
+  }
+
+  if (queryOptions.tmdb !== undefined) {
+    streams = streams.filter((stream) => stream.tmdb === queryOptions.tmdb);
   }
 
   // Debug logging
@@ -109,51 +197,104 @@ export default function VodStreams() {
 
   if (categoriesData?.data) {
     categoriesData.data.forEach((cat: Category) => {
-      categories[cat.id] = cat.category_name;
+      const displayName = getCategoryDisplayName(cat);
+      categories[String(cat.externalId)] = displayName;
     });
   }
 
-  const getCategoryName = (categoryId: string | number | null): string => {
-    if (!categoryId) return 'Unknown';
-    return categories[categoryId] || `Category ${categoryId}`;
+  const missingCategoryIds = Array.from(
+    new Set(
+      streams
+        .map((stream) => stream.categoryId)
+        .filter(
+          (categoryId): categoryId is number =>
+            categoryId !== null && categoryId !== undefined && !categories[String(categoryId)]
+        )
+    )
+  );
+
+  const { data: missingCategoryNames } = useQuery({
+    queryKey: ['stream-category-names-vod', sourceId, missingCategoryIds],
+    queryFn: async () => {
+      if (!sourceId || missingCategoryIds.length === 0) {
+        return {} as Record<string, string>;
+      }
+
+      const entries = await Promise.all(
+        missingCategoryIds.map(async (externalId) => {
+          try {
+            const result = await categoriesApi.getCategoryByExternalId(externalId, sourceId, 'vod');
+            return [String(externalId), getCategoryDisplayName(result.data)] as const;
+          } catch {
+            return [String(externalId), `Category ${externalId}`] as const;
+          }
+        })
+      );
+
+      return Object.fromEntries(entries);
+    },
+    enabled: isAuthenticated && sourceId !== null && missingCategoryIds.length > 0,
+  });
+
+  const categoryNames = {
+    ...categories,
+    ...(missingCategoryNames ?? {}),
   };
 
-  const getDuration = (stream: Stream): string | null => {
-    if (!stream.data?.duration) return null;
-    const seconds = typeof stream.data.duration === 'number' ? stream.data.duration : 0;
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
+  const getCategoryName = (categoryId: string | number | null): string => {
+    if (!categoryId) return 'Unknown';
+    const categoryName = categoryNames[String(categoryId)];
+    if (categoryName) {
+      return categoryName;
+    }
+    return `Category ${categoryId}`;
+  };
+
+  const asRecord = (value: unknown): Record<string, unknown> | null => {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+    return value as Record<string, unknown>;
+  };
+
+  const handleColumnVisibilityModelChange = (model: GridColumnVisibilityModel) => {
+    setColumnVisibilityModel(model);
+    localStorage.setItem(columnVisibilityStorageKey, JSON.stringify(model));
   };
 
   const columns: GridColDef[] = [
-    { field: 'id', headerName: 'ID', width: 70 },
-    { field: 'num', headerName: 'Order', width: 80 },
-    { field: 'stream_id', headerName: 'Stream ID', width: 100 },
-    { field: 'name', headerName: 'Name', width: 200, flex: 1 },
+    { field: 'id', headerName: 'ID', width: 50 },
+    { field: 'num', headerName: 'Order', width: 60 },
+    { field: 'externalId', headerName: 'Stream ID', width: 100 },
+    { field: 'name', headerName: 'Name', width: 350, flex: 1 },
     {
-      field: 'category_id',
+      field: 'categoryId',
       headerName: 'Category',
       width: 150,
       renderCell: (params) => getCategoryName(params.value),
-    },
-    {
-      field: 'data',
-      headerName: 'Duration',
-      width: 100,
-      renderCell: (params) => {
-        const stream = streams.find((s) => s.data === params.value);
-        return getDuration(stream!) || '—';
-      },
     },
     {
       field: 'icon',
       headerName: 'Icon',
       width: 100,
       renderCell: (params) => {
-        const stream = streams.find((s) => s.id === params.row.id);
-        const iconUrl = stream?.data?.stream_icon;
+        let dataObj: Record<string, unknown> | null = null;
+        const data = params.row.data;
+        if (data) {
+          if (typeof data === 'string') {
+            try {
+              dataObj = asRecord(JSON.parse(data));
+            } catch {
+              dataObj = null;
+            }
+          } else {
+            dataObj = asRecord(data);
+          }
+        }
+        const iconUrl =
+          (typeof dataObj?.stream_icon === 'string' && dataObj.stream_icon) ||
+          (typeof dataObj?.cover === 'string' && dataObj.cover) ||
+          null;
         return iconUrl ? (
           <Box
             component="img"
@@ -171,13 +312,49 @@ export default function VodStreams() {
       },
     },
     {
-      field: 'is_adult',
+      field: 'isAdult',
       headerName: 'Adult',
       width: 80,
       renderCell: (params) => (params.value ? <Chip label="Adult" color="error" size="small" /> : '—'),
     },
     {
-      field: 'allow_deny',
+      field: 'addedDate',
+      headerName: 'Added Date',
+      width: 130,
+      renderCell: (params) => formatDisplayDate(params.value),
+    },
+    {
+      field: 'createdAt',
+      headerName: 'Created',
+      width: 140,
+      renderCell: (params) => formatDisplayDate(params.value),
+    },
+    {
+      field: 'updatedAt',
+      headerName: 'Updated',
+      width: 140,
+      renderCell: (params) => formatDisplayDate(params.value),
+    },
+    {
+      field: 'releaseDate',
+      headerName: 'Release Date',
+      width: 140,
+      renderCell: (params) => formatDisplayDate(params.value),
+    },
+    {
+      field: 'rating',
+      headerName: 'Rating',
+      width: 90,
+      renderCell: (params) => (params.value ?? '—'),
+    },
+    {
+      field: 'tmdb',
+      headerName: 'TMDB',
+      width: 110,
+      renderCell: (params) => (params.value ?? '—'),
+    },
+    {
+      field: 'allowDeny',
       headerName: 'Access Control',
       width: 120,
       sortable: false,
@@ -185,7 +362,7 @@ export default function VodStreams() {
       renderCell: (params) => {
         const stream = params.row as Stream;
         const isLoading = updateAllowDenyMutation.isPending;
-        const value = stream.allow_deny ?? 'default';
+        const value = stream.allowDeny ?? 'default';
 
         const getColor = (val: string) => {
           switch (val) {
@@ -317,9 +494,50 @@ export default function VodStreams() {
                   <MenuItem value="default">Default</MenuItem>
                 </Select>
               </FormControl>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setShowAdvancedFilters((current) => !current)}
+              >
+                {showAdvancedFilters ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
+              </Button>
             </>
           )}
         </Box>
+
+        {sourceId && showAdvancedFilters && (
+          <Box sx={{ mt: 2, display: 'grid', gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', gap: 1.5 }}>
+            <StreamDateFilterField label="Added From" value={addedDateFrom} onChange={(value) => { setAddedDateFrom(value); setPage(1); }} />
+            <StreamDateFilterField label="Added To" value={addedDateTo} onChange={(value) => { setAddedDateTo(value); setPage(1); }} />
+            <StreamDateFilterField label="Created From" value={createdDateFrom} onChange={(value) => { setCreatedDateFrom(value); setPage(1); }} />
+            <StreamDateFilterField label="Created To" value={createdDateTo} onChange={(value) => { setCreatedDateTo(value); setPage(1); }} />
+            <StreamDateFilterField label="Updated From" value={updateDateFrom} onChange={(value) => { setUpdateDateFrom(value); setPage(1); }} />
+            <StreamDateFilterField label="Updated To" value={updateDateTo} onChange={(value) => { setUpdateDateTo(value); setPage(1); }} />
+            <StreamDateFilterField label="Release From" value={releaseDateFrom} onChange={(value) => { setReleaseDateFrom(value); setPage(1); }} />
+            <StreamDateFilterField label="Release To" value={releaseDateTo} onChange={(value) => { setReleaseDateTo(value); setPage(1); }} />
+            <TextField
+              label="Rating Min"
+              type="number"
+              value={ratingMin}
+              onChange={(e) => { setRatingMin(e.target.value); setPage(1); }}
+              size="small"
+            />
+            <TextField
+              label="Rating Max"
+              type="number"
+              value={ratingMax}
+              onChange={(e) => { setRatingMax(e.target.value); setPage(1); }}
+              size="small"
+            />
+            <TextField
+              label="TMDB"
+              type="number"
+              value={tmdb}
+              onChange={(e) => { setTmdb(e.target.value); setPage(1); }}
+              size="small"
+            />
+          </Box>
+        )}
       </Card>
 
       {/* Main Content with Optional Sidebar */}
@@ -369,6 +587,14 @@ export default function VodStreams() {
                 <DataGrid
                   rows={streams}
                   columns={columns}
+                  columnVisibilityModel={columnVisibilityModel}
+                  onColumnVisibilityModelChange={handleColumnVisibilityModelChange}
+                  sortingMode="server"
+                  sortModel={sortModel}
+                  onSortModelChange={(model) => {
+                    setSortModel(model);
+                    setPage(1);
+                  }}
                   pageSizeOptions={[10, 20, 50]}
                   disableSelectionOnClick
                   onRowClick={(params) => navigate(`/streams/${params.row.id}/vod`)}
@@ -397,17 +623,23 @@ export default function VodStreams() {
           {/* Grid View */}
           {!isLoadingStreams && sourceId && view === 'grid' && streams.length > 0 && (
             <>
-              <Grid container spacing={2}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(5, 1fr)',
+                  gap: 2,
+                }}
+              >
                 {streams.map((stream) => (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={stream.id}>
+                  <Box key={stream.id} sx={{ minWidth: 0 }}>
                     <StreamCard
                       stream={stream}
-                      categoryName={getCategoryName(stream.category_id)}
+                      categoryName={getCategoryName(stream.categoryId)}
                       onClick={() => navigate(`/streams/${stream.id}/vod`)}
                     />
-                  </Grid>
+                  </Box>
                 ))}
-              </Grid>
+              </Box>
               {pagination && pagination.pages > 1 && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
                   <Pagination
@@ -422,51 +654,11 @@ export default function VodStreams() {
           )}
         </Box>
 
-        {/* Right: Categories Sidebar */}
-        <Box sx={{ flex: '0 0 calc(25% - 24px)' }}>
-          <Card sx={{ position: 'sticky', top: 20, width: '100%', minHeight: 200, backgroundColor: '#fafafa' }}>
-            <Box sx={{ p: 2, backgroundColor: 'background.paper' }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-                Filter by Category ({vodCategories.length})
-              </Typography>
-              <Chip
-                label="All Categories"
-                onClick={() => handleCategorySelect(null)}
-                variant={selectedCategoryId === null ? 'filled' : 'outlined'}
-                color={selectedCategoryId === null ? 'primary' : 'default'}
-                size="small"
-                sx={{ width: '100%', mb: 1 }}
-              />
-            </Box>
-
-            <Box sx={{ maxHeight: 400, overflow: 'auto', borderTop: '1px solid #e0e0e0' }}>
-              {vodCategories.map((category: Category) => (
-                <Box
-                  key={category.id}
-                  onClick={() => handleCategorySelect(Number(category.category_id))}
-                  sx={{
-                    p: 1.5,
-                    px: 2,
-                    cursor: 'pointer',
-                    backgroundColor:
-                      selectedCategoryId === Number(category.category_id) ? 'primary.light' : 'transparent',
-                    '&:hover': {
-                      backgroundColor:
-                        selectedCategoryId === Number(category.category_id)
-                          ? 'primary.light'
-                          : 'action.hover',
-                    },
-                    borderBottom: '1px solid #f0f0f0',
-                  }}
-                >
-                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    {category.category_name}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
-          </Card>
-        </Box>
+        <CategoryFilterSidebar
+          categories={vodCategories}
+          selectedCategoryId={selectedCategoryId}
+          onCategorySelect={handleCategorySelect}
+        />
       </Box>
       ) : (
         <>
@@ -509,6 +701,14 @@ export default function VodStreams() {
                 <DataGrid
                   rows={streams}
                   columns={columns}
+                  columnVisibilityModel={columnVisibilityModel}
+                  onColumnVisibilityModelChange={handleColumnVisibilityModelChange}
+                  sortingMode="server"
+                  sortModel={sortModel}
+                  onSortModelChange={(model) => {
+                    setSortModel(model);
+                    setPage(1);
+                  }}
                   pageSizeOptions={[10, 20, 50]}
                   disableSelectionOnClick
                   onRowClick={(params) => navigate(`/streams/${params.row.id}/vod`)}
@@ -542,7 +742,7 @@ export default function VodStreams() {
                   <Grid item xs={12} sm={6} md={4} lg={3} key={stream.id}>
                     <StreamCard
                       stream={stream}
-                      categoryName={getCategoryName(stream.category_id)}
+                      categoryName={getCategoryName(stream.categoryId)}
                       onClick={() => navigate(`/streams/${stream.id}/vod`)}
                     />
                   </Grid>

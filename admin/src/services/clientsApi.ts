@@ -4,13 +4,20 @@ export interface Client {
   id?: number;
   username: string;
   password: string;
-  source_id: number;
-  filter_id?: number | null;
+  name?: string | null;
+  sourceId?: number;
+  filterId?: number | null;
   email?: string | null;
-  is_active: number;
-  hide_adult_content?: number;
-  created_at?: string;
-  updated_at?: string;
+  expiryDate?: string | null;
+  isActive: boolean;
+  hideAdultContent?: boolean;
+  enableProxy?: boolean | null;
+  connectXtreamApi?: 'INHERITED' | 'DEFAULT' | 'NO_PROXY' | null;
+  connectXtreamStream?: 'INHERITED' | 'DIRECT' | 'NO_PROXY' | 'PROXY' | 'REDIRECT' | 'DEFAULT' | null;
+  connectXmltv?: 'INHERITED' | 'REDIRECT' | 'TUNNEL' | 'NO_PROXY' | 'DEFAULT' | null;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ConnectionLog {

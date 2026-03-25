@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS vod_streams (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    source_id INT NOT NULL,
+    external_id INT NOT NULL,
+    num INT DEFAULT 0,
+    allow_deny ENUM('allow', 'deny'),
+    name VARCHAR(500) NOT NULL,
+    category_id INT NOT NULL,
+    category_ids TEXT,
+    is_adult TINYINT(1) NOT NULL DEFAULT 0,
+    labels TEXT,
+    data JSON,
+    added_date DATE,
+    release_date DATE,
+    rating DOUBLE,
+    tmdb BIGINT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_stream (source_id, external_id),
+    INDEX idx_vod_source_category_num (source_id, category_id, num),
+    INDEX idx_vod_source_num (source_id, num)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
