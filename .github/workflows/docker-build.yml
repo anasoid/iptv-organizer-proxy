@@ -57,7 +57,7 @@ jobs:
             tagSuffix: '-openwrt'
             nativeExtraArgs: '-Dquarkus.profile=openwrt'
             useContainerBuild: 'false'
-            jdkDistribution: 'mandrel'
+            jdkDistribution: 'graalvm-community'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
@@ -87,7 +87,7 @@ jobs:
             tagSuffix: '-openwrt'
             nativeExtraArgs: '-Dquarkus.profile=openwrt'
             useContainerBuild: 'false'
-            jdkDistribution: 'mandrel'
+            jdkDistribution: 'graalvm-community'
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
