@@ -37,7 +37,6 @@ jobs:
             tagSuffix: ''
             nativeExtraArgs: ''
             useContainerBuild: 'true'
-            jdkDistribution: 'temurin'
           - os: ubuntu-latest
             platform: linux/amd64
             arch: amd64
@@ -47,7 +46,6 @@ jobs:
             tagSuffix: '-full'
             nativeExtraArgs: ''
             useContainerBuild: 'true'
-            jdkDistribution: 'temurin'
           - os: ubuntu-latest
             platform: linux/amd64
             arch: amd64
@@ -57,7 +55,6 @@ jobs:
             tagSuffix: '-openwrt'
             nativeExtraArgs: '-Dquarkus.profile=openwrt'
             useContainerBuild: 'false'
-            jdkDistribution: 'graalvm-community'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
@@ -67,7 +64,6 @@ jobs:
             tagSuffix: ''
             nativeExtraArgs: ''
             useContainerBuild: 'true'
-            jdkDistribution: 'temurin'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
@@ -77,7 +73,6 @@ jobs:
             tagSuffix: '-full'
             nativeExtraArgs: ''
             useContainerBuild: 'true'
-            jdkDistribution: 'temurin'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
@@ -87,7 +82,6 @@ jobs:
             tagSuffix: '-openwrt'
             nativeExtraArgs: '-Dquarkus.profile=openwrt'
             useContainerBuild: 'false'
-            jdkDistribution: 'graalvm-community'
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -113,12 +107,24 @@ jobs:
           npm ci
           npm run build:java
 
-      # 3. Setup JDK based on matrix configuration (temurin for regular builds, mandrel for openwrt musl)
-      - name: Setup JDK ${{ matrix.graalvmVersion }}
+      # 3. Setup JDK based on variant:
+      #    - Regular builds use Temurin (native-image runs inside the Mandrel container)
+      #    - OpenWrt uses GraalVM Community on the runner (container-build disabled, needs native-image locally)
+      - name: Setup Temurin JDK ${{ matrix.graalvmVersion }}
+        if: matrix.variant != 'openwrt'
         uses: actions/setup-java@v4
         with:
-          distribution: '${{ matrix.jdkDistribution }}'
+          distribution: 'temurin'
           java-version: '${{ matrix.graalvmVersion }}'
+          cache: 'gradle'
+
+      - name: Setup GraalVM Community ${{ matrix.graalvmVersion }} (openwrt musl build)
+        if: matrix.variant == 'openwrt'
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '${{ matrix.graalvmVersion }}'
+          distribution: 'graalvm-community'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           cache: 'gradle'
 
       # Install musl toolchain on runner for openwrt static build (container-build is disabled for this variant)
