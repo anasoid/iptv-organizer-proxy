@@ -100,7 +100,8 @@ jobs:
 
       # 3. Setup JDK based on variant:
       #    - Regular builds use Temurin (native-image runs inside the Mandrel container)
-      #    - OpenWrt uses GraalVM Community on the runner (container-build disabled, needs native-image locally)
+      #    - OpenWrt uses Oracle GraalVM on the runner (container-build disabled, needs native-image locally)
+      #      Oracle GraalVM is required: Community Edition lacks aarch64 musl static-image support.
       - name: Setup Temurin JDK ${{ matrix.graalvmVersion }}
         if: matrix.variant != 'openwrt'
         uses: actions/setup-java@v4
@@ -109,12 +110,12 @@ jobs:
           java-version: '${{ matrix.graalvmVersion }}'
           cache: 'gradle'
 
-      - name: Setup GraalVM Community ${{ matrix.graalvmVersion }} (openwrt musl build)
+      - name: Setup Oracle GraalVM ${{ matrix.graalvmVersion }} (openwrt musl build)
         if: matrix.variant == 'openwrt'
         uses: graalvm/setup-graalvm@v1
         with:
           java-version: '${{ matrix.graalvmVersion }}'
-          distribution: 'graalvm-community'
+          distribution: 'graalvm'           # Oracle GraalVM supports aarch64 musl; Community Edition does not
           github-token: ${{ secrets.GITHUB_TOKEN }}
           cache: 'gradle'
 
@@ -122,14 +123,29 @@ jobs:
         if: matrix.variant == 'openwrt'
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y musl-tools zlib1g-dev
+          sudo apt-get install -y musl-tools musl-dev zlib1g-dev
+          # GraalVM looks for "{arch}-linux-musl-gcc" in PATH; Ubuntu only ships "musl-gcc"
+          MUSL_ARCH_GCC="$(uname -m)-linux-musl-gcc"
+          if ! command -v "$MUSL_ARCH_GCC" &>/dev/null; then
+            sudo ln -s "$(command -v musl-gcc)" "/usr/local/bin/$MUSL_ARCH_GCC"
+          fi
+          # Make static zlib available in the musl library directory for static linking
+          MUSL_LIB="/usr/lib/$(uname -m)-linux-musl"
+          sudo mkdir -p "$MUSL_LIB"
+          ZLIB_A="$(find /usr/lib/$(uname -m)-linux-gnu -name 'libz.a' 2>/dev/null | head -1)"
+          if [ -n "$ZLIB_A" ] && [ ! -f "$MUSL_LIB/libz.a" ]; then
+            sudo ln -s "$ZLIB_A" "$MUSL_LIB/libz.a"
+          fi
 
       - name: Validate musl compiler (openwrt)
         if: matrix.variant == 'openwrt'
         run: |
           echo "runner arch: $(uname -m)"
+          MUSL_ARCH_GCC="$(uname -m)-linux-musl-gcc"
           command -v musl-gcc
-          musl-gcc -v
+          command -v "$MUSL_ARCH_GCC"
+          "$MUSL_ARCH_GCC" -v
+          ls -la "/usr/lib/$(uname -m)-linux-musl/libz.a" 2>/dev/null || echo "WARNING: libz.a not found in musl lib path"
 
       - name: Grant execute permission for gradlew
         run: chmod +x back/gradlew
@@ -171,8 +187,9 @@ jobs:
           export GRADLE_OPTS="-Xmx2g"
           NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
           if [[ "${{ matrix.variant }}" == "openwrt" ]]; then
-            # Force native-image to use the runner-local musl toolchain.
-            export CC="$(command -v musl-gcc)"
+            # Oracle GraalVM looks for "{arch}-linux-musl-gcc" in PATH for musl static builds.
+            # Set CC explicitly to the symlinked arch-specific compiler.
+            export CC="/usr/local/bin/$(uname -m)-linux-musl-gcc"
           fi
           ./gradlew build \
             -x test \
