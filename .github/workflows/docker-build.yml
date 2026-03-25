@@ -117,7 +117,19 @@ jobs:
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           cache: 'gradle'
-          native-image-musl: 'true'
+
+      - name: Install musl toolchain (openwrt)
+        if: matrix.variant == 'openwrt'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y musl-tools zlib1g-dev
+
+      - name: Validate musl compiler (openwrt)
+        if: matrix.variant == 'openwrt'
+        run: |
+          echo "runner arch: $(uname -m)"
+          command -v musl-gcc
+          musl-gcc -v
 
       - name: Grant execute permission for gradlew
         run: chmod +x back/gradlew
@@ -158,6 +170,10 @@ jobs:
         run: |
           export GRADLE_OPTS="-Xmx2g"
           NATIVE_XMX_OPT="-DNATIVE_IMAGE_XMX=2300m"
+          if [[ "${{ matrix.variant }}" == "openwrt" ]]; then
+            # Force native-image to use the runner-local musl toolchain.
+            export CC="$(command -v musl-gcc)"
+          fi
           ./gradlew build \
             -x test \
             -PbuildingNativeImage \
