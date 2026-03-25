@@ -51,7 +51,7 @@ jobs:
             graalvmVersion: '25'
             fullJdbcDrivers: 'false'
             tagSuffix: '-openwrt'
-            nativeExtraArgs: '-Dquarkus.native.additional-build-args-append=,--static,--libc=musl'
+            nativeExtraArgs: '-Dquarkus.native.additional-build-args-append=--static,--libc=musl'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
@@ -75,7 +75,7 @@ jobs:
             graalvmVersion: '25'
             fullJdbcDrivers: 'false'
             tagSuffix: '-openwrt'
-            nativeExtraArgs: '-Dquarkus.native.additional-build-args-append=,--static,--libc=musl'
+            nativeExtraArgs: '-Dquarkus.native.additional-build-args-append=--static,--libc=musl'
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
