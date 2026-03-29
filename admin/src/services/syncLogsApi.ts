@@ -65,10 +65,19 @@ class SyncLogsApi {
       sourceId?: number;
       syncType?: string;
       status?: string;
-    }
+    },
+    sortBy?: string,
+    sortOrder?: 'asc' | 'desc'
   ): Promise<SyncLogsResponse> {
+    const params: any = { page, limit, ...filters };
+    if (sortBy) {
+      params.sortBy = sortBy;
+    }
+    if (sortOrder) {
+      params.sortOrder = sortOrder;
+    }
     const response = await api.get('/sync-logs', {
-      params: { page, limit, ...filters },
+      params,
     });
     return response.data;
   }
