@@ -11,6 +11,7 @@ import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.ValidationException;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.LiveStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Series;
@@ -237,9 +238,9 @@ public class ClientsController extends BaseController {
       throw new ValidationException("Source not found for client");
     }
 
-    JsonStreamResult<Map<?, ?>> result =
+    JsonStreamResult<BaseStream> result =
         xtreamUserService.getLiveStreams(client, source, categoryId);
-    List<Map<?, ?>> streams = collectToList(result);
+    List<Map<?, ?>> streams = convertStreamResultToMapList(result);
 
     return ResponseUtils.ok(streams);
   }
@@ -259,9 +260,9 @@ public class ClientsController extends BaseController {
       throw new ValidationException("Source not found for client");
     }
 
-    JsonStreamResult<Map<?, ?>> result =
+    JsonStreamResult<BaseStream> result =
         xtreamUserService.getVodStreams(client, source, categoryId);
-    List<Map<?, ?>> streams = collectToList(result);
+    List<Map<?, ?>> streams = convertStreamResultToMapList(result);
 
     return ResponseUtils.ok(streams);
   }
@@ -281,8 +282,8 @@ public class ClientsController extends BaseController {
       throw new ValidationException("Source not found for client");
     }
 
-    JsonStreamResult<Map<?, ?>> result = xtreamUserService.getSeries(client, source, categoryId);
-    List<Map<?, ?>> series = collectToList(result);
+    JsonStreamResult<BaseStream> result = xtreamUserService.getSeries(client, source, categoryId);
+    List<Map<?, ?>> series = convertStreamResultToMapList(result);
 
     return ResponseUtils.ok(series);
   }
@@ -466,10 +467,10 @@ public class ClientsController extends BaseController {
     List<LiveStream> allStreams = liveStreamService.findBySourceId(source.getId());
 
     // Get ALLOWED streams
-    JsonStreamResult<Map<?, ?>> allowedResult =
+    JsonStreamResult<BaseStream> allowedResult =
         xtreamUserService.getLiveStreams(client, source, null);
     Set<String> allowedIds =
-        collectToList(allowedResult).stream()
+        convertStreamResultToMapList(allowedResult).stream()
             .map(m -> String.valueOf(m.get("stream_id")))
             .collect(Collectors.toSet());
 
@@ -513,10 +514,10 @@ public class ClientsController extends BaseController {
     List<VodStream> allStreams = vodStreamService.findBySourceId(source.getId());
 
     // Get ALLOWED streams
-    JsonStreamResult<Map<?, ?>> allowedResult =
+    JsonStreamResult<BaseStream> allowedResult =
         xtreamUserService.getVodStreams(client, source, null);
     Set<String> allowedIds =
-        collectToList(allowedResult).stream()
+        convertStreamResultToMapList(allowedResult).stream()
             .map(m -> String.valueOf(m.get("stream_id")))
             .collect(Collectors.toSet());
 
@@ -560,9 +561,9 @@ public class ClientsController extends BaseController {
     List<Series> allSeries = seriesService.findBySourceId(source.getId());
 
     // Get ALLOWED series
-    JsonStreamResult<Map<?, ?>> allowedResult = xtreamUserService.getSeries(client, source, null);
+    JsonStreamResult<BaseStream> allowedResult = xtreamUserService.getSeries(client, source, null);
     Set<String> allowedIds =
-        collectToList(allowedResult).stream()
+        convertStreamResultToMapList(allowedResult).stream()
             .map(m -> String.valueOf(m.get("series_id")))
             .collect(Collectors.toSet());
 
@@ -581,5 +582,58 @@ public class ClientsController extends BaseController {
             .collect(Collectors.toList());
 
     return ResponseUtils.ok(blocked);
+  }
+
+  /**
+   * Convert JsonStreamResult<BaseStream> to List<Map<?, ?>> with lazy Xtream format conversion
+   *
+   * @param result The stream result
+   * @return List of Maps in Xtream API format
+   */
+  private List<Map<?, ?>> convertStreamResultToMapList(JsonStreamResult<BaseStream> result) {
+    List<Map<?, ?>> list = new ArrayList<>();
+    for (Iterator<BaseStream> it = result.iterator(); it.hasNext(); ) {
+      list.add(convertStreamToXtreamMap(it.next()));
+    }
+    return list;
+  }
+
+  /**
+   * Convert BaseStream to Xtream Map format
+   *
+   * @param stream The stream entity
+   * @return Map with Xtream API format fields
+   */
+  private Map<?, ?> convertStreamToXtreamMap(BaseStream stream) {
+    Map<String, Object> map = new HashMap<>();
+    map.put("num", stream.getNum());
+    map.put("name", stream.getName());
+    map.put("stream_id", stream.getExternalId());
+    map.put("stream_icon", "");
+    map.put("category_id", stream.getCategoryId());
+    map.put("added", stream.getAddedDate() != null ? stream.getAddedDate().toString() : "");
+    map.put("is_adult", stream.getIsAdult() ? "1" : "0");
+    map.put("category_ids", stream.getCategoryIds());
+
+    // Include raw JSON data if available
+    if (stream.getData() != null && !stream.getData().isEmpty()) {
+      try {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rawData =
+            new com.fasterxml.jackson.databind.ObjectMapper()
+                .readValue(stream.getData(), Map.class);
+        // Merge raw data with our standardized fields
+        rawData.forEach(
+            (key, value) -> {
+              if (!map.containsKey(key)) {
+                map.put(key, value);
+              }
+            });
+      } catch (Exception e) {
+        // Log warning but don't fail - raw data is optional
+      }
+    }
+
+    return map;
   }
 }

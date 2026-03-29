@@ -32,9 +32,9 @@ import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /** Unit tests for XtreamUserService using Mockito. */
@@ -309,16 +309,17 @@ class XtreamUserServiceTest {
     FilterContext filterContext = new FilterContext();
     when(contentFilterService.buildFilterContext(testClient)).thenReturn(filterContext);
 
-    VodStream vodStream = VodStream.builder().externalId(301).name("VOD Test").isAdult(false).build();
+    VodStream vodStream =
+        VodStream.builder().externalId(301).name("VOD Test").isAdult(false).build();
     when(vodStreamService.streamBySourceId(1L)).thenReturn(List.of(vodStream).iterator());
     when(categoryService.findBySourceAndType(1L, StreamType.VOD.getCategoryType()))
         .thenReturn(List.of());
-    when(contentFilterService.shouldIncludeStream(
-            any(), any(BaseStream.class), any(), anyMap()))
+    when(contentFilterService.shouldIncludeStream(any(), any(BaseStream.class), any(), anyMap()))
         .thenReturn(true);
 
     // When
-    JsonStreamResult<Map<?, ?>> result = xtreamUserService.getVodStreams(testClient, testSource, null);
+    JsonStreamResult<BaseStream> result =
+        xtreamUserService.getVodStreams(testClient, testSource, null);
     result.iterator().forEachRemaining(item -> {});
 
     // Then
@@ -338,12 +339,11 @@ class XtreamUserServiceTest {
     when(seriesService.streamBySourceId(1L)).thenReturn(List.of(series).iterator());
     when(categoryService.findBySourceAndType(1L, StreamType.SERIES.getCategoryType()))
         .thenReturn(List.of());
-    when(contentFilterService.shouldIncludeStream(
-            any(), any(BaseStream.class), any(), anyMap()))
+    when(contentFilterService.shouldIncludeStream(any(), any(BaseStream.class), any(), anyMap()))
         .thenReturn(true);
 
     // When
-    JsonStreamResult<Map<?, ?>> result = xtreamUserService.getSeries(testClient, testSource, null);
+    JsonStreamResult<BaseStream> result = xtreamUserService.getSeries(testClient, testSource, null);
     result.iterator().forEachRemaining(item -> {});
 
     // Then
