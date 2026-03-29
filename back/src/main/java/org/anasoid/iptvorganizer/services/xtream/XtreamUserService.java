@@ -487,7 +487,7 @@ public class XtreamUserService {
         buildCategoryCache(source.getId(), type.getCategoryType());
 
     // Apply filtering to stream iterator
-    return applyStreamFiltering(context, rawStreams, categoryCache);
+    return applyStreamFiltering(context, rawStreams, categoryCache, type);
   }
 
   /**
@@ -501,7 +501,8 @@ public class XtreamUserService {
   private JsonStreamResult<Map<?, ?>> applyStreamFiltering(
       FilterContext context,
       JsonStreamResult<Map<?, ?>> rawStreams,
-      Map<Integer, Category> categoryCache) {
+      Map<Integer, Category> categoryCache,
+      StreamType streamType) {
     // If no filtering needed, return as-is
     if (context == null) {
       return rawStreams;
@@ -509,7 +510,7 @@ public class XtreamUserService {
 
     // Create lazy filtering iterator that filters streams during iteration
     Iterator<Map<?, ?>> filteringIterator =
-        new FilteringIterator(rawStreams.iterator(), context, categoryCache);
+        new FilteringIterator(rawStreams.iterator(), context, categoryCache, streamType);
 
     // Wrap in new JsonStreamResult with same close handler
     return new JsonStreamResult<>(filteringIterator, new AtomicLong(0), rawStreams::close);
@@ -607,15 +608,20 @@ public class XtreamUserService {
     private final Iterator<Map<?, ?>> delegate;
     private final FilterContext context;
     private final Map<Integer, Category> categoryCache;
+    private final StreamType streamType;
     Map<String, Boolean> categoryMatchCache = new HashMap<>();
     private Map<?, ?> nextItem = null;
     private boolean hasNextCached = false;
 
     FilteringIterator(
-        Iterator<Map<?, ?>> delegate, FilterContext context, Map<Integer, Category> categoryCache) {
+        Iterator<Map<?, ?>> delegate,
+        FilterContext context,
+        Map<Integer, Category> categoryCache,
+        StreamType streamType) {
       this.delegate = delegate;
       this.context = context;
       this.categoryCache = categoryCache;
+      this.streamType = streamType;
     }
 
     @Override
@@ -663,8 +669,13 @@ public class XtreamUserService {
      * @return Temporary BaseStream with extracted fields
      */
     private BaseStream extractStreamFromMap(Map<?, ?> map) {
-      // Build temporary BaseStream using builder pattern
-      var builder = LiveStream.builder();
+      // Build temporary BaseStream matching current endpoint stream type.
+      var builder =
+          switch (streamType) {
+            case LIVE -> LiveStream.builder();
+            case VOD -> VodStream.builder();
+            case SERIES -> Series.builder();
+          };
 
       // Extract and convert Map fields
       if (map.containsKey("stream_id")) {

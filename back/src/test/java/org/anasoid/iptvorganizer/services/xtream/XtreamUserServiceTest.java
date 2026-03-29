@@ -12,8 +12,11 @@ import org.anasoid.iptvorganizer.dto.HttpRequestDto;
 import org.anasoid.iptvorganizer.dto.RequestType;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
+import org.anasoid.iptvorganizer.models.entity.stream.Series;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
+import org.anasoid.iptvorganizer.models.entity.stream.VodStream;
 import org.anasoid.iptvorganizer.models.http.HttpOptions;
 import org.anasoid.iptvorganizer.models.http.ProxyOptions;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
@@ -31,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /** Unit tests for XtreamUserService using Mockito. */
@@ -297,6 +301,56 @@ class XtreamUserServiceTest {
     List<String> names =
         categoriesList.stream().map(cat -> (String) cat.get("category_name")).toList();
     assertThat(names).containsExactly("Sports", "Movies");
+  }
+
+  @Test
+  void testGetVodStreams_FilteringUsesVodStreamType() {
+    // Given: one VOD stream and permissive filtering
+    FilterContext filterContext = new FilterContext();
+    when(contentFilterService.buildFilterContext(testClient)).thenReturn(filterContext);
+
+    VodStream vodStream = VodStream.builder().externalId(301).name("VOD Test").isAdult(false).build();
+    when(vodStreamService.streamBySourceId(1L)).thenReturn(List.of(vodStream).iterator());
+    when(categoryService.findBySourceAndType(1L, StreamType.VOD.getCategoryType()))
+        .thenReturn(List.of());
+    when(contentFilterService.shouldIncludeStream(
+            any(), any(BaseStream.class), any(), anyMap()))
+        .thenReturn(true);
+
+    // When
+    JsonStreamResult<Map<?, ?>> result = xtreamUserService.getVodStreams(testClient, testSource, null);
+    result.iterator().forEachRemaining(item -> {});
+
+    // Then
+    ArgumentCaptor<BaseStream> streamCaptor = ArgumentCaptor.forClass(BaseStream.class);
+    verify(contentFilterService)
+        .shouldIncludeStream(any(), streamCaptor.capture(), any(), anyMap());
+    assertThat(streamCaptor.getValue()).isInstanceOf(VodStream.class);
+  }
+
+  @Test
+  void testGetSeries_FilteringUsesSeriesType() {
+    // Given: one series and permissive filtering
+    FilterContext filterContext = new FilterContext();
+    when(contentFilterService.buildFilterContext(testClient)).thenReturn(filterContext);
+
+    Series series = Series.builder().externalId(401).name("Series Test").isAdult(false).build();
+    when(seriesService.streamBySourceId(1L)).thenReturn(List.of(series).iterator());
+    when(categoryService.findBySourceAndType(1L, StreamType.SERIES.getCategoryType()))
+        .thenReturn(List.of());
+    when(contentFilterService.shouldIncludeStream(
+            any(), any(BaseStream.class), any(), anyMap()))
+        .thenReturn(true);
+
+    // When
+    JsonStreamResult<Map<?, ?>> result = xtreamUserService.getSeries(testClient, testSource, null);
+    result.iterator().forEachRemaining(item -> {});
+
+    // Then
+    ArgumentCaptor<BaseStream> streamCaptor = ArgumentCaptor.forClass(BaseStream.class);
+    verify(contentFilterService)
+        .shouldIncludeStream(any(), streamCaptor.capture(), any(), anyMap());
+    assertThat(streamCaptor.getValue()).isInstanceOf(Series.class);
   }
 
   /**
