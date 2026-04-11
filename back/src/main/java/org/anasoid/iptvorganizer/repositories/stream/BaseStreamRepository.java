@@ -90,6 +90,32 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
   }
 
   /**
+   * Check whether a category has at least one stream with explicit allow_deny='allow'.
+   *
+   * @param sourceId The source ID
+   * @param categoryId The category ID (external_id)
+   * @return true if at least one explicitly allowed stream exists
+   */
+  public boolean existsAllowedStreamBySourceAndCategory(Long sourceId, Integer categoryId) {
+    String sql =
+        "SELECT 1 FROM "
+            + getTableName()
+            + " WHERE source_id = ? AND category_id = ? AND LOWER(COALESCE(allow_deny, '')) = ? LIMIT 1";
+    try (java.sql.Connection conn = dataSource.getConnection();
+        java.sql.PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setLong(1, sourceId);
+      stmt.setInt(2, categoryId);
+      stmt.setString(3, BaseStream.AllowDenyStatus.ALLOW.name().toLowerCase(Locale.ROOT));
+      try (java.sql.ResultSet rs = stmt.executeQuery()) {
+        return rs.next();
+      }
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException(
+          "Failed to check allowed stream by source and category in " + getTableName(), e);
+    }
+  }
+
+  /**
    * Stream entities by source ID using lazy iterator for O(1) memory usage.
    *
    * <p>Returns a JdbcStreamIterator that fetches rows one at a time from the database instead of

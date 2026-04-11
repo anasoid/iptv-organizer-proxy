@@ -44,6 +44,11 @@ public class SeriesService extends BaseService<Series, SeriesRepository> {
     return repository.findBySourceAndCategory(sourceId, categoryId, limit);
   }
 
+  /** Check if category has at least one stream with explicit allow_deny='allow'. */
+  public boolean existsAllowedStreamBySourceAndCategory(Long sourceId, Integer categoryId) {
+    return repository.existsAllowedStreamBySourceAndCategory(sourceId, categoryId);
+  }
+
   /** Find stream by source and external stream ID from database */
   public Series findBySourceAndStreamId(Long sourceId, Integer streamId) {
     return repository.findBySourceAndStreamId(sourceId, streamId);

@@ -81,8 +81,8 @@ public class ContentFilterService {
    * Get allowed categories for a stream type. Categories are filtered based on:
    *
    * <p>1. Category allow_deny='allow' - always shown 2. Category allow_deny='deny' - always hidden
-   * 3. Category allow_deny=null - filtered by YAML rules, then shown if has ≥1 accessible stream 4.
-   * Applied filter rules (PHP-compatible)
+   * 3. Category has any stream with allow_deny='allow' - shown 4. Remaining neutral categories:
+   * apply category filter rules, then require at least one accessible stream
    *
    * @param context The filtering context
    * @param sourceId ID of the source
@@ -103,32 +103,38 @@ public class ContentFilterService {
       return allCategories;
     }
 
-    // Separate explicitly allowed/denied categories from neutral ones
+    // Separate categories by priority:
+    // 1) explicit category allow, 2) explicit category deny, 3) has stream explicit allow,
+    // 4) remaining neutral categories
     List<Category> allowedByDefault = new ArrayList<>();
+    List<Category> allowedByStreamOverride = new ArrayList<>();
     List<Category> neutralCategories = new ArrayList<>();
 
     for (Category category : allCategories) {
       if (category.getAllowDeny() == BaseStream.AllowDenyStatus.ALLOW) {
         allowedByDefault.add(category);
+      } else if (category.getAllowDeny() == BaseStream.AllowDenyStatus.DENY) {
+        // Explicit category deny always excluded.
+        continue;
+      } else if (hasExplicitlyAllowedStream(sourceId, category, streamType)) {
+        allowedByStreamOverride.add(category);
       } else if (category.getAllowDeny() != BaseStream.AllowDenyStatus.DENY) {
         neutralCategories.add(category);
       }
     }
 
-    // Apply YAML filter rules to neutral categories
+    // Apply category-level rules only to the remaining neutral categories.
     List<Category> yamlFilteredCategories = neutralCategories;
     if (isFilteringEnabled(context)) {
       yamlFilteredCategories =
           filterService.filterCategories(neutralCategories, streamType, context.getFilterConfig());
     }
 
-    // Build category cache for stream accessibility checks
-    Map<Integer, Category> categoryCache = buildCategoryCache(sourceId, streamType);
-
-    // Evaluate each neutral category individually
+    // Evaluate category accessibility for neutral categories after rule filtering.
     List<Category> result = new ArrayList<>(allowedByDefault);
+    result.addAll(allowedByStreamOverride);
     for (Category category : yamlFilteredCategories) {
-      if (shouldIncludeCategory(context, category, sourceId, streamType, categoryCache)) {
+      if (hasAccessibleStreams(context, sourceId, category, streamType)) {
         result.add(category);
       }
     }
@@ -167,7 +173,12 @@ public class ContentFilterService {
       return false;
     }
 
-    // Priority 3: Neutral category - check if it has accessible streams
+    // Priority 3: Category has explicit allowed stream from DB query
+    if (hasExplicitlyAllowedStream(sourceId, category, streamType)) {
+      return true;
+    }
+
+    // Priority 4: Neutral category - check if it has accessible streams
     return hasAccessibleStreams(context, sourceId, category, streamType);
   }
 
@@ -337,5 +348,33 @@ public class ContentFilterService {
    */
   public FilterConfig getCachedFilterConfig(FilterContext context) {
     return context != null ? context.getFilterConfig() : null;
+  }
+
+  /**
+   * Query whether category has at least one stream with explicit allow_deny='allow'.
+   *
+   * @param sourceId ID of the source
+   * @param category Category to check
+   * @param streamType Stream type (live, vod, series)
+   * @return true if category has an explicitly allowed stream
+   */
+  private boolean hasExplicitlyAllowedStream(Long sourceId, Category category, String streamType) {
+    if (category == null || category.getExternalId() == null) {
+      return false;
+    }
+
+    switch (streamType.toLowerCase()) {
+      case "live":
+        return liveStreamService.existsAllowedStreamBySourceAndCategory(
+            sourceId, category.getExternalId());
+      case "vod":
+        return vodStreamService.existsAllowedStreamBySourceAndCategory(
+            sourceId, category.getExternalId());
+      case "series":
+        return seriesService.existsAllowedStreamBySourceAndCategory(
+            sourceId, category.getExternalId());
+      default:
+        return false;
+    }
   }
 }
