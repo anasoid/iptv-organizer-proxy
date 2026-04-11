@@ -16,6 +16,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  BUILDKIT_IMAGE: moby/buildkit:buildx-stable-1
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ jobs:
             graalvmVersion: '25'
             fullJdbcDrivers: 'false'
             tagSuffix: ''
+            useContainerBuild: 'true'
           - os: ubuntu-latest
             platform: linux/amd64
             arch: amd64
@@ -42,6 +44,7 @@ jobs:
             graalvmVersion: '25'
             fullJdbcDrivers: 'true'
             tagSuffix: '-full'
+            useContainerBuild: 'true'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
@@ -49,6 +52,7 @@ jobs:
             graalvmVersion: '25'
             fullJdbcDrivers: 'false'
             tagSuffix: ''
+            useContainerBuild: 'true'
           - os: ubuntu-24.04-arm   # GitHub-hosted arm64 runner (free for public repos)
             platform: linux/arm64
             arch: arm64
@@ -56,6 +60,7 @@ jobs:
             graalvmVersion: '25'
             fullJdbcDrivers: 'true'
             tagSuffix: '-full'
+            useContainerBuild: 'true'
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -81,8 +86,8 @@ jobs:
           npm ci
           npm run build:java
 
-      # 3. Setup JDK 25 based on matrix configuration
-      - name: Setup JDK ${{ matrix.graalvmVersion }}
+      # 3. Setup JDK for all variants.
+      - name: Setup Temurin JDK ${{ matrix.graalvmVersion }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -93,8 +98,24 @@ jobs:
         run: chmod +x back/gradlew
 
       # 4. Docker Buildx (single-platform per job — no cross-compilation needed)
+      - name: Warm pull BuildKit image (retry)
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            if docker pull "${{ env.BUILDKIT_IMAGE }}"; then
+              exit 0
+            fi
+            echo "BuildKit pull failed (attempt ${i}/3), retrying..."
+            sleep $((i * 10))
+          done
+          echo "Failed to pull ${{ env.BUILDKIT_IMAGE }} after retries"
+          exit 1
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=${{ env.BUILDKIT_IMAGE }}
 
       # 5. Login to GHCR (skip on PRs)
       - name: Log in to GitHub Container Registry
@@ -134,7 +155,7 @@ jobs:
             -PfullJdbcDrivers=${{ matrix.fullJdbcDrivers }} \
             -Dquarkus.native.enabled=true \
             -Dquarkus.package.jar.enabled=false \
-            -Dquarkus.native.container-build=true \
+            -Dquarkus.native.container-build=${{ matrix.useContainerBuild }} \
             -Dquarkus.native.compression.level=9 \
             "-Dquarkus.native.container-runtime-options=--memory=3g" \
             ${NATIVE_XMX_OPT} \
@@ -166,7 +187,7 @@ jobs:
             -PfullJdbcDrivers=${{ matrix.fullJdbcDrivers }} \
             -Dquarkus.native.enabled=true \
             -Dquarkus.package.jar.enabled=false \
-            -Dquarkus.native.container-build=true \
+            -Dquarkus.native.container-build=${{ matrix.useContainerBuild }} \
             -Dquarkus.native.compression.level=9 \
             "-Dquarkus.native.container-runtime-options=--memory=3g" \
             ${NATIVE_XMX_OPT} \
@@ -205,8 +226,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Warm pull BuildKit image (retry)
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            if docker pull "${{ env.BUILDKIT_IMAGE }}"; then
+              exit 0
+            fi
+            echo "BuildKit pull failed (attempt ${i}/3), retrying..."
+            sleep $((i * 10))
+          done
+          echo "Failed to pull ${{ env.BUILDKIT_IMAGE }} after retries"
+          exit 1
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=${{ env.BUILDKIT_IMAGE }}
 
       - name: Determine image tag
         id: tag
@@ -221,6 +258,7 @@ jobs:
             TAG="pr-${{ github.event.pull_request.number }}"
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
 
       # Combine arch-specific SQLite-only images into a single multi-arch manifest (no suffix)
       - name: Create and push multi-arch manifest (sqlite / no suffix)
@@ -253,6 +291,20 @@ jobs:
             --file ./docker/Dockerfile.vfs \
             --platform linux/amd64,linux/arm64 \
             --build-arg BASE_IMAGE="${BASE}:${TAG}" \
+            --push \
+            --tag "${VFS_TAG}" \
+            .
+
+      # Build VFS variant for full-driver image
+      - name: Build and push VFS image (full)
+        run: |
+          BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/iptv-organizer-proxy"
+          TAG="${{ steps.tag.outputs.tag }}"
+          VFS_TAG="${BASE}:${TAG}-vfs-full"
+          docker buildx build \
+            --file ./docker/Dockerfile.vfs \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg BASE_IMAGE="${BASE}:${TAG}-full" \
             --push \
             --tag "${VFS_TAG}" \
             .

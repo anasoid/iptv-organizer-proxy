@@ -35,7 +35,7 @@ dependencies {
         testImplementation 'io.quarkus:quarkus-jdbc-postgresql'
     }
     // SQLite JDBC driver - loaded at runtime via db-kind=other + explicit driver class
-    implementation 'org.xerial:sqlite-jdbc:3.46.0.0'
+    implementation 'org.xerial:sqlite-jdbc:3.51.3.0'
 
     // Transaction Management
     implementation 'io.quarkus:quarkus-narayana-jta'
@@ -68,10 +68,10 @@ dependencies {
     testImplementation 'org.mockito:mockito-junit-jupiter'
 
     // WireMock for HTTP mocking
-    testImplementation 'org.wiremock:wiremock-standalone:3.3.1'
+    testImplementation 'org.wiremock:wiremock-standalone:3.13.2'
 
     // AssertJ for fluent assertions
-    testImplementation 'org.assertj:assertj-core:3.25.1'
+    testImplementation 'org.assertj:assertj-core:3.27.7'
 
     // JaCoCo for code coverage with Quarkus (excluded from native builds)
     if (!project.hasProperty('buildingNativeImage')) {
@@ -140,6 +140,19 @@ tasks.named('quarkusRun') {
     jvmArgs = [
             '-Xmx64M'
     ]
+}
+
+tasks.register('prepareNativeDockerContext', Copy) {
+    from('src/main/docker/docker-entrypoint.sh')
+    into(layout.buildDirectory.dir('quarkus-docker'))
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('prepareNativeDockerContext')
+}
+
+tasks.named('quarkusBuild') {
+    dependsOn tasks.named('prepareNativeDockerContext')
 }
 
 // JaCoCo Configuration
