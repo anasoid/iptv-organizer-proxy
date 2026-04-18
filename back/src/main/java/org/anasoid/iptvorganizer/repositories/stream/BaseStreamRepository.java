@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import org.anasoid.iptvorganizer.models.entity.stream.AllowDenyStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 
 /**
@@ -105,7 +106,7 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
         java.sql.PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setLong(1, sourceId);
       stmt.setInt(2, categoryId);
-      stmt.setString(3, BaseStream.AllowDenyStatus.ALLOW.name().toLowerCase(Locale.ROOT));
+      stmt.setString(3, AllowDenyStatus.ALLOW.name().toLowerCase(Locale.ROOT));
       try (java.sql.ResultSet rs = stmt.executeQuery()) {
         return rs.next();
       }

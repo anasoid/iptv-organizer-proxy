@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.exceptions.FilterException;
 import org.anasoid.iptvorganizer.models.entity.Filter;
+import org.anasoid.iptvorganizer.models.entity.stream.AllowDenyStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.filtering.CategoryMatch;
@@ -464,30 +465,29 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
 
     // Phase 1: Separate streams by allow_deny priority
     for (BaseStream stream : streams) {
-      BaseStream.AllowDenyStatus streamAllowDeny = stream.getAllowDeny();
+      AllowDenyStatus streamAllowDeny = stream.getAllowDeny();
       Category category = categoryCache.get(stream.getCategoryId());
-      BaseStream.AllowDenyStatus categoryAllowDeny =
-          category != null ? category.getAllowDeny() : null;
+      AllowDenyStatus categoryAllowDeny = category != null ? category.getAllowDeny() : null;
 
       // Priority 1: Stream allow_deny='allow' - ALWAYS INCLUDE
-      if (streamAllowDeny == BaseStream.AllowDenyStatus.ALLOW) {
+      if (streamAllowDeny == AllowDenyStatus.ALLOW) {
         allowed.add(stream);
         continue;
       }
 
       // Priority 2: Stream allow_deny='deny' - ALWAYS EXCLUDE
-      if (streamAllowDeny == BaseStream.AllowDenyStatus.DENY) {
+      if (streamAllowDeny == AllowDenyStatus.DENY) {
         continue; // Skip this stream
       }
 
       // Priority 3: Category allow_deny='allow' - INCLUDE STREAM
-      if (categoryAllowDeny == BaseStream.AllowDenyStatus.ALLOW) {
+      if (categoryAllowDeny == AllowDenyStatus.ALLOW) {
         allowed.add(stream);
         continue;
       }
 
       // Priority 4: Category allow_deny='deny' - EXCLUDE STREAM
-      if (categoryAllowDeny == BaseStream.AllowDenyStatus.DENY) {
+      if (categoryAllowDeny == AllowDenyStatus.DENY) {
         continue; // Skip this stream
       }
 
@@ -582,22 +582,22 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
       boolean hideAdultContent,
       Map<String, Boolean> categoryMatchCache) {
     // Priority 1: Stream allow_deny='allow' - ALWAYS INCLUDE
-    if (stream.getAllowDeny() == BaseStream.AllowDenyStatus.ALLOW) {
+    if (stream.getAllowDeny() == AllowDenyStatus.ALLOW) {
       return true;
     }
 
     // Priority 2: Stream allow_deny='deny' - ALWAYS EXCLUDE
-    if (stream.getAllowDeny() == BaseStream.AllowDenyStatus.DENY) {
+    if (stream.getAllowDeny() == AllowDenyStatus.DENY) {
       return false;
     }
 
     // Priority 3: Category allow_deny='allow' - INCLUDE
-    if (category != null && category.getAllowDeny() == BaseStream.AllowDenyStatus.ALLOW) {
+    if (category != null && category.getAllowDeny() == AllowDenyStatus.ALLOW) {
       return true;
     }
 
     // Priority 4: Category allow_deny='deny' - EXCLUDE
-    if (category != null && category.getAllowDeny() == BaseStream.AllowDenyStatus.DENY) {
+    if (category != null && category.getAllowDeny() == AllowDenyStatus.DENY) {
       return false;
     }
 

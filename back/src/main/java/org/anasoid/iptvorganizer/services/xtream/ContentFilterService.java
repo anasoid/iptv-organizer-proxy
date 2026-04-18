@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Filter;
+import org.anasoid.iptvorganizer.models.entity.stream.AllowDenyStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.filtering.FilterConfig;
@@ -111,14 +112,14 @@ public class ContentFilterService {
     List<Category> neutralCategories = new ArrayList<>();
 
     for (Category category : allCategories) {
-      if (category.getAllowDeny() == BaseStream.AllowDenyStatus.ALLOW) {
+      if (category.getAllowDeny() == AllowDenyStatus.ALLOW) {
         allowedByDefault.add(category);
-      } else if (category.getAllowDeny() == BaseStream.AllowDenyStatus.DENY) {
+      } else if (category.getAllowDeny() == AllowDenyStatus.DENY) {
         // Explicit category deny always excluded.
         continue;
       } else if (hasExplicitlyAllowedStream(sourceId, category, streamType)) {
         allowedByStreamOverride.add(category);
-      } else if (category.getAllowDeny() != BaseStream.AllowDenyStatus.DENY) {
+      } else if (category.getAllowDeny() != AllowDenyStatus.DENY) {
         neutralCategories.add(category);
       }
     }
@@ -164,12 +165,12 @@ public class ContentFilterService {
       String streamType,
       Map<Integer, Category> categoryCache) {
     // Priority 1: Explicit allow always includes
-    if (category.getAllowDeny() == BaseStream.AllowDenyStatus.ALLOW) {
+    if (category.getAllowDeny() == AllowDenyStatus.ALLOW) {
       return true;
     }
 
     // Priority 2: Explicit deny always excludes
-    if (category.getAllowDeny() == BaseStream.AllowDenyStatus.DENY) {
+    if (category.getAllowDeny() == AllowDenyStatus.DENY) {
       return false;
     }
 
