@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Filter;
+import org.anasoid.iptvorganizer.models.entity.stream.AllowDenyStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.LiveStream;
@@ -157,7 +158,7 @@ class ContentFilterServiceTest {
     context.setHideAdultContent(false);
 
     Category allowedCategory = createTestCategory(1, "Allowed");
-    allowedCategory.setAllowDeny(BaseStream.AllowDenyStatus.ALLOW);
+    allowedCategory.setAllowDeny(AllowDenyStatus.ALLOW);
 
     Category neutralCategory = createTestCategory(2, "Neutral");
     neutralCategory.setAllowDeny(null);
@@ -180,10 +181,10 @@ class ContentFilterServiceTest {
     context.setHideAdultContent(true); // Enable some filtering
 
     Category deniedCategory = createTestCategory(1, "Denied");
-    deniedCategory.setAllowDeny(BaseStream.AllowDenyStatus.DENY);
+    deniedCategory.setAllowDeny(AllowDenyStatus.DENY);
 
     Category allowedCategory = createTestCategory(2, "Allowed");
-    allowedCategory.setAllowDeny(BaseStream.AllowDenyStatus.ALLOW);
+    allowedCategory.setAllowDeny(AllowDenyStatus.ALLOW);
 
     List<Category> allCategories = List.of(deniedCategory, allowedCategory);
     when(categoryService.findBySourceAndType(1L, "live")).thenReturn(allCategories);
@@ -214,7 +215,7 @@ class ContentFilterServiceTest {
     // Given: Stream with explicit allow
     FilterContext context = new FilterContext();
     BaseStream stream = createTestStream(1, "Stream 1", false);
-    stream.setAllowDeny(BaseStream.AllowDenyStatus.ALLOW);
+    stream.setAllowDeny(AllowDenyStatus.ALLOW);
     Category category = createTestCategory(1, "Category 1");
 
     // Mock the filter service to allow the stream
@@ -232,7 +233,7 @@ class ContentFilterServiceTest {
     // Given: Stream with explicit deny
     FilterContext context = new FilterContext();
     BaseStream stream = createTestStream(1, "Stream 1", false);
-    stream.setAllowDeny(BaseStream.AllowDenyStatus.DENY);
+    stream.setAllowDeny(AllowDenyStatus.DENY);
     Category category = createTestCategory(1, "Category 1");
 
     // When: Check stream inclusion
@@ -279,7 +280,7 @@ class ContentFilterServiceTest {
     // Given: Category with explicit allow
     FilterContext context = new FilterContext();
     Category category = createTestCategory(1, "Allowed");
-    category.setAllowDeny(BaseStream.AllowDenyStatus.ALLOW);
+    category.setAllowDeny(AllowDenyStatus.ALLOW);
     Map<Integer, Category> categoryCache = new HashMap<>();
 
     // When: Check category inclusion
@@ -295,7 +296,7 @@ class ContentFilterServiceTest {
     // Given: Category with explicit deny
     FilterContext context = new FilterContext();
     Category category = createTestCategory(1, "Denied");
-    category.setAllowDeny(BaseStream.AllowDenyStatus.DENY);
+    category.setAllowDeny(AllowDenyStatus.DENY);
     Map<Integer, Category> categoryCache = new HashMap<>();
 
     // When: Check category inclusion

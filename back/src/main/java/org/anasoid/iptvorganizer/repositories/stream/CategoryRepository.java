@@ -9,7 +9,7 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
-import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
+import org.anasoid.iptvorganizer.models.entity.stream.AllowDenyStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 
@@ -86,7 +86,7 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
         .name(rs.getString("name"))
         .type(rs.getString("type"))
         .num(rs.getInt("num"))
-        .allowDeny(BaseStream.AllowDenyStatus.fromValue(rs.getString("allow_deny")))
+        .allowDeny(AllowDenyStatus.fromValue(rs.getString("allow_deny")))
         .parentId((Integer) rs.getObject("parent_id"))
         .labels(rs.getString("labels"))
         .blackList(Category.BlackListStatus.fromValue(rs.getString("black_list")))

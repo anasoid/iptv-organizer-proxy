@@ -17,7 +17,7 @@ import org.anasoid.iptvorganizer.controllers.admin.BaseController;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.ValidationException;
-import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
+import org.anasoid.iptvorganizer.models.entity.stream.AllowDenyStatus;
 import org.anasoid.iptvorganizer.services.stream.CategoryService;
 import org.anasoid.iptvorganizer.utils.ResponseUtils;
 
@@ -152,7 +152,7 @@ public class CategoriesController extends BaseController {
     }
 
     if (request != null && request.get("allowDeny") != null) {
-      cat.setAllowDeny(BaseStream.AllowDenyStatus.fromValue(request.get("allowDeny")));
+      cat.setAllowDeny(AllowDenyStatus.fromValue(request.get("allowDeny")));
       categoryService.update(cat);
     }
     return ResponseUtils.ok(cat);

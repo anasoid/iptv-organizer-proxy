@@ -1,7 +1,6 @@
 package org.anasoid.iptvorganizer.models.entity.stream;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonValue;
 import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -22,9 +21,6 @@ import lombok.experimental.SuperBuilder;
 public abstract class BaseStream extends SourcedEntity {
   /** ID of the category this stream belongs to */
   private Integer categoryId;
-
-  /** Allow/deny status for filtering */
-  private AllowDenyStatus allowDeny;
 
   /** Stream name/title */
   private String name;
@@ -52,35 +48,6 @@ public abstract class BaseStream extends SourcedEntity {
 
   /** TMDb ID for the stream (Long, nullable) */
   private Long tmdb;
-
-  public enum AllowDenyStatus {
-    ALLOW("allow"),
-    DENY("deny");
-
-    private final String value;
-
-    AllowDenyStatus(String value) {
-      this.value = value;
-    }
-
-    @JsonValue
-    public String getValue() {
-      return value;
-    }
-
-    /** Convert string value to enum */
-    public static AllowDenyStatus fromValue(String value) {
-      if (value == null) {
-        return null;
-      }
-      for (AllowDenyStatus status : AllowDenyStatus.values()) {
-        if (status.value.equalsIgnoreCase(value)) {
-          return status;
-        }
-      }
-      throw new IllegalArgumentException("Unknown allow/deny status: " + value);
-    }
-  }
 
   public abstract StreamType getStreamType();
 }

@@ -203,7 +203,8 @@ public class XtreamUserService {
    * @param categoryId Optional category filter
    * @return Stream result with lazy Iterator of streams
    */
-  public JsonStreamResult<Map<?, ?>> getLiveStreams(Client client, Source source, Long categoryId) {
+  public JsonStreamResult<BaseStream> getLiveStreams(
+      Client client, Source source, Long categoryId) {
     return getFilteredStreamsByType(client, source, StreamType.LIVE, categoryId);
   }
 
@@ -215,7 +216,7 @@ public class XtreamUserService {
    * @param categoryId Optional category filter
    * @return Stream result with lazy Iterator of streams
    */
-  public JsonStreamResult<Map<?, ?>> getVodStreams(Client client, Source source, Long categoryId) {
+  public JsonStreamResult<BaseStream> getVodStreams(Client client, Source source, Long categoryId) {
 
     return getFilteredStreamsByType(client, source, StreamType.VOD, categoryId);
   }
@@ -228,7 +229,7 @@ public class XtreamUserService {
    * @param categoryId Optional category filter
    * @return Stream result with lazy Iterator of series
    */
-  public JsonStreamResult<Map<?, ?>> getSeries(Client client, Source source, Long categoryId) {
+  public JsonStreamResult<BaseStream> getSeries(Client client, Source source, Long categoryId) {
 
     return getFilteredStreamsByType(client, source, StreamType.SERIES, categoryId);
   }
@@ -407,47 +408,6 @@ public class XtreamUserService {
   }
 
   /**
-   * Convert a single stream to Xtream Map format (lazy conversion).
-   *
-   * <p>Maps a BaseStream entity to a Map<String, Object> with Xtream API fields. This is called
-   * once per item during iteration, not for all items upfront.
-   *
-   * @param stream The stream entity to convert
-   * @return Map with Xtream API format fields
-   */
-  private Map<?, ?> convertStreamToMap(BaseStream stream) {
-    Map<String, Object> map = new HashMap<>();
-    // Materialize properties one at a time for this stream
-    map.put("num", stream.getNum());
-    map.put("name", stream.getName());
-    map.put("stream_id", stream.getExternalId());
-    map.put("stream_icon", "");
-    map.put("category_id", stream.getCategoryId());
-    map.put("added", stream.getAddedDate() != null ? stream.getAddedDate().toString() : "");
-    map.put("is_adult", stream.getIsAdult() ? "1" : "0");
-    map.put("category_ids", stream.getCategoryIds());
-
-    // Include raw JSON data if available
-    if (stream.getData() != null && !stream.getData().isEmpty()) {
-      try {
-        @SuppressWarnings("unchecked")
-        Map<String, Object> rawData = objectMapper.readValue(stream.getData(), Map.class);
-        // Merge raw data with our standardized fields
-        rawData.forEach(
-            (key, value) -> {
-              if (!map.containsKey(key)) {
-                map.put(key, value);
-              }
-            });
-      } catch (Exception e) {
-        log.warn("Failed to parse stream data for stream {}", stream.getExternalId(), e);
-      }
-    }
-
-    return map;
-  }
-
-  /**
    * Materialize categories to Maps (fully resolve lazy-loaded properties while context is active)
    *
    * @param categories List of categories
@@ -476,39 +436,41 @@ public class XtreamUserService {
    * @param categoryId Optional category filter
    * @return Stream result with filtered streams
    */
-  private JsonStreamResult<Map<?, ?>> getFilteredStreamsByType(
+  private JsonStreamResult<BaseStream> getFilteredStreamsByType(
       Client client, Source source, StreamType type, Long categoryId) {
     FilterContext context = contentFilterService.buildFilterContext(client);
     // Get raw streams from upstream
-    JsonStreamResult<Map<?, ?>> rawStreams = getStreamsByType(source, type, categoryId);
+    JsonStreamResult<BaseStream> rawStreams = getStreamsByType(source, type, categoryId);
 
     // Build category cache for filtering
     Map<Integer, Category> categoryCache =
         buildCategoryCache(source.getId(), type.getCategoryType());
 
     // Apply filtering to stream iterator
-    return applyStreamFiltering(context, rawStreams, categoryCache);
+    return applyStreamFiltering(context, rawStreams, categoryCache, type);
   }
 
   /**
    * Apply filtering to streamed results
    *
    * @param context The filtering context
-   * @param rawStreams Raw stream results from Xtream API
+   * @param rawStreams Raw stream results
    * @param categoryCache Cached categories for lookups
+   * @param streamType Stream type to build correct subclass
    * @return Filtered stream results
    */
-  private JsonStreamResult<Map<?, ?>> applyStreamFiltering(
+  private JsonStreamResult<BaseStream> applyStreamFiltering(
       FilterContext context,
-      JsonStreamResult<Map<?, ?>> rawStreams,
-      Map<Integer, Category> categoryCache) {
+      JsonStreamResult<BaseStream> rawStreams,
+      Map<Integer, Category> categoryCache,
+      StreamType streamType) {
     // If no filtering needed, return as-is
     if (context == null) {
       return rawStreams;
     }
 
     // Create lazy filtering iterator that filters streams during iteration
-    Iterator<Map<?, ?>> filteringIterator =
+    Iterator<BaseStream> filteringIterator =
         new FilteringIterator(rawStreams.iterator(), context, categoryCache);
 
     // Wrap in new JsonStreamResult with same close handler
@@ -538,23 +500,22 @@ public class XtreamUserService {
    * @param source The source
    * @param type The stream type
    * @param categoryId Optional category filter (not currently implemented)
-   * @return Stream result with lazy Iterator
+   * @return Stream result with lazy Iterator of BaseStream entities
    */
-  private JsonStreamResult<Map<?, ?>> getStreamsByType(
+  private JsonStreamResult<BaseStream> getStreamsByType(
       Source source, StreamType type, Long categoryId) {
     final Iterator<? extends BaseStream> streamIterator =
         switch (type) {
           case LIVE -> liveStreamService.streamBySourceId(source.getId());
           case VOD -> vodStreamService.streamBySourceId(source.getId());
           case SERIES -> seriesService.streamBySourceId(source.getId());
-          default -> throw new IllegalArgumentException("Unknown stream type: " + type);
         };
 
-    // Wrap with lazy Map conversion (single item at a time)
-    Iterator<Map<?, ?>> mapIterator = new MappingIterator(streamIterator);
-
+    // Return streams directly without Map conversion (controllers will convert)
     return new JsonStreamResult<>(
-        mapIterator, new AtomicLong(0), () -> closeIterator(streamIterator));
+        (Iterator<BaseStream>) streamIterator,
+        new AtomicLong(0),
+        () -> closeIterator(streamIterator));
   }
 
   /**
@@ -573,46 +534,23 @@ public class XtreamUserService {
   }
 
   /**
-   * Lazy mapping iterator that converts BaseStream to Map on-demand.
-   *
-   * <p>Single item conversion only - materializes one stream to Map at a time while
-   * ContentFilterService context is active.
-   */
-  private class MappingIterator implements Iterator<Map<?, ?>> {
-    private final Iterator<? extends BaseStream> delegate;
-
-    MappingIterator(Iterator<? extends BaseStream> delegate) {
-      this.delegate = delegate;
-    }
-
-    @Override
-    public boolean hasNext() {
-      return delegate.hasNext();
-    }
-
-    @Override
-    public Map<?, ?> next() {
-      BaseStream stream = delegate.next();
-      return convertStreamToMap(stream); // Single item conversion
-    }
-  }
-
-  /**
    * Lazy filtering iterator that filters streams using FilterContext.
    *
    * <p>Uses lookahead pattern to process streams one-at-a-time without materializing entire list.
-   * Returns original Maps for streams that pass filtering checks.
+   * Returns original streams for streams that pass filtering checks.
    */
-  private class FilteringIterator implements Iterator<Map<?, ?>> {
-    private final Iterator<Map<?, ?>> delegate;
+  private class FilteringIterator implements Iterator<BaseStream> {
+    private final Iterator<BaseStream> delegate;
     private final FilterContext context;
     private final Map<Integer, Category> categoryCache;
     Map<String, Boolean> categoryMatchCache = new HashMap<>();
-    private Map<?, ?> nextItem = null;
+    private BaseStream nextItem = null;
     private boolean hasNextCached = false;
 
     FilteringIterator(
-        Iterator<Map<?, ?>> delegate, FilterContext context, Map<Integer, Category> categoryCache) {
+        Iterator<BaseStream> delegate,
+        FilterContext context,
+        Map<Integer, Category> categoryCache) {
       this.delegate = delegate;
       this.context = context;
       this.categoryCache = categoryCache;
@@ -628,21 +566,20 @@ public class XtreamUserService {
     }
 
     @Override
-    public Map<?, ?> next() {
+    public BaseStream next() {
       if (!hasNext()) {
         throw new java.util.NoSuchElementException();
       }
       hasNextCached = false;
-      Map<?, ?> result = nextItem;
+      BaseStream result = nextItem;
       nextItem = null;
       return result;
     }
 
     /** Advance iterator until finding a stream that passes filtering. */
-    private Map<?, ?> advanceToNext() {
+    private BaseStream advanceToNext() {
       while (delegate.hasNext()) {
-        Map<?, ?> item = delegate.next();
-        BaseStream stream = extractStreamFromMap(item);
+        BaseStream stream = delegate.next();
 
         // Look up category from cache (may be null)
         Category category = categoryCache.get(stream.getCategoryId());
@@ -650,83 +587,10 @@ public class XtreamUserService {
         // Check if stream passes filtering
         if (contentFilterService.shouldIncludeStream(
             context, stream, category, categoryMatchCache)) {
-          return item; // Return original Map
+          return stream;
         }
       }
       return null; // No more streams
-    }
-
-    /**
-     * Extract stream information from Map and build temporary BaseStream for filtering.
-     *
-     * @param map The Map containing stream data
-     * @return Temporary BaseStream with extracted fields
-     */
-    private BaseStream extractStreamFromMap(Map<?, ?> map) {
-      // Build temporary BaseStream using builder pattern
-      var builder = LiveStream.builder();
-
-      // Extract and convert Map fields
-      if (map.containsKey("stream_id")) {
-        builder.externalId(toInteger(map.get("stream_id")));
-      }
-      if (map.containsKey("name")) {
-        builder.name(toString(map.get("name")));
-      }
-      if (map.containsKey("category_id")) {
-        builder.categoryId(toInteger(map.get("category_id")));
-      }
-      if (map.containsKey("is_adult")) {
-        builder.isAdult(toBoolean(map.get("is_adult")));
-      }
-      if (map.containsKey("allow_deny")) {
-        builder.allowDeny(BaseStream.AllowDenyStatus.fromValue(toString(map.get("allow_deny"))));
-      }
-      if (map.containsKey("labels")) {
-        builder.labels(toString(map.get("labels")));
-      }
-
-      return builder.build();
-    }
-
-    /** Convert Object to Integer, handling various types. */
-    private Integer toInteger(Object obj) {
-      switch (obj) {
-        case null -> {
-          return null;
-        }
-        case Integer i -> {
-          return i;
-        }
-        case Number number -> {
-          return number.intValue();
-        }
-        case String s -> {
-          try {
-            return Integer.parseInt(s);
-          } catch (NumberFormatException e) {
-            return null;
-          }
-        }
-        default -> {}
-      }
-      return null;
-    }
-
-    /** Convert Object to String. */
-    private String toString(Object obj) {
-      return obj == null ? null : obj.toString();
-    }
-
-    /** Convert Object to Boolean, handling various types ("1"/"0", true/false, numeric). */
-    private Boolean toBoolean(Object obj) {
-      return switch (obj) {
-        case null -> null;
-        case Boolean b -> b;
-        case String str -> "1".equals(str) || "true".equalsIgnoreCase(str);
-        case Number number -> number.intValue() != 0;
-        default -> false;
-      };
     }
   }
 }
