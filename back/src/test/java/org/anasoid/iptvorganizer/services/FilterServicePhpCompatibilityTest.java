@@ -106,9 +106,13 @@ public class FilterServicePhpCompatibilityTest {
   public void testLabelMatchingCommaSeparated() {
     ChannelMatch criteria = ChannelMatch.builder().byLabels(Arrays.asList("hd", "sports")).build();
 
-    assertTrue(filterService.matchesChannelCriteria("", "hd,news", criteria));
-    assertTrue(filterService.matchesChannelCriteria("", "sports,news", criteria));
-    assertFalse(filterService.matchesChannelCriteria("", "sd,news", criteria));
+    BaseStream stream1 = LiveStream.builder().name("").labels("hd,news").build();
+    BaseStream stream2 = LiveStream.builder().name("").labels("sports,news").build();
+    BaseStream stream3 = LiveStream.builder().name("").labels("sd,news").build();
+
+    assertTrue(filterService.matchesChannelCriteria(stream1, criteria));
+    assertTrue(filterService.matchesChannelCriteria(stream2, criteria));
+    assertFalse(filterService.matchesChannelCriteria(stream3, criteria));
   }
 
   @DisplayName("Label matching - wildcards in labels")
@@ -117,9 +121,13 @@ public class FilterServicePhpCompatibilityTest {
     ChannelMatch criteria =
         ChannelMatch.builder().byLabels(Collections.singletonList("*hd*")).build();
 
-    assertTrue(filterService.matchesChannelCriteria("", "uhd,fhd", criteria));
-    assertTrue(filterService.matchesChannelCriteria("", "full-hd", criteria));
-    assertFalse(filterService.matchesChannelCriteria("", "sd,4k", criteria));
+    BaseStream stream1 = LiveStream.builder().name("").labels("uhd,fhd").build();
+    BaseStream stream2 = LiveStream.builder().name("").labels("full-hd").build();
+    BaseStream stream3 = LiveStream.builder().name("").labels("sd,4k").build();
+
+    assertTrue(filterService.matchesChannelCriteria(stream1, criteria));
+    assertTrue(filterService.matchesChannelCriteria(stream2, criteria));
+    assertFalse(filterService.matchesChannelCriteria(stream3, criteria));
   }
 
   // ==================== Matching Criteria Tests ====================

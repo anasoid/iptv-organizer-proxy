@@ -248,14 +248,31 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
    * @param labelString Comma-separated label string
    * @return List of lowercase labels
    */
-  protected List<String> parseLabels(String labelString) {
+  private List<String> parseLabels(String labelString, String defaultLabel) {
+    List<String> result = new ArrayList<>();
+    result.add(defaultLabel);
     if (labelString == null || labelString.isEmpty()) {
       return Collections.emptyList();
     }
-    return Arrays.stream(labelString.split(","))
+    Arrays.stream(labelString.split(","))
         .map(s -> s.trim().toLowerCase())
         .filter(s -> !s.isEmpty())
-        .collect(Collectors.toList());
+        .forEach(result::add);
+
+    return result;
+  }
+
+  private List<String> parseLabels(Category category) {
+
+    return parseLabels(
+        category.getLabels(), category.getType() != null ? category.getType().toLowerCase() : "");
+  }
+
+  private List<String> parseLabels(BaseStream stream) {
+
+    return parseLabels(
+        stream.getLabels(),
+        stream.getStreamType() != null ? stream.getStreamType().name().toLowerCase() : "");
   }
 
   /**
@@ -274,15 +291,14 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
    * <p>Matching Rules: - by_name: ANY pattern matches (OR logic) - by_labels: ANY pattern matches
    * ANY label (OR logic) - Both name and labels criteria must match if both specified (AND)
    *
-   * @param channelName Stream name
-   * @param channelLabelsStr Comma-separated channel labels
+   * @param stream BaseStream containing name and labels
    * @param criteria Channel matching criteria
    * @return true if stream matches criteria
    */
-  protected boolean matchesChannelCriteria(
-      String channelName, String channelLabelsStr, ChannelMatch criteria) {
-    channelName = channelName != null ? channelName.toLowerCase() : "";
-    List<String> channelLabels = parseLabels(channelLabelsStr);
+  protected boolean matchesChannelCriteria(BaseStream stream, ChannelMatch criteria) {
+    String channelName =
+        stream != null && stream.getName() != null ? stream.getName().toLowerCase() : "";
+    List<String> channelLabels = parseLabels(stream);
 
     // Check by_name: ANY pattern matches (OR logic)
     boolean nameMatches = true; // No name criteria = matches
@@ -315,15 +331,13 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
    * <p>Matching Rules: - by_name: ANY pattern matches (OR logic) - by_labels: ANY pattern matches
    * ANY label (OR logic) - Both name and labels criteria must match if both specified (AND)
    *
-   * @param categoryName Category name
-   * @param categoryLabelsStr Comma-separated category labels
+   * @param category Category entity containing name and labels
    * @param criteria Category matching criteria
    * @return true if category matches criteria
    */
-  public boolean matchesCategoryCriteria(
-      String categoryName, String categoryLabelsStr, CategoryMatch criteria) {
-    categoryName = categoryName != null ? categoryName.toLowerCase() : "";
-    List<String> categoryLabels = parseLabels(categoryLabelsStr);
+  public boolean matchesCategoryCriteria(Category category, CategoryMatch criteria) {
+    String categoryName = category.getName() != null ? category.getName().toLowerCase() : "";
+    List<String> categoryLabels = parseLabels(category);
 
     // Check by_name: ANY pattern matches (OR logic)
     boolean nameMatches = true; // No name criteria = matches
@@ -386,8 +400,7 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
     // If both channel and category criteria exist, both must match (AND)
     if (hasChannelCriteria && hasCategoryCriteria) {
       // Evaluate channel criteria
-      boolean channelMatches =
-          matchesChannelCriteria(stream.getName(), stream.getLabels(), match.getChannels());
+      boolean channelMatches = matchesChannelCriteria(stream, match.getChannels());
       if (!channelMatches) {
         return false; // Short-circuit: channel doesn't match
       }
@@ -401,7 +414,7 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
 
     // If only channel criteria exists
     if (hasChannelCriteria) {
-      return matchesChannelCriteria(stream.getName(), stream.getLabels(), match.getChannels());
+      return matchesChannelCriteria(stream, match.getChannels());
     }
 
     // If only category criteria exists - use request cache
@@ -435,14 +448,13 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
 
     // If categoryId is null, evaluate without caching (e.g., in tests)
     if (categoryId == null) {
-      return matchesCategoryCriteria(category.getName(), category.getLabels(), criteria);
+      return matchesCategoryCriteria(category, criteria);
     }
 
     String cacheKey = categoryId + "#" + System.identityHashCode(criteria);
 
     return categoryMatchCache.computeIfAbsent(
-        cacheKey,
-        key -> matchesCategoryCriteria(category.getName(), category.getLabels(), criteria));
+        cacheKey, key -> matchesCategoryCriteria(category, criteria));
   }
 
   /**
@@ -693,8 +705,7 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
                 MatchCriteria match = rule.getMatch();
 
                 // Check if category matches this rule
-                if (matchesCategoryCriteria(
-                    category.getName(), category.getLabels(), match.getCategories())) {
+                if (matchesCategoryCriteria(category, match.getCategories())) {
                   // If matches and type is include → ACCEPT
                   if (rule.getType() == FilterAction.INCLUDE) {
                     return true;

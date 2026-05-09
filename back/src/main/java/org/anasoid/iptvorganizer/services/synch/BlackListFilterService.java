@@ -81,8 +81,7 @@ public class BlackListFilterService {
    * consistent matching logic.
    */
   private boolean matchesCategoryCriteria(Category category, MatchCriteria match) {
-    return filterService.matchesCategoryCriteria(
-        category.getName(), category.getLabels(), match.getCategories());
+    return filterService.matchesCategoryCriteria(category, match.getCategories());
   }
 
   /** Parse YAML filter configuration from string. Returns null if parsing fails. */
