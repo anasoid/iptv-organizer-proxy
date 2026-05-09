@@ -54,6 +54,16 @@ export interface SyncLogStatsResponse {
   data: SyncLogStats;
 }
 
+interface SyncLogsQueryParams {
+  page: number;
+  limit: number;
+  sourceId?: number;
+  syncType?: string;
+  status?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
 class SyncLogsApi {
   /**
    * Get all sync logs with pagination and filters
@@ -65,10 +75,19 @@ class SyncLogsApi {
       sourceId?: number;
       syncType?: string;
       status?: string;
-    }
+    },
+    sortBy?: string,
+    sortOrder?: 'asc' | 'desc'
   ): Promise<SyncLogsResponse> {
+    const params: SyncLogsQueryParams = { page, limit, ...filters };
+    if (sortBy) {
+      params.sortBy = sortBy;
+    }
+    if (sortOrder) {
+      params.sortOrder = sortOrder;
+    }
     const response = await api.get('/sync-logs', {
-      params: { page, limit, ...filters },
+      params,
     });
     return response.data;
   }

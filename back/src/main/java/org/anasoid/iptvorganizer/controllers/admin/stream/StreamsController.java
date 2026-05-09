@@ -11,6 +11,7 @@ import org.anasoid.iptvorganizer.controllers.admin.BaseController;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.ValidationException;
+import org.anasoid.iptvorganizer.models.entity.stream.AllowDenyStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.repositories.stream.BaseStreamRepository;
 import org.anasoid.iptvorganizer.services.stream.LiveStreamService;
@@ -205,8 +206,7 @@ public class StreamsController extends BaseController {
       case "live":
         var liveStream = liveStreamService.getById(id);
         if (liveStream != null) {
-          liveStream.setAllowDeny(
-              allowDeny != null ? BaseStream.AllowDenyStatus.fromValue(allowDeny) : null);
+          liveStream.setAllowDeny(allowDeny != null ? AllowDenyStatus.fromValue(allowDeny) : null);
           liveStreamService.update(liveStream);
           stream = liveStream;
         }
@@ -214,8 +214,7 @@ public class StreamsController extends BaseController {
       case "vod":
         var vodStream = vodStreamService.getById(id);
         if (vodStream != null) {
-          vodStream.setAllowDeny(
-              allowDeny != null ? BaseStream.AllowDenyStatus.fromValue(allowDeny) : null);
+          vodStream.setAllowDeny(allowDeny != null ? AllowDenyStatus.fromValue(allowDeny) : null);
           vodStreamService.update(vodStream);
           stream = vodStream;
         }
@@ -223,8 +222,7 @@ public class StreamsController extends BaseController {
       case "series":
         var series = seriesService.getById(id);
         if (series != null) {
-          series.setAllowDeny(
-              allowDeny != null ? BaseStream.AllowDenyStatus.fromValue(allowDeny) : null);
+          series.setAllowDeny(allowDeny != null ? AllowDenyStatus.fromValue(allowDeny) : null);
           seriesService.update(series);
           stream = series;
         }

@@ -19,6 +19,7 @@ import org.anasoid.iptvorganizer.exceptions.ForbiddenException;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
+import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.http.HttpStreamingResponse;
 import org.anasoid.iptvorganizer.repositories.ClientRepository;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
@@ -139,13 +140,18 @@ public class XtreamController {
         return streamJsonArray(xtreamUserService.getSeriesCategories(client, source));
 
       case "get_live_streams":
-        return streamJsonArray(xtreamUserService.getLiveStreams(client, source, categoryId));
+        return streamJsonArray(
+            convertStreamResultToMapList(
+                xtreamUserService.getLiveStreams(client, source, categoryId)));
 
       case "get_vod_streams":
-        return streamJsonArray(xtreamUserService.getVodStreams(client, source, categoryId));
+        return streamJsonArray(
+            convertStreamResultToMapList(
+                xtreamUserService.getVodStreams(client, source, categoryId)));
 
       case "get_series":
-        return streamJsonArray(xtreamUserService.getSeries(client, source, categoryId));
+        return streamJsonArray(
+            convertStreamResultToMapList(xtreamUserService.getSeries(client, source, categoryId)));
 
       case "get_series_info":
         if (seriesId == null) {
@@ -385,5 +391,69 @@ public class XtreamController {
                 && baseUri.getPort() != (baseUri.getScheme().equals("https") ? 443 : 80)
             ? ":" + baseUri.getPort()
             : "");
+  }
+
+  /**
+   * Convert JsonStreamResult<BaseStream> to JsonStreamResult<Map<?, ?>> with lazy Xtream format
+   * conversion
+   *
+   * @param result The stream result with BaseStream entities
+   * @return Stream result with Map conversions
+   */
+  private JsonStreamResult<Map<?, ?>> convertStreamResultToMapList(
+      JsonStreamResult<BaseStream> result) {
+    Iterator<Map<?, ?>> mapIterator =
+        new java.util.Iterator<Map<?, ?>>() {
+          private final Iterator<BaseStream> delegate = result.iterator();
+
+          @Override
+          public boolean hasNext() {
+            return delegate.hasNext();
+          }
+
+          @Override
+          public Map<?, ?> next() {
+            return convertStreamToXtreamMap(delegate.next());
+          }
+        };
+    return new JsonStreamResult<>(
+        mapIterator, new java.util.concurrent.atomic.AtomicLong(0), result::close);
+  }
+
+  /**
+   * Convert BaseStream to Xtream Map format
+   *
+   * @param stream The stream entity
+   * @return Map with Xtream API format fields
+   */
+  private Map<?, ?> convertStreamToXtreamMap(BaseStream stream) {
+    Map<String, Object> map = new java.util.HashMap<>();
+    map.put("num", stream.getNum());
+    map.put("name", stream.getName());
+    map.put("stream_id", stream.getExternalId());
+    map.put("stream_icon", "");
+    map.put("category_id", stream.getCategoryId());
+    map.put("added", stream.getAddedDate() != null ? stream.getAddedDate().toString() : "");
+    map.put("is_adult", stream.getIsAdult() ? "1" : "0");
+    map.put("category_ids", stream.getCategoryIds());
+
+    // Include raw JSON data if available
+    if (stream.getData() != null && !stream.getData().isEmpty()) {
+      try {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rawData = objectMapper.readValue(stream.getData(), Map.class);
+        // Merge raw data with our standardized fields
+        rawData.forEach(
+            (key, value) -> {
+              if (!map.containsKey(key)) {
+                map.put(key, value);
+              }
+            });
+      } catch (Exception e) {
+        // Log warning but don't fail - raw data is optional
+      }
+    }
+
+    return map;
   }
 }

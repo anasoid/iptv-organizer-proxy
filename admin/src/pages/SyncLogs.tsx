@@ -41,6 +41,9 @@ export default function SyncLogs() {
   const [syncTypeFilter, setSyncTypeFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
 
+  // Sorting
+  const [sortModel, setSortModel] = useState([{ field: 'startedAt', sort: 'desc' }]);
+
   // Build filters object
   const filters = {
     ...(sourceIdFilter ? { sourceId: sourceIdFilter } : {}),
@@ -48,10 +51,14 @@ export default function SyncLogs() {
     ...(statusFilter ? { status: statusFilter } : {}),
   };
 
+  // Extract sort parameters
+  const sortBy = sortModel[0]?.field || 'startedAt';
+  const sortOrder = sortModel[0]?.sort === 'desc' ? 'desc' : 'asc';
+
   // Fetch sync logs (only when authenticated)
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['syncLogs', page, limit, filters],
-    queryFn: () => syncLogsApi.getSyncLogs(page, limit, filters),
+    queryKey: ['syncLogs', page, limit, filters, sortBy, sortOrder],
+    queryFn: () => syncLogsApi.getSyncLogs(page, limit, filters, sortBy, sortOrder),
     enabled: isAuthenticated,
   });
 
@@ -101,7 +108,7 @@ export default function SyncLogs() {
   };
 
   const formatDuration = (seconds: number | null | undefined): string => {
-    if (!seconds) return '-';
+    if (seconds === null || seconds === undefined) return '-';
     if (seconds < 60) return `${seconds}s`;
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
@@ -321,9 +328,12 @@ export default function SyncLogs() {
           columns={columns}
           pagination
           paginationMode="server"
+          sortingMode="server"
           rowCount={data?.pagination?.total || 0}
           paginationModel={{ pageSize: limit, page: page - 1 }}
           onPaginationModelChange={(model) => setPage(model.page + 1)}
+          sortModel={sortModel}
+          onSortModelChange={(newSortModel) => setSortModel(newSortModel)}
           pageSizeOptions={[10]}
           getRowId={(row: SyncLog) => row.id}
           sx={{ height: '100%', width: '100%' }}

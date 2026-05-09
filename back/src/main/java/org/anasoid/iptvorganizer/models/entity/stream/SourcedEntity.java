@@ -27,4 +27,7 @@ public abstract class SourcedEntity extends BaseEntity {
 
   /** Ordering number within the source */
   private Integer num;
+
+  /** Allow/deny status for filtering */
+  private AllowDenyStatus allowDeny;
 }

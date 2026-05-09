@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.exceptions.FilterException;
 import org.anasoid.iptvorganizer.models.entity.Filter;
+import org.anasoid.iptvorganizer.models.entity.stream.AllowDenyStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.filtering.CategoryMatch;
@@ -247,14 +248,31 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
    * @param labelString Comma-separated label string
    * @return List of lowercase labels
    */
-  protected List<String> parseLabels(String labelString) {
+  private List<String> parseLabels(String labelString, String defaultLabel) {
+    List<String> result = new ArrayList<>();
+    result.add(defaultLabel);
     if (labelString == null || labelString.isEmpty()) {
       return Collections.emptyList();
     }
-    return Arrays.stream(labelString.split(","))
+    Arrays.stream(labelString.split(","))
         .map(s -> s.trim().toLowerCase())
         .filter(s -> !s.isEmpty())
-        .collect(Collectors.toList());
+        .forEach(result::add);
+
+    return result;
+  }
+
+  private List<String> parseLabels(Category category) {
+
+    return parseLabels(
+        category.getLabels(), category.getType() != null ? category.getType().toLowerCase() : "");
+  }
+
+  private List<String> parseLabels(BaseStream stream) {
+
+    return parseLabels(
+        stream.getLabels(),
+        stream.getStreamType() != null ? stream.getStreamType().name().toLowerCase() : "");
   }
 
   /**
@@ -273,15 +291,14 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
    * <p>Matching Rules: - by_name: ANY pattern matches (OR logic) - by_labels: ANY pattern matches
    * ANY label (OR logic) - Both name and labels criteria must match if both specified (AND)
    *
-   * @param channelName Stream name
-   * @param channelLabelsStr Comma-separated channel labels
+   * @param stream BaseStream containing name and labels
    * @param criteria Channel matching criteria
    * @return true if stream matches criteria
    */
-  protected boolean matchesChannelCriteria(
-      String channelName, String channelLabelsStr, ChannelMatch criteria) {
-    channelName = channelName != null ? channelName.toLowerCase() : "";
-    List<String> channelLabels = parseLabels(channelLabelsStr);
+  protected boolean matchesChannelCriteria(BaseStream stream, ChannelMatch criteria) {
+    String channelName =
+        stream != null && stream.getName() != null ? stream.getName().toLowerCase() : "";
+    List<String> channelLabels = parseLabels(stream);
 
     // Check by_name: ANY pattern matches (OR logic)
     boolean nameMatches = true; // No name criteria = matches
@@ -314,15 +331,13 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
    * <p>Matching Rules: - by_name: ANY pattern matches (OR logic) - by_labels: ANY pattern matches
    * ANY label (OR logic) - Both name and labels criteria must match if both specified (AND)
    *
-   * @param categoryName Category name
-   * @param categoryLabelsStr Comma-separated category labels
+   * @param category Category entity containing name and labels
    * @param criteria Category matching criteria
    * @return true if category matches criteria
    */
-  public boolean matchesCategoryCriteria(
-      String categoryName, String categoryLabelsStr, CategoryMatch criteria) {
-    categoryName = categoryName != null ? categoryName.toLowerCase() : "";
-    List<String> categoryLabels = parseLabels(categoryLabelsStr);
+  public boolean matchesCategoryCriteria(Category category, CategoryMatch criteria) {
+    String categoryName = category.getName() != null ? category.getName().toLowerCase() : "";
+    List<String> categoryLabels = parseLabels(category);
 
     // Check by_name: ANY pattern matches (OR logic)
     boolean nameMatches = true; // No name criteria = matches
@@ -385,8 +400,7 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
     // If both channel and category criteria exist, both must match (AND)
     if (hasChannelCriteria && hasCategoryCriteria) {
       // Evaluate channel criteria
-      boolean channelMatches =
-          matchesChannelCriteria(stream.getName(), stream.getLabels(), match.getChannels());
+      boolean channelMatches = matchesChannelCriteria(stream, match.getChannels());
       if (!channelMatches) {
         return false; // Short-circuit: channel doesn't match
       }
@@ -400,7 +414,7 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
 
     // If only channel criteria exists
     if (hasChannelCriteria) {
-      return matchesChannelCriteria(stream.getName(), stream.getLabels(), match.getChannels());
+      return matchesChannelCriteria(stream, match.getChannels());
     }
 
     // If only category criteria exists - use request cache
@@ -434,14 +448,13 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
 
     // If categoryId is null, evaluate without caching (e.g., in tests)
     if (categoryId == null) {
-      return matchesCategoryCriteria(category.getName(), category.getLabels(), criteria);
+      return matchesCategoryCriteria(category, criteria);
     }
 
     String cacheKey = categoryId + "#" + System.identityHashCode(criteria);
 
     return categoryMatchCache.computeIfAbsent(
-        cacheKey,
-        key -> matchesCategoryCriteria(category.getName(), category.getLabels(), criteria));
+        cacheKey, key -> matchesCategoryCriteria(category, criteria));
   }
 
   /**
@@ -464,30 +477,29 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
 
     // Phase 1: Separate streams by allow_deny priority
     for (BaseStream stream : streams) {
-      BaseStream.AllowDenyStatus streamAllowDeny = stream.getAllowDeny();
+      AllowDenyStatus streamAllowDeny = stream.getAllowDeny();
       Category category = categoryCache.get(stream.getCategoryId());
-      BaseStream.AllowDenyStatus categoryAllowDeny =
-          category != null ? category.getAllowDeny() : null;
+      AllowDenyStatus categoryAllowDeny = category != null ? category.getAllowDeny() : null;
 
       // Priority 1: Stream allow_deny='allow' - ALWAYS INCLUDE
-      if (streamAllowDeny == BaseStream.AllowDenyStatus.ALLOW) {
+      if (streamAllowDeny == AllowDenyStatus.ALLOW) {
         allowed.add(stream);
         continue;
       }
 
       // Priority 2: Stream allow_deny='deny' - ALWAYS EXCLUDE
-      if (streamAllowDeny == BaseStream.AllowDenyStatus.DENY) {
+      if (streamAllowDeny == AllowDenyStatus.DENY) {
         continue; // Skip this stream
       }
 
       // Priority 3: Category allow_deny='allow' - INCLUDE STREAM
-      if (categoryAllowDeny == BaseStream.AllowDenyStatus.ALLOW) {
+      if (categoryAllowDeny == AllowDenyStatus.ALLOW) {
         allowed.add(stream);
         continue;
       }
 
       // Priority 4: Category allow_deny='deny' - EXCLUDE STREAM
-      if (categoryAllowDeny == BaseStream.AllowDenyStatus.DENY) {
+      if (categoryAllowDeny == AllowDenyStatus.DENY) {
         continue; // Skip this stream
       }
 
@@ -582,22 +594,22 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
       boolean hideAdultContent,
       Map<String, Boolean> categoryMatchCache) {
     // Priority 1: Stream allow_deny='allow' - ALWAYS INCLUDE
-    if (stream.getAllowDeny() == BaseStream.AllowDenyStatus.ALLOW) {
+    if (stream.getAllowDeny() == AllowDenyStatus.ALLOW) {
       return true;
     }
 
     // Priority 2: Stream allow_deny='deny' - ALWAYS EXCLUDE
-    if (stream.getAllowDeny() == BaseStream.AllowDenyStatus.DENY) {
+    if (stream.getAllowDeny() == AllowDenyStatus.DENY) {
       return false;
     }
 
     // Priority 3: Category allow_deny='allow' - INCLUDE
-    if (category != null && category.getAllowDeny() == BaseStream.AllowDenyStatus.ALLOW) {
+    if (category != null && category.getAllowDeny() == AllowDenyStatus.ALLOW) {
       return true;
     }
 
     // Priority 4: Category allow_deny='deny' - EXCLUDE
-    if (category != null && category.getAllowDeny() == BaseStream.AllowDenyStatus.DENY) {
+    if (category != null && category.getAllowDeny() == AllowDenyStatus.DENY) {
       return false;
     }
 
@@ -693,8 +705,7 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
                 MatchCriteria match = rule.getMatch();
 
                 // Check if category matches this rule
-                if (matchesCategoryCriteria(
-                    category.getName(), category.getLabels(), match.getCategories())) {
+                if (matchesCategoryCriteria(category, match.getCategories())) {
                   // If matches and type is include → ACCEPT
                   if (rule.getType() == FilterAction.INCLUDE) {
                     return true;

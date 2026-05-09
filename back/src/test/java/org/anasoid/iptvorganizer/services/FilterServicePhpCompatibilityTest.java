@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.anasoid.iptvorganizer.models.entity.stream.AllowDenyStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.models.entity.stream.LiveStream;
@@ -105,9 +106,13 @@ public class FilterServicePhpCompatibilityTest {
   public void testLabelMatchingCommaSeparated() {
     ChannelMatch criteria = ChannelMatch.builder().byLabels(Arrays.asList("hd", "sports")).build();
 
-    assertTrue(filterService.matchesChannelCriteria("", "hd,news", criteria));
-    assertTrue(filterService.matchesChannelCriteria("", "sports,news", criteria));
-    assertFalse(filterService.matchesChannelCriteria("", "sd,news", criteria));
+    BaseStream stream1 = LiveStream.builder().name("").labels("hd,news").build();
+    BaseStream stream2 = LiveStream.builder().name("").labels("sports,news").build();
+    BaseStream stream3 = LiveStream.builder().name("").labels("sd,news").build();
+
+    assertTrue(filterService.matchesChannelCriteria(stream1, criteria));
+    assertTrue(filterService.matchesChannelCriteria(stream2, criteria));
+    assertFalse(filterService.matchesChannelCriteria(stream3, criteria));
   }
 
   @DisplayName("Label matching - wildcards in labels")
@@ -116,9 +121,13 @@ public class FilterServicePhpCompatibilityTest {
     ChannelMatch criteria =
         ChannelMatch.builder().byLabels(Collections.singletonList("*hd*")).build();
 
-    assertTrue(filterService.matchesChannelCriteria("", "uhd,fhd", criteria));
-    assertTrue(filterService.matchesChannelCriteria("", "full-hd", criteria));
-    assertFalse(filterService.matchesChannelCriteria("", "sd,4k", criteria));
+    BaseStream stream1 = LiveStream.builder().name("").labels("uhd,fhd").build();
+    BaseStream stream2 = LiveStream.builder().name("").labels("full-hd").build();
+    BaseStream stream3 = LiveStream.builder().name("").labels("sd,4k").build();
+
+    assertTrue(filterService.matchesChannelCriteria(stream1, criteria));
+    assertTrue(filterService.matchesChannelCriteria(stream2, criteria));
+    assertFalse(filterService.matchesChannelCriteria(stream3, criteria));
   }
 
   // ==================== Matching Criteria Tests ====================
@@ -183,10 +192,9 @@ public class FilterServicePhpCompatibilityTest {
   @DisplayName("Priority 1 - Stream allow_deny='allow'")
   @Test
   public void testPriority1StreamAllow() {
-    BaseStream stream =
-        LiveStream.builder().allowDeny(BaseStream.AllowDenyStatus.ALLOW).isAdult(true).build();
+    BaseStream stream = LiveStream.builder().allowDeny(AllowDenyStatus.ALLOW).isAdult(true).build();
 
-    Category category = Category.builder().allowDeny(BaseStream.AllowDenyStatus.DENY).build();
+    Category category = Category.builder().allowDeny(AllowDenyStatus.DENY).build();
 
     // Even with adult content and category deny, stream allow wins
     assertTrue(filterService.shouldIncludeStream(stream, category, null, true));
@@ -195,9 +203,9 @@ public class FilterServicePhpCompatibilityTest {
   @DisplayName("Priority 2 - Stream allow_deny='deny'")
   @Test
   public void testPriority2StreamDeny() {
-    BaseStream stream = LiveStream.builder().allowDeny(BaseStream.AllowDenyStatus.DENY).build();
+    BaseStream stream = LiveStream.builder().allowDeny(AllowDenyStatus.DENY).build();
 
-    Category category = Category.builder().allowDeny(BaseStream.AllowDenyStatus.ALLOW).build();
+    Category category = Category.builder().allowDeny(AllowDenyStatus.ALLOW).build();
 
     // Stream deny overrides category allow
     assertFalse(filterService.shouldIncludeStream(stream, category, null, false));
@@ -208,7 +216,7 @@ public class FilterServicePhpCompatibilityTest {
   public void testPriority3CategoryAllow() {
     BaseStream stream = LiveStream.builder().build();
 
-    Category category = Category.builder().allowDeny(BaseStream.AllowDenyStatus.ALLOW).build();
+    Category category = Category.builder().allowDeny(AllowDenyStatus.ALLOW).build();
 
     // Category allow includes stream
     assertTrue(filterService.shouldIncludeStream(stream, category, null, false));
@@ -219,7 +227,7 @@ public class FilterServicePhpCompatibilityTest {
   public void testPriority4CategoryDeny() {
     BaseStream stream = LiveStream.builder().build();
 
-    Category category = Category.builder().allowDeny(BaseStream.AllowDenyStatus.DENY).build();
+    Category category = Category.builder().allowDeny(AllowDenyStatus.DENY).build();
 
     // Category deny excludes stream
     assertFalse(filterService.shouldIncludeStream(stream, category, null, false));
@@ -453,7 +461,7 @@ public class FilterServicePhpCompatibilityTest {
             .externalId(1)
             .categoryId(1)
             .name("Allow")
-            .allowDeny(BaseStream.AllowDenyStatus.ALLOW)
+            .allowDeny(AllowDenyStatus.ALLOW)
             .build();
 
     LiveStream denyStream =
@@ -461,7 +469,7 @@ public class FilterServicePhpCompatibilityTest {
             .externalId(2)
             .categoryId(1)
             .name("Deny")
-            .allowDeny(BaseStream.AllowDenyStatus.DENY)
+            .allowDeny(AllowDenyStatus.DENY)
             .build();
 
     LiveStream normalStream =

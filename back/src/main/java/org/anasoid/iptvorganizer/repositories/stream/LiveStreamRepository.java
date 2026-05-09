@@ -10,7 +10,7 @@ import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.Map;
 import org.anasoid.iptvorganizer.models.entity.Source;
-import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
+import org.anasoid.iptvorganizer.models.entity.stream.AllowDenyStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.LiveStream;
 import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
 import org.anasoid.iptvorganizer.utils.xtream.XtreamClient;
@@ -93,7 +93,7 @@ public class LiveStreamRepository extends BaseStreamRepository<LiveStream> {
         .sourceId(rs.getLong("source_id"))
         .externalId(rs.getInt("external_id"))
         .num(rs.getInt("num"))
-        .allowDeny(BaseStream.AllowDenyStatus.fromValue(rs.getString("allow_deny")))
+        .allowDeny(AllowDenyStatus.fromValue(rs.getString("allow_deny")))
         .name(rs.getString("name"))
         .categoryId(rs.getInt("category_id"))
         .categoryIds(rs.getString("category_ids"))

@@ -8,7 +8,7 @@ import jakarta.inject.Inject;
 import java.util.List;
 import org.anasoid.iptvorganizer.SQLiteTestProfile;
 import org.anasoid.iptvorganizer.models.entity.Source;
-import org.anasoid.iptvorganizer.models.entity.stream.BaseStream.AllowDenyStatus;
+import org.anasoid.iptvorganizer.models.entity.stream.AllowDenyStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 import org.junit.jupiter.api.Test;

@@ -117,9 +117,17 @@ public interface SynchronizedItemRepository<T extends SourcedEntity> {
 
         // Check if any functional field has changed
         T existingEntity = existingEntitiesMap.get(entity.getExternalId());
-        if (existingEntity != null && !hasFunctionalChanges(entity, existingEntity)) {
-          skippedCount++; // Skip update - no changes detected
-          continue;
+        if (existingEntity != null) {
+
+          // If the synced data doesn't specify allowDeny, preserve the existing value
+          if (entity.getAllowDeny() == null && existingEntity.getAllowDeny() != null) {
+            entity.setAllowDeny(existingEntity.getAllowDeny());
+          }
+
+          if (!hasFunctionalChanges(entity, existingEntity)) {
+            skippedCount++; // Skip update - no changes detected
+            continue;
+          }
         }
 
         update(entity); // Only update if changes detected
