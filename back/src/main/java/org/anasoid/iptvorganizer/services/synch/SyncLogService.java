@@ -40,6 +40,23 @@ public class SyncLogService extends BaseService<SyncLog, SyncLogRepository> {
     return repository.findBySourceId(sourceId);
   }
 
+  /** Find sync logs with optional filters, sorting and pagination. */
+  public List<SyncLog> findFilteredPaged(
+      Long sourceId,
+      String syncType,
+      String status,
+      int page,
+      int limit,
+      String sortBy,
+      String sortOrder) {
+    return repository.findFilteredPaged(sourceId, syncType, status, page, limit, sortBy, sortOrder);
+  }
+
+  /** Count sync logs with optional filters. */
+  public Long countFiltered(Long sourceId, String syncType, String status) {
+    return repository.countFiltered(sourceId, syncType, status);
+  }
+
   public void fixInterruptedSyncs() {
     log.info("Checking for interrupted syncs from previous shutdown...");
 

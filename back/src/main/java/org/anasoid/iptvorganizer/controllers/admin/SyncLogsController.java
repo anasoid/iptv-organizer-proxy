@@ -4,9 +4,11 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.util.List;
 import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.ValidationException;
+import org.anasoid.iptvorganizer.models.entity.SyncLog;
 import org.anasoid.iptvorganizer.services.synch.SyncLogService;
 import org.anasoid.iptvorganizer.utils.ResponseUtils;
 
@@ -25,45 +27,17 @@ public class SyncLogsController extends BaseController {
       @QueryParam("syncType") String syncType,
       @QueryParam("status") String status,
       @QueryParam("page") @DefaultValue("1") int page,
-      @QueryParam("limit") @DefaultValue("20") int limit) {
+      @QueryParam("limit") @DefaultValue("20") int limit,
+      @QueryParam("sortBy") @DefaultValue("startedAt") String sortBy,
+      @QueryParam("sortOrder") @DefaultValue("desc") String sortOrder) {
 
     if (page < 1 || limit < 1) {
       throw new ValidationException("Page and limit must be greater than 0");
     }
 
-    java.util.List<org.anasoid.iptvorganizer.models.entity.SyncLog> logs;
-
-    // Fetch logs by source if sourceId provided, otherwise fetch all logs
-    if (sourceId != null) {
-      logs = syncLogService.findBySourceId(sourceId);
-    } else {
-      logs = syncLogService.getAll();
-    }
-
-    // Apply status filter if provided
-    if (status != null && !status.isBlank()) {
-      final String statusFilter = status;
-      logs =
-          logs.stream()
-              .filter(l -> l.getStatus().toString().equalsIgnoreCase(statusFilter))
-              .collect(java.util.stream.Collectors.toList());
-    }
-
-    // Apply sync type filter if provided
-    if (syncType != null && !syncType.isBlank()) {
-      final String typeFilter = syncType;
-      logs =
-          logs.stream()
-              .filter(l -> l.getSyncType().equalsIgnoreCase(typeFilter))
-              .collect(java.util.stream.Collectors.toList());
-    }
-
-    // Apply pagination
-    long total = logs.size();
-    int startIdx = (page - 1) * limit;
-    int endIdx = Math.min(startIdx + limit, (int) total);
-    java.util.List<org.anasoid.iptvorganizer.models.entity.SyncLog> paginatedLogs =
-        startIdx < logs.size() ? logs.subList(startIdx, endIdx) : java.util.Collections.emptyList();
+    List<SyncLog> paginatedLogs =
+        syncLogService.findFilteredPaged(sourceId, syncType, status, page, limit, sortBy, sortOrder);
+    long total = syncLogService.countFiltered(sourceId, syncType, status);
 
     return ResponseUtils.okWithPagination(paginatedLogs, PaginationMeta.of(page, limit, total));
   }
@@ -92,7 +66,7 @@ public class SyncLogsController extends BaseController {
   @Path("/stats")
   public Response getSyncStats(
       @QueryParam("sourceId") Long sourceId, @QueryParam("syncType") String syncType) {
-    java.util.List<org.anasoid.iptvorganizer.models.entity.SyncLog> logs;
+    List<SyncLog> logs;
 
     // Fetch logs by source if sourceId provided, otherwise fetch all logs
     if (sourceId != null) {
