@@ -124,7 +124,9 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
     return countFiltered(sourceId, syncType, status);
   }
 
-  /** Find sync logs using optional source, sync_type, and status filters with sorting and pagination */
+  /**
+   * Find sync logs using optional source, sync_type, and status filters with sorting and pagination
+   */
   public List<SyncLog> findFilteredPaged(
       Long sourceId,
       String syncType,
@@ -151,7 +153,8 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
       params.add(status);
     }
 
-    return findWherePaged(whereClause.toString(), page, limit, buildOrderBy(sortBy, sortOrder), params.toArray());
+    return findWherePaged(
+        whereClause.toString(), page, limit, buildOrderBy(sortBy, sortOrder), params.toArray());
   }
 
   /** Count sync logs using optional source, sync_type, and status filters */

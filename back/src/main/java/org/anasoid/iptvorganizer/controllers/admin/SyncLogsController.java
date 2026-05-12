@@ -36,7 +36,8 @@ public class SyncLogsController extends BaseController {
     }
 
     List<SyncLog> paginatedLogs =
-        syncLogService.findFilteredPaged(sourceId, syncType, status, page, limit, sortBy, sortOrder);
+        syncLogService.findFilteredPaged(
+            sourceId, syncType, status, page, limit, sortBy, sortOrder);
     long total = syncLogService.countFiltered(sourceId, syncType, status);
 
     return ResponseUtils.okWithPagination(paginatedLogs, PaginationMeta.of(page, limit, total));
