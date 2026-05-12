@@ -92,8 +92,8 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
   }
 
   /** Invalidate cache entries when filter is updated or deleted */
-  public void invalidateCache(Long filterId) {
-    configCache.remove(filterId);
+  public void clearCache() {
+    configCache.clear();
   }
 
   /** Apply filter to a list of items */
@@ -642,6 +642,25 @@ public class FilterService extends BaseService<Filter, FilterRepository> {
 
     // No filters applied - include by default
     return true;
+  }
+
+  @Override
+  public void update(Filter entity) {
+    super.update(entity);
+    clearCache();
+  }
+
+  @Override
+  public void delete(Long id) {
+    super.delete(id);
+    clearCache();
+  }
+
+  @Override
+  public Filter save(Filter entity) {
+    Filter filter = super.save(entity);
+    clearCache();
+    return filter;
   }
 
   /**
