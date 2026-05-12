@@ -27,6 +27,7 @@ import type { SyncLog } from '../services/syncLogsApi';
 import sourcesApi from '../services/sourcesApi';
 import type { Source } from '../services/sourcesApi';
 import { useAuthStore } from '../stores/authStore';
+import { formatDisplayDateTime } from '../utils/dateFormat';
 
 export default function SyncLogs() {
   const queryClient = useQueryClient();
@@ -149,8 +150,7 @@ export default function SyncLogs() {
       field: 'startedAt',
       headerName: 'Started',
       width: 160,
-      renderCell: (params) =>
-        params.value ? new Date(params.value).toLocaleString() : '-',
+      renderCell: (params) => formatDisplayDateTime(params.value),
     },
     {
       field: 'durationSeconds',
@@ -389,7 +389,7 @@ export default function SyncLogs() {
                     Started At
                   </Typography>
                   <Typography variant="body1">
-                    {new Date(viewLog.startedAt).toLocaleString()}
+                    {formatDisplayDateTime(viewLog.startedAt)}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
@@ -397,7 +397,7 @@ export default function SyncLogs() {
                     Completed At
                   </Typography>
                   <Typography variant="body1">
-                    {viewLog.completedAt ? new Date(viewLog.completedAt).toLocaleString() : '-'}
+                    {formatDisplayDateTime(viewLog.completedAt)}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
