@@ -4,7 +4,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.*;
 import lombok.extern.slf4j.Slf4j;
@@ -52,7 +51,6 @@ public class XmltvController {
    * @return XMLTV formatted EPG data
    */
   @GET
-  @Produces(MediaType.APPLICATION_XML)
   public Response getXmltv(
       @QueryParam("username") String username,
       @QueryParam("password") String password,

@@ -10,12 +10,25 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
 import org.anasoid.iptvorganizer.models.entity.SyncLog.SyncLogStatus;
 import org.anasoid.iptvorganizer.repositories.BaseRepository;
 
 @ApplicationScoped
 public class SyncLogRepository extends BaseRepository<SyncLog> {
+
+  private static final String DEFAULT_ORDER_BY = "started_at DESC";
+  private static final Map<String, String> SORT_COLUMN_MAP =
+      Map.of(
+          "id", "id",
+          "sourceId", "source_id",
+          "syncType", "sync_type",
+          "status", "status",
+          "startedAt", "started_at",
+          "completedAt", "completed_at",
+          "createdAt", "created_at",
+          "updatedAt", "updated_at");
 
   @Override
   protected String getTableName() {
@@ -103,40 +116,75 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
   /** Find sync logs by source ID with optional sync_type and status filters */
   public List<SyncLog> findBySourceIdFiltered(
       Long sourceId, String syncType, String status, int page, int limit) {
-    StringBuilder whereClause = new StringBuilder("source_id = ?");
-    List<Object> params = new ArrayList<>();
-    params.add(sourceId);
-
-    if (syncType != null && !syncType.isEmpty()) {
-      whereClause.append(" AND sync_type = ?");
-      params.add(syncType);
-    }
-
-    if (status != null && !status.isEmpty()) {
-      whereClause.append(" AND status = ?");
-      params.add(status);
-    }
-
-    return findWherePaged(whereClause.toString(), page, limit, "started_at DESC", params.toArray());
+    return findFilteredPaged(sourceId, syncType, status, page, limit, "startedAt", "desc");
   }
 
   /** Count sync logs by source ID with optional filters */
   public Long countBySourceIdFiltered(Long sourceId, String syncType, String status) {
-    StringBuilder whereClause = new StringBuilder("source_id = ?");
-    List<Object> params = new ArrayList<>();
-    params.add(sourceId);
+    return countFiltered(sourceId, syncType, status);
+  }
 
-    if (syncType != null && !syncType.isEmpty()) {
-      whereClause.append(" AND sync_type = ?");
+  /**
+   * Find sync logs using optional source, sync_type, and status filters with sorting and pagination
+   */
+  public List<SyncLog> findFilteredPaged(
+      Long sourceId,
+      String syncType,
+      String status,
+      int page,
+      int limit,
+      String sortBy,
+      String sortOrder) {
+    StringBuilder whereClause = new StringBuilder("1=1");
+    List<Object> params = new ArrayList<>();
+
+    if (sourceId != null) {
+      whereClause.append(" AND source_id = ?");
+      params.add(sourceId);
+    }
+
+    if (syncType != null && !syncType.isBlank()) {
+      whereClause.append(" AND LOWER(sync_type) = LOWER(?)");
       params.add(syncType);
     }
 
-    if (status != null && !status.isEmpty()) {
-      whereClause.append(" AND status = ?");
+    if (status != null && !status.isBlank()) {
+      whereClause.append(" AND LOWER(status) = LOWER(?)");
+      params.add(status);
+    }
+
+    return findWherePaged(
+        whereClause.toString(), page, limit, buildOrderBy(sortBy, sortOrder), params.toArray());
+  }
+
+  /** Count sync logs using optional source, sync_type, and status filters */
+  public Long countFiltered(Long sourceId, String syncType, String status) {
+    StringBuilder whereClause = new StringBuilder("1=1");
+    List<Object> params = new ArrayList<>();
+
+    if (sourceId != null) {
+      whereClause.append(" AND source_id = ?");
+      params.add(sourceId);
+    }
+
+    if (syncType != null && !syncType.isBlank()) {
+      whereClause.append(" AND LOWER(sync_type) = LOWER(?)");
+      params.add(syncType);
+    }
+
+    if (status != null && !status.isBlank()) {
+      whereClause.append(" AND LOWER(status) = LOWER(?)");
       params.add(status);
     }
 
     return countWhere(whereClause.toString(), params.toArray());
+  }
+
+  private String buildOrderBy(String sortBy, String sortOrder) {
+    String defaultColumn = DEFAULT_ORDER_BY.split(" ")[0];
+    String column = SORT_COLUMN_MAP.getOrDefault(sortBy, defaultColumn);
+    String direction = "asc".equalsIgnoreCase(sortOrder) ? "ASC" : "DESC";
+    return column + " " + direction;
   }
 
   /** Find sync logs by source ID */

@@ -17,6 +17,27 @@ export function formatDisplayDate(value: string | null | undefined): string {
   return date.toLocaleDateString('en-GB');
 }
 
+export function formatDisplayDateTime(value: string | null | undefined): string {
+  if (!value) {
+    return '—';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString('en-GB', {
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
 export function toIsoDateFromDisplay(value: string): string | undefined {
   const trimmed = value.trim();
   if (!trimmed) {

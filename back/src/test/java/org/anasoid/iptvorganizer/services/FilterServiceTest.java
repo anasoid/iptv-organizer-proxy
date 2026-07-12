@@ -208,7 +208,7 @@ public class FilterServiceTest {
     filter.setId(1L);
 
     // Should not throw when invalidating non-cached entry
-    assertDoesNotThrow(() -> filterService.invalidateCache(1L));
+    assertDoesNotThrow(() -> filterService.clearCache());
   }
 
   @Test
