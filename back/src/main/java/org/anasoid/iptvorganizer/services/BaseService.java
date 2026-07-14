@@ -13,10 +13,6 @@ public abstract class BaseService<T extends BaseEntity, R extends BaseRepository
     return getRepository().findById(id);
   }
 
-  public List<T> getAll() {
-    return getRepository().findAll();
-  }
-
   public abstract Long create(T entity);
 
   public void update(T entity) {

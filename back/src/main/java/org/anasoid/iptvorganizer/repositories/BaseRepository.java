@@ -50,21 +50,6 @@ public abstract class BaseRepository<T extends BaseEntity> {
     }
   }
 
-  public List<T> findAll() {
-    List<T> results = new ArrayList<>();
-    String sql = "SELECT * FROM " + getTableName();
-    try (Connection conn = dataSource.getConnection();
-        PreparedStatement stmt = conn.prepareStatement(sql);
-        ResultSet rs = stmt.executeQuery()) {
-      while (rs.next()) {
-        results.add(mapRow(rs));
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to find " + getTableName() + " all", e);
-    }
-    return results;
-  }
-
   public final Long insert(T entity) {
     entity.setUpdatedAt(LocalDateTime.now());
     entity.setCreatedAt(LocalDateTime.now());
