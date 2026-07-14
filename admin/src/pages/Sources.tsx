@@ -113,6 +113,20 @@ export default function Sources() {
         params.value ? new Date(params.value).toLocaleString() : 'Never',
     },
     {
+      field: 'nextSync',
+      headerName: 'Next Sync',
+      width: 150,
+      renderCell: (params) =>
+        params.value ? new Date(params.value).toLocaleString() : '—',
+    },
+    {
+      field: 'syncInterval',
+      headerName: 'Sync Interval',
+      width: 120,
+      renderCell: (params) =>
+        params.value != null ? `${params.value} min` : '—',
+    },
+    {
       field: 'proxyId',
       headerName: 'Proxy',
       width: 80,
