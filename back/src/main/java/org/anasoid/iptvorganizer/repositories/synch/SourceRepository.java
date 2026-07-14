@@ -43,10 +43,19 @@ public class SourceRepository extends BaseRepository<Source> {
     return results;
   }
 
+  private void ensureNextSync(Source source) {
+    if (source.getNextSync() == null) {
+      source.setNextSync(
+          LocalDateTime.now()
+              .plusDays(source.getSyncInterval() != null ? source.getSyncInterval() : 1));
+    }
+  }
+
   @Override
   protected Long internalInsert(Source source) {
+    ensureNextSync(source);
     String sql =
-        "INSERT INTO sources (name, url, username, password, sync_interval, is_active, proxy_id, enable_proxy, connect_xtream_api, connect_xtream_stream, connect_xmltv, black_list_filter) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO sources (name, url, username, password, sync_interval, last_sync, next_sync, is_active, proxy_id, enable_proxy, connect_xtream_api, connect_xtream_stream, connect_xmltv, black_list_filter) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setString(1, source.getName());
@@ -54,20 +63,22 @@ public class SourceRepository extends BaseRepository<Source> {
       stmt.setString(3, source.getUsername());
       stmt.setString(4, source.getPassword());
       stmt.setInt(5, source.getSyncInterval());
-      stmt.setBoolean(6, source.getIsActive());
-      stmt.setObject(7, source.getProxyId());
-      stmt.setObject(8, source.getEnableProxy());
+      stmt.setObject(6, source.getLastSync());
+      stmt.setObject(7, source.getNextSync());
+      stmt.setBoolean(8, source.getIsActive());
+      stmt.setObject(9, source.getProxyId());
+      stmt.setObject(10, source.getEnableProxy());
       stmt.setString(
-          9,
+          11,
           source.getConnectXtreamApi() != null ? source.getConnectXtreamApi().name() : "DEFAULT");
       stmt.setString(
-          10,
+          12,
           source.getConnectXtreamStream() != null
               ? source.getConnectXtreamStream().name()
               : "DEFAULT");
       stmt.setString(
-          11, source.getConnectXmltv() != null ? source.getConnectXmltv().name() : "DEFAULT");
-      stmt.setString(12, source.getBlackListFilter());
+          13, source.getConnectXmltv() != null ? source.getConnectXmltv().name() : "DEFAULT");
+      stmt.setString(14, source.getBlackListFilter());
       stmt.executeUpdate();
 
       // Get generated key using standard JDBC approach - works with MySQL, H2, SQLite
@@ -86,6 +97,7 @@ public class SourceRepository extends BaseRepository<Source> {
 
   @Override
   protected void internalUpdate(Source source) {
+    ensureNextSync(source);
     String sql =
         "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, proxy_id = ?, enable_proxy = ?, connect_xtream_api = ?, connect_xtream_stream = ?, connect_xmltv = ?, black_list_filter = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
