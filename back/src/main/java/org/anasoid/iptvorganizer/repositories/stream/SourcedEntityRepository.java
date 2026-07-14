@@ -108,58 +108,6 @@ public abstract class SourcedEntityRepository<T extends SourcedEntity> extends B
   }
 
   /**
-   * Find entities by external IDs in bulk using IN clause. Much more efficient than individual
-   * queries for batch operations.
-   *
-   * @param externalIds List of external IDs to find
-   * @param sourceId Source ID to filter by
-   * @return Map of external_id -> entity for quick lookup
-   */
-  public Map<Integer, Long> findIdsByExternalIds(List<Integer> externalIds, Long sourceId) {
-    return findIdsByExternalIds(externalIds, sourceId, "");
-  }
-
-  protected Map<Integer, Long> findIdsByExternalIds(
-      List<Integer> externalIds, Long sourceId, String prefilter) {
-    if (externalIds.isEmpty()) {
-      return Map.of();
-    }
-
-    Map<Integer, Long> results = new HashMap<>();
-
-    // Build IN clause with placeholders
-    String placeholders = String.join(",", Collections.nCopies(externalIds.size(), "?"));
-    String sql =
-        "SELECT id, external_id FROM "
-            + getTableName()
-            + " WHERE source_id = ? AND external_id IN ("
-            + placeholders
-            + ")"
-            + prefilter;
-
-    try (Connection conn = dataSource.getConnection();
-        PreparedStatement stmt = conn.prepareStatement(sql)) {
-      stmt.setLong(1, sourceId);
-
-      // Bind external IDs
-      for (int i = 0; i < externalIds.size(); i++) {
-        stmt.setInt(i + 2, externalIds.get(i));
-      }
-
-      try (ResultSet rs = stmt.executeQuery()) {
-        while (rs.next()) {
-          results.put(rs.getInt("external_id"), rs.getLong("id"));
-        }
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException(
-          "Failed to bulk find by external ids in " + getTableName() + "->" + sql, e);
-    }
-
-    return results;
-  }
-
-  /**
    * Find full entities by external IDs in bulk using IN clause. Much more efficient than individual
    * queries for batch operations with change detection.
    *
