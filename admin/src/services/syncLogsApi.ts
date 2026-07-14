@@ -8,7 +8,7 @@ export interface SyncLog {
   startedAt: string;
   completedAt?: string | null;
   durationSeconds?: number | null;
-  status: 'running' | 'completed' | 'failed';
+  status: 'running' | 'completed' | 'failed' | 'interrupted';
   itemsAdded: number;
   itemsUpdated: number;
   itemsDeleted: number;
@@ -22,6 +22,7 @@ export interface SyncLogStats {
   completedSyncs: number;
   failedSyncs: number;
   runningSyncs?: number;
+  interruptedSyncs?: number;
   totalAdded: number;
   totalUpdated: number;
   totalDeleted: number;

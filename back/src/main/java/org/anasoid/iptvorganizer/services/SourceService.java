@@ -2,6 +2,7 @@ package org.anasoid.iptvorganizer.services;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.util.List;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 
@@ -9,6 +10,10 @@ import org.anasoid.iptvorganizer.repositories.synch.SourceRepository;
 public class SourceService extends BaseService<Source, SourceRepository> {
 
   @Inject SourceRepository repository;
+
+  public List<Source> getAll() {
+    return getRepository().findAll();
+  }
 
   @Override
   protected SourceRepository getRepository() {

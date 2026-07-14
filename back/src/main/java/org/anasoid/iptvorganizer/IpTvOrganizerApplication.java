@@ -50,7 +50,12 @@ public class IpTvOrganizerApplication {
    */
   @Scheduled(every = "{sync.check.interval}", identity = "sync-daemon")
   public void scheduledSync() {
-    syncManager.scheduledSync();
+    log.info("Start scheduledSync");
+    try {
+      syncManager.scheduledSync();
+    } finally {
+      log.info("End scheduledSync");
+    }
   }
 
   void onStart(@Observes StartupEvent event) {

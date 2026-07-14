@@ -57,6 +57,11 @@ public class SyncLogService extends BaseService<SyncLog, SyncLogRepository> {
     return repository.countFiltered(sourceId, syncType, status);
   }
 
+  /** Sum sync item counters with optional filters. */
+  public SyncLogRepository.SyncItemTotals sumItemsFiltered(Long sourceId, String syncType) {
+    return repository.sumItemsFiltered(sourceId, syncType);
+  }
+
   public void fixInterruptedSyncs() {
     log.info("Checking for interrupted syncs from previous shutdown...");
 

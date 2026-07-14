@@ -77,6 +77,13 @@ export default function SyncLogs() {
     enabled: isAuthenticated,
   });
 
+  const sourcesMap = new Map(
+    (Array.isArray(sourcesData?.data) ? sourcesData.data : []).map((source: Source) => [
+      source.id,
+      source.name,
+    ])
+  );
+
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: (id: number) => syncLogsApi.deleteSyncLog(id),
@@ -101,11 +108,19 @@ export default function SyncLogs() {
         return 'success';
       case 'running':
         return 'info';
+      case 'interrupted':
+        return 'warning';
       case 'failed':
         return 'error';
       default:
         return 'default';
     }
+  };
+
+  const getSourceDisplay = (sourceId?: number, sourceName?: string): string => {
+    if (!sourceId) return '-';
+    const resolvedName = sourceName || sourcesMap.get(sourceId);
+    return resolvedName ? `${resolvedName} (#${sourceId})` : `Source #${sourceId}`;
   };
 
   const formatDuration = (seconds: number | null | undefined): string => {
@@ -123,7 +138,7 @@ export default function SyncLogs() {
       headerName: 'Source',
       width: 150,
       flex: 1,
-      renderCell: (params) => params.value || `Source #${params.row.sourceId}`,
+      renderCell: (params) => getSourceDisplay(params.row.sourceId, params.value as string | undefined),
     },
     {
       field: 'syncType',
@@ -264,6 +279,18 @@ export default function SyncLogs() {
               </CardContent>
             </Card>
           </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <Card>
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom variant="body2">
+                  Interrupted
+                </Typography>
+                <Typography variant="h5" color="warning.main">
+                  {stats.interruptedSyncs || 0}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
         </Grid>
       )}
 
@@ -312,6 +339,7 @@ export default function SyncLogs() {
             <MenuItem value="running">Running</MenuItem>
             <MenuItem value="completed">Completed</MenuItem>
             <MenuItem value="failed">Failed</MenuItem>
+            <MenuItem value="interrupted">Interrupted</MenuItem>
           </Select>
         </FormControl>
 
@@ -363,7 +391,7 @@ export default function SyncLogs() {
                     Source
                   </Typography>
                   <Typography variant="body1">
-                    {viewLog.sourceName || `Source #${viewLog.sourceId}`}
+                    {getSourceDisplay(viewLog.sourceId, viewLog.sourceName)}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
