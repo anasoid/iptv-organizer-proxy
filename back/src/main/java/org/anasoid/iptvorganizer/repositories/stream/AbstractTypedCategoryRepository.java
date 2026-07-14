@@ -89,13 +89,6 @@ public abstract class AbstractTypedCategoryRepository
   }
 
   @Override
-  public Map<Integer, Long> findIdsByExternalIds(List<Integer> externalIds, Long sourceId) {
-    // Use the bulk find method from CategoryRepository, then filter by type
-    return categoryRepository.findIdsByExternalIds(
-        externalIds, sourceId, " AND type = '" + getType().getCategoryType() + "'");
-  }
-
-  @Override
   public Map<Integer, Category> findEntitiesByExternalIds(
       List<Integer> externalIds, Long sourceId) {
     // Use the bulk find method from CategoryRepository and filter by type

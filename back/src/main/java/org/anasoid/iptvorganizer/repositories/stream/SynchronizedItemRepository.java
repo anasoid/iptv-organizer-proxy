@@ -4,6 +4,7 @@ import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.SourcedEntity;
 import org.anasoid.iptvorganizer.utils.streaming.JsonStreamResult;
@@ -35,13 +36,6 @@ public interface SynchronizedItemRepository<T extends SourcedEntity> {
    * @return JsonStreamResult with lazy Iterator for streaming items
    */
   JsonStreamResult<Map<?, ?>> fetchExternalData(Source source);
-
-  /**
-   * Find existing entities by external IDs in bulk using IN clause. Returns a map of external_id ->
-   * entity for quick lookup. This method should be implemented by subclasses that extend
-   * SourcedEntityRepository or provide their own bulk lookup implementation.
-   */
-  Map<Integer, Long> findIdsByExternalIds(List<Integer> externalIds, Long sourceId);
 
   /**
    * Find full entities by external IDs in bulk using IN clause. Returns a map of external_id ->
@@ -96,14 +90,11 @@ public interface SynchronizedItemRepository<T extends SourcedEntity> {
     List<Integer> externalIds =
         entities.stream().map(SourcedEntity::getExternalId).filter(Objects::nonNull).toList();
 
-    Map<Integer, Long> existingIdMap = findIdsByExternalIds(externalIds, sourceId);
-
     // Bulk fetch full entities for change detection
-    List<Integer> existingExternalIds = new java.util.ArrayList<>(existingIdMap.keySet());
-    Map<Integer, T> existingEntitiesMap =
-        existingExternalIds.isEmpty()
-            ? Map.of()
-            : findEntitiesByExternalIds(existingExternalIds, sourceId);
+    Map<Integer, T> existingEntitiesMap = findEntitiesByExternalIds(externalIds, sourceId);
+    Map<Integer, Long> existingIdMap =
+        existingEntitiesMap.entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getId()));
 
     int insertCount = 0;
     int skippedCount = 0;
