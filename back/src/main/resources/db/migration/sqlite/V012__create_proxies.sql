@@ -10,10 +10,9 @@ CREATE TABLE IF NOT EXISTS proxies (
     proxy_password TEXT,
     timeout INTEGER,
     max_retries INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_proxy_name ON proxies(name);
 CREATE INDEX IF NOT EXISTS idx_proxy_type ON proxies(proxy_type);
-

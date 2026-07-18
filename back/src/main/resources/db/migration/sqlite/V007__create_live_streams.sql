@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS live_streams (
     release_date DATE,
     rating REAL,
     tmdb INTEGER, -- store as Long in Java
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     UNIQUE (source_id, external_id)
 );

@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS proxies (
     proxy_password VARCHAR(255),
     timeout INT,
     max_retries INT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_at DATETIME,
+    updated_at DATETIME,
     INDEX idx_proxy_name (name),
     INDEX idx_proxy_type (proxy_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

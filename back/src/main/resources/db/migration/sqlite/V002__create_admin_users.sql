@@ -4,8 +4,8 @@ CREATE TABLE IF NOT EXISTS admin_users (
     password_hash TEXT NOT NULL,
     email TEXT,
     is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
     last_login TIMESTAMP NULL
 );
 
