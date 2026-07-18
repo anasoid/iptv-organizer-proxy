@@ -1,6 +1,10 @@
 package org.anasoid.iptvorganizer.repositories.stream;
 
 import jakarta.transaction.Transactional;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -11,6 +15,8 @@ import java.util.Map;
 import java.util.Objects;
 import org.anasoid.iptvorganizer.models.entity.stream.AllowDenyStatus;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
+import org.anasoid.iptvorganizer.utils.db.DatabaseUtils;
+import org.anasoid.iptvorganizer.utils.streaming.JdbcStreamIterator;
 
 /**
  * Base repository for stream-like entities (LiveStream, VodStream, Series).
@@ -127,6 +133,35 @@ public abstract class BaseStreamRepository<T extends BaseStream> extends Sourced
    */
   public Iterator<T> streamBySourceId(Long sourceId) {
     return super.streamBySourceId(sourceId);
+  }
+
+  /**
+   * Stream entities by source ID and category ID using lazy iterator for O(1) memory usage.
+   *
+   * @param sourceId The source ID to filter by
+   * @param categoryId The category ID (external_id) to filter by
+   * @return Iterator that streams rows from the database
+   */
+  public Iterator<T> streamBySourceAndCategory(Long sourceId, Integer categoryId) {
+    String sql =
+        "SELECT * FROM "
+            + getTableName()
+            + " WHERE source_id = ? AND category_id = ? ORDER BY num ASC, id DESC";
+    try {
+      Connection conn = dataSource.getConnection();
+      PreparedStatement stmt =
+          conn.prepareStatement(sql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+
+      DatabaseUtils.configureStreamingStatement(stmt, conn);
+
+      stmt.setLong(1, sourceId);
+      stmt.setInt(2, categoryId);
+      ResultSet rs = stmt.executeQuery();
+
+      return new JdbcStreamIterator<>(conn, stmt, rs, this::mapRow);
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to stream by source and category in " + getTableName(), e);
+    }
   }
 
   /**
