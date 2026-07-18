@@ -431,9 +431,7 @@ public class XtreamController {
     map.put("num", stream.getNum());
     map.put("name", stream.getName());
     map.put("stream_id", stream.getExternalId());
-    map.put("stream_icon", "");
     map.put("category_id", stream.getCategoryId());
-    map.put("added", stream.getAddedDate() != null ? stream.getAddedDate().toString() : "");
     map.put("is_adult", stream.getIsAdult() ? "1" : "0");
     map.put("category_ids", stream.getCategoryIds());
 
