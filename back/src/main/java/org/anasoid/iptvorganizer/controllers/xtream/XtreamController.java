@@ -10,7 +10,9 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.*;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.dto.HttpRequestDto;
@@ -433,7 +435,7 @@ public class XtreamController {
     map.put("stream_id", stream.getExternalId());
     map.put("category_id", stream.getCategoryId());
     map.put("is_adult", stream.getIsAdult() ? "1" : "0");
-    map.put("category_ids", stream.getCategoryIds());
+    map.put("category_ids", parseCategoryIds(stream.getCategoryIds()));
 
     // Include raw JSON data if available
     if (stream.getData() != null && !stream.getData().isEmpty()) {
@@ -453,5 +455,34 @@ public class XtreamController {
     }
 
     return map;
+  }
+
+  private List<Integer> parseCategoryIds(String categoryIds) {
+    if (categoryIds == null || categoryIds.isBlank()) {
+      return List.of();
+    }
+
+    String normalizedCategoryIds = categoryIds.trim();
+    if (normalizedCategoryIds.startsWith("[")) {
+      try {
+        return objectMapper.readerForListOf(Integer.class).readValue(normalizedCategoryIds);
+      } catch (IOException e) {
+        log.warn("Failed to parse category_ids JSON array: {}", categoryIds, e);
+      }
+    }
+
+    List<Integer> parsedCategoryIds = new ArrayList<>();
+    for (String part : normalizedCategoryIds.replace("[", "").replace("]", "").split(",")) {
+      String trimmedPart = part.trim();
+      if (trimmedPart.isEmpty()) {
+        continue;
+      }
+      try {
+        parsedCategoryIds.add(Integer.parseInt(trimmedPart));
+      } catch (NumberFormatException e) {
+        log.warn("Failed to parse category_ids entry '{}' from '{}'", trimmedPart, categoryIds, e);
+      }
+    }
+    return parsedCategoryIds;
   }
 }
