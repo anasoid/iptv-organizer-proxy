@@ -23,6 +23,8 @@ public abstract class BaseRepository<T extends BaseEntity> {
   @Getter(AccessLevel.PROTECTED)
   private Cache<T> cache;
 
+  private String findByIdSql;
+
   @Inject protected DataSource dataSource;
   @Inject protected CacheManager cacheManager;
 
@@ -35,9 +37,8 @@ public abstract class BaseRepository<T extends BaseEntity> {
     if (cacheOpt.isPresent()) {
       return cacheOpt.get();
     }
-    String sql = "SELECT * FROM " + getTableName() + " WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
-        PreparedStatement stmt = conn.prepareStatement(sql)) {
+        PreparedStatement stmt = conn.prepareStatement(findByIdSql)) {
       stmt.setLong(1, id);
       try (ResultSet rs = stmt.executeQuery()) {
         T result = rs.next() ? mapRow(rs) : null;
@@ -47,21 +48,6 @@ public abstract class BaseRepository<T extends BaseEntity> {
     } catch (SQLException e) {
       throw new RuntimeException("Failed to find " + getTableName() + " by id: " + id, e);
     }
-  }
-
-  public List<T> findAll() {
-    List<T> results = new ArrayList<>();
-    String sql = "SELECT * FROM " + getTableName();
-    try (Connection conn = dataSource.getConnection();
-        PreparedStatement stmt = conn.prepareStatement(sql);
-        ResultSet rs = stmt.executeQuery()) {
-      while (rs.next()) {
-        results.add(mapRow(rs));
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to find " + getTableName() + " all", e);
-    }
-    return results;
   }
 
   public final Long insert(T entity) {
@@ -195,28 +181,6 @@ public abstract class BaseRepository<T extends BaseEntity> {
   }
 
   /**
-   * Find IDs only for a specific source_id (lightweight query) Used for delete detection in sync
-   * operations
-   */
-  public List<Long> findIdsBySourceId(Long sourceId) {
-    List<Long> ids = new ArrayList<>();
-    String sql = "SELECT id FROM " + getTableName() + " WHERE source_id = ?";
-    try (Connection conn = dataSource.getConnection();
-        PreparedStatement stmt = conn.prepareStatement(sql)) {
-      stmt.setLong(1, sourceId);
-      try (ResultSet rs = stmt.executeQuery()) {
-        while (rs.next()) {
-          ids.add(rs.getLong("id"));
-        }
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException(
-          "Failed to find " + getTableName() + " ids by source id: " + sourceId, e);
-    }
-    return ids;
-  }
-
-  /**
    * Safely converts a ResultSet column value to Boolean, handling SQLite's integer 0/1
    * representation as well as native Boolean types.
    *
@@ -252,6 +216,7 @@ public abstract class BaseRepository<T extends BaseEntity> {
   @PostConstruct
   protected void init() {
     cache = cacheManager.getCache(getTableName(), cacheSize(), cacheDuration());
+    findByIdSql = "SELECT * FROM " + getTableName() + " WHERE id = ?";
   }
 
   protected abstract int cacheSize();

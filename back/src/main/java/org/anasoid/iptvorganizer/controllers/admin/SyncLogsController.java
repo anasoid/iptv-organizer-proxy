@@ -9,6 +9,7 @@ import org.anasoid.iptvorganizer.dto.response.PaginationMeta;
 import org.anasoid.iptvorganizer.exceptions.NotFoundException;
 import org.anasoid.iptvorganizer.exceptions.ValidationException;
 import org.anasoid.iptvorganizer.models.entity.SyncLog;
+import org.anasoid.iptvorganizer.models.entity.SyncLog.SyncLogStatus;
 import org.anasoid.iptvorganizer.services.synch.SyncLogService;
 import org.anasoid.iptvorganizer.utils.ResponseUtils;
 
@@ -67,47 +68,26 @@ public class SyncLogsController extends BaseController {
   @Path("/stats")
   public Response getSyncStats(
       @QueryParam("sourceId") Long sourceId, @QueryParam("syncType") String syncType) {
-    List<SyncLog> logs;
-
-    // Fetch logs by source if sourceId provided, otherwise fetch all logs
-    if (sourceId != null) {
-      logs = syncLogService.findBySourceId(sourceId);
-    } else {
-      logs = syncLogService.getAll();
-    }
-
-    // Apply sync type filter if provided
-    if (syncType != null && !syncType.isBlank()) {
-      final String typeFilter = syncType;
-      logs =
-          logs.stream()
-              .filter(l -> l.getSyncType().equalsIgnoreCase(typeFilter))
-              .collect(java.util.stream.Collectors.toList());
-    }
-
-    // Calculate statistics
-    long totalSyncs = logs.size();
+    long totalSyncs = syncLogService.countFiltered(sourceId, syncType, null);
     long completedSyncs =
-        logs.stream().filter(l -> "COMPLETED".equalsIgnoreCase(l.getStatus().toString())).count();
+        syncLogService.countFiltered(sourceId, syncType, SyncLogStatus.COMPLETED.getValue());
     long failedSyncs =
-        logs.stream().filter(l -> "FAILED".equalsIgnoreCase(l.getStatus().toString())).count();
+        syncLogService.countFiltered(sourceId, syncType, SyncLogStatus.FAILED.getValue());
     long runningSyncs =
-        logs.stream().filter(l -> "RUNNING".equalsIgnoreCase(l.getStatus().toString())).count();
-    long totalAdded =
-        logs.stream().mapToLong(l -> l.getItemsAdded() != null ? l.getItemsAdded() : 0).sum();
-    long totalUpdated =
-        logs.stream().mapToLong(l -> l.getItemsUpdated() != null ? l.getItemsUpdated() : 0).sum();
-    long totalDeleted =
-        logs.stream().mapToLong(l -> l.getItemsDeleted() != null ? l.getItemsDeleted() : 0).sum();
+        syncLogService.countFiltered(sourceId, syncType, SyncLogStatus.RUNNING.getValue());
+    long interruptedSyncs =
+        syncLogService.countFiltered(sourceId, syncType, SyncLogStatus.INTERRUPTED.getValue());
+    var itemTotals = syncLogService.sumItemsFiltered(sourceId, syncType);
 
     var stats = new java.util.HashMap<String, Object>();
     stats.put("totalSyncs", totalSyncs);
     stats.put("completedSyncs", completedSyncs);
     stats.put("failedSyncs", failedSyncs);
     stats.put("runningSyncs", runningSyncs);
-    stats.put("totalAdded", totalAdded);
-    stats.put("totalUpdated", totalUpdated);
-    stats.put("totalDeleted", totalDeleted);
+    stats.put("interruptedSyncs", interruptedSyncs);
+    stats.put("totalAdded", itemTotals.totalAdded());
+    stats.put("totalUpdated", itemTotals.totalUpdated());
+    stats.put("totalDeleted", itemTotals.totalDeleted());
 
     return ResponseUtils.ok(stats);
   }

@@ -51,6 +51,21 @@ public class SourceRepository extends BaseRepository<Source> {
     }
   }
 
+  public List<Source> findAll() {
+    List<Source> results = new ArrayList<>();
+    String sql = "SELECT * FROM " + getTableName();
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql);
+        ResultSet rs = stmt.executeQuery()) {
+      while (rs.next()) {
+        results.add(mapRow(rs));
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to find " + getTableName() + " all", e);
+    }
+    return results;
+  }
+
   @Override
   protected Long internalInsert(Source source) {
     ensureNextSync(source);

@@ -180,6 +180,44 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
     return countWhere(whereClause.toString(), params.toArray());
   }
 
+  /** Sum item counters using optional source and sync_type filters. */
+  public SyncItemTotals sumItemsFiltered(Long sourceId, String syncType) {
+    StringBuilder sql =
+        new StringBuilder(
+            "SELECT COALESCE(SUM(items_added), 0) AS total_added, "
+                + "COALESCE(SUM(items_updated), 0) AS total_updated, "
+                + "COALESCE(SUM(items_deleted), 0) AS total_deleted "
+                + "FROM sync_logs WHERE 1=1");
+    List<Object> params = new ArrayList<>();
+
+    if (sourceId != null) {
+      sql.append(" AND source_id = ?");
+      params.add(sourceId);
+    }
+
+    if (syncType != null && !syncType.isBlank()) {
+      sql.append(" AND LOWER(sync_type) = LOWER(?)");
+      params.add(syncType);
+    }
+
+    try (Connection conn = dataSource.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql.toString())) {
+      for (int i = 0; i < params.size(); i++) {
+        stmt.setObject(i + 1, params.get(i));
+      }
+
+      try (ResultSet rs = stmt.executeQuery()) {
+        if (rs.next()) {
+          return new SyncItemTotals(
+              rs.getLong("total_added"), rs.getLong("total_updated"), rs.getLong("total_deleted"));
+        }
+      }
+      return new SyncItemTotals(0L, 0L, 0L);
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to sum sync log item totals with filters", e);
+    }
+  }
+
   private String buildOrderBy(String sortBy, String sortOrder) {
     String defaultColumn = DEFAULT_ORDER_BY.split(" ")[0];
     String column = SORT_COLUMN_MAP.getOrDefault(sortBy, defaultColumn);
@@ -232,4 +270,6 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
   protected Duration cacheDuration() {
     return Duration.ofHours(0);
   }
+
+  public record SyncItemTotals(Long totalAdded, Long totalUpdated, Long totalDeleted) {}
 }
