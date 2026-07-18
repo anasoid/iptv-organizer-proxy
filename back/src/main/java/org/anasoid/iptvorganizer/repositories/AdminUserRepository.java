@@ -21,13 +21,15 @@ public class AdminUserRepository extends BaseRepository<AdminUser> {
   @Override
   protected Long internalInsert(AdminUser user) {
     String sql =
-        "INSERT INTO admin_users (username, password_hash, email, is_active) VALUES (?, ?, ?, ?)";
+        "INSERT INTO admin_users (username, password_hash, email, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setString(1, user.getUsername());
       stmt.setString(2, user.getPasswordHash());
       stmt.setString(3, user.getEmail());
       stmt.setBoolean(4, user.getIsActive());
+      stmt.setObject(5, user.getCreatedAt());
+      stmt.setObject(6, user.getUpdatedAt());
       stmt.executeUpdate();
       return getGeneratedId(stmt);
     } catch (SQLException e) {
@@ -38,14 +40,15 @@ public class AdminUserRepository extends BaseRepository<AdminUser> {
   @Override
   protected void internalUpdate(AdminUser user) {
     String sql =
-        "UPDATE admin_users SET username = ?, password_hash = ?, email = ?, is_active = ? WHERE id = ?";
+        "UPDATE admin_users SET username = ?, password_hash = ?, email = ?, is_active = ?, updated_at = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setString(1, user.getUsername());
       stmt.setString(2, user.getPasswordHash());
       stmt.setString(3, user.getEmail());
       stmt.setBoolean(4, user.getIsActive());
-      stmt.setLong(5, user.getId());
+      stmt.setObject(5, user.getUpdatedAt());
+      stmt.setLong(6, user.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update admin user", e);
@@ -92,11 +95,12 @@ public class AdminUserRepository extends BaseRepository<AdminUser> {
 
   /** Update last login timestamp */
   public void updateLastLogin(Long userId, LocalDateTime lastLogin) {
-    String sql = "UPDATE admin_users SET last_login = ? WHERE id = ?";
+    String sql = "UPDATE admin_users SET last_login = ?, updated_at = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setObject(1, lastLogin);
-      stmt.setLong(2, userId);
+      stmt.setObject(2, currentTimestamp());
+      stmt.setLong(3, userId);
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update last login", e);

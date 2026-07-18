@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS clients (
     connect_xmltv TEXT DEFAULT 'INHERITED',
     max_connections INTEGER NOT NULL DEFAULT 1,
     notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
     last_login TIMESTAMP NULL,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     FOREIGN KEY (filter_id) REFERENCES filters(id) ON DELETE SET NULL
@@ -30,4 +30,3 @@ CREATE TABLE IF NOT EXISTS clients (
 CREATE INDEX IF NOT EXISTS idx_client_source_is_active ON clients(source_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_client_filter_id ON clients(filter_id);
 CREATE INDEX IF NOT EXISTS idx_client_expiry_date ON clients(expiry_date);
-

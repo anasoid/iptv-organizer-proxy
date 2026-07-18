@@ -21,7 +21,7 @@ public class FilterRepository extends BaseRepository<Filter> {
   @Override
   protected Long internalInsert(Filter filter) {
     String sql =
-        "INSERT INTO filters (name, description, filter_config, use_source_filter, favoris) VALUES (?, ?, ?, ?, ?)";
+        "INSERT INTO filters (name, description, filter_config, use_source_filter, favoris, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setString(1, filter.getName());
@@ -29,6 +29,8 @@ public class FilterRepository extends BaseRepository<Filter> {
       stmt.setString(3, filter.getFilterConfig());
       stmt.setBoolean(4, filter.getUseSourceFilter());
       stmt.setString(5, filter.getFavoris());
+      stmt.setObject(6, filter.getCreatedAt());
+      stmt.setObject(7, filter.getUpdatedAt());
       stmt.executeUpdate();
       return getGeneratedId(stmt);
     } catch (SQLException e) {
@@ -39,7 +41,7 @@ public class FilterRepository extends BaseRepository<Filter> {
   @Override
   protected void internalUpdate(Filter filter) {
     String sql =
-        "UPDATE filters SET name = ?, description = ?, filter_config = ?, use_source_filter = ?, favoris = ? WHERE id = ?";
+        "UPDATE filters SET name = ?, description = ?, filter_config = ?, use_source_filter = ?, favoris = ?, updated_at = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setString(1, filter.getName());
@@ -47,7 +49,8 @@ public class FilterRepository extends BaseRepository<Filter> {
       stmt.setString(3, filter.getFilterConfig());
       stmt.setBoolean(4, filter.getUseSourceFilter());
       stmt.setString(5, filter.getFavoris());
-      stmt.setLong(6, filter.getId());
+      stmt.setObject(6, filter.getUpdatedAt());
+      stmt.setLong(7, filter.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update filter", e);

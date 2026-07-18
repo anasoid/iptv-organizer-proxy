@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS sync_logs (
     items_deleted INT NOT NULL DEFAULT 0,
     error_message TEXT,
     duration_seconds INT DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_at DATETIME,
+    updated_at DATETIME,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     INDEX idx_sync_logs_source_status_started (source_id, status, started_at),
     INDEX idx_sync_logs_status_started (status, started_at)

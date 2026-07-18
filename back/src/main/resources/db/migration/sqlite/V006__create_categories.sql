@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS categories (
     parent_id INTEGER,
     labels TEXT,
     black_list TEXT NOT NULL DEFAULT 'default' CHECK(black_list IN ('default', 'hide', 'visible', 'force_hide', 'force_visible')),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     UNIQUE (source_id, external_id, type)
 );

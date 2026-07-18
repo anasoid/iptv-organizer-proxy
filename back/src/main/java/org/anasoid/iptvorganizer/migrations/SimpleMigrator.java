@@ -40,7 +40,8 @@ public class SimpleMigrator {
           "V009__create_series.sql",
           "V010__create_sync_logs.sql",
           "V011__create_connection_logs.sql",
-          "V012__create_proxies.sql");
+          "V012__create_proxies.sql",
+          "V155865585__remove_timestamp_defaults.sql");
 
   private volatile boolean migrationDone = false;
 
@@ -91,7 +92,7 @@ public class SimpleMigrator {
               version TEXT NOT NULL UNIQUE,
               description TEXT,
               checksum TEXT NOT NULL,
-              applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              applied_at TIMESTAMP
           )
           """;
     } else {
@@ -103,7 +104,7 @@ public class SimpleMigrator {
               version VARCHAR(255) NOT NULL UNIQUE,
               description VARCHAR(500),
               checksum VARCHAR(32) NOT NULL,
-              applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              applied_at TIMESTAMP,
               INDEX idx_version (version)
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
           """;
@@ -154,11 +155,12 @@ public class SimpleMigrator {
 
         // Record migration in schema_version
         String insertSql =
-            "INSERT INTO schema_version (version, description, checksum) VALUES (?, ?, ?)";
+            "INSERT INTO schema_version (version, description, checksum, applied_at) VALUES (?, ?, ?, ?)";
         try (PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
           pstmt.setString(1, version);
           pstmt.setString(2, description);
           pstmt.setString(3, checksum);
+          pstmt.setTimestamp(4, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
           pstmt.executeUpdate();
         }
 

@@ -33,7 +33,7 @@ public class LiveStreamRepository extends BaseStreamRepository<LiveStream> {
   @Override
   protected Long internalInsert(LiveStream stream) {
     String sql =
-        "INSERT INTO live_streams (source_id, external_id, num, allow_deny, name, category_id, category_ids, is_adult, labels, data, added_date, release_date, rating, tmdb) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO live_streams (source_id, external_id, num, allow_deny, name, category_id, category_ids, is_adult, labels, data, added_date, release_date, rating, tmdb, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setLong(1, stream.getSourceId());
@@ -50,6 +50,8 @@ public class LiveStreamRepository extends BaseStreamRepository<LiveStream> {
       setLocalDate(stmt, 12, stream.getReleaseDate());
       stmt.setObject(13, stream.getRating());
       stmt.setObject(14, stream.getTmdb());
+      stmt.setObject(15, stream.getCreatedAt());
+      stmt.setObject(16, stream.getUpdatedAt());
       stmt.executeUpdate();
       Long id = getGeneratedId(stmt);
       stream.setId(id);
@@ -62,7 +64,7 @@ public class LiveStreamRepository extends BaseStreamRepository<LiveStream> {
   @Override
   protected void internalUpdate(LiveStream stream) {
     String sql =
-        "UPDATE live_streams SET source_id = ?, external_id = ?, num = ?, allow_deny = ?, name = ?, category_id = ?, category_ids = ?, is_adult = ?, labels = ?, data = ?, added_date = ?, release_date = ?, rating = ?, tmdb = ? WHERE id = ?";
+        "UPDATE live_streams SET source_id = ?, external_id = ?, num = ?, allow_deny = ?, name = ?, category_id = ?, category_ids = ?, is_adult = ?, labels = ?, data = ?, added_date = ?, release_date = ?, rating = ?, tmdb = ?, updated_at = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setLong(1, stream.getSourceId());
@@ -79,7 +81,8 @@ public class LiveStreamRepository extends BaseStreamRepository<LiveStream> {
       setLocalDate(stmt, 12, stream.getReleaseDate());
       stmt.setObject(13, stream.getRating());
       stmt.setObject(14, stream.getTmdb());
-      stmt.setLong(15, stream.getId());
+      stmt.setObject(15, stream.getUpdatedAt());
+      stmt.setLong(16, stream.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update live stream", e);

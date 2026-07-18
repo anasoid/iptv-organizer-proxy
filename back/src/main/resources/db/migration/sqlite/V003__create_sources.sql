@@ -19,11 +19,10 @@ CREATE TABLE IF NOT EXISTS sources (
     connect_xmltv TEXT DEFAULT 'DEFAULT',
     proxy_id INTEGER REFERENCES proxies(id) ON DELETE SET NULL,
     black_list_filter TEXT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_source_is_active ON sources(is_active);
 CREATE INDEX IF NOT EXISTS idx_source_next_sync ON sources(next_sync);
 CREATE INDEX IF NOT EXISTS idx_source_proxy_id ON sources(proxy_id);
-

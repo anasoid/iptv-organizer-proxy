@@ -24,7 +24,7 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
   @Override
   protected Long internalInsert(Category category) {
     String sql =
-        "INSERT INTO categories (source_id, external_id, name, type, num, allow_deny, parent_id, labels, black_list) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO categories (source_id, external_id, name, type, num, allow_deny, parent_id, labels, black_list, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setLong(1, category.getSourceId());
@@ -41,6 +41,8 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
           category.getBlackList() != null
               ? category.getBlackList().getValue()
               : Category.BlackListStatus.DEFAULT.getValue());
+      stmt.setObject(10, category.getCreatedAt());
+      stmt.setObject(11, category.getUpdatedAt());
       stmt.executeUpdate();
       Long id = getGeneratedId(stmt);
       category.setId(id);
@@ -53,7 +55,7 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
   @Override
   protected void internalUpdate(Category category) {
     String sql =
-        "UPDATE categories SET source_id = ?, external_id = ?, name = ?, type = ?, num = ?, allow_deny = ?, parent_id = ?, labels = ?, black_list = ? WHERE id = ?";
+        "UPDATE categories SET source_id = ?, external_id = ?, name = ?, type = ?, num = ?, allow_deny = ?, parent_id = ?, labels = ?, black_list = ?, updated_at = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setLong(1, category.getSourceId());
@@ -70,7 +72,8 @@ public class CategoryRepository extends SourcedEntityRepository<Category> {
           category.getBlackList() != null
               ? category.getBlackList().getValue()
               : Category.BlackListStatus.DEFAULT.getValue());
-      stmt.setLong(10, category.getId());
+      stmt.setObject(10, category.getUpdatedAt());
+      stmt.setLong(11, category.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update category", e);

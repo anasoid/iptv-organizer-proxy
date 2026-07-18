@@ -28,7 +28,7 @@ public class ClientRepository extends BaseRepository<Client> {
   @Override
   protected Long internalInsert(Client client) {
     String sql =
-        "INSERT INTO clients (source_id, filter_id, username, password, name, email, expiry_date, is_active, hide_adult_content, enable_proxy, notes, connect_xtream_api, connect_xtream_stream, connect_xmltv) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO clients (source_id, filter_id, username, password, name, email, expiry_date, is_active, hide_adult_content, enable_proxy, notes, connect_xtream_api, connect_xtream_stream, connect_xmltv, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setLong(1, client.getSourceId());
@@ -52,6 +52,8 @@ public class ClientRepository extends BaseRepository<Client> {
               : "INHERITED");
       stmt.setString(
           14, client.getConnectXmltv() != null ? client.getConnectXmltv().name() : "INHERITED");
+      stmt.setObject(15, client.getCreatedAt());
+      stmt.setObject(16, client.getUpdatedAt());
       stmt.executeUpdate();
       return getGeneratedId(stmt);
     } catch (SQLException e) {
@@ -62,7 +64,7 @@ public class ClientRepository extends BaseRepository<Client> {
   @Override
   protected void internalUpdate(Client client) {
     String sql =
-        "UPDATE clients SET source_id = ?, filter_id = ?, username = ?, password = ?, name = ?, email = ?, expiry_date = ?, is_active = ?, hide_adult_content = ?, enable_proxy = ?, notes = ?, connect_xtream_api = ?, connect_xtream_stream = ?, connect_xmltv = ? WHERE id = ?";
+        "UPDATE clients SET source_id = ?, filter_id = ?, username = ?, password = ?, name = ?, email = ?, expiry_date = ?, is_active = ?, hide_adult_content = ?, enable_proxy = ?, notes = ?, connect_xtream_api = ?, connect_xtream_stream = ?, connect_xmltv = ?, updated_at = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setLong(1, client.getSourceId());
@@ -86,7 +88,8 @@ public class ClientRepository extends BaseRepository<Client> {
               : "INHERITED");
       stmt.setString(
           14, client.getConnectXmltv() != null ? client.getConnectXmltv().name() : "INHERITED");
-      stmt.setLong(15, client.getId());
+      stmt.setObject(15, client.getUpdatedAt());
+      stmt.setLong(16, client.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update client", e);

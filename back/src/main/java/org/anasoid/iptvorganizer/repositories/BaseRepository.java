@@ -7,6 +7,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,17 +52,22 @@ public abstract class BaseRepository<T extends BaseEntity> {
   }
 
   public final Long insert(T entity) {
-    entity.setUpdatedAt(LocalDateTime.now());
-    entity.setCreatedAt(LocalDateTime.now());
+    LocalDateTime now = currentTimestamp();
+    entity.setUpdatedAt(now);
+    entity.setCreatedAt(now);
     Long result = internalInsert(entity);
     getCache().invalidateAll();
     return result;
   }
 
   public final void update(T entity) {
-    entity.setUpdatedAt(LocalDateTime.now());
+    entity.setUpdatedAt(currentTimestamp());
     internalUpdate(entity);
     getCache().invalidateAll();
+  }
+
+  protected final LocalDateTime currentTimestamp() {
+    return LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
   }
 
   protected abstract Long internalInsert(T entity);

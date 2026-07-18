@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS series (
     release_date DATE,
     rating REAL,
     tmdb INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
     UNIQUE (source_id, external_id)
 );

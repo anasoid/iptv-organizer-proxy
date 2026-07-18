@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS connection_logs (
     action TEXT NOT NULL,
     ip_address TEXT NOT NULL,
     user_agent TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 );
 
