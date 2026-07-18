@@ -14,6 +14,7 @@ import org.anasoid.iptvorganizer.models.entity.Client;
 import org.anasoid.iptvorganizer.models.entity.Source;
 import org.anasoid.iptvorganizer.models.entity.stream.BaseStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Category;
+import org.anasoid.iptvorganizer.models.entity.stream.LiveStream;
 import org.anasoid.iptvorganizer.models.entity.stream.Series;
 import org.anasoid.iptvorganizer.models.entity.stream.StreamType;
 import org.anasoid.iptvorganizer.models.entity.stream.VodStream;
@@ -327,6 +328,49 @@ class XtreamUserServiceTest {
     verify(contentFilterService)
         .shouldIncludeStream(any(), streamCaptor.capture(), any(), anyMap());
     assertThat(streamCaptor.getValue()).isInstanceOf(VodStream.class);
+  }
+
+  @Test
+  void testGetLiveStreams_WithCategoryId_UsesCategoryFilteredStreamQuery() {
+    FilterContext filterContext = new FilterContext();
+    when(contentFilterService.buildFilterContext(testClient)).thenReturn(filterContext);
+
+    LiveStream liveStream =
+        LiveStream.builder().externalId(201).name("Live Test").isAdult(false).build();
+    when(liveStreamService.streamBySourceAndCategory(1L, 55))
+        .thenReturn(List.of(liveStream).iterator());
+    when(categoryService.findBySourceAndType(1L, StreamType.LIVE.getCategoryType()))
+        .thenReturn(List.of());
+    when(contentFilterService.shouldIncludeStream(any(), eq(liveStream), any(), anyMap()))
+        .thenReturn(true);
+
+    JsonStreamResult<BaseStream> result =
+        xtreamUserService.getLiveStreams(testClient, testSource, 55L);
+    result.iterator().forEachRemaining(item -> {});
+
+    verify(liveStreamService).streamBySourceAndCategory(1L, 55);
+    verify(liveStreamService, never()).streamBySourceId(1L);
+  }
+
+  @Test
+  void testGetLiveStreams_WithoutCategoryId_UsesUnfilteredStreamQuery() {
+    FilterContext filterContext = new FilterContext();
+    when(contentFilterService.buildFilterContext(testClient)).thenReturn(filterContext);
+
+    LiveStream liveStream =
+        LiveStream.builder().externalId(202).name("Live Test 2").isAdult(false).build();
+    when(liveStreamService.streamBySourceId(1L)).thenReturn(List.of(liveStream).iterator());
+    when(categoryService.findBySourceAndType(1L, StreamType.LIVE.getCategoryType()))
+        .thenReturn(List.of());
+    when(contentFilterService.shouldIncludeStream(any(), eq(liveStream), any(), anyMap()))
+        .thenReturn(true);
+
+    JsonStreamResult<BaseStream> result =
+        xtreamUserService.getLiveStreams(testClient, testSource, null);
+    result.iterator().forEachRemaining(item -> {});
+
+    verify(liveStreamService).streamBySourceId(1L);
+    verify(liveStreamService, never()).streamBySourceAndCategory(anyLong(), anyInt());
   }
 
   @Test
