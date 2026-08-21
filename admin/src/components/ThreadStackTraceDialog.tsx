@@ -8,9 +8,12 @@ import {
   DialogContent,
   DialogTitle,
   Button,
+  FormControlLabel,
   Grid,
+  Switch,
   Typography,
 } from '@mui/material';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import jvmMetricsApi from '../services/jvmMetricsApi';
 
@@ -35,6 +38,7 @@ export default function ThreadStackTraceDialog({
   threadName,
   onClose,
 }: ThreadStackTraceDialogProps) {
+  const [wrapLines, setWrapLines] = useState(true);
   const { data, isLoading, isError } = useQuery({
     queryKey: ['threadStackTrace', threadId],
     queryFn: () => jvmMetricsApi.getThreadStackTrace(threadId as number),
@@ -42,11 +46,38 @@ export default function ThreadStackTraceDialog({
   });
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="md"
+      PaperProps={{
+        sx: {
+          resize: 'both',
+          overflow: 'auto',
+          minWidth: 700,
+          minHeight: 480,
+          maxWidth: '95vw',
+          maxHeight: '95vh',
+        },
+      }}
+    >
       <DialogTitle>
         Stack Trace{threadName ? ` — ${threadName}` : ''}
       </DialogTitle>
       <DialogContent dividers>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={wrapLines}
+                onChange={(_, checked) => setWrapLines(checked)}
+              />
+            }
+            label={<Typography variant="body2">Wrap lines</Typography>}
+          />
+        </Box>
         {threadId === null && (
           <Alert severity="warning">Thread id is not available for this entry.</Alert>
         )}
@@ -130,8 +161,9 @@ export default function ThreadStackTraceDialog({
                 m: 0,
                 fontFamily: 'monospace',
                 fontSize: '0.8rem',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
+                whiteSpace: wrapLines ? 'pre-wrap' : 'pre',
+                wordBreak: wrapLines ? 'break-word' : 'normal',
+                overflowX: wrapLines ? 'hidden' : 'auto',
               }}
             >
               {data.stackTrace.join('\n')}
