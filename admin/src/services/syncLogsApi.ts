@@ -55,6 +55,19 @@ export interface SyncLogStatsResponse {
   data: SyncLogStats;
 }
 
+export interface ActiveSync {
+  sourceId: number;
+  syncType: string;
+  threadName: string;
+  startTime: string;
+  durationSeconds: number;
+}
+
+export interface ActiveSyncsResponse {
+  success: boolean;
+  data: ActiveSync[];
+}
+
 interface SyncLogsQueryParams {
   page: number;
   limit: number;
@@ -119,6 +132,14 @@ class SyncLogsApi {
     const response = await api.get('/sync-logs/stats', {
       params: filters,
     });
+    return response.data;
+  }
+
+  /**
+   * Get active sync operations from in-memory lock manager
+   */
+  async getActiveSyncs(): Promise<ActiveSyncsResponse> {
+    const response = await api.get('/sync/active');
     return response.data;
   }
 }

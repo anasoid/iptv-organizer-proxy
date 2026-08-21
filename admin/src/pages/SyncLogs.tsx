@@ -17,6 +17,8 @@ import {
   Card,
   CardContent,
   Typography,
+  Tab,
+  Tabs,
 } from '@mui/material';
 import { DataGrid, GridActionsCellItem } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
@@ -24,6 +26,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Delete as DeleteIcon, Visibility as ViewIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 import syncLogsApi, { SYNC_TYPES } from '../services/syncLogsApi';
 import type { SyncLog } from '../services/syncLogsApi';
+import type { ActiveSync } from '../services/syncLogsApi';
 import sourcesApi from '../services/sourcesApi';
 import type { Source } from '../services/sourcesApi';
 import { useAuthStore } from '../stores/authStore';
@@ -36,6 +39,7 @@ export default function SyncLogs() {
   const [viewLog, setViewLog] = useState<SyncLog | null>(null);
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
+  const [activeTab, setActiveTab] = useState(0);
 
   // Filters
   const [sourceIdFilter, setSourceIdFilter] = useState<number | ''>('');
@@ -57,7 +61,12 @@ export default function SyncLogs() {
   const sortOrder = sortModel[0]?.sort === 'desc' ? 'desc' : 'asc';
 
   // Fetch sync logs (only when authenticated)
-  const { data, isLoading, error, refetch } = useQuery({
+  const {
+    data,
+    isLoading: isLogsLoading,
+    error: logsError,
+    refetch: refetchLogs,
+  } = useQuery({
     queryKey: ['syncLogs', page, limit, filters, sortBy, sortOrder],
     queryFn: () => syncLogsApi.getSyncLogs(page, limit, filters, sortBy, sortOrder),
     enabled: isAuthenticated,
@@ -75,6 +84,19 @@ export default function SyncLogs() {
     queryKey: ['syncLogStats', filters],
     queryFn: () => syncLogsApi.getSyncLogStats(filters),
     enabled: isAuthenticated,
+  });
+
+  // Fetch active syncs from in-memory lock manager
+  const {
+    data: activeSyncsData,
+    isLoading: isActiveSyncsLoading,
+    error: activeSyncsError,
+    refetch: refetchActiveSyncs,
+  } = useQuery({
+    queryKey: ['activeSyncs'],
+    queryFn: () => syncLogsApi.getActiveSyncs(),
+    enabled: isAuthenticated && activeTab === 1,
+    refetchInterval: activeTab === 1 ? 5000 : false,
   });
 
   const sourcesMap = new Map(
@@ -215,7 +237,56 @@ export default function SyncLogs() {
     },
   ];
 
-  if (isLoading) {
+  const activeSyncColumns: GridColDef[] = [
+    {
+      field: 'sourceName',
+      headerName: 'Source',
+      width: 150,
+      flex: 1,
+      renderCell: (params) => getSourceDisplay(params.row.sourceId),
+    },
+    {
+      field: 'syncType',
+      headerName: 'Type',
+      width: 180,
+      renderCell: (params) => {
+        const typeObj = SYNC_TYPES.find(t => t.id === params.value);
+        return typeObj?.label || params.value;
+      },
+    },
+    {
+      field: 'threadName',
+      headerName: 'Thread',
+      width: 220,
+      renderCell: (params) => params.value || '-',
+    },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 110,
+      renderCell: () => (
+        <Chip
+          label="running"
+          color="info"
+          size="small"
+        />
+      ),
+    },
+    {
+      field: 'startTime',
+      headerName: 'Started',
+      width: 180,
+      renderCell: (params) => formatDisplayDateTime(params.value),
+    },
+    {
+      field: 'durationSeconds',
+      headerName: 'Duration',
+      width: 100,
+      renderCell: (params) => formatDuration(params.value),
+    },
+  ];
+
+  if (activeTab === 0 && isLogsLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
         <CircularProgress />
@@ -232,16 +303,26 @@ export default function SyncLogs() {
         <Button
           variant="outlined"
           startIcon={<RefreshIcon />}
-          onClick={() => refetch()}
+          onClick={() => (activeTab === 0 ? refetchLogs() : refetchActiveSyncs())}
         >
           Refresh
         </Button>
       </Box>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>Failed to load sync logs</Alert>}
+      <Tabs
+        value={activeTab}
+        onChange={(_, value: number) => setActiveTab(value)}
+        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
+      >
+        <Tab label="History Logs" />
+        <Tab label="Active (Memory)" />
+      </Tabs>
+
+      {activeTab === 0 && logsError && <Alert severity="error" sx={{ mb: 2 }}>Failed to load sync logs</Alert>}
+      {activeTab === 1 && activeSyncsError && <Alert severity="error" sx={{ mb: 2 }}>Failed to load active syncs</Alert>}
 
       {/* Statistics Cards */}
-      {stats && (
+      {activeTab === 0 && stats && (
         <Grid container spacing={2} sx={{ mb: 2 }}>
           <Grid item xs={12} sm={6} md={4}>
             <Card>
@@ -295,91 +376,107 @@ export default function SyncLogs() {
       )}
 
       {/* Filters */}
-      <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Source</InputLabel>
-          <Select
-            value={sourceIdFilter}
-            label="Source"
-            onChange={(e) => setSourceIdFilter(e.target.value as number | '')}
-          >
-            <MenuItem value="">All Sources</MenuItem>
-            {sourcesData?.data?.map((source: Source) => (
-              <MenuItem key={source.id} value={source.id}>
-                {source.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+      {activeTab === 0 && (
+        <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>Source</InputLabel>
+            <Select
+              value={sourceIdFilter}
+              label="Source"
+              onChange={(e) => setSourceIdFilter(e.target.value as number | '')}
+            >
+              <MenuItem value="">All Sources</MenuItem>
+              {sourcesData?.data?.map((source: Source) => (
+                <MenuItem key={source.id} value={source.id}>
+                  {source.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Sync Type</InputLabel>
-          <Select
-            value={syncTypeFilter}
-            label="Sync Type"
-            onChange={(e) => setSyncTypeFilter(e.target.value)}
-          >
-            <MenuItem value="">All Types</MenuItem>
-            {SYNC_TYPES.map((type) => (
-              <MenuItem key={type.id} value={type.id}>
-                {type.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>Sync Type</InputLabel>
+            <Select
+              value={syncTypeFilter}
+              label="Sync Type"
+              onChange={(e) => setSyncTypeFilter(e.target.value)}
+            >
+              <MenuItem value="">All Types</MenuItem>
+              {SYNC_TYPES.map((type) => (
+                <MenuItem key={type.id} value={type.id}>
+                  {type.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-        <FormControl size="small" sx={{ minWidth: 150 }}>
-          <InputLabel>Status</InputLabel>
-          <Select
-            value={statusFilter}
-            label="Status"
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <MenuItem value="">All Status</MenuItem>
-            <MenuItem value="running">Running</MenuItem>
-            <MenuItem value="completed">Completed</MenuItem>
-            <MenuItem value="failed">Failed</MenuItem>
-            <MenuItem value="interrupted">Interrupted</MenuItem>
-          </Select>
-        </FormControl>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={statusFilter}
+              label="Status"
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <MenuItem value="">All Status</MenuItem>
+              <MenuItem value="running">Running</MenuItem>
+              <MenuItem value="completed">Completed</MenuItem>
+              <MenuItem value="failed">Failed</MenuItem>
+              <MenuItem value="interrupted">Interrupted</MenuItem>
+            </Select>
+          </FormControl>
 
-        {(sourceIdFilter || syncTypeFilter || statusFilter) && (
-          <Button variant="outlined" onClick={handleClearFilters}>
-            Clear Filters
-          </Button>
+          {(sourceIdFilter || syncTypeFilter || statusFilter) && (
+            <Button variant="outlined" onClick={handleClearFilters}>
+              Clear Filters
+            </Button>
+          )}
+        </Box>
+      )}
+
+      <Box sx={{ flex: 1, width: '100%', minHeight: 0 }}>
+        {activeTab === 0 ? (
+          <DataGrid
+            rows={data?.data || []}
+            columns={columns}
+            pagination
+            paginationMode="server"
+            sortingMode="server"
+            rowCount={data?.pagination?.total || 0}
+            paginationModel={{ pageSize: limit, page: page - 1 }}
+            onPaginationModelChange={(model) => setPage(model.page + 1)}
+            sortModel={sortModel}
+            onSortModelChange={(newSortModel) => setSortModel(newSortModel)}
+            pageSizeOptions={[10]}
+            getRowId={(row: SyncLog) => row.id}
+            sx={{ height: '100%', width: '100%' }}
+          />
+        ) : (
+          <DataGrid
+            loading={isActiveSyncsLoading}
+            rows={activeSyncsData?.data || []}
+            columns={activeSyncColumns}
+            disableRowSelectionOnClick
+            disableColumnMenu
+            pageSizeOptions={[10]}
+            getRowId={(row: ActiveSync) => row.sourceId}
+            sx={{ height: '100%', width: '100%' }}
+          />
         )}
       </Box>
 
-      <Box sx={{ flex: 1, width: '100%', minHeight: 0 }}>
-        <DataGrid
-          rows={data?.data || []}
-          columns={columns}
-          pagination
-          paginationMode="server"
-          sortingMode="server"
-          rowCount={data?.pagination?.total || 0}
-          paginationModel={{ pageSize: limit, page: page - 1 }}
-          onPaginationModelChange={(model) => setPage(model.page + 1)}
-          sortModel={sortModel}
-          onSortModelChange={(newSortModel) => setSortModel(newSortModel)}
-          pageSizeOptions={[10]}
-          getRowId={(row: SyncLog) => row.id}
-          sx={{ height: '100%', width: '100%' }}
-        />
-      </Box>
-
       {/* View Details Dialog */}
-      <Dialog
-        open={viewLog !== null}
-        onClose={() => setViewLog(null)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Sync Log Details</DialogTitle>
-        <DialogContent>
-          {viewLog && (
-            <Box sx={{ pt: 1 }}>
-              <Grid container spacing={2}>
+      {activeTab === 0 && (
+        <Dialog
+          open={viewLog !== null}
+          onClose={() => setViewLog(null)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>Sync Log Details</DialogTitle>
+          <DialogContent>
+            {viewLog && (
+              <Box sx={{ pt: 1 }}>
+                <Grid container spacing={2}>
                 <Grid item xs={6}>
                   <Typography variant="body2" color="textSecondary">
                     ID
@@ -464,32 +561,35 @@ export default function SyncLogs() {
                     </Alert>
                   </Grid>
                 )}
-              </Grid>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setViewLog(null)}>Close</Button>
-        </DialogActions>
-      </Dialog>
+                </Grid>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setViewLog(null)}>Close</Button>
+          </DialogActions>
+        </Dialog>
+      )}
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteConfirm !== null} onClose={() => setDeleteConfirm(null)}>
-        <DialogTitle>Delete Sync Log</DialogTitle>
-        <DialogContent>
-          Are you sure you want to delete this sync log? This action cannot be undone.
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirm(null)}>Cancel</Button>
-          <Button
-            onClick={() => deleteConfirm && deleteMutation.mutate(deleteConfirm)}
-            color="error"
-            variant="contained"
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {activeTab === 0 && (
+        <Dialog open={deleteConfirm !== null} onClose={() => setDeleteConfirm(null)}>
+          <DialogTitle>Delete Sync Log</DialogTitle>
+          <DialogContent>
+            Are you sure you want to delete this sync log? This action cannot be undone.
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+            <Button
+              onClick={() => deleteConfirm && deleteMutation.mutate(deleteConfirm)}
+              color="error"
+              variant="contained"
+            >
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </Box>
   );
 }
