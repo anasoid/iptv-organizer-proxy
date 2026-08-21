@@ -28,6 +28,7 @@ public class SyncLockManager {
     private String syncType;
     private LocalDateTime startTime;
     private String threadName;
+    private Long threadId;
   }
 
   /**
@@ -45,6 +46,7 @@ public class SyncLockManager {
               .syncType(syncType)
               .startTime(LocalDateTime.now())
               .threadName(Thread.currentThread().getName())
+              .threadId(Thread.currentThread().threadId())
               .build();
 
       activeSyncs.put(sourceId, metadata);

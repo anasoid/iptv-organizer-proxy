@@ -59,6 +59,7 @@ export interface ActiveSync {
   sourceId: number;
   syncType: string;
   threadName: string;
+  threadId?: number;
   startTime: string;
   durationSeconds: number;
 }

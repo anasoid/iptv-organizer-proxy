@@ -328,6 +328,7 @@ public class SourcesController extends BaseController {
                   map.put("sourceId", metadata.getSourceId());
                   map.put("syncType", metadata.getSyncType());
                   map.put("threadName", metadata.getThreadName());
+                  map.put("threadId", metadata.getThreadId());
                   map.put("startTime", metadata.getStartTime());
                   map.put(
                       "durationSeconds",

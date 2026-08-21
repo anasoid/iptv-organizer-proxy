@@ -23,7 +23,12 @@ import {
 import { DataGrid, GridActionsCellItem } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Delete as DeleteIcon, Visibility as ViewIcon, Refresh as RefreshIcon } from '@mui/icons-material';
+import {
+  Delete as DeleteIcon,
+  Visibility as ViewIcon,
+  Refresh as RefreshIcon,
+  Subject as StackTraceIcon,
+} from '@mui/icons-material';
 import syncLogsApi, { SYNC_TYPES } from '../services/syncLogsApi';
 import type { SyncLog } from '../services/syncLogsApi';
 import type { ActiveSync } from '../services/syncLogsApi';
@@ -31,6 +36,7 @@ import sourcesApi from '../services/sourcesApi';
 import type { Source } from '../services/sourcesApi';
 import { useAuthStore } from '../stores/authStore';
 import { formatDisplayDateTime } from '../utils/dateFormat';
+import ThreadStackTraceDialog from '../components/ThreadStackTraceDialog';
 
 export default function SyncLogs() {
   const queryClient = useQueryClient();
@@ -40,6 +46,7 @@ export default function SyncLogs() {
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
   const [activeTab, setActiveTab] = useState(0);
+  const [selectedThread, setSelectedThread] = useState<{ id: number | null; name?: string | null } | null>(null);
 
   // Filters
   const [sourceIdFilter, setSourceIdFilter] = useState<number | ''>('');
@@ -283,6 +290,27 @@ export default function SyncLogs() {
       headerName: 'Duration',
       width: 100,
       renderCell: (params) => formatDuration(params.value),
+    },
+    {
+      field: 'actions',
+      type: 'actions',
+      width: 80,
+      getActions: (params) => {
+        const threadId = (params.row as ActiveSync).threadId;
+        return [
+          <GridActionsCellItem
+            key="stackTrace"
+            icon={<StackTraceIcon />}
+            label="View Stack Trace"
+            disabled={!threadId}
+            onClick={() => {
+              if (threadId) {
+                setSelectedThread({ id: threadId, name: (params.row as ActiveSync).threadName });
+              }
+            }}
+          />,
+        ];
+      },
     },
   ];
 
@@ -590,6 +618,13 @@ export default function SyncLogs() {
           </DialogActions>
         </Dialog>
       )}
+
+      <ThreadStackTraceDialog
+        open={selectedThread !== null}
+        threadId={selectedThread?.id ?? null}
+        threadName={selectedThread?.name}
+        onClose={() => setSelectedThread(null)}
+      />
     </Box>
   );
 }
