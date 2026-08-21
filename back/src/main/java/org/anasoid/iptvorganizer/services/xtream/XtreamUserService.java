@@ -499,16 +499,26 @@ public class XtreamUserService {
    *
    * @param source The source
    * @param type The stream type
-   * @param categoryId Optional category filter (not currently implemented)
+   * @param categoryId Optional category filter
    * @return Stream result with lazy Iterator of BaseStream entities
    */
   private JsonStreamResult<BaseStream> getStreamsByType(
       Source source, StreamType type, Long categoryId) {
+    Integer categoryFilter = categoryId == null ? null : Math.toIntExact(categoryId);
     final Iterator<? extends BaseStream> streamIterator =
         switch (type) {
-          case LIVE -> liveStreamService.streamBySourceId(source.getId());
-          case VOD -> vodStreamService.streamBySourceId(source.getId());
-          case SERIES -> seriesService.streamBySourceId(source.getId());
+          case LIVE ->
+              categoryFilter == null
+                  ? liveStreamService.streamBySourceId(source.getId())
+                  : liveStreamService.streamBySourceAndCategory(source.getId(), categoryFilter);
+          case VOD ->
+              categoryFilter == null
+                  ? vodStreamService.streamBySourceId(source.getId())
+                  : vodStreamService.streamBySourceAndCategory(source.getId(), categoryFilter);
+          case SERIES ->
+              categoryFilter == null
+                  ? seriesService.streamBySourceId(source.getId())
+                  : seriesService.streamBySourceAndCategory(source.getId(), categoryFilter);
         };
 
     // Return streams directly without Map conversion (controllers will convert)

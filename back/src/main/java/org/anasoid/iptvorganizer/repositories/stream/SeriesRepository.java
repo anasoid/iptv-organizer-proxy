@@ -32,7 +32,7 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
   @Override
   protected Long internalInsert(Series series) {
     String sql =
-        "INSERT INTO series (source_id, external_id, num, allow_deny, name, category_id, category_ids, is_adult, labels, data, added_date, release_date, rating, tmdb) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO series (source_id, external_id, num, allow_deny, name, category_id, category_ids, is_adult, labels, data, added_date, release_date, rating, tmdb, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setLong(1, series.getSourceId());
@@ -49,6 +49,8 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
       setLocalDate(stmt, 12, series.getReleaseDate());
       stmt.setObject(13, series.getRating());
       stmt.setObject(14, series.getTmdb());
+      stmt.setObject(15, series.getCreatedAt());
+      stmt.setObject(16, series.getUpdatedAt());
       stmt.executeUpdate();
       Long id = getGeneratedId(stmt);
       series.setId(id);
@@ -61,7 +63,7 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
   @Override
   protected void internalUpdate(Series series) {
     String sql =
-        "UPDATE series SET source_id = ?, external_id = ?, num = ?, allow_deny = ?, name = ?, category_id = ?, category_ids = ?, is_adult = ?, labels = ?, data = ?, added_date = ?, release_date = ?, rating = ?, tmdb = ? WHERE id = ?";
+        "UPDATE series SET source_id = ?, external_id = ?, num = ?, allow_deny = ?, name = ?, category_id = ?, category_ids = ?, is_adult = ?, labels = ?, data = ?, added_date = ?, release_date = ?, rating = ?, tmdb = ?, updated_at = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setLong(1, series.getSourceId());
@@ -78,7 +80,8 @@ public class SeriesRepository extends BaseStreamRepository<Series> {
       setLocalDate(stmt, 12, series.getReleaseDate());
       stmt.setObject(13, series.getRating());
       stmt.setObject(14, series.getTmdb());
-      stmt.setLong(15, series.getId());
+      stmt.setObject(15, series.getUpdatedAt());
+      stmt.setLong(16, series.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update series", e);

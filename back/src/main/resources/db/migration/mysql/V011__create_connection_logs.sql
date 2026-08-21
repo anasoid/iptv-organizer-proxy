@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS connection_logs (
     action VARCHAR(255) NOT NULL,
     ip_address VARCHAR(45) NOT NULL,
     user_agent TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
     INDEX idx_connection_logs_client_created (client_id, created_at),
     INDEX idx_connection_logs_ip_address (ip_address)

@@ -53,6 +53,11 @@ public abstract class BaseStreamService<T extends BaseStream, R extends BaseStre
     return getRepository().streamBySourceId(sourceId);
   }
 
+  /** Stream streams by source ID and category ID from database (lazy loading for O(1) memory) */
+  public Iterator<T> streamBySourceAndCategory(Long sourceId, Integer categoryId) {
+    return getRepository().streamBySourceAndCategory(sourceId, categoryId);
+  }
+
   /** Find streams by source and category from database */
   public List<T> findBySourceAndCategory(Long sourceId, Integer categoryId, int limit) {
     return getRepository().findBySourceAndCategory(sourceId, categoryId, limit);

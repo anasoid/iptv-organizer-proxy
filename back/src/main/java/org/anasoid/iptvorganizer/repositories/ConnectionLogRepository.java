@@ -21,13 +21,14 @@ public class ConnectionLogRepository extends BaseRepository<ConnectionLog> {
   @Override
   protected Long internalInsert(ConnectionLog log) {
     String sql =
-        "INSERT INTO connection_logs (client_id, action, ip_address, user_agent) VALUES (?, ?, ?, ?)";
+        "INSERT INTO connection_logs (client_id, action, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setLong(1, log.getClientId());
       stmt.setString(2, log.getAction());
       stmt.setString(3, log.getIpAddress());
       stmt.setString(4, log.getUserAgent());
+      stmt.setObject(5, log.getCreatedAt());
       stmt.executeUpdate();
       return getGeneratedId(stmt);
     } catch (SQLException e) {

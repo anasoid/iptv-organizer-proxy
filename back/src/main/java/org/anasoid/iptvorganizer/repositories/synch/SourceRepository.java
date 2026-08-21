@@ -70,7 +70,7 @@ public class SourceRepository extends BaseRepository<Source> {
   protected Long internalInsert(Source source) {
     ensureNextSync(source);
     String sql =
-        "INSERT INTO sources (name, url, username, password, sync_interval, last_sync, next_sync, is_active, proxy_id, enable_proxy, connect_xtream_api, connect_xtream_stream, connect_xmltv, black_list_filter) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO sources (name, url, username, password, sync_interval, last_sync, next_sync, is_active, proxy_id, enable_proxy, connect_xtream_api, connect_xtream_stream, connect_xmltv, black_list_filter, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setString(1, source.getName());
@@ -94,6 +94,8 @@ public class SourceRepository extends BaseRepository<Source> {
       stmt.setString(
           13, source.getConnectXmltv() != null ? source.getConnectXmltv().name() : "DEFAULT");
       stmt.setString(14, source.getBlackListFilter());
+      stmt.setObject(15, source.getCreatedAt());
+      stmt.setObject(16, source.getUpdatedAt());
       stmt.executeUpdate();
 
       // Get generated key using standard JDBC approach - works with MySQL, H2, SQLite
@@ -114,7 +116,7 @@ public class SourceRepository extends BaseRepository<Source> {
   protected void internalUpdate(Source source) {
     ensureNextSync(source);
     String sql =
-        "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, proxy_id = ?, enable_proxy = ?, connect_xtream_api = ?, connect_xtream_stream = ?, connect_xmltv = ?, black_list_filter = ? WHERE id = ?";
+        "UPDATE sources SET name = ?, url = ?, username = ?, password = ?, sync_interval = ?, last_sync = ?, next_sync = ?, is_active = ?, proxy_id = ?, enable_proxy = ?, connect_xtream_api = ?, connect_xtream_stream = ?, connect_xmltv = ?, black_list_filter = ?, updated_at = ? WHERE id = ?";
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setString(1, source.getName());
@@ -138,7 +140,8 @@ public class SourceRepository extends BaseRepository<Source> {
       stmt.setString(
           13, source.getConnectXmltv() != null ? source.getConnectXmltv().name() : "DEFAULT");
       stmt.setString(14, source.getBlackListFilter());
-      stmt.setLong(15, source.getId());
+      stmt.setObject(15, source.getUpdatedAt());
+      stmt.setLong(16, source.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException("Failed to update source", e);

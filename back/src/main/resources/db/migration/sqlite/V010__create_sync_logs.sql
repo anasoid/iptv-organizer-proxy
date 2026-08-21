@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS sync_logs (
     items_deleted INTEGER NOT NULL DEFAULT 0,
     error_message TEXT,
     duration_seconds INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE
 );
 

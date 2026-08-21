@@ -52,9 +52,9 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
       stmt.setString(9, syncLog.getErrorMessage());
       stmt.setInt(10, syncLog.getDurationSeconds() != null ? syncLog.getDurationSeconds() : 0);
       stmt.setObject(
-          11, syncLog.getCreatedAt() != null ? syncLog.getCreatedAt() : LocalDateTime.now());
+          11, syncLog.getCreatedAt() != null ? syncLog.getCreatedAt() : currentTimestamp());
       stmt.setObject(
-          12, syncLog.getUpdatedAt() != null ? syncLog.getUpdatedAt() : LocalDateTime.now());
+          12, syncLog.getUpdatedAt() != null ? syncLog.getUpdatedAt() : currentTimestamp());
       stmt.executeUpdate();
 
       // Get generated key using standard JDBC approach - works with MySQL, H2, SQLite
@@ -88,7 +88,7 @@ public class SyncLogRepository extends BaseRepository<SyncLog> {
       stmt.setString(9, syncLog.getErrorMessage());
       stmt.setInt(10, syncLog.getDurationSeconds() != null ? syncLog.getDurationSeconds() : 0);
       stmt.setObject(
-          11, syncLog.getUpdatedAt() != null ? syncLog.getUpdatedAt() : LocalDateTime.now());
+          11, syncLog.getUpdatedAt() != null ? syncLog.getUpdatedAt() : currentTimestamp());
       stmt.setLong(12, syncLog.getId());
       stmt.executeUpdate();
     } catch (SQLException e) {

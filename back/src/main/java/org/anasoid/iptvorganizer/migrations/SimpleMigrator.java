@@ -49,12 +49,14 @@ public class SimpleMigrator {
   }
 
   public void startMigrations() {
+    long startNanos = System.nanoTime();
     log.info("Starting database migrations for: " + dbKind);
     try {
       runMigrations();
       migrationDone = true;
+      log.info("Database migrations finished in {} ms", elapsedMillis(startNanos));
     } catch (Exception e) {
-      log.error("Migration failed", e);
+      log.error("Database migrations failed after {} ms", elapsedMillis(startNanos), e);
       throw new RuntimeException("Database migration failed", e);
     }
   }
@@ -62,23 +64,46 @@ public class SimpleMigrator {
   private void runMigrations() throws Exception {
     ensureSchemaVersionTable();
     List<String> appliedVersions = getAppliedMigrations();
-
-    List<String> pendingMigrations = new ArrayList<>();
+    int executedMigrations = 0;
+    int skippedMigrations = 0;
     for (String migration : MIGRATIONS) {
+      long checkStartNanos = System.nanoTime();
       String version = getVersion(migration);
-      if (!appliedVersions.contains(version)) {
-        pendingMigrations.add(migration);
+      if (appliedVersions.contains(version)) {
+        skippedMigrations++;
+        log.info(
+            "Skipping migration file {} (version={}) in {} ms: already applied",
+            migration,
+            version,
+            elapsedMillis(checkStartNanos));
+        continue;
+      }
+
+      long executionStartNanos = System.nanoTime();
+      try {
+        applyMigration(migration);
+        executedMigrations++;
+        log.info(
+            "Executed migration file {} (version={}) in {} ms",
+            migration,
+            version,
+            elapsedMillis(executionStartNanos));
+      } catch (Exception e) {
+        log.error(
+            "Migration file {} failed after {} ms",
+            migration,
+            elapsedMillis(executionStartNanos),
+            e);
+        throw e;
       }
     }
 
-    if (pendingMigrations.isEmpty()) {
+    if (executedMigrations == 0) {
       log.info("No pending migrations");
-      return;
     }
 
-    for (String migration : pendingMigrations) {
-      applyMigration(migration);
-    }
+    log.info(
+        "Migration scan completed: executed={}, skipped={}", executedMigrations, skippedMigrations);
   }
 
   private void ensureSchemaVersionTable() throws Exception {
@@ -91,7 +116,7 @@ public class SimpleMigrator {
               version TEXT NOT NULL UNIQUE,
               description TEXT,
               checksum TEXT NOT NULL,
-              applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              applied_at TIMESTAMP
           )
           """;
     } else {
@@ -103,7 +128,7 @@ public class SimpleMigrator {
               version VARCHAR(255) NOT NULL UNIQUE,
               description VARCHAR(500),
               checksum VARCHAR(32) NOT NULL,
-              applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              applied_at TIMESTAMP,
               INDEX idx_version (version)
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
           """;
@@ -154,11 +179,12 @@ public class SimpleMigrator {
 
         // Record migration in schema_version
         String insertSql =
-            "INSERT INTO schema_version (version, description, checksum) VALUES (?, ?, ?)";
+            "INSERT INTO schema_version (version, description, checksum, applied_at) VALUES (?, ?, ?, ?)";
         try (PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
           pstmt.setString(1, version);
           pstmt.setString(2, description);
           pstmt.setString(3, checksum);
+          pstmt.setTimestamp(4, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
           pstmt.executeUpdate();
         }
 
@@ -169,6 +195,10 @@ public class SimpleMigrator {
         throw e;
       }
     }
+  }
+
+  private long elapsedMillis(long startNanos) {
+    return (System.nanoTime() - startNanos) / 1_000_000L;
   }
 
   private String loadSqlFile(String filename) {
