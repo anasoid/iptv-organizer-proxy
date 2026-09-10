@@ -74,6 +74,34 @@ export interface ThreadInfo {
   priority: number;
 }
 
+export interface ThreadDumpResponse {
+  blob: Blob;
+  filename: string;
+}
+
+export interface ThreadStackTraceResponse {
+  threadId: number;
+  name: string;
+  state: string;
+  daemon: boolean;
+  priority: number;
+  cpuTimeMs: number;
+  userTimeMs: number;
+  blockedCount: number;
+  blockedTimeMs: number;
+  waitedCount: number;
+  waitedTimeMs: number;
+  lockName?: string | null;
+  lockOwnerId?: number | null;
+  lockOwnerName?: string | null;
+  suspended: boolean;
+  inNative: boolean;
+  deadlocked: boolean;
+  lockedMonitors: string[];
+  lockedSynchronizers: string[];
+  stackTrace: string[];
+}
+
 /**
  * Format a JS Date as an ISO-8601 timestamp with timezone (UTC "Z").
  * The backend accepts offset timestamps and converts them to server-local
@@ -106,8 +134,36 @@ class JvmMetricsApi {
     const response = await api.get<{ data: ThreadInfo[] }>('/jvm/metrics/threads');
     return response.data.data;
   }
+
+  async getThreadDump(): Promise<ThreadDumpResponse> {
+    const response = await api.get<Blob>('/jvm/metrics/thread-dump', { responseType: 'blob' });
+    return {
+      blob: response.data,
+      filename:
+        parseFileNameFromContentDisposition(response.headers['content-disposition']) ??
+        `thread-dump-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`,
+    };
+  }
+
+  async getThreadStackTrace(threadId: number): Promise<ThreadStackTraceResponse> {
+    const response = await api.get<{ data: ThreadStackTraceResponse }>(
+      `/jvm/metrics/threads/${threadId}/stack-trace`,
+    );
+    return response.data.data;
+  }
+}
+
+function parseFileNameFromContentDisposition(header?: string): string | null {
+  if (!header) {
+    return null;
+  }
+  const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+  const simpleMatch = header.match(/filename="?([^";]+)"?/i);
+  return simpleMatch?.[1] ?? null;
 }
 
 export const jvmMetricsApi = new JvmMetricsApi();
 export default jvmMetricsApi;
-

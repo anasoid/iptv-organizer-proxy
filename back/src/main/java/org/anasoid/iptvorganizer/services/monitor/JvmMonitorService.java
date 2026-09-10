@@ -19,8 +19,10 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -28,6 +30,7 @@ import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.anasoid.iptvorganizer.models.monitor.JvmMetricsEntry;
 import org.anasoid.iptvorganizer.models.monitor.ThreadInfo;
+import org.anasoid.iptvorganizer.models.monitor.ThreadStackTraceDetails;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
@@ -204,6 +207,200 @@ public class JvmMonitorService {
     }
     result.sort(Comparator.comparing(ThreadInfo::getName));
     return result;
+  }
+
+  /** Builds a plain-text JVM thread dump from the current live thread snapshot. */
+  public String getThreadDump() {
+    List<Thread> threads =
+        safeCall(
+            "thread dump snapshot",
+            () -> new ArrayList<>(Thread.getAllStackTraces().keySet()),
+            List.of());
+    threads.sort(Comparator.comparing(Thread::getName));
+    StringBuilder dump = new StringBuilder(32 * 1024);
+    dump.append("Generated at: ").append(LocalDateTime.now()).append(System.lineSeparator());
+    dump.append(System.lineSeparator());
+    for (Thread thread : threads) {
+      if (thread == null) {
+        continue;
+      }
+      dump.append('"')
+          .append(thread.getName())
+          .append('"')
+          .append(" #")
+          .append(thread.threadId())
+          .append(" prio=")
+          .append(thread.getPriority())
+          .append(thread.isDaemon() ? " daemon" : "")
+          .append(" state=")
+          .append(thread.getState())
+          .append(System.lineSeparator());
+      StackTraceElement[] stackTrace =
+          safeCall("thread stack trace", thread::getStackTrace, new StackTraceElement[0]);
+      for (StackTraceElement frame : stackTrace) {
+        dump.append("\tat ").append(frame).append(System.lineSeparator());
+      }
+      dump.append(System.lineSeparator());
+    }
+    return dump.toString();
+  }
+
+  /** Returns detailed thread diagnostics for a single thread id from the current JVM snapshot. */
+  public Optional<ThreadStackTraceDetails> getThreadStackTraceDetails(long threadId) {
+    if (threadId <= 0) {
+      return Optional.empty();
+    }
+
+    List<Thread> threads =
+        safeCall(
+            "thread snapshot",
+            () -> new ArrayList<>(Thread.getAllStackTraces().keySet()),
+            List.of());
+    Thread targetThread = null;
+    for (Thread thread : threads) {
+      if (thread != null && thread.threadId() == threadId) {
+        targetThread = thread;
+        break;
+      }
+    }
+    if (targetThread == null) {
+      return Optional.empty();
+    }
+
+    StackTraceElement[] stackTrace =
+        safeCall("thread stack trace", targetThread::getStackTrace, new StackTraceElement[0]);
+    List<String> stackTraceLines = new ArrayList<>(stackTrace.length);
+    for (StackTraceElement frame : stackTrace) {
+      stackTraceLines.add("at " + frame);
+    }
+
+    ThreadMXBean threadBean = safeCall("thread bean", ManagementFactory::getThreadMXBean, null);
+    java.lang.management.ThreadInfo detailedInfo = null;
+    long cpuTimeMs = -1L;
+    long userTimeMs = -1L;
+    boolean deadlocked = false;
+    List<String> lockedMonitors = List.of();
+    List<String> lockedSynchronizers = List.of();
+
+    if (threadBean != null) {
+      boolean contentionSupported =
+          safeCall(
+              "thread contention monitoring supported",
+              threadBean::isThreadContentionMonitoringSupported,
+              false);
+      if (contentionSupported
+          && !safeCall(
+              "thread contention monitoring enabled",
+              threadBean::isThreadContentionMonitoringEnabled,
+              false)) {
+        safeCall(
+            "enable thread contention monitoring",
+            () -> {
+              threadBean.setThreadContentionMonitoringEnabled(true);
+              return true;
+            },
+            false);
+      }
+
+      java.lang.management.ThreadInfo[] detailedInfos =
+          safeCall(
+              "thread detail info",
+              () -> threadBean.getThreadInfo(new long[] {threadId}, true, true),
+              null);
+      if (detailedInfos != null && detailedInfos.length > 0) {
+        detailedInfo = detailedInfos[0];
+      }
+
+      boolean cpuTimeSupported =
+          safeCall("thread cpu time supported", threadBean::isThreadCpuTimeSupported, false);
+      if (cpuTimeSupported) {
+        if (!safeCall("thread cpu time enabled", threadBean::isThreadCpuTimeEnabled, false)) {
+          safeCall(
+              "enable thread cpu time",
+              () -> {
+                threadBean.setThreadCpuTimeEnabled(true);
+                return true;
+              },
+              false);
+        }
+        long cpuTimeNs =
+            safeCall("thread cpu time", () -> threadBean.getThreadCpuTime(threadId), -1L);
+        long userTimeNs =
+            safeCall("thread user time", () -> threadBean.getThreadUserTime(threadId), -1L);
+        cpuTimeMs = cpuTimeNs >= 0 ? cpuTimeNs / 1_000_000L : -1L;
+        userTimeMs = userTimeNs >= 0 ? userTimeNs / 1_000_000L : -1L;
+      }
+
+      long[] deadlockedThreadIds =
+          safeCall("deadlocked threads", threadBean::findDeadlockedThreads, null);
+      if (deadlockedThreadIds != null) {
+        for (long id : deadlockedThreadIds) {
+          if (id == threadId) {
+            deadlocked = true;
+            break;
+          }
+        }
+      }
+    }
+
+    long blockedCount = -1L;
+    long blockedTimeMs = -1L;
+    long waitedCount = -1L;
+    long waitedTimeMs = -1L;
+    String lockName = null;
+    Long lockOwnerId = null;
+    String lockOwnerName = null;
+    boolean suspended = false;
+    boolean inNative = false;
+
+    if (detailedInfo != null) {
+      blockedCount = detailedInfo.getBlockedCount();
+      blockedTimeMs = detailedInfo.getBlockedTime();
+      waitedCount = detailedInfo.getWaitedCount();
+      waitedTimeMs = detailedInfo.getWaitedTime();
+      lockName = detailedInfo.getLockName();
+      if (detailedInfo.getLockOwnerId() >= 0) {
+        lockOwnerId = detailedInfo.getLockOwnerId();
+      }
+      lockOwnerName = detailedInfo.getLockOwnerName();
+      suspended = detailedInfo.isSuspended();
+      inNative = detailedInfo.isInNative();
+      lockedMonitors =
+          Arrays.stream(detailedInfo.getLockedMonitors()).map(Object::toString).toList();
+      lockedSynchronizers =
+          Arrays.stream(detailedInfo.getLockedSynchronizers()).map(Object::toString).toList();
+    }
+
+    return Optional.of(
+        ThreadStackTraceDetails.builder()
+            .threadId(threadId)
+            .name(targetThread.getName())
+            .state(targetThread.getState().name())
+            .daemon(targetThread.isDaemon())
+            .priority(targetThread.getPriority())
+            .cpuTimeMs(cpuTimeMs)
+            .userTimeMs(userTimeMs)
+            .blockedCount(blockedCount)
+            .blockedTimeMs(blockedTimeMs)
+            .waitedCount(waitedCount)
+            .waitedTimeMs(waitedTimeMs)
+            .lockName(lockName)
+            .lockOwnerId(lockOwnerId)
+            .lockOwnerName(lockOwnerName)
+            .suspended(suspended)
+            .inNative(inNative)
+            .deadlocked(deadlocked)
+            .lockedMonitors(lockedMonitors)
+            .lockedSynchronizers(lockedSynchronizers)
+            .stackTrace(stackTraceLines)
+            .build());
+  }
+
+  /** Returns only stack-trace lines for compatibility with existing callers. */
+  public List<String> getThreadStackTrace(long threadId) {
+    return getThreadStackTraceDetails(threadId)
+        .map(ThreadStackTraceDetails::getStackTrace)
+        .orElse(List.of());
   }
 
   private List<ThreadInfo> getThreadsFromThreadApi() {

@@ -1,7 +1,11 @@
-import { useState, useCallback } from 'react';import { useQuery } from '@tanstack/react-query';
+import { useState, useCallback } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Box,
+  Button,
   Paper,
+  Tab,
+  Tabs,
   Typography,
   ToggleButton,
   ToggleButtonGroup,
@@ -20,7 +24,11 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
-import { Refresh as RefreshIcon } from '@mui/icons-material';
+import {
+  Download as DownloadIcon,
+  Refresh as RefreshIcon,
+  Subject as StackTraceIcon,
+} from '@mui/icons-material';
 import {
   LineChart,
   Line,
@@ -32,6 +40,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import jvmMetricsApi, { type JvmMetricsEntry, type ThreadInfo } from '../services/jvmMetricsApi';
+import ThreadStackTraceDialog from '../components/ThreadStackTraceDialog';
 // ---------------------------------------------------------------------------
 // Time range helpers
 // ---------------------------------------------------------------------------
@@ -87,8 +96,9 @@ interface ThreadTableProps {
   isLoading: boolean;
   error: unknown;
   onRefresh: () => void;
+  onShowStackTrace: (thread: ThreadInfo) => void;
 }
-function ThreadTable({ threads, isLoading, error, onRefresh }: ThreadTableProps) {
+function ThreadTable({ threads, isLoading, error, onRefresh, onShowStackTrace }: ThreadTableProps) {
   return (
     <Paper sx={{ p: 2, mt: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
@@ -121,12 +131,13 @@ function ThreadTable({ threads, isLoading, error, onRefresh }: ThreadTableProps)
                 <TableCell>State</TableCell>
                 <TableCell>Daemon</TableCell>
                 <TableCell align="right">Priority</TableCell>
+                <TableCell align="center">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {threads.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ color: 'text.secondary' }}>
+                  <TableCell colSpan={6} align="center" sx={{ color: 'text.secondary' }}>
                     No thread data available.
                   </TableCell>
                 </TableRow>
@@ -155,6 +166,13 @@ function ThreadTable({ threads, isLoading, error, onRefresh }: ThreadTableProps)
                       )}
                     </TableCell>
                     <TableCell align="right">{t.priority}</TableCell>
+                    <TableCell align="center">
+                      <Tooltip title="View stack trace">
+                        <IconButton size="small" onClick={() => onShowStackTrace(t)}>
+                          <StackTraceIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -273,10 +291,13 @@ function MetricChart({
 // Main page
 // ---------------------------------------------------------------------------
 export default function JvmMetrics() {
+  const [activeTab, setActiveTab] = useState<'metrics' | 'threads'>('metrics');
   const [rangeMinutes, setRangeMinutes] = useState(60);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshSeed, setRefreshSeed] = useState(0);
   const [threadRefreshSeed, setThreadRefreshSeed] = useState(0);
+  const [threadDumpError, setThreadDumpError] = useState<string | null>(null);
+  const [selectedThread, setSelectedThread] = useState<ThreadInfo | null>(null);
   const fetchMetrics = useCallback(() => {
     const end = new Date();
     const start = new Date(end.getTime() - rangeMinutes * 60 * 1000);
@@ -285,7 +306,8 @@ export default function JvmMetrics() {
   const { data: raw, isLoading, error } = useQuery({
     queryKey: ['jvmMetrics', rangeMinutes, refreshSeed],
     queryFn: fetchMetrics,
-    refetchInterval: autoRefresh ? 60_000 : false,
+    enabled: activeTab === 'metrics',
+    refetchInterval: autoRefresh && activeTab === 'metrics' ? 60_000 : false,
   });
   const {
     data: threads = [],
@@ -294,9 +316,29 @@ export default function JvmMetrics() {
   } = useQuery({
     queryKey: ['jvmThreads', threadRefreshSeed],
     queryFn: () => jvmMetricsApi.getThreads(),
-    refetchInterval: autoRefresh ? 60_000 : false,
+    enabled: activeTab === 'threads',
+    refetchInterval: autoRefresh && activeTab === 'threads' ? 60_000 : false,
   });
   const entries: JvmMetricsEntry[] = raw ?? [];
+  const threadDumpMutation = useMutation({
+    mutationFn: () => jvmMetricsApi.getThreadDump(),
+    onSuccess: ({ blob, filename }) => {
+      setThreadDumpError(null);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+    },
+    onError: (error: unknown) => {
+      setThreadDumpError(
+        error instanceof Error ? error.message : 'Failed to download thread dump.',
+      );
+    },
+  });
   // Transform entries into chart-ready rows
   const chartData = entries.map((m) => ({
     _label: fmtTimestamp(m.timestamp, rangeMinutes),
@@ -357,189 +399,235 @@ export default function JvmMetrics() {
             label={<Typography variant="body2">Auto-refresh (1 min)</Typography>}
           />
           <Tooltip title="Refresh now">
-            <IconButton size="small" onClick={() => { setRefreshSeed((s) => s + 1); setThreadRefreshSeed((s) => s + 1); }}>
+            <IconButton
+              size="small"
+              onClick={() =>
+                activeTab === 'metrics'
+                  ? setRefreshSeed((s) => s + 1)
+                  : setThreadRefreshSeed((s) => s + 1)
+              }
+            >
               <RefreshIcon />
             </IconButton>
           </Tooltip>
         </Box>
       </Box>
-      {/* ── Time range selector ─────────────────────────────────────────── */}
-      <Box sx={{ mb: 2 }}>
-        <ToggleButtonGroup
-          value={rangeMinutes}
-          exclusive
-          onChange={(_, v) => v != null && setRangeMinutes(v)}
-          size="small"
-        >
-          {TIME_RANGES.map((r) => (
-            <ToggleButton key={r.minutes} value={r.minutes}>
-              {r.label}
-            </ToggleButton>
-          ))}
-        </ToggleButtonGroup>
-      </Box>
-      {/* ── Loading / error states ──────────────────────────────────────── */}
-      {isLoading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-          <CircularProgress />
-        </Box>
-      )}
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          Failed to load JVM metrics.
-        </Alert>
-      )}
-      {/* ── Summary chips ───────────────────────────────────────────────── */}
-      {latest && (
-        <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-          <Chip
-            label={`Heap: ${latest.heapUsedMb} / ${latest.heapMaxMb > 0 ? latest.heapMaxMb : '?'} MB`}
-            color="primary"
-            variant="outlined"
-            size="small"
-          />
-          {latest.processRssMb >= 0 && (
-            <Chip
-              label={`RSS: ${latest.processRssMb} MB`}
-              color="warning"
-              variant="outlined"
+      <Tabs
+        value={activeTab}
+        onChange={(_, value: 'metrics' | 'threads') => setActiveTab(value)}
+        sx={{ mb: 2 }}
+      >
+        <Tab label="Metrics" value="metrics" />
+        <Tab label="Threads" value="threads" />
+      </Tabs>
+
+      {activeTab === 'metrics' ? (
+        <>
+          {/* ── Time range selector ─────────────────────────────────────────── */}
+          <Box sx={{ mb: 2 }}>
+            <ToggleButtonGroup
+              value={rangeMinutes}
+              exclusive
+              onChange={(_, v) => v != null && setRangeMinutes(v)}
               size="small"
-            />
+            >
+              {TIME_RANGES.map((r) => (
+                <ToggleButton key={r.minutes} value={r.minutes}>
+                  {r.label}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Box>
+          {/* ── Loading / error states ──────────────────────────────────────── */}
+          {isLoading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+              <CircularProgress />
+            </Box>
           )}
-          <Chip
-            label={`CPU: ${pct(latest.processCpuLoad)}`}
-            color="secondary"
-            variant="outlined"
-            size="small"
-          />
-          <Chip
-            label={`Threads: ${latest.threadCount}`}
-            variant="outlined"
-            size="small"
-          />
-          <Chip
-            label={`Uptime: ${fmtUptime(latest.jvmUptimeSeconds)}`}
-            variant="outlined"
-            size="small"
-          />
-          {latest.dbSizeMb >= 0 && (
-            <Chip
-              label={`DB: ${latest.dbSizeMb} MB`}
-              color="success"
-              variant="outlined"
-              size="small"
-            />
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              Failed to load JVM metrics.
+            </Alert>
           )}
-        </Box>
+          {/* ── Summary chips ───────────────────────────────────────────────── */}
+          {latest && (
+            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+              <Chip
+                label={`Heap: ${latest.heapUsedMb} / ${latest.heapMaxMb > 0 ? latest.heapMaxMb : '?'} MB`}
+                color="primary"
+                variant="outlined"
+                size="small"
+              />
+              {latest.processRssMb >= 0 && (
+                <Chip
+                  label={`RSS: ${latest.processRssMb} MB`}
+                  color="warning"
+                  variant="outlined"
+                  size="small"
+                />
+              )}
+              <Chip
+                label={`CPU: ${pct(latest.processCpuLoad)}`}
+                color="secondary"
+                variant="outlined"
+                size="small"
+              />
+              <Chip
+                label={`Threads: ${latest.threadCount}`}
+                variant="outlined"
+                size="small"
+              />
+              <Chip
+                label={`Uptime: ${fmtUptime(latest.jvmUptimeSeconds)}`}
+                variant="outlined"
+                size="small"
+              />
+              {latest.dbSizeMb >= 0 && (
+                <Chip
+                  label={`DB: ${latest.dbSizeMb} MB`}
+                  color="success"
+                  variant="outlined"
+                  size="small"
+                />
+              )}
+            </Box>
+          )}
+          {/* ── Charts grid ─────────────────────────────────────────────────── */}
+          {!isLoading && (
+            <Grid container spacing={2}>
+              {/* 1 – Heap memory */}
+              <Grid size={{ xs: 12, md: 6 }}>
+                <MetricChart
+                  title="Heap Memory (MB)"
+                  data={chartData}
+                  lines={[
+                    { key: 'heapUsed', name: 'Used', color: '#f44336' },
+                    { key: 'heapCommitted', name: 'Committed', color: '#ff9800' },
+                    { key: 'heapMax', name: 'Max', color: '#9e9e9e' },
+                  ]}
+                  yFormatter={mb}
+                />
+              </Grid>
+              {/* 2 – Non-heap / Metaspace / Direct buffers */}
+              <Grid size={{ xs: 12, md: 6 }}>
+                <MetricChart
+                  title="Non-Heap Memory (MB)"
+                  data={chartData}
+                  lines={[
+                    { key: 'nonHeapUsed', name: 'Non-Heap Used', color: '#9c27b0' },
+                    { key: 'metaspace', name: 'Metaspace', color: '#e91e63' },
+                    { key: 'directBuffer', name: 'Direct Buffers', color: '#00bcd4' },
+                  ]}
+                  yFormatter={mb}
+                />
+              </Grid>
+              {/* 3 – CPU */}
+              <Grid size={{ xs: 12, md: 6 }}>
+                <MetricChart
+                  title="CPU Load (%)"
+                  data={chartData}
+                  lines={[
+                    { key: 'processCpu', name: 'Process CPU', color: '#2196f3' },
+                    { key: 'systemCpu', name: 'System CPU', color: '#009688' },
+                  ]}
+                  yFormatter={fmtPct}
+                />
+              </Grid>
+              {/* 4 – Process RSS / VSZ */}
+              <Grid size={{ xs: 12, md: 6 }}>
+                <MetricChart
+                  title="Process Memory (MB)"
+                  data={chartData}
+                  lines={[
+                    { key: 'rss', name: 'RSS (actual, matches top/ps)', color: '#f44336' },
+                    { key: 'virtualMem', name: 'VSZ (virtual)', color: '#bdbdbd' },
+                  ]}
+                  yFormatter={mb}
+                  defaultHiddenKeys={['virtualMem']}
+                />
+              </Grid>
+              {/* 5 – Host memory */}
+              <Grid size={{ xs: 12, md: 6 }}>
+                <MetricChart
+                  title="Host Memory (MB)"
+                  data={chartData}
+                  lines={[
+                    { key: 'memAvailable', name: 'Available (incl. cache)', color: '#4caf50' },
+                    { key: 'freePhysical', name: 'MemFree (excl. cache)', color: '#bdbdbd' },
+                  ]}
+                  yFormatter={mb}
+                />
+              </Grid>
+              {/* 6 – Threads */}
+              <Grid size={{ xs: 12, md: 6 }}>
+                <MetricChart
+                  title="Threads"
+                  data={chartData}
+                  lines={[
+                    { key: 'threads', name: 'Live', color: '#3f51b5' },
+                    { key: 'peakThreads', name: 'Peak', color: '#f44336' },
+                    { key: 'daemonThreads', name: 'Daemon', color: '#009688' },
+                  ]}
+                />
+              </Grid>
+              {/* 7 – GC */}
+              <Grid size={{ xs: 12, md: 6 }}>
+                <MetricChart
+                  title="GC Activity (per minute)"
+                  data={chartData}
+                  lines={[
+                    { key: 'gcTime', name: 'GC pause time/min (ms)', color: '#ff5722' },
+                    { key: 'gcCount', name: 'GC collections/min', color: '#795548' },
+                  ]}
+                />
+              </Grid>
+              {/* 8 – Database size */}
+              <Grid size={{ xs: 12, md: 6 }}>
+                <MetricChart
+                  title="Database Size (MB)"
+                  data={chartData}
+                  lines={[
+                    { key: 'dbSize', name: 'DB Size', color: '#43a047' },
+                  ]}
+                  yFormatter={mb}
+                />
+              </Grid>
+            </Grid>
+          )}
+        </>
+      ) : (
+        <>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+            <Button
+              variant="contained"
+              startIcon={threadDumpMutation.isPending ? <CircularProgress size={18} /> : <DownloadIcon />}
+              onClick={() => threadDumpMutation.mutate()}
+              disabled={threadDumpMutation.isPending}
+            >
+              Download Thread Dump
+            </Button>
+          </Box>
+          {threadDumpError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {threadDumpError}
+            </Alert>
+          )}
+          <ThreadTable
+            threads={threads}
+            isLoading={threadsLoading}
+            error={threadsError}
+            onRefresh={() => setThreadRefreshSeed((s) => s + 1)}
+            onShowStackTrace={(thread) => {
+              setSelectedThread(thread);
+            }}
+          />
+        </>
       )}
-      {/* ── Charts grid ─────────────────────────────────────────────────── */}
-      {!isLoading && (
-        <Grid container spacing={2}>
-          {/* 1 – Heap memory */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <MetricChart
-              title="Heap Memory (MB)"
-              data={chartData}
-              lines={[
-                { key: 'heapUsed', name: 'Used', color: '#f44336' },
-                { key: 'heapCommitted', name: 'Committed', color: '#ff9800' },
-                { key: 'heapMax', name: 'Max', color: '#9e9e9e' },
-              ]}
-              yFormatter={mb}
-            />
-          </Grid>
-          {/* 2 – Non-heap / Metaspace / Direct buffers */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <MetricChart
-              title="Non-Heap Memory (MB)"
-              data={chartData}
-              lines={[
-                { key: 'nonHeapUsed', name: 'Non-Heap Used', color: '#9c27b0' },
-                { key: 'metaspace', name: 'Metaspace', color: '#e91e63' },
-                { key: 'directBuffer', name: 'Direct Buffers', color: '#00bcd4' },
-              ]}
-              yFormatter={mb}
-            />
-          </Grid>
-          {/* 3 – CPU */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <MetricChart
-              title="CPU Load (%)"
-              data={chartData}
-              lines={[
-                { key: 'processCpu', name: 'Process CPU', color: '#2196f3' },
-                { key: 'systemCpu', name: 'System CPU', color: '#009688' },
-              ]}
-              yFormatter={fmtPct}
-            />
-          </Grid>
-          {/* 4 – Process RSS / VSZ */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <MetricChart
-              title="Process Memory (MB)"
-              data={chartData}
-              lines={[
-                { key: 'rss', name: 'RSS (actual, matches top/ps)', color: '#f44336' },
-                { key: 'virtualMem', name: 'VSZ (virtual)', color: '#bdbdbd' },
-              ]}
-              yFormatter={mb}
-              defaultHiddenKeys={['virtualMem']}
-            />
-          </Grid>
-          {/* 5 – Host memory */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <MetricChart
-              title="Host Memory (MB)"
-              data={chartData}
-              lines={[
-                { key: 'memAvailable', name: 'Available (incl. cache)', color: '#4caf50' },
-                { key: 'freePhysical', name: 'MemFree (excl. cache)', color: '#bdbdbd' },
-              ]}
-              yFormatter={mb}
-            />
-          </Grid>
-          {/* 6 – Threads */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <MetricChart
-              title="Threads"
-              data={chartData}
-              lines={[
-                { key: 'threads', name: 'Live', color: '#3f51b5' },
-                { key: 'peakThreads', name: 'Peak', color: '#f44336' },
-                { key: 'daemonThreads', name: 'Daemon', color: '#009688' },
-              ]}
-            />
-          </Grid>
-          {/* 7 – GC */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <MetricChart
-              title="GC Activity (per minute)"
-              data={chartData}
-              lines={[
-                { key: 'gcTime', name: 'GC pause time/min (ms)', color: '#ff5722' },
-                { key: 'gcCount', name: 'GC collections/min', color: '#795548' },
-              ]}
-            />
-          </Grid>
-          {/* 8 – Database size */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <MetricChart
-              title="Database Size (MB)"
-              data={chartData}
-              lines={[
-                { key: 'dbSize', name: 'DB Size', color: '#43a047' },
-              ]}
-              yFormatter={mb}
-            />
-          </Grid>
-        </Grid>
-      )}
-      {/* ── Thread list ─────────────────────────────────────────────────── */}
-      <ThreadTable
-        threads={threads}
-        isLoading={threadsLoading}
-        error={threadsError}
-        onRefresh={() => setThreadRefreshSeed((s) => s + 1)}
+      <ThreadStackTraceDialog
+        open={selectedThread !== null}
+        threadId={selectedThread?.id ?? null}
+        threadName={selectedThread?.name}
+        onClose={() => setSelectedThread(null)}
       />
     </Box>
   );

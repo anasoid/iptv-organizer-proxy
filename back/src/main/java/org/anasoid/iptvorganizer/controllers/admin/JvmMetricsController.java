@@ -3,6 +3,7 @@ package org.anasoid.iptvorganizer.controllers.admin;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
@@ -10,6 +11,7 @@ import jakarta.ws.rs.core.Response;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
@@ -77,6 +79,32 @@ public class JvmMetricsController extends BaseController {
     List<ThreadInfo> threads = jvmMonitorService.getThreads();
     log.debug("JVM threads request: returned={}", threads.size());
     return ResponseUtils.ok(threads);
+  }
+
+  /** Returns stack trace for a single thread id from the current JVM snapshot. */
+  @GET
+  @Path("/threads/{threadId}/stack-trace")
+  public Response getThreadStackTrace(@PathParam("threadId") long threadId) {
+    var details = jvmMonitorService.getThreadStackTraceDetails(threadId);
+    if (details.isEmpty()) {
+      return ResponseUtils.notFound("Thread not found: " + threadId);
+    }
+    return ResponseUtils.ok(details.get());
+  }
+
+  /** Downloads a point-in-time thread dump as plain text. */
+  @GET
+  @Path("/thread-dump")
+  @Produces(MediaType.TEXT_PLAIN)
+  public Response downloadThreadDump() {
+    String threadDump = jvmMonitorService.getThreadDump();
+    String fileName =
+        "thread-dump-"
+            + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+            + ".txt";
+    return Response.ok(threadDump, MediaType.TEXT_PLAIN_TYPE)
+        .header("Content-Disposition", "attachment; filename=\"" + fileName + "\"")
+        .build();
   }
 
   private LocalDateTime parseQueryDateTime(String value) {
